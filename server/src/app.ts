@@ -3,6 +3,7 @@ import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
 import { dataDeletionRouter } from "./routes/dataDeletion.js";
 import { webhooksRouter } from "./routes/webhooks.js";
+import { authRouter } from "./routes/auth.js";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -33,6 +34,7 @@ export function createApp() {
   app.use(legalRouter);
   app.use(dataDeletionRouter);
   app.use(webhooksRouter);
+  app.use(authRouter);
 
   return app;
 }

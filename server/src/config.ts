@@ -1,3 +1,5 @@
+import { loadKeyring } from "./lib/tokenVault.js";
+
 // Getters, not a frozen object: read live so tests (and anything else that
 // sets process.env after this module first loads) see the current value.
 export const config = {
@@ -13,6 +15,17 @@ export const config = {
   },
   get metaWebhookVerifyToken() {
     return process.env.META_WEBHOOK_VERIFY_TOKEN ?? "";
+  },
+  get instagramClientId() {
+    return process.env.INSTAGRAM_CLIENT_ID ?? "";
+  },
+  get instagramRedirectUri() {
+    return process.env.INSTAGRAM_REDIRECT_URI ?? "";
+  },
+  // Token vault keyring (see lib/tokenVault.ts) — re-parsed on every access
+  // rather than cached, matching the live-read pattern above.
+  get tokenKeyring() {
+    return loadKeyring(process.env.TOKEN_ENCRYPTION_KEYS);
   },
 };
 

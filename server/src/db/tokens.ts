@@ -22,8 +22,59 @@ export async function upsertToken(
      do update set encrypted_token = excluded.encrypted_token,
                     key_version = excluded.key_version,
                     expires_at = excluded.expires_at,
+                    status = 'healthy',
+                    last_error = null,
+                    last_checked_at = now(),
                     updated_at = now()`,
     [params.tenantId, params.instagramAccountId, ciphertext, keyVersion, params.expiresAt ?? null],
+  );
+}
+
+export interface TokenHealthRow {
+  tenantId: string;
+  instagramAccountId: string;
+  expiresAt: Date | null;
+  status: "healthy" | "error";
+}
+
+/**
+ * Tokens due for a refresh attempt (Account Health Monitoring). A
+ * long-lived token can only be refreshed once it's at least 24h old, so
+ * this only ever returns tokens both nearing expiry AND old enough to
+ * refresh — a token connected minutes ago never shows up here even if its
+ * expiry window is somehow already close.
+ */
+export async function listTokensDueForRefresh(pool: Pool, withinDays: number): Promise<TokenHealthRow[]> {
+  const result = await pool.query<{
+    tenant_id: string;
+    instagram_account_id: string;
+    expires_at: Date | null;
+    status: "healthy" | "error";
+  }>(
+    `select tenant_id, instagram_account_id, expires_at, status from meta_tokens
+     where expires_at is not null
+       and expires_at < now() + ($1 || ' days')::interval
+       and updated_at < now() - interval '24 hours'`,
+    [withinDays],
+  );
+  return result.rows.map((row) => ({
+    tenantId: row.tenant_id,
+    instagramAccountId: row.instagram_account_id,
+    expiresAt: row.expires_at,
+    status: row.status,
+  }));
+}
+
+export async function markTokenError(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId: string,
+  error: string,
+): Promise<void> {
+  await pool.query(
+    `update meta_tokens set status = 'error', last_error = $3, last_checked_at = now()
+     where tenant_id = $1 and instagram_account_id = $2`,
+    [tenantId, instagramAccountId, error],
   );
 }
 
