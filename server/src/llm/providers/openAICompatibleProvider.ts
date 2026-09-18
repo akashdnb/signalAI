@@ -25,7 +25,7 @@ const MAX_ERROR_BODY_CHARS = 200;
 export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): LLMProvider {
   return {
     name: config.name,
-    async generateReply({ systemPrompt, userMessage }: GenerateReplyInput): Promise<string> {
+    async generateReply({ systemPrompt, userMessage, responseFormat }: GenerateReplyInput): Promise<string> {
       const res = await fetch(`${config.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -39,6 +39,9 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
             { role: "system", content: systemPrompt },
             { role: "user", content: userMessage },
           ],
+          // R3-07: native JSON mode, when the caller asks for it, instead
+          // of relying entirely on prose-plus-regex recovery.
+          ...(responseFormat ? { response_format: { type: responseFormat } } : {}),
         }),
         signal: AbortSignal.timeout(config.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });

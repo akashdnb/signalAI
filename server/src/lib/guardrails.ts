@@ -34,6 +34,14 @@ const FORBIDDEN_OUTPUT_PATTERNS = [
 
 const URL_PATTERN = /\bhttps?:\/\/\S+/gi;
 
+function safeParseUrl(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
 const MAX_COMMENT_REPLY_LENGTH = 300; // public comment replies: short/constrained, higher guardrail strictness
 
 export interface InputClassification {
@@ -78,10 +86,18 @@ export function validateOutput(text: string, tier: "comment" | "dm", allowedLink
     }
   }
 
+  // R3-02 fix: startsWith let `https://cta.link.evil.com` through when the
+  // allowed CTA was `https://cta.link` — a same-prefix, different-origin
+  // bypass. Parse both and compare origin + a pathname-prefix, which a
+  // string prefix can't be tricked into matching across origins.
   const urls = text.match(URL_PATTERN) ?? [];
-  for (const url of urls) {
-    if (!allowedLink || !url.startsWith(allowedLink)) {
-      return { allowed: false, reason: `output contains a link not on the allowlist: ${url}` };
+  if (urls.length > 0) {
+    const allowed = allowedLink ? safeParseUrl(allowedLink) : null;
+    for (const rawUrl of urls) {
+      const url = safeParseUrl(rawUrl);
+      if (!allowed || !url || url.origin !== allowed.origin || !url.pathname.startsWith(allowed.pathname)) {
+        return { allowed: false, reason: `output contains a link not on the allowlist: ${rawUrl}` };
+      }
     }
   }
 

@@ -1,3 +1,6 @@
+import { initSentry, Sentry } from "./lib/sentry.js";
+initSentry(); // before every other import that could throw during startup
+
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { getPool } from "./db/pool.js";
@@ -5,7 +8,7 @@ import { getBoss } from "./queue/boss.js";
 import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
 import { ensureTokenRefreshQueue, startTokenRefreshWorker } from "./queue/tokenRefreshQueue.js";
 import { ensureDataDeletionQueue, startDataDeletionWorker } from "./queue/dataDeletionQueue.js";
-import { startDeadLetterWatcher, startLeadEventsWorker } from "./queue/worker.js";
+import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs } from "./queue/worker.js";
 import { createLLMProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
@@ -48,16 +51,37 @@ async function main() {
   await startLeadEventsWorker(boss, pool, createLeadEventReplyHandler(pool, llmProvider));
   await startDataDeletionWorker(boss, pool);
 
-  await startDeadLetterWatcher(boss, async (job) => {
+  // R1-04 fix: this used to be console.error only — stdout in a Render
+  // container nobody is watching, which didn't meet B4's own done-condition
+  // ("fires an alert instead of wedging a lead forever"). Telegram alerting
+  // (B11) will add a second channel here once it exists; Sentry alone
+  // already closes the "nobody finds out" gap this finding was about.
+  await startDeadLetterWatcher(boss, pool, async (job) => {
+    const message = `Lead event permanently failed, wedged at ${LEAD_EVENTS_DLQ}`;
     // eslint-disable-next-line no-console
-    console.error(`Lead event permanently failed, wedged at ${LEAD_EVENTS_DLQ}:`, job);
+    console.error(message, job);
+    Sentry.captureMessage(message, { level: "error", extra: { job } });
   });
+
+  // R3-08: catches up on any wedged keys whose failure happened while no
+  // DLQ worker was listening (e.g. a crash mid-outage) — otherwise those
+  // leads stay silently stuck until the next unrelated DLQ event.
+  const swept = await sweepWedgedLeadEventJobs(boss, pool);
+  if (swept > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`Swept ${swept} wedged lead-event job(s) on boot`);
+    Sentry.captureMessage(`Swept ${swept} wedged lead-event job(s) on boot`, { level: "warning" });
+  }
 
   await startTokenRefreshWorker(boss, pool, config.tokenKeyring, async (results) => {
     const failures = results.filter((r) => !r.ok);
     if (failures.length > 0) {
       // eslint-disable-next-line no-console
       console.error("Token refresh failures (Account Health Monitoring):", failures);
+      Sentry.captureMessage("Token refresh failures (Account Health Monitoring)", {
+        level: "error",
+        extra: { failures },
+      });
     }
   });
 
@@ -71,5 +95,6 @@ async function main() {
 main().catch((err) => {
   // eslint-disable-next-line no-console
   console.error("Fatal startup error:", err);
+  Sentry.captureException(err);
   process.exit(1);
 });

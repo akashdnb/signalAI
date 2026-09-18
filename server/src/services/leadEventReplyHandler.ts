@@ -46,6 +46,7 @@ export function createLeadEventReplyHandler(pool: Pool, provider: LLMProvider) {
           sourceText,
           username: event.username ?? undefined,
           tier: "comment",
+          ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,
       );
@@ -75,6 +76,7 @@ export function createLeadEventReplyHandler(pool: Pool, provider: LLMProvider) {
         sourceText,
         username: event.username ?? undefined,
         tier: "comment",
+        ctaLink: campaign.ctaLink ?? undefined,
       },
       provider,
     );

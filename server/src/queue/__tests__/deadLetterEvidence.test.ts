@@ -4,18 +4,16 @@ import { getPool, closePool } from "../../db/pool.js";
 import { createTenant } from "../../db/tenants.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
-import { ensureQueues, enqueueLeadEvent } from "../leadEventsQueue.js";
-import { startDeadLetterWatcher, startLeadEventsWorker } from "../worker.js";
+import { ensureQueues, enqueueLeadEvent, LEAD_EVENTS_QUEUE } from "../leadEventsQueue.js";
+import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs } from "../worker.js";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// R1-03: does dead-lettering a permanently-failed job actually free its
-// singletonKey under key_strict_fifo, or does the source job stay in a
-// terminal "failed" state that keeps blocking the key forever? The DLQ
-// design is worthless if the answer is the latter.
-describe("R1-03: dead-lettering unblocks the singletonKey", () => {
+// R3-08: deleting the source job to free the key must not also destroy
+// the only evidence of what failed.
+describe("R3-08: dead-letter evidence persistence and the boot sweep", () => {
   let boss: PgBoss;
 
   beforeAll(() => {
@@ -26,6 +24,7 @@ describe("R1-03: dead-lettering unblocks the singletonKey", () => {
 
   beforeEach(async () => {
     await resetDb(getPool());
+    await getPool().query("truncate table dead_letter_events");
     boss = new PgBoss(process.env.DATABASE_URL!);
     await boss.start();
     await ensureQueues(boss);
@@ -44,37 +43,37 @@ describe("R1-03: dead-lettering unblocks the singletonKey", () => {
     await closePool();
   });
 
-  it("a second job for the same lead runs after the first is dead-lettered", async () => {
+  it("records the job data and failure output before deleting the source job", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
-    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-poison");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
 
-    const processed: number[] = [];
-    let deadLettered = false;
-    await startLeadEventsWorker(boss, pool, async (job) => {
-      if (job.sequence === 1) throw new Error("permanent failure");
-      processed.push(job.sequence);
+    await startLeadEventsWorker(boss, pool, async () => {
+      throw new Error("permanent failure for evidence test");
     });
+    let deadLettered = false;
     await startDeadLetterWatcher(boss, pool, async () => {
       deadLettered = true;
     });
 
-    await enqueueLeadEvent(boss, { tenantId: tenant.id, leadId: lead.id, leadEventId: "e1", sequence: 1 });
+    await enqueueLeadEvent(boss, { tenantId: tenant.id, leadId: lead.id, leadEventId: "evt-evidence", sequence: 1 });
 
-    // Poll for the actual dead-letter event rather than a fixed sleep —
-    // retryBackoff has a randomized component, so a fixed wait is
-    // occasionally (correctly) too short and only ever flaky, never wrong
-    // the other direction.
     const deadline = Date.now() + 50000;
     while (!deadLettered && Date.now() < deadline) {
       await sleep(1000);
     }
     expect(deadLettered).toBe(true);
 
-    // Now enqueue job 2 for the SAME lead and see if it ever runs.
-    await enqueueLeadEvent(boss, { tenantId: tenant.id, leadId: lead.id, leadEventId: "e2", sequence: 2 });
-    await sleep(6000);
-
-    expect(processed).toEqual([2]);
+    const rows = await pool.query(
+      "select queue_name, source_job_id, job_data from dead_letter_events where queue_name = $1",
+      [LEAD_EVENTS_QUEUE],
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].job_data.leadEventId).toBe("evt-evidence");
   }, 60000);
+
+  it("sweepWedgedLeadEventJobs is a no-op when there is nothing wedged", async () => {
+    const swept = await sweepWedgedLeadEventJobs(boss, getPool());
+    expect(swept).toBe(0);
+  });
 });

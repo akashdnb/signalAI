@@ -36,6 +36,11 @@ describe("lead events queue (pg-boss, key_strict_fifo)", () => {
 
   afterEach(async () => {
     await boss.stop({ graceful: false });
+    // stop() resolving doesn't guarantee an in-flight poll callback has
+    // finished — without this, a worker from this test can occasionally
+    // steal a job meant for the next file's test, across a file boundary,
+    // not just a test boundary within one file.
+    await sleep(250);
   });
 
   afterAll(async () => {
@@ -108,7 +113,7 @@ describe("lead events queue (pg-boss, key_strict_fifo)", () => {
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-poison");
 
     const deadLettered: string[] = [];
-    await startDeadLetterWatcher(boss, async (job) => {
+    await startDeadLetterWatcher(boss, pool, async (job) => {
       deadLettered.push(job.leadEventId);
     });
     await startLeadEventsWorker(boss, pool, async () => {

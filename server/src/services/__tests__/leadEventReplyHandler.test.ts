@@ -134,4 +134,48 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     expect(updatedLead!.activeMilestoneId).toBeNull();
     expect(provider.generateReply).not.toHaveBeenCalled();
   });
+
+  // R3-06 regression: neither call site passed campaign.ctaLink through,
+  // so validateOutput's allowedLink was always undefined and every
+  // generated link — including the campaign's own CTA — was rejected.
+  // The CTA is the one action the whole funnel exists to produce.
+  it("carries the campaign's CTA link into a plain (non-milestone) AI-generated reply", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], {
+      replyMode: "ai_generated",
+      ctaLink: "https://example.com/offer",
+    });
+
+    const provider = mockProvider(["Here you go!"]);
+    const handler = createLeadEventReplyHandler(pool, provider);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+    await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("https://example.com/offer"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("engine=ai_generated"));
+    logSpy.mockRestore();
+  });
+
+  it("carries the campaign's CTA link into a Milestone Engine reply", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], {
+      replyMode: "ai_generated",
+      ctaLink: "https://example.com/offer",
+    });
+    await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "send pricing" }]);
+
+    const provider = mockProvider([JSON.stringify({ reply: "Here's our pricing.", milestone_satisfied: true })]);
+    const handler = createLeadEventReplyHandler(pool, provider);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "what's the price?");
+    await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("https://example.com/offer"));
+    logSpy.mockRestore();
+  });
 });

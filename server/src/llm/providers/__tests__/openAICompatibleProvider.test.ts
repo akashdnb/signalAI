@@ -38,6 +38,46 @@ describe("openAICompatibleProvider", () => {
     ]);
   });
 
+  it("passes response_format through when the caller requests JSON mode (R3-07)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "{}" } }] }),
+    });
+
+    const provider = createOpenAICompatibleProvider({
+      name: "groq",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: "key",
+      model: "llama-3.1",
+    });
+
+    await provider.generateReply({ systemPrompt: "sys", userMessage: "u", responseFormat: "json_object" });
+
+    const [, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const body = JSON.parse(options.body);
+    expect(body.response_format).toEqual({ type: "json_object" });
+  });
+
+  it("omits response_format when the caller doesn't request it", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "text" } }] }),
+    });
+
+    const provider = createOpenAICompatibleProvider({
+      name: "groq",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: "key",
+      model: "llama-3.1",
+    });
+
+    await provider.generateReply({ systemPrompt: "sys", userMessage: "u" });
+
+    const [, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const body = JSON.parse(options.body);
+    expect(body.response_format).toBeUndefined();
+  });
+
   it("throws with the response body when the API call fails", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,

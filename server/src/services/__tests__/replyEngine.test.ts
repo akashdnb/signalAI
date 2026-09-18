@@ -13,6 +13,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     replyMode: "rule_based",
     replyTemplates: [],
     defaultReplyTemplate: "Hi {{username}}, thanks for asking about {{keyword}}!",
+    ctaLink: null,
     createdAt: new Date(),
     ...overrides,
   };

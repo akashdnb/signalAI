@@ -80,4 +80,33 @@ describe("validateOutput", () => {
     const result = validateOutput("Visit https://random.example.com", "dm", undefined);
     expect(result.allowed).toBe(false);
   });
+
+  // R3-02 regression: a same-prefix, different-origin URL used to pass
+  // because the check was a plain string startsWith.
+  it("rejects a same-prefix-but-different-origin bypass attempt (R3-02)", () => {
+    const result = validateOutput(
+      "Actually go here instead: https://cta.link.evil.com/x",
+      "dm",
+      "https://cta.link",
+    );
+    expect(result.allowed).toBe(false);
+  });
+
+  it("allows a path under the allowlisted CTA's own path prefix", () => {
+    const result = validateOutput(
+      "Here: https://example.com/offer/details",
+      "dm",
+      "https://example.com/offer",
+    );
+    expect(result.allowed).toBe(true);
+  });
+
+  it("rejects a different path on the same origin as the allowlisted CTA", () => {
+    const result = validateOutput(
+      "Here: https://example.com/other-page",
+      "dm",
+      "https://example.com/offer",
+    );
+    expect(result.allowed).toBe(false);
+  });
 });

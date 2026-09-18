@@ -1,4 +1,37 @@
 import type { Pool } from "pg";
+import { classifyInput } from "../lib/guardrails.js";
+
+const MAX_GOAL_DESCRIPTION_LENGTH = 200;
+const MAX_CAPTURE_FIELD_LENGTH = 50;
+
+/**
+ * R3-03 fix, write-time half: goalDescription/captureField are tenant-
+ * authored and land in the LLM's instruction channel (see
+ * milestoneEngine.ts's buildSystemPrompt). Rejecting obviously
+ * instruction-shaped text here — reusing classifyInput, since the risk is
+ * identical to what it already detects in end-user messages — is cheaper
+ * now than after campaigns with bad goal text exist.
+ */
+function validateMilestoneInput(goalDescription: string, captureField?: string): void {
+  if (!goalDescription.trim()) {
+    throw new Error("goalDescription must not be empty");
+  }
+  if (goalDescription.length > MAX_GOAL_DESCRIPTION_LENGTH) {
+    throw new Error(`goalDescription must be at most ${MAX_GOAL_DESCRIPTION_LENGTH} characters`);
+  }
+  if (/[\r\n]/.test(goalDescription)) {
+    throw new Error("goalDescription must not contain newlines");
+  }
+  if (classifyInput(goalDescription).blocked) {
+    throw new Error("goalDescription looks like an attempt to inject instructions, not a goal description");
+  }
+
+  if (captureField !== undefined) {
+    if (!/^[a-zA-Z0-9_]{1,50}$/.test(captureField) || captureField.length > MAX_CAPTURE_FIELD_LENGTH) {
+      throw new Error("captureField must be a short identifier (letters, digits, underscore only)");
+    }
+  }
+}
 
 export interface Milestone {
   id: string;
@@ -52,6 +85,7 @@ export async function setCampaignMilestones(
     const inserted: MilestoneRow[] = [];
     for (let i = 0; i < milestones.length; i++) {
       const m = milestones[i]!;
+      validateMilestoneInput(m.goalDescription, m.captureField);
       const result = await client.query<MilestoneRow>(
         `insert into campaign_milestones (tenant_id, campaign_id, ordinal, goal_description, capture_field)
          values ($1, $2, $3, $4, $5) returning *`,

@@ -6,6 +6,7 @@ import { parseInstagramWebhookPayload } from "../lib/instagramWebhookParser.js";
 import { ingestWebhookEvents } from "../services/webhookIngestService.js";
 import { getPool } from "../db/pool.js";
 import { getBoss } from "../queue/boss.js";
+import { Sentry } from "../lib/sentry.js";
 
 export const webhooksRouter = Router();
 
@@ -54,6 +55,7 @@ webhooksRouter.post("/webhooks/instagram", async (req, res) => {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Webhook ingestion failed — returning non-2xx so Meta retries:", err);
+    Sentry.captureException(err);
     return res.sendStatus(500);
   }
 });

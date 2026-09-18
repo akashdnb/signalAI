@@ -63,12 +63,23 @@ export function verifyOAuthState(secret: string, state: string): OAuthState | nu
   return payload;
 }
 
-/** Minimal cookie-header parser — avoids pulling in `cookie-parser` for the one cookie this flow needs. */
+/**
+ * Minimal cookie-header parser — avoids pulling in `cookie-parser` for the
+ * one cookie this flow needs. R4-03 fix: the header comes straight from an
+ * attacker-controllable `Cookie` header, and `decodeURIComponent` throws on
+ * malformed percent-encoding (`%zz`) — a crafted request used to 500 the
+ * callback instead of being rejected cleanly as "no cookie."
+ */
 export function parseCookie(cookieHeader: string | undefined, name: string): string | undefined {
   if (!cookieHeader) return undefined;
   for (const part of cookieHeader.split(";")) {
     const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
+    if (key !== name) continue;
+    try {
+      return decodeURIComponent(rest.join("="));
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }

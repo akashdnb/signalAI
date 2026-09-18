@@ -12,6 +12,7 @@ export interface Campaign {
   replyMode: ReplyMode;
   replyTemplates: string[];
   defaultReplyTemplate: string;
+  ctaLink: string | null;
   createdAt: Date;
 }
 
@@ -24,6 +25,7 @@ interface CampaignRow {
   reply_mode: ReplyMode;
   reply_templates: string[];
   default_reply_template: string;
+  cta_link: string | null;
   created_at: Date;
 }
 
@@ -37,6 +39,7 @@ function toCampaign(row: CampaignRow): Campaign {
     replyMode: row.reply_mode,
     replyTemplates: row.reply_templates,
     defaultReplyTemplate: row.default_reply_template,
+    ctaLink: row.cta_link,
     createdAt: row.created_at,
   };
 }
@@ -46,14 +49,15 @@ export async function createCampaign(
   tenantId: string,
   name: string,
   keywords: string[],
-  options?: { replyMode?: ReplyMode; replyTemplates?: string[]; defaultReplyTemplate?: string },
+  options?: { replyMode?: ReplyMode; replyTemplates?: string[]; defaultReplyTemplate?: string; ctaLink?: string },
 ): Promise<Campaign> {
   const result = await pool.query<CampaignRow>(
-    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template)
+    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link)
      values ($1, $2, $3,
        coalesce($4, 'rule_based'),
        coalesce($5, array[]::text[]),
-       coalesce($6, 'Thanks for your comment! We''ll be in touch shortly.'))
+       coalesce($6, 'Thanks for your comment! We''ll be in touch shortly.'),
+       $7)
      returning *`,
     [
       tenantId,
@@ -62,6 +66,7 @@ export async function createCampaign(
       options?.replyMode ?? null,
       options?.replyTemplates ?? null,
       options?.defaultReplyTemplate ?? null,
+      options?.ctaLink ?? null,
     ],
   );
   return toCampaign(result.rows[0]!);
