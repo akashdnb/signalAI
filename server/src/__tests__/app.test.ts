@@ -7,6 +7,8 @@ import { createTenant } from "../db/tenants.js";
 import { findOrCreateLeadByInstagramUserId } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
+import { getBoss, stopBoss } from "../queue/boss.js";
+import { ensureDataDeletionQueue, startDataDeletionWorker } from "../queue/dataDeletionQueue.js";
 import { resetDb } from "./helpers/db.js";
 
 const APP_SECRET = "test-secret";
@@ -25,8 +27,12 @@ function sign(payload: object): string {
   return `${base64UrlEncode(sig)}.${encodedPayload}`;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 describe("app", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.META_APP_SECRET = APP_SECRET;
     if (!process.env.DATABASE_URL) {
       throw new Error(
@@ -34,6 +40,11 @@ describe("app", () => {
           "(see docs/phase0_phase1_impl_plan.md B2).",
       );
     }
+    // R1-09: deletion now runs through a worker, not synchronously inside
+    // the route — the test needs one running to observe 'pending' -> 'complete'.
+    const boss = await getBoss();
+    await ensureDataDeletionQueue(boss);
+    await startDataDeletionWorker(boss, getPool());
   });
 
   beforeEach(async () => {
@@ -41,6 +52,7 @@ describe("app", () => {
   });
 
   afterAll(async () => {
+    await stopBoss();
     await closePool();
   });
 
@@ -68,7 +80,7 @@ describe("app", () => {
     expect(res.status).toBe(403);
   });
 
-  it("round-trips a real signed Data Deletion Callback and actually scrubs PII", async () => {
+  it("round-trips a real signed Data Deletion Callback: pending immediately, complete once the worker runs, and actually scrubs PII", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "pilot-creator-1");
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-42");
@@ -100,11 +112,20 @@ describe("app", () => {
     expect(post.body.confirmation_code).toBeTruthy();
     expect(post.body.url).toContain(post.body.confirmation_code);
 
-    const status = await request(app).get(
-      `/data-deletion/status/${post.body.confirmation_code}`,
-    );
-    expect(status.status).toBe(200);
-    expect(status.body.status).toBe("complete");
+    // R1-09: the route must not have already scrubbed by the time it
+    // responds — the whole point is that the scrub is asynchronous.
+    const immediateStatus = await request(app).get(`/data-deletion/status/${post.body.confirmation_code}`);
+    expect(immediateStatus.body.status).toBe("pending");
+
+    let finalStatus: string | undefined;
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      const res = await request(app).get(`/data-deletion/status/${post.body.confirmation_code}`);
+      finalStatus = res.body.status;
+      if (finalStatus === "complete") break;
+      await sleep(500);
+    }
+    expect(finalStatus).toBe("complete");
 
     // The actual point of this test: content is gone, structure survives.
     const piiRow = await pool.query(
@@ -124,5 +145,11 @@ describe("app", () => {
       lead.id,
     ]);
     expect(eventRow.rows[0].meta_event_id).toBe("meta-evt-1");
+  }, 20000);
+
+  it("returns 404 for an unknown confirmation code", async () => {
+    const app = createApp();
+    const res = await request(app).get("/data-deletion/status/00000000-0000-0000-0000-000000000000");
+    expect(res.status).toBe(404);
   });
 });

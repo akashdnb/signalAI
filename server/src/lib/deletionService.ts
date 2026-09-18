@@ -1,13 +1,9 @@
-import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { findLeadsByInstagramUserIdAcrossTenants, hardScrubLead } from "../db/pii.js";
+import type { PgBoss } from "pg-boss";
+import { createDeletionRequest, getDeletionStatus as getDeletionStatusFromDb } from "../db/deletionRequests.js";
+import { enqueueDataDeletion } from "../queue/dataDeletionQueue.js";
 
-export type DeletionStatus = "pending" | "complete";
-
-// Confirmation-code status is fine in memory: it's a short-lived receipt for
-// Meta's status URL, not the deletion record itself (that's the DB row's
-// deleted_at). Does not survive a restart — acceptable for what it is.
-const statusByCode = new Map<string, DeletionStatus>();
+export type { DeletionStatus } from "../db/deletionRequests.js";
 
 /**
  * OPEN QUESTION, resolve before App Review submission: the callback's
@@ -16,26 +12,27 @@ const statusByCode = new Map<string, DeletionStatus>();
  * tenant/creator), not an end-user commenter — so in the common case this
  * scrubs the tenant's own leads, which is very likely correct, but the
  * product/legal question of "does a creator's own account-deletion request
- * also erase their leads' conversation history" has not been decided. This
- * implementation scrubs every lead matching the id, across tenants, which
- * is the safer (more deletes, not fewer) default until that's settled.
+ * also erase their leads' conversation history" has not been decided. The
+ * worker (queue/dataDeletionQueue.ts) scrubs every lead matching the id,
+ * across tenants, which is the safer (more deletes, not fewer) default
+ * until that's settled.
+ *
+ * R1-08/R1-09 fix: status persists in Postgres (survives a restart, which
+ * matters because the App Reviewer checking the status URL is exactly who
+ * would hit an in-memory Map after a redeploy) and the actual scrub runs
+ * in a worker, not synchronously inside this call — this returns 'pending'
+ * immediately, matching Meta's fast-ack-plus-status-URL contract.
  */
 export async function requestDeletion(
   pool: Pool,
+  boss: PgBoss,
   metaUserId: string,
 ): Promise<{ confirmationCode: string }> {
-  const confirmationCode = randomUUID();
-  statusByCode.set(confirmationCode, "pending");
-
-  const matches = await findLeadsByInstagramUserIdAcrossTenants(pool, metaUserId);
-  for (const match of matches) {
-    await hardScrubLead(pool, match.tenantId, match.leadId);
-  }
-
-  statusByCode.set(confirmationCode, "complete");
+  const confirmationCode = await createDeletionRequest(pool, metaUserId);
+  await enqueueDataDeletion(boss, { confirmationCode, metaUserId });
   return { confirmationCode };
 }
 
-export function getDeletionStatus(confirmationCode: string): DeletionStatus | null {
-  return statusByCode.get(confirmationCode) ?? null;
+export async function getDeletionStatus(pool: Pool, confirmationCode: string) {
+  return getDeletionStatusFromDb(pool, confirmationCode);
 }

@@ -4,6 +4,7 @@ import { getPool } from "./db/pool.js";
 import { getBoss } from "./queue/boss.js";
 import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
 import { ensureTokenRefreshQueue, startTokenRefreshWorker } from "./queue/tokenRefreshQueue.js";
+import { ensureDataDeletionQueue, startDataDeletionWorker } from "./queue/dataDeletionQueue.js";
 import { startDeadLetterWatcher, startLeadEventsWorker } from "./queue/worker.js";
 import { createLLMProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
@@ -42,8 +43,10 @@ async function main() {
 
   await ensureQueues(boss);
   await ensureTokenRefreshQueue(boss);
+  await ensureDataDeletionQueue(boss);
 
   await startLeadEventsWorker(boss, pool, createLeadEventReplyHandler(pool, llmProvider));
+  await startDataDeletionWorker(boss, pool);
 
   await startDeadLetterWatcher(boss, async (job) => {
     // eslint-disable-next-line no-console

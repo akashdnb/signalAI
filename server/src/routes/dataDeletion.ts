@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { verifySignedRequest } from "../lib/metaSignedRequest.js";
 import { getDeletionStatus, requestDeletion } from "../lib/deletionService.js";
 import { getPool } from "../db/pool.js";
+import { getBoss } from "../queue/boss.js";
 
 export const dataDeletionRouter = Router();
 
@@ -18,7 +19,8 @@ dataDeletionRouter.post("/data-deletion", async (req, res) => {
     return res.status(403).json({ error: "invalid signature" });
   }
 
-  const { confirmationCode } = await requestDeletion(getPool(), payload.user_id);
+  const boss = await getBoss();
+  const { confirmationCode } = await requestDeletion(getPool(), boss, payload.user_id);
   const statusUrl = `${req.protocol}://${req.get("host")}/data-deletion/status/${confirmationCode}`;
 
   return res.status(200).json({
@@ -27,8 +29,8 @@ dataDeletionRouter.post("/data-deletion", async (req, res) => {
   });
 });
 
-dataDeletionRouter.get("/data-deletion/status/:code", (req, res) => {
-  const status = getDeletionStatus(req.params.code);
+dataDeletionRouter.get("/data-deletion/status/:code", async (req, res) => {
+  const status = await getDeletionStatus(getPool(), req.params.code);
   if (!status) {
     return res.status(404).json({ error: "unknown confirmation code" });
   }
