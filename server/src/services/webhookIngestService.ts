@@ -4,6 +4,8 @@ import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { findOrCreateLeadByInstagramUserId, nextSequence, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
+import { listActiveCampaignKeywords } from "../db/campaigns.js";
+import { findMatchingCampaign } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import type { ParsedWebhookEvent } from "../lib/instagramWebhookParser.js";
 
@@ -30,6 +32,21 @@ export async function ingestWebhookEvent(
   const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, event.instagramUserId);
   const sequence = await nextSequence(pool, tenantId, lead.id);
 
+  // Keyword matching (Phase 1 Automation Engine) runs here, not deferred to
+  // the worker: it's cheap deterministic string comparison against
+  // non-PII data, so there's no reason to pay a queue round-trip for it.
+  // Every comment is still recorded (for analytics: "Total Comments
+  // Received" counts all of them) — matching only decides whether the
+  // worker treats this as a trigger.
+  let attributes: Record<string, unknown> = {};
+  if (event.eventType === "comment" && event.commentText) {
+    const campaigns = await listActiveCampaignKeywords(pool, tenantId);
+    const match = findMatchingCampaign(event.commentText, campaigns);
+    if (match) {
+      attributes = { matchedCampaignId: match.campaignId, matchedKeyword: match.keyword };
+    }
+  }
+
   const inserted = await insertEventIdempotent(pool, {
     tenantId,
     leadId: lead.id,
@@ -37,6 +54,7 @@ export async function ingestWebhookEvent(
     eventType: event.eventType,
     occurredAt: event.occurredAt,
     sequence,
+    attributes,
   });
 
   if (!inserted) {

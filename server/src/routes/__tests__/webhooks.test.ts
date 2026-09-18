@@ -5,6 +5,7 @@ import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { createTenant } from "../../db/tenants.js";
 import { upsertToken } from "../../db/tokens.js";
+import { createCampaign } from "../../db/campaigns.js";
 import { stopBoss } from "../../queue/boss.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
@@ -147,6 +148,101 @@ describe("webhooks route", () => {
       tenant.id,
     ]);
     expect(events.rows[0].count).toBe(1);
+  });
+
+  it("flags a comment that matches an active campaign keyword (Phase 1 Automation Engine)", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "unused-in-this-test",
+    });
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway Reel", ["LINK"]);
+
+    const payload = {
+      entry: [
+        {
+          id: "acct-1",
+          changes: [
+            { field: "comments", value: { id: "comment-match", text: "please send the LINK!", from: { id: "u1" } } },
+          ],
+        },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    expect(res.status).toBe(200);
+    const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
+    expect(event.rows[0].attributes).toMatchObject({ matchedCampaignId: campaign.id, matchedKeyword: "LINK" });
+  });
+
+  it("records a non-matching comment for analytics but with no campaign match", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "unused-in-this-test",
+    });
+    await createCampaign(pool, tenant.id, "Giveaway Reel", ["LINK"]);
+
+    const payload = {
+      entry: [
+        { id: "acct-1", changes: [{ field: "comments", value: { id: "c-nomatch", text: "nice reel!", from: { id: "u1" } } }] },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    expect(res.status).toBe(200);
+    const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
+    expect(event.rows[0].attributes).toEqual({});
+  });
+
+  it("ignores a disabled campaign's keyword", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "unused-in-this-test",
+    });
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway Reel", ["LINK"]);
+    await pool.query("update campaigns set enabled = false where id = $1", [campaign.id]);
+
+    const payload = {
+      entry: [
+        { id: "acct-1", changes: [{ field: "comments", value: { id: "c-disabled", text: "send LINK", from: { id: "u1" } } }] },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
+    expect(event.rows[0].attributes).toEqual({});
   });
 
   it("acks an event for an unconnected/unknown account without creating any lead", async () => {
