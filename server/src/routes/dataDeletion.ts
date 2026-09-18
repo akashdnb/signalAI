@@ -2,11 +2,12 @@ import { Router } from "express";
 import { config } from "../config.js";
 import { verifySignedRequest } from "../lib/metaSignedRequest.js";
 import { getDeletionStatus, requestDeletion } from "../lib/deletionService.js";
+import { getPool } from "../db/pool.js";
 
 export const dataDeletionRouter = Router();
 
 // Meta's Data Deletion Callback: POST, form-encoded, one field `signed_request`.
-dataDeletionRouter.post("/data-deletion", (req, res) => {
+dataDeletionRouter.post("/data-deletion", async (req, res) => {
   const signedRequest = req.body?.signed_request;
   if (typeof signedRequest !== "string") {
     return res.status(400).json({ error: "missing signed_request" });
@@ -17,7 +18,7 @@ dataDeletionRouter.post("/data-deletion", (req, res) => {
     return res.status(403).json({ error: "invalid signature" });
   }
 
-  const { confirmationCode } = requestDeletion(payload.user_id);
+  const { confirmationCode } = await requestDeletion(getPool(), payload.user_id);
   const statusUrl = `${req.protocol}://${req.get("host")}/data-deletion/status/${confirmationCode}`;
 
   return res.status(200).json({
