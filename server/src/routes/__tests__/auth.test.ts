@@ -205,6 +205,49 @@ describe("auth routes", () => {
     expect(replayFromDifferentClient.status).toBe(403);
   });
 
+  // R5-01 regression: /start always mints a fresh tenant, which is correct
+  // for a first connection but was silently splitting a creator across two
+  // tenants on every reconnect (expired token, failed refresh, clicking
+  // "connect" again) — findTenantByInstagramAccountId has no ORDER BY and
+  // takes rows[0], so inbound webhooks would then route to an arbitrary
+  // one of the two. The fix resolves the tenant from the OAuth-returned
+  // account id, reusing the original tenant instead of the freshly-minted
+  // one whenever that account is already connected somewhere.
+  it("reconnecting the same Instagram account re-attaches to its original tenant, not a new one (R5-01)", async () => {
+    const pool = getPool();
+    mockSuccessfulExchange();
+    const app = createApp();
+
+    const firstAgent = request.agent(app);
+    const firstStart = await firstAgent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const firstState = extractState(firstStart.headers.location);
+    const firstCallback = await firstAgent
+      .get("/auth/instagram/callback")
+      .query({ code: "auth-code", state: firstState });
+    expect(firstCallback.status).toBe(200);
+
+    const originalRow = await pool.query(
+      "select tenant_id from meta_tokens where instagram_account_id = 'acct-1'",
+    );
+    const originalTenantId = originalRow.rows[0].tenant_id;
+
+    // A reconnect: same real Instagram account (mock always returns
+    // acct-1), but a brand new browser session/agent — exactly what
+    // happens when a creator clicks "connect" again after a token issue.
+    mockSuccessfulExchange();
+    const secondAgent = request.agent(app);
+    const secondStart = await secondAgent.get("/auth/instagram/start").query({ tenantName: "creator-a-again" });
+    const secondState = extractState(secondStart.headers.location);
+    const secondCallback = await secondAgent
+      .get("/auth/instagram/callback")
+      .query({ code: "auth-code", state: secondState });
+    expect(secondCallback.status).toBe(200);
+
+    const rows = await pool.query("select tenant_id from meta_tokens where instagram_account_id = 'acct-1'");
+    expect(rows.rowCount).toBe(1); // never two rows for the same account
+    expect(rows.rows[0].tenant_id).toBe(originalTenantId); // reused, not a new tenant
+  });
+
   it("callback rejects a request missing code or state", async () => {
     const app = createApp();
     const res = await request(app).get("/auth/instagram/callback").query({ code: "only-code" });

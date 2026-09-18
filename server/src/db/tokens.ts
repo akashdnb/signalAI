@@ -15,11 +15,17 @@ export async function upsertToken(
   const key = keyring.get(keyVersion)!;
   const { ciphertext } = encryptToken(params.accessToken, key, keyVersion);
 
+  // R5-01: conflict target is the account alone, not (tenant_id,
+  // instagram_account_id) — one Instagram account can only ever belong to
+  // one tenant, so `tenant_id` is included in the SET to correct a stale
+  // row if a caller ever resolves the wrong tenant, but it must never be
+  // possible for the same account to hold two rows under different tenants.
   await pool.query(
     `insert into meta_tokens (tenant_id, instagram_account_id, encrypted_token, key_version, expires_at)
      values ($1, $2, $3, $4, $5)
-     on conflict (tenant_id, instagram_account_id)
-     do update set encrypted_token = excluded.encrypted_token,
+     on conflict (instagram_account_id)
+     do update set tenant_id = excluded.tenant_id,
+                    encrypted_token = excluded.encrypted_token,
                     key_version = excluded.key_version,
                     expires_at = excluded.expires_at,
                     status = 'healthy',
@@ -76,6 +82,22 @@ export async function markTokenError(
      where tenant_id = $1 and instagram_account_id = $2`,
     [tenantId, instagramAccountId, error],
   );
+}
+
+/**
+ * Phase 1 assumes one connected Instagram account per tenant (no
+ * multi-account support yet) — this is how the send path resolves "which
+ * account is this lead's conversation with" from just a tenantId.
+ */
+export async function getSoleConnectedAccount(
+  pool: Pool,
+  tenantId: string,
+): Promise<{ instagramAccountId: string } | null> {
+  const result = await pool.query<{ instagram_account_id: string }>(
+    `select instagram_account_id from meta_tokens where tenant_id = $1 order by created_at limit 1`,
+    [tenantId],
+  );
+  return result.rows[0] ? { instagramAccountId: result.rows[0].instagram_account_id } : null;
 }
 
 /**

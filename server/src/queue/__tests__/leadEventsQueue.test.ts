@@ -55,6 +55,7 @@ describe("lead events queue (pg-boss, key_strict_fifo)", () => {
     const processedOrder: number[] = [];
     await startLeadEventsWorker(boss, pool, async (job) => {
       processedOrder.push(job.sequence);
+      return { advance: true };
     });
 
     for (const sequence of [1, 2, 3]) {
@@ -78,6 +79,7 @@ describe("lead events queue (pg-boss, key_strict_fifo)", () => {
     const processed: number[] = [];
     await startLeadEventsWorker(boss, pool, async (job) => {
       processed.push(job.sequence);
+      return { advance: true };
     });
 
     await enqueueLeadEvent(boss, { tenantId: tenant.id, leadId: lead.id, leadEventId: "e5", sequence: 5 });
@@ -98,6 +100,7 @@ describe("lead events queue (pg-boss, key_strict_fifo)", () => {
     const processed: string[] = [];
     await startLeadEventsWorker(boss, pool, async (job) => {
       processed.push(job.leadId);
+      return { advance: true };
     });
 
     await enqueueLeadEvent(boss, { tenantId: tenant.id, leadId: leadA.id, leadEventId: "a1", sequence: 1 });
@@ -147,6 +150,7 @@ describe("lead events queue (pg-boss, key_strict_fifo)", () => {
     await startLeadEventsWorker(boss, pool, async () => {
       attempts += 1;
       if (attempts === 1) throw new Error("transient failure, first attempt only");
+      return { advance: true };
     });
 
     await enqueueLeadEvent(boss, {

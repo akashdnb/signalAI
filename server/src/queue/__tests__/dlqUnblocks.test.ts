@@ -54,6 +54,7 @@ describe("R1-03: dead-lettering unblocks the singletonKey", () => {
     await startLeadEventsWorker(boss, pool, async (job) => {
       if (job.sequence === 1) throw new Error("permanent failure");
       processed.push(job.sequence);
+      return { advance: true };
     });
     await startDeadLetterWatcher(boss, pool, async () => {
       deadLettered = true;

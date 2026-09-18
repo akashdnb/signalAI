@@ -109,4 +109,21 @@ describe("validateOutput", () => {
     );
     expect(result.allowed).toBe(false);
   });
+
+  // R5-02 regression: a raw pathname.startsWith() repeated R3-02's mistake
+  // one level down — "/promo" is a string prefix of "/promotion-of-x" with
+  // no segment boundary between them.
+  it("rejects a same-origin, same-prefix-but-different-segment path (R5-02)", () => {
+    const result = validateOutput(
+      "Here: https://example.com/promotion-of-something-else",
+      "dm",
+      "https://example.com/promo",
+    );
+    expect(result.allowed).toBe(false);
+  });
+
+  it("allows an exact path match with no trailing segment", () => {
+    const result = validateOutput("Here: https://example.com/promo", "dm", "https://example.com/promo");
+    expect(result.allowed).toBe(true);
+  });
 });

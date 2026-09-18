@@ -44,6 +44,19 @@ function safeParseUrl(value: string): URL | null {
 
 const MAX_COMMENT_REPLY_LENGTH = 300; // public comment replies: short/constrained, higher guardrail strictness
 
+/**
+ * R5-02 fix: a raw `pathname.startsWith()` repeats R3-02's mistake one
+ * level down — an allowed path of `/promo` also admits `/promotion-of-x`,
+ * since "promo" is a string prefix of "promotion-of-x" with no separator
+ * between them. Require either an exact match or the allowed path followed
+ * by a `/` segment boundary.
+ */
+function pathIsAllowed(urlPath: string, allowedPath: string): boolean {
+  if (urlPath === allowedPath) return true;
+  const base = allowedPath.endsWith("/") ? allowedPath : `${allowedPath}/`;
+  return urlPath.startsWith(base);
+}
+
 export interface InputClassification {
   blocked: boolean;
   reason?: string;
@@ -95,7 +108,7 @@ export function validateOutput(text: string, tier: "comment" | "dm", allowedLink
     const allowed = allowedLink ? safeParseUrl(allowedLink) : null;
     for (const rawUrl of urls) {
       const url = safeParseUrl(rawUrl);
-      if (!allowed || !url || url.origin !== allowed.origin || !url.pathname.startsWith(allowed.pathname)) {
+      if (!allowed || !url || url.origin !== allowed.origin || !pathIsAllowed(url.pathname, allowed.pathname)) {
         return { allowed: false, reason: `output contains a link not on the allowlist: ${rawUrl}` };
       }
     }

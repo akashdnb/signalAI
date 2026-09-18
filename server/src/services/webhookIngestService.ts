@@ -115,7 +115,7 @@ async function ingestOneEvent(
     await enqueueLeadEvent(
       boss,
       { tenantId, leadId: lead.id, leadEventId: inserted.id, sequence },
-      client,
+      { client },
     );
 
     await client.query("COMMIT");

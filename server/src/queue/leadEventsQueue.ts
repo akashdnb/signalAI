@@ -48,10 +48,11 @@ export function asPgBossDb(client: PoolClient): Db {
 export async function enqueueLeadEvent(
   boss: PgBoss,
   job: LeadEventJob,
-  client?: PoolClient,
+  options?: { client?: PoolClient; delaySeconds?: number },
 ): Promise<void> {
   await boss.send(LEAD_EVENTS_QUEUE, job, {
     singletonKey: job.leadId,
-    ...(client ? { db: asPgBossDb(client) } : {}),
+    ...(options?.client ? { db: asPgBossDb(options.client) } : {}),
+    ...(options?.delaySeconds ? { startAfter: options.delaySeconds } : {}),
   });
 }

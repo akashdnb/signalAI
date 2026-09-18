@@ -2,6 +2,7 @@ import { Router } from "express";
 import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { createTenant } from "../db/tenants.js";
+import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { upsertToken } from "../db/tokens.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
 import { OAUTH_NONCE_COOKIE, createOAuthState, nonceMatches, parseCookie, verifyOAuthState } from "../lib/oauthState.js";
@@ -112,8 +113,25 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
     const profile = await fetchInstagramProfile(longLived.access_token);
 
     const pool = getPool();
+
+    // R5-01 fix: `/start` always mints a fresh tenant (see the comment
+    // there), which is correct for a genuinely new connection but wrong
+    // for a reconnect — using statePayload.tenantId unconditionally would
+    // silently split one creator across two tenants every time they
+    // reconnect (expired token, failed refresh, clicking "connect" again).
+    // `profile.id` comes from the OAuth exchange itself, not from anything
+    // the caller supplied, so it's the attacker-uncontrollable identifier
+    // that actually determines which tenant this account belongs to: if
+    // it's already connected somewhere, reuse that tenant and let the
+    // fresh one from `/start` go unused, rather than creating a second
+    // home for the same account. meta_tokens' global unique index on
+    // instagram_account_id (migration 1758240000016) backs this up at the
+    // data layer too.
+    const existingTenantId = await findTenantByInstagramAccountId(pool, profile.id);
+    const tenantId = existingTenantId ?? statePayload.tenantId;
+
     await upsertToken(pool, config.tokenKeyring, {
-      tenantId: statePayload.tenantId,
+      tenantId,
       instagramAccountId: profile.id,
       accessToken: longLived.access_token,
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),

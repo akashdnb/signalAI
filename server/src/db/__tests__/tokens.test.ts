@@ -76,6 +76,28 @@ describe("token vault repository", () => {
     expect(await getDecryptedToken(pool, keyring, tenant.id, "acct-1")).toBe("second-token");
   });
 
+  // R5-01: the unique index moved from (tenant_id, instagram_account_id) to
+  // instagram_account_id alone — one Instagram account can only ever
+  // belong to one tenant. Without this, two tenants could each hold a row
+  // for the same account and findTenantByInstagramAccountId would resolve
+  // to an arbitrary one of them.
+  it("re-upserting the same account under a different tenant reassigns it rather than creating a second row", async () => {
+    const pool = getPool();
+    const tenantA = await createTenant(pool, "creator-a");
+    const tenantB = await createTenant(pool, "creator-b");
+
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-shared", accessToken: "t1" });
+    await upsertToken(pool, keyring, { tenantId: tenantB.id, instagramAccountId: "acct-shared", accessToken: "t2" });
+
+    const rows = await pool.query(
+      "select tenant_id from meta_tokens where instagram_account_id = 'acct-shared'",
+    );
+    expect(rows.rowCount).toBe(1);
+    expect(rows.rows[0].tenant_id).toBe(tenantB.id);
+    expect(await getDecryptedToken(pool, keyring, tenantA.id, "acct-shared")).toBeNull();
+    expect(await getDecryptedToken(pool, keyring, tenantB.id, "acct-shared")).toBe("t2");
+  });
+
   it("returns null for an account with no stored token", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");

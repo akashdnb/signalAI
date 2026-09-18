@@ -1,6 +1,5 @@
-import { initSentry, Sentry } from "./lib/sentry.js";
-initSentry(); // before every other import that could throw during startup
-
+import "./lib/sentryInit.js"; // must be the first import — see sentryInit.ts for why a statement here wasn't enough
+import { Sentry } from "./lib/sentry.js";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { getPool } from "./db/pool.js";
@@ -13,6 +12,7 @@ import { createLLMProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
 import { assertKeyringConfigured } from "./lib/tokenVault.js";
+import { pruneExpiredNonces } from "./db/oauthNonces.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -48,7 +48,11 @@ async function main() {
   await ensureTokenRefreshQueue(boss);
   await ensureDataDeletionQueue(boss);
 
-  await startLeadEventsWorker(boss, pool, createLeadEventReplyHandler(pool, llmProvider));
+  await startLeadEventsWorker(
+    boss,
+    pool,
+    createLeadEventReplyHandler(pool, boss, llmProvider, config.tokenKeyring),
+  );
   await startDataDeletionWorker(boss, pool);
 
   // R1-04 fix: this used to be console.error only — stdout in a Render
@@ -71,6 +75,14 @@ async function main() {
     // eslint-disable-next-line no-console
     console.warn(`Swept ${swept} wedged lead-event job(s) on boot`);
     Sentry.captureMessage(`Swept ${swept} wedged lead-event job(s) on boot`, { level: "warning" });
+  }
+
+  // R5-03: spent_oauth_nonces has no other cleanup path — rows are only
+  // ever useful for the state's own 10-minute lifetime.
+  const prunedNonces = await pruneExpiredNonces(pool);
+  if (prunedNonces > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`Pruned ${prunedNonces} expired OAuth nonce(s) on boot`);
   }
 
   await startTokenRefreshWorker(boss, pool, config.tokenKeyring, async (results) => {

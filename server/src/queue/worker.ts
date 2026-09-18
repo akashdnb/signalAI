@@ -4,15 +4,26 @@ import { advanceSequence, isSequenceStale } from "../db/leads.js";
 import { recordDeadLetterEvent } from "../db/deadLetterEvents.js";
 import { LEAD_EVENTS_DLQ, LEAD_EVENTS_QUEUE, type LeadEventJob } from "./leadEventsQueue.js";
 
-export type LeadEventHandler = (job: LeadEventJob) => Promise<void>;
+/**
+ * B9: a handler can finish a turn without the event's work actually being
+ * done — a messaging-window closure means nothing more can happen this
+ * turn (advance, nothing to retry); a rate-limit defer means the SAME
+ * event needs to run again later (do not advance, or a re-enqueued retry
+ * would find itself already "applied" and silently no-op — see
+ * leadEventReplyHandler.ts's rate-limit path). `advance: false` is what
+ * keeps those two cases distinguishable.
+ */
+export type LeadEventHandlerResult = { advance: boolean };
+export type LeadEventHandler = (job: LeadEventJob) => Promise<LeadEventHandlerResult>;
 
 /**
  * Applies the per-lead ordering frontier around the handoff to business
  * logic (roadmap: events older than last_applied_sequence are logged but
  * produce no state-mutating side effects). The frontier only advances
- * AFTER the handler succeeds — advancing it before would make a retry of a
- * genuine failure indistinguishable from a stale duplicate, silently
- * eating the retry instead of ever reaching the dead letter queue.
+ * AFTER the handler succeeds AND reports `advance: true` — advancing
+ * unconditionally would make a retry of a genuine failure (or a
+ * deliberate rate-limit defer) indistinguishable from a stale duplicate,
+ * silently eating the retry instead of the event ever actually going out.
  *
  * batchSize/localConcurrency default well above pg-boss's own defaults
  * (batchSize: 1) on purpose: key_strict_fifo exposes at most one eligible
@@ -37,8 +48,10 @@ export function startLeadEventsWorker(
         jobs.map(async (job) => {
           const { tenantId, leadId, sequence } = job.data;
           if (await isSequenceStale(pool, tenantId, leadId, sequence)) return;
-          await handler(job.data);
-          await advanceSequence(pool, tenantId, leadId, sequence);
+          const result = await handler(job.data);
+          if (result.advance) {
+            await advanceSequence(pool, tenantId, leadId, sequence);
+          }
         }),
       );
     },
