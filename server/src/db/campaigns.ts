@@ -1,11 +1,16 @@
 import type { Pool } from "pg";
 
+export type ReplyMode = "rule_based" | "ai_generated";
+
 export interface Campaign {
   id: string;
   tenantId: string;
   name: string;
   keywords: string[];
   enabled: boolean;
+  replyMode: ReplyMode;
+  replyTemplates: string[];
+  defaultReplyTemplate: string;
   createdAt: Date;
 }
 
@@ -15,6 +20,9 @@ interface CampaignRow {
   name: string;
   keywords: string[];
   enabled: boolean;
+  reply_mode: ReplyMode;
+  reply_templates: string[];
+  default_reply_template: string;
   created_at: Date;
 }
 
@@ -25,6 +33,9 @@ function toCampaign(row: CampaignRow): Campaign {
     name: row.name,
     keywords: row.keywords,
     enabled: row.enabled,
+    replyMode: row.reply_mode,
+    replyTemplates: row.reply_templates,
+    defaultReplyTemplate: row.default_reply_template,
     createdAt: row.created_at,
   };
 }
@@ -34,10 +45,23 @@ export async function createCampaign(
   tenantId: string,
   name: string,
   keywords: string[],
+  options?: { replyMode?: ReplyMode; replyTemplates?: string[]; defaultReplyTemplate?: string },
 ): Promise<Campaign> {
   const result = await pool.query<CampaignRow>(
-    `insert into campaigns (tenant_id, name, keywords) values ($1, $2, $3) returning *`,
-    [tenantId, name, keywords],
+    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template)
+     values ($1, $2, $3,
+       coalesce($4, 'rule_based'),
+       coalesce($5, array[]::text[]),
+       coalesce($6, 'Thanks for your comment! We''ll be in touch shortly.'))
+     returning *`,
+    [
+      tenantId,
+      name,
+      keywords,
+      options?.replyMode ?? null,
+      options?.replyTemplates ?? null,
+      options?.defaultReplyTemplate ?? null,
+    ],
   );
   return toCampaign(result.rows[0]!);
 }
@@ -48,6 +72,14 @@ export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campa
     [tenantId],
   );
   return result.rows.map(toCampaign);
+}
+
+export async function getCampaign(pool: Pool, tenantId: string, campaignId: string): Promise<Campaign | null> {
+  const result = await pool.query<CampaignRow>(
+    `select * from campaigns where id = $1 and tenant_id = $2`,
+    [campaignId, tenantId],
+  );
+  return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
 /** Only what the matcher needs, for the hot ingestion path — not the full row. */

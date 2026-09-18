@@ -44,6 +44,50 @@ function toEvent(row: LeadEventRow): LeadEvent {
  * a duplicate is an expected, normal outcome of at-least-once delivery, not
  * an error condition.
  */
+export interface EventForReply {
+  leadId: string;
+  eventType: string;
+  matchedCampaignId: string | null;
+  matchedKeyword: string | null;
+  commentText: string | null;
+  dmText: string | null;
+  username: string | null;
+}
+
+/** Everything the reply engine needs for one event, joined once rather than three separate round trips. */
+export async function getEventForReply(
+  pool: Pool,
+  tenantId: string,
+  leadEventId: string,
+): Promise<EventForReply | null> {
+  const result = await pool.query<{
+    lead_id: string;
+    event_type: string;
+    attributes: { matchedCampaignId?: string; matchedKeyword?: string };
+    comment_text: string | null;
+    dm_text: string | null;
+    username: string | null;
+  }>(
+    `select e.lead_id, e.event_type, e.attributes, p.comment_text, p.dm_text, p.username
+     from lead_events e
+     left join lead_pii p on p.lead_event_id = e.id
+     where e.id = $1 and e.tenant_id = $2`,
+    [leadEventId, tenantId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    leadId: row.lead_id,
+    eventType: row.event_type,
+    matchedCampaignId: row.attributes.matchedCampaignId ?? null,
+    matchedKeyword: row.attributes.matchedKeyword ?? null,
+    commentText: row.comment_text,
+    dmText: row.dm_text,
+    username: row.username,
+  };
+}
+
 export async function insertEventIdempotent(
   pool: Pool,
   params: {

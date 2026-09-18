@@ -4,17 +4,41 @@ import { getPool } from "./db/pool.js";
 import { getBoss } from "./queue/boss.js";
 import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
 import { ensureTokenRefreshQueue, startTokenRefreshWorker } from "./queue/tokenRefreshQueue.js";
-import { startDeadLetterWatcher } from "./queue/worker.js";
+import { startDeadLetterWatcher, startLeadEventsWorker } from "./queue/worker.js";
+import { createLLMProviderFromEnv } from "./llm/factory.js";
+import type { LLMProvider } from "./llm/provider.js";
+import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
+
+/**
+ * Every Phase 1 campaign defaults to rule_based, which never calls this —
+ * so an unconfigured LLM provider must not crash startup. It degrades to
+ * "every ai_generated campaign fails closed to its rule-based reply"
+ * (replyEngine's own fallback path), not a boot failure.
+ */
+function loadLLMProviderOrFallback(): LLMProvider {
+  try {
+    return createLLMProviderFromEnv();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      name: "unconfigured",
+      generateReply: async () => {
+        throw new Error(`LLM provider unavailable: ${message}`);
+      },
+    };
+  }
+}
 
 async function main() {
   const pool = getPool();
   const boss = await getBoss();
+  const llmProvider = loadLLMProviderOrFallback();
 
   await ensureQueues(boss);
   await ensureTokenRefreshQueue(boss);
 
-  // Business-logic reply handlers (B6-B9) register on this same queue as
-  // they land; wiring them up doesn't change this composition root.
+  await startLeadEventsWorker(boss, pool, createLeadEventReplyHandler(pool, llmProvider));
+
   await startDeadLetterWatcher(boss, async (job) => {
     // eslint-disable-next-line no-console
     console.error(`Lead event permanently failed, wedged at ${LEAD_EVENTS_DLQ}:`, job);
