@@ -2,6 +2,7 @@ import type { LLMProvider } from "../llm/provider.js";
 import type { Milestone } from "../db/milestones.js";
 import { classifyInput, validateOutput } from "../lib/guardrails.js";
 import { appendCtaLink } from "../lib/messageComposer.js";
+import { ALLOW_ALL_SPEND_GUARD, type AiSpendGuard } from "./aiSpendGuard.js";
 
 export interface MilestoneCheckContext {
   milestone: Milestone;
@@ -17,6 +18,8 @@ export interface MilestoneCheckResult {
   satisfied: boolean;
   capturedValue?: string;
   fellBackReason?: string;
+  /** B10: set specifically when the fallback was caused by the per-account daily AI call cap. */
+  capExceeded?: boolean;
 }
 
 interface StructuredModelOutput {
@@ -148,7 +151,7 @@ function isValidCapturedValue(fieldName: string, value: string): boolean {
   return !REFUSAL_PHRASES.has(trimmed.toLowerCase());
 }
 
-function fallbackResult(reason: string): MilestoneCheckResult {
+function fallbackResult(reason: string, capExceeded = false): MilestoneCheckResult {
   return {
     // Hardcoded and identical for every tenant — correct as a safe
     // default, but this is [[Phase 2C]] Client Guardrails (brand voice)
@@ -156,6 +159,7 @@ function fallbackResult(reason: string): MilestoneCheckResult {
     reply: "Thanks for your message! Someone from our team will follow up with you shortly.",
     satisfied: false,
     fellBackReason: reason,
+    ...(capExceeded ? { capExceeded: true } : {}),
   };
 }
 
@@ -171,10 +175,17 @@ function fallbackResult(reason: string): MilestoneCheckResult {
 export async function runMilestoneCheck(
   ctx: MilestoneCheckContext,
   provider: LLMProvider,
+  spendGuard: AiSpendGuard = ALLOW_ALL_SPEND_GUARD,
 ): Promise<MilestoneCheckResult> {
   const inputCheck = classifyInput(ctx.sourceText);
   if (inputCheck.blocked) {
     return fallbackResult(inputCheck.reason!);
+  }
+
+  // B10: same placement/rationale as replyEngine.ts — checked immediately
+  // before the provider call, inside this function.
+  if (!(await spendGuard.tryConsume())) {
+    return fallbackResult("ai spend cap exceeded for this account", true);
   }
 
   let raw: string;

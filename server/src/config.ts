@@ -22,6 +22,13 @@ export const config = {
   get instagramRedirectUri() {
     return process.env.INSTAGRAM_REDIRECT_URI ?? "";
   },
+  // B10: hard per-account daily cap on AI-generated calls. Default chosen
+  // to comfortably cover a real pilot conversation volume while still
+  // bounding a viral-Reel worst case to a fixed cost (max_tokens is
+  // already capped per call — see openAICompatibleProvider.ts).
+  get aiDailyCallCap() {
+    return Number(process.env.AI_DAILY_CALL_CAP ?? 300);
+  },
   // Token vault keyring (see lib/tokenVault.ts) — re-parsed on every access
   // rather than cached, matching the live-read pattern above.
   get tokenKeyring() {

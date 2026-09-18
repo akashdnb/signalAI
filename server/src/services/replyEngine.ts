@@ -2,6 +2,7 @@ import type { Campaign } from "../db/campaigns.js";
 import type { LLMProvider } from "../llm/provider.js";
 import { classifyInput, validateOutput } from "../lib/guardrails.js";
 import { appendCtaLink, renderTemplate } from "../lib/messageComposer.js";
+import { ALLOW_ALL_SPEND_GUARD, type AiSpendGuard } from "./aiSpendGuard.js";
 
 export type ReplyTier = "comment" | "dm";
 
@@ -19,6 +20,8 @@ export interface PreparedReply {
   engine: "rule_based" | "ai_generated";
   /** Set when AI generation was attempted but guardrails or the provider rejected/failed it, and the fail-closed rule-based reply was used instead. */
   fellBackReason?: string;
+  /** B10: set specifically when the fallback was caused by the per-account daily AI call cap, not any other failure mode — the one case the worker should alert an operator about. */
+  capExceeded?: boolean;
 }
 
 function ruleBasedReply(ctx: ReplyContext): PreparedReply {
@@ -53,7 +56,11 @@ function buildSystemPrompt(ctx: ReplyContext): string {
  * deterministic fallback every other AI failure does, not something an
  * attacker can steer.
  */
-export async function generateReply(ctx: ReplyContext, provider: LLMProvider): Promise<PreparedReply> {
+export async function generateReply(
+  ctx: ReplyContext,
+  provider: LLMProvider,
+  spendGuard: AiSpendGuard = ALLOW_ALL_SPEND_GUARD,
+): Promise<PreparedReply> {
   if (ctx.campaign.replyMode === "rule_based") {
     return ruleBasedReply(ctx);
   }
@@ -61,6 +68,18 @@ export async function generateReply(ctx: ReplyContext, provider: LLMProvider): P
   const inputCheck = classifyInput(ctx.sourceText);
   if (inputCheck.blocked) {
     return { ...ruleBasedReply(ctx), fellBackReason: inputCheck.reason };
+  }
+
+  // B10: checked immediately before the provider call, inside this
+  // function rather than the worker — reusing the existing fail-closed
+  // fallback so an exhausted cap degrades exactly like every other failure
+  // mode, and so any future caller of generateReply is capped too.
+  if (!(await spendGuard.tryConsume())) {
+    return {
+      ...ruleBasedReply(ctx),
+      fellBackReason: "ai spend cap exceeded for this account",
+      capExceeded: true,
+    };
   }
 
   try {

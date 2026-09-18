@@ -13,6 +13,7 @@ import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
 import { assertKeyringConfigured } from "./lib/tokenVault.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
+import { pruneOldSends } from "./db/accountSends.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -51,7 +52,7 @@ async function main() {
   await startLeadEventsWorker(
     boss,
     pool,
-    createLeadEventReplyHandler(pool, boss, llmProvider, config.tokenKeyring),
+    createLeadEventReplyHandler(pool, boss, llmProvider, config.tokenKeyring, config.aiDailyCallCap),
   );
   await startDataDeletionWorker(boss, pool);
 
@@ -83,6 +84,14 @@ async function main() {
   if (prunedNonces > 0) {
     // eslint-disable-next-line no-console
     console.log(`Pruned ${prunedNonces} expired OAuth nonce(s) on boot`);
+  }
+
+  // R6-06: same shape as R5-03 — account_sends is only ever queried over
+  // the trailing hour, so anything older is pure bloat.
+  const prunedSends = await pruneOldSends(pool);
+  if (prunedSends > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`Pruned ${prunedSends} expired account_sends row(s) on boot`);
   }
 
   await startTokenRefreshWorker(boss, pool, config.tokenKeyring, async (results) => {

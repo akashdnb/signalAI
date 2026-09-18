@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../../db/campaigns.js";
 import type { LLMProvider } from "../../llm/provider.js";
+import type { AiSpendGuard } from "../aiSpendGuard.js";
 import { generateReply, type ReplyContext } from "../replyEngine.js";
+
+function spendGuard(allow: boolean): AiSpendGuard {
+  return { tryConsume: vi.fn(async () => allow) };
+}
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
   return {
@@ -132,5 +137,46 @@ describe("generateReply", () => {
     const call = generateReplyMock.mock.calls[0]![0];
     expect(call.systemPrompt).toContain("private direct message");
     expect(call.systemPrompt).not.toContain("PUBLIC comment reply");
+  });
+
+  // B10: the cap is checked immediately before the provider call, inside
+  // generateReply itself, reusing the same fail-closed fallback as every
+  // other failure mode.
+  describe("AI spend cap (B10)", () => {
+    it("falls back to the rule-based reply and flags capExceeded when the guard refuses", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue("should never be used");
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider, spendGuard(false));
+
+      expect(result.engine).toBe("rule_based");
+      expect(result.capExceeded).toBe(true);
+      expect(result.fellBackReason).toContain("spend cap");
+      expect(generateReplyMock).not.toHaveBeenCalled();
+    });
+
+    it("calls the provider normally when the guard allows it", async () => {
+      const provider = mockProvider(vi.fn().mockResolvedValue("Sure, here's the info!"));
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider, spendGuard(true));
+
+      expect(result.engine).toBe("ai_generated");
+      expect(result.capExceeded).toBeUndefined();
+    });
+
+    it("never checks the guard for a rule_based campaign — rule-based replies don't cost anything", async () => {
+      const guard = spendGuard(true);
+      await generateReply(makeContext(), mockProvider(vi.fn()), guard);
+      expect(guard.tryConsume).not.toHaveBeenCalled();
+    });
+
+    it("defaults to unmetered when no guard is supplied", async () => {
+      const provider = mockProvider(vi.fn().mockResolvedValue("ok"));
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+      const result = await generateReply(ctx, provider);
+      expect(result.engine).toBe("ai_generated");
+    });
   });
 });

@@ -27,6 +27,7 @@ vi.mock("../../queue/leadEventsQueue.js", async (importOriginal) => {
 
 const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
 const fakeBoss = {} as PgBoss;
+const DEFAULT_AI_CAP = 1000; // high enough that tests not exercising B10 never hit it
 
 function mockProvider(replies: string[]): LLMProvider {
   let call = 0;
@@ -98,7 +99,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       JSON.stringify({ reply: "Here is our pricing.", milestone_satisfied: true }),
       JSON.stringify({ reply: "Booked for 3pm!", milestone_satisfied: true, captured_value: "3pm" }),
     ]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const first = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "my email is a@b.com");
     const r1 = await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: first.event.id, sequence: 1 });
@@ -137,7 +138,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const provider = mockProvider([
       JSON.stringify({ reply: "Could you share your email?", milestone_satisfied: false }),
     ]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "what is this about?");
     await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
@@ -155,7 +156,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"]); // rule_based, no milestones
 
     const provider = mockProvider(["unused"]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
     await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
@@ -179,7 +180,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     });
 
     const provider = mockProvider(["Here you go!"]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
     await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
@@ -201,7 +202,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "send pricing" }]);
 
     const provider = mockProvider([JSON.stringify({ reply: "Here's our pricing.", milestone_satisfied: true })]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "what's the price?");
     await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
@@ -219,7 +220,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
 
     const provider = mockProvider(["unused"]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
     // Slam the window shut after seedMatchedEvent opened it.
@@ -237,7 +238,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
 
     const provider = mockProvider(["unused"]);
-    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
     const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
 
@@ -257,5 +258,94 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       { tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 },
       { delaySeconds: expect.any(Number) },
     );
+  });
+
+  // B10: the cap is checked inside generateReply/runMilestoneCheck, before
+  // the provider call — this asserts the end-to-end degrade actually
+  // reaches the send (rule-based reply still goes out, nothing is dropped)
+  // and that an operator alert fires.
+  it("daily AI call cap reached: degrades to a rule-based reply and still sends it", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+    const provider = mockProvider(["should never be called"]);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, 0); // cap of 0 — always exceeded
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+    const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    expect(result).toEqual({ advance: true });
+    expect(provider.generateReply).not.toHaveBeenCalled();
+    expect(sendInstagramMessage).toHaveBeenCalledTimes(1); // the rule-based fallback still goes out — nothing dropped
+    const [, , text] = vi.mocked(sendInstagramMessage).mock.calls[0]!;
+    expect(text).toBe(campaign.defaultReplyTemplate.replace("{{username}}", "real_handle").replace("{{keyword}}", "LINK"));
+  });
+
+  // R6-01 regression: milestone advancement used to commit before the send
+  // — a failed send still left the lead's active_milestone_id pointing at
+  // the NEXT milestone, so a retry would answer milestone 2 without the
+  // lead ever having received milestone 1's reply.
+  it("does not advance the milestone when the Instagram send fails", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
+    await setCampaignMilestones(pool, tenant.id, campaign.id, [
+      { goalDescription: "capture email", captureField: "email" },
+      { goalDescription: "send pricing" },
+    ]);
+
+    const provider = mockProvider([
+      JSON.stringify({ reply: "Thanks! Got your email.", milestone_satisfied: true, captured_value: "a@b.com" }),
+    ]);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+    vi.mocked(sendInstagramMessage).mockRejectedValueOnce(new Error("Instagram send failed: 500"));
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "my email is a@b.com");
+
+    await expect(
+      handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 }),
+    ).rejects.toThrow("Instagram send failed");
+
+    const after = await getLead(pool, tenant.id, lead.id);
+    const milestones = await pool.query(
+      "select id from campaign_milestones where campaign_id = $1 order by ordinal asc",
+      [campaign.id],
+    );
+    const firstMilestoneId = milestones.rows[0].id;
+    // Still on the first milestone — never moved to the second, which is
+    // what "satisfied: true" would otherwise have committed.
+    expect(after!.activeMilestoneId).toBe(firstMilestoneId);
+
+    const advancements = await pool.query(
+      "select count(*)::int as count from milestone_advancements where lead_id = $1",
+      [lead.id],
+    );
+    expect(advancements.rows[0].count).toBe(0);
+
+    const facts = await getCapturedFacts(pool, tenant.id, lead.id);
+    expect(facts).toEqual({}); // the captured email was never merged either — the whole commit was deferred
+  });
+
+  // R6-02/R6-03: the reservation itself is what counts as "sent" for rate
+  // limiting purposes (recorded atomically before the send attempt) —
+  // this confirms exactly one row lands per successful handler call, not
+  // zero (would mean the limiter isn't tracking) and not two (would mean
+  // double-counting).
+  it("records exactly one account_sends row per successful send", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"]); // rule_based
+
+    const provider = mockProvider(["unused"]);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+    await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    const rows = await pool.query(
+      "select count(*)::int as count from account_sends where instagram_account_id = 'acct-1'",
+    );
+    expect(rows.rows[0].count).toBe(1);
   });
 });

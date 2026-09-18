@@ -12,12 +12,20 @@ export async function sendInstagramMessage(
   recipientInstagramUserId: string,
   text: string,
 ): Promise<void> {
-  const url = new URL(`${GRAPH_BASE_URL}/v21.0/me/messages`);
-  url.searchParams.set("access_token", accessToken);
+  // R6-04 fix: the token used to travel as an `access_token` URL query
+  // param — request URLs are the most-logged string in any stack (process
+  // logs, proxies, APM traces, error messages that echo the request line),
+  // so the one secret B2 went to the trouble of envelope-encrypting at
+  // rest was traveling in the one place everything writes down. Meta
+  // accepts it as a Bearer token too.
+  const url = `${GRAPH_BASE_URL}/v21.0/me/messages`;
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
       recipient: { id: recipientInstagramUserId },
       message: { text },

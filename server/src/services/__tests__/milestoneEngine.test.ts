@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LLMProvider } from "../../llm/provider.js";
 import type { Milestone } from "../../db/milestones.js";
+import type { AiSpendGuard } from "../aiSpendGuard.js";
 import { runMilestoneCheck } from "../milestoneEngine.js";
+
+function spendGuard(allow: boolean): AiSpendGuard {
+  return { tryConsume: vi.fn(async () => allow) };
+}
 
 function makeMilestone(overrides: Partial<Milestone> = {}): Milestone {
   return {
@@ -287,5 +292,39 @@ describe("runMilestoneCheck", () => {
 
     expect(result.reply).toBe("hi");
     expect(result.fellBackReason).toBeUndefined();
+  });
+
+  // B10: same placement/rationale as replyEngine.test.ts.
+  describe("AI spend cap (B10)", () => {
+    it("falls back to the non-advancing fallback and flags capExceeded when the guard refuses", async () => {
+      const generateReplyMock = vi.fn();
+      const provider = mockProvider(generateReplyMock);
+
+      const result = await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "my email is a@b.com", tier: "comment" },
+        provider,
+        spendGuard(false),
+      );
+
+      expect(result.satisfied).toBe(false);
+      expect(result.capExceeded).toBe(true);
+      expect(result.fellBackReason).toContain("spend cap");
+      expect(generateReplyMock).not.toHaveBeenCalled();
+    });
+
+    it("calls the provider normally when the guard allows it", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue(JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_value: "a@b.com" })),
+      );
+
+      const result = await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "my email is a@b.com", tier: "comment" },
+        provider,
+        spendGuard(true),
+      );
+
+      expect(result.satisfied).toBe(true);
+      expect(result.capExceeded).toBeUndefined();
+    });
   });
 });

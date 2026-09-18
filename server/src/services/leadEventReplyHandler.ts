@@ -16,10 +16,12 @@ import {
 } from "../db/milestones.js";
 import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
-import { countRecentSends, recordSend } from "../db/accountSends.js";
+import { tryReserveSend } from "../db/accountSends.js";
 import { sendInstagramMessage } from "../lib/instagramSend.js";
+import { Sentry } from "../lib/sentry.js";
 import { generateReply } from "./replyEngine.js";
 import { runMilestoneCheck } from "./milestoneEngine.js";
+import { createAccountSpendGuard } from "./aiSpendGuard.js";
 
 // Meta's published ceiling for private-reply/DM sends per Instagram account.
 const HOURLY_SEND_LIMIT = 750;
@@ -30,25 +32,37 @@ const HOURLY_SEND_LIMIT = 750;
 const RATE_LIMIT_RETRY_DELAY_SECONDS = 60;
 
 /**
- * The B4/B9 worker's handler for the main lead-events queue: decides what
- * (if anything) to reply, then actually sends it to Instagram.
+ * The B4/B9/B10 worker's handler for the main lead-events queue: decides
+ * what (if anything) to reply, then actually sends it to Instagram.
  *
- * Ordering matters here in a way that isn't obvious from reading top to
- * bottom: the messaging-window and rate-limit checks run BEFORE any
- * milestone-engine side effects (captured-fact merges, milestone
- * advancement) or LLM call. A rate-limited send reports `advance: false`
- * and re-enqueues the same job with a delay so it runs again later — if
- * milestone state had already been mutated before that point, the retry
- * would redo the LLM/milestone work against state that had already moved
- * on, double-advancing the milestone. Checking the send preconditions
- * first means a deferred retry re-enters this function with everything
- * exactly as it was the first time.
+ * Two ordering decisions here aren't obvious from reading top to bottom:
+ *
+ * 1. The messaging-window check and the rate-limit reservation both run
+ *    BEFORE any milestone-engine side effects or LLM call. A rate-limited
+ *    send reports `advance: false` and re-enqueues the same job with a
+ *    delay so it runs again later — if milestone state had already been
+ *    mutated before that point, the retry would redo the LLM/milestone
+ *    work against state that had already moved on, double-advancing the
+ *    milestone. Checking send preconditions first means a deferred retry
+ *    re-enters this function with everything exactly as it was the first
+ *    time.
+ *
+ * 2. Milestone advancement (captured-fact merges, `recordMilestoneAdvancement`,
+ *    moving `active_milestone_id` to the next milestone) is computed but
+ *    NOT committed until AFTER `sendInstagramMessage` resolves (R6-01
+ *    fix). Committing it earlier — as an earlier version of this handler
+ *    did — meant a failed send (Meta 5xx, timeout, a token revoked in the
+ *    last few milliseconds) still advanced the conversation: the retry
+ *    would re-enter with `active_milestone_id` already pointing at
+ *    milestone N+1, and the lead would receive milestone 2's reply having
+ *    never received milestone 1's.
  */
 export function createLeadEventReplyHandler(
   pool: Pool,
   boss: PgBoss,
   provider: LLMProvider,
   keyring: Map<string, Buffer>,
+  aiDailyCallCap: number,
 ) {
   return async function handleLeadEvent(job: LeadEventJob): Promise<LeadEventHandlerResult> {
     const event = await getEventForReply(pool, job.tenantId, job.leadEventId);
@@ -74,15 +88,29 @@ export function createLeadEventReplyHandler(
     const account = await getSoleConnectedAccount(pool, job.tenantId);
     if (!account) return { advance: true }; // token was revoked/disconnected since the event was matched
 
-    if ((await countRecentSends(pool, account.instagramAccountId)) >= HOURLY_SEND_LIMIT) {
+    // R6-02/R6-03 fix: a single atomic reserve-and-record, replacing a
+    // separate count-then-later-record pair. key_strict_fifo runs
+    // different leads on the SAME account concurrently by design — the
+    // exact viral-Reel burst this limiter exists to survive — so a
+    // check-then-act count could let N concurrent workers each see a slot
+    // free and each send. See accountSends.ts for the full reasoning.
+    if (!(await tryReserveSend(pool, job.tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT))) {
       await enqueueLeadEvent(boss, job, { delaySeconds: RATE_LIMIT_RETRY_DELAY_SECONDS });
       return { advance: false };
     }
 
     const milestones = await listMilestones(pool, job.tenantId, campaign.id);
     const sourceText = event.commentText ?? "";
+    // B10: one guard per event, shared by whichever path below actually
+    // calls the provider — rule-based replies never reach it, so they
+    // never count against the cap.
+    const spendGuard = createAccountSpendGuard(pool, job.tenantId, account.instagramAccountId, aiDailyCallCap);
 
     let replyText: string;
+    let capExceeded = false;
+    // R6-01: milestone advancement is computed here but only committed
+    // after a confirmed send, below.
+    let commitMilestoneAdvancement: (() => Promise<void>) | null = null;
 
     if (milestones.length === 0 || campaign.replyMode === "rule_based") {
       // No Milestone Engine configured, or the campaign opted out of AI
@@ -97,8 +125,10 @@ export function createLeadEventReplyHandler(
           ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,
+        spendGuard,
       );
       replyText = reply.text;
+      capExceeded = reply.capExceeded ?? false;
     } else {
       const activeMilestone = lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
@@ -107,6 +137,9 @@ export function createLeadEventReplyHandler(
       if (!activeMilestone) return { advance: true }; // campaign has milestones but somehow none resolved
 
       if (!lead.activeMilestoneId) {
+        // Idempotent regardless of send outcome — always resolves to the
+        // same first milestone id on a retry, so this is safe to commit
+        // immediately rather than deferring it too.
         await setActiveMilestone(pool, job.tenantId, job.leadId, activeMilestone.id);
       }
 
@@ -122,30 +155,51 @@ export function createLeadEventReplyHandler(
           ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,
+        spendGuard,
       );
 
       if (result.satisfied) {
-        if (activeMilestone.captureField && result.capturedValue) {
-          await mergeCapturedFacts(pool, job.tenantId, job.leadId, {
-            [activeMilestone.captureField]: result.capturedValue,
-          });
-        }
-        await recordMilestoneAdvancement(pool, job.tenantId, job.leadId, campaign.id, activeMilestone.id);
+        commitMilestoneAdvancement = async () => {
+          if (activeMilestone.captureField && result.capturedValue) {
+            await mergeCapturedFacts(pool, job.tenantId, job.leadId, {
+              [activeMilestone.captureField]: result.capturedValue,
+            });
+          }
+          await recordMilestoneAdvancement(pool, job.tenantId, job.leadId, campaign.id, activeMilestone.id);
 
-        const next = await getNextMilestone(pool, job.tenantId, campaign.id, activeMilestone.ordinal);
-        if (next) {
-          await setActiveMilestone(pool, job.tenantId, job.leadId, next.id);
-        }
+          const next = await getNextMilestone(pool, job.tenantId, campaign.id, activeMilestone.ordinal);
+          if (next) {
+            await setActiveMilestone(pool, job.tenantId, job.leadId, next.id);
+          }
+        };
       }
 
       replyText = result.reply;
+      capExceeded = result.capExceeded ?? false;
+    }
+
+    if (capExceeded) {
+      const message = "AI spend cap exceeded — degraded to rule-based reply";
+      // eslint-disable-next-line no-console
+      console.warn(message, { tenantId: job.tenantId, instagramAccountId: account.instagramAccountId });
+      Sentry.captureMessage(message, {
+        level: "warning",
+        extra: { tenantId: job.tenantId, instagramAccountId: account.instagramAccountId },
+      });
     }
 
     const token = await getDecryptedToken(pool, keyring, job.tenantId, account.instagramAccountId);
-    if (!token) return { advance: true }; // disconnected between the rate-limit check above and now
+    if (!token) return { advance: true }; // disconnected between the reservation above and now; the reserved slot goes unused
 
     await sendInstagramMessage(token, lead.instagramUserId, replyText);
-    await recordSend(pool, job.tenantId, account.instagramAccountId);
+
+    // R6-01: only commit milestone advancement once the send actually
+    // succeeded — a throw above propagates out of this handler and the
+    // job retries with nothing committed yet, so the retry redoes the
+    // LLM/milestone work cleanly instead of skipping ahead.
+    if (commitMilestoneAdvancement) {
+      await commitMilestoneAdvancement();
+    }
 
     return { advance: true };
   };
