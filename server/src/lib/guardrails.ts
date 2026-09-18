@@ -7,16 +7,22 @@
  *
  * Two passes around the LLM call, not one: a system prompt saying "don't
  * do X" is a suggestion the model can be talked around. Input
- * classification and output validation are the actual enforcement.
+ * classification and output validation are the actual enforcement — but
+ * per R1-05/R2-05, the load-bearing control is structural (untrusted text
+ * stays in the `user` role, never concatenated into instructions — see
+ * replyEngine.ts/milestoneEngine.ts) and the output side, not a denylist
+ * on the input. A denylist can't catch a real attempt (different wording,
+ * another language, homoglyphs) but reliably blocks ordinary customers —
+ * "does this act as a moisturizer?", "you are now my favourite brand",
+ * "my system: dry skin" all matched the previous, broader patterns. What's
+ * below is narrowed to phrasing that requires both a disregard/override
+ * verb AND "instructions" as its object — organic customer comments
+ * essentially never produce that combination.
  */
 
 const PROMPT_INJECTION_PATTERNS = [
-  /ignore (all|any|the)? ?(previous|prior|above) instructions/i,
-  /you are now/i,
-  /system\s*:/i,
-  /disregard (all|any|the)? ?(previous|prior|above)/i,
-  /act as (an?|the)/i,
-  /new instructions/i,
+  /\b(ignore|disregard|forget)\b[\s\S]{0,20}\b(previous|prior|above|all)\b[\s\S]{0,10}\binstructions?\b/i,
+  /\bnew\s+system\s+prompt\b/i,
 ];
 
 const FORBIDDEN_OUTPUT_PATTERNS = [
@@ -25,6 +31,8 @@ const FORBIDDEN_OUTPUT_PATTERNS = [
   /\byou should (sue|file a lawsuit)/i,
   /\bguaranteed (returns|profit|income)/i,
 ];
+
+const URL_PATTERN = /\bhttps?:\/\/\S+/gi;
 
 const MAX_COMMENT_REPLY_LENGTH = 300; // public comment replies: short/constrained, higher guardrail strictness
 
@@ -37,7 +45,8 @@ export interface InputClassification {
  * Runs BEFORE generation. Comment/DM text is attacker-controlled input
  * flowing into a prompt whose output can post publicly under the client's
  * brand — this is what catches an attempted prompt injection before it
- * ever reaches the model, rather than hoping the model resists it.
+ * ever reaches the model, rather than hoping the model resists it. Kept
+ * deliberately narrow (see module doc) — a wide net here costs real leads.
  */
 export function classifyInput(text: string): InputClassification {
   for (const pattern of PROMPT_INJECTION_PATTERNS) {
@@ -55,12 +64,24 @@ export interface OutputValidation {
 
 /**
  * Runs AFTER generation, before send. Catches leakage even when the input
- * looked benign — the real safety net, not the system prompt.
+ * looked benign — the real safety net, not the system prompt. `allowedLink`
+ * is the campaign's own CTA (already appended to `text` by the caller
+ * before this runs) — R2-05: any OTHER link in a generated reply is
+ * rejected, since an AI-generated public comment posting an arbitrary URL
+ * under the client's brand is the one injection outcome that actually
+ * matters commercially.
  */
-export function validateOutput(text: string, tier: "comment" | "dm"): OutputValidation {
+export function validateOutput(text: string, tier: "comment" | "dm", allowedLink?: string): OutputValidation {
   for (const pattern of FORBIDDEN_OUTPUT_PATTERNS) {
     if (pattern.test(text)) {
       return { allowed: false, reason: `output matched forbidden pattern: ${pattern}` };
+    }
+  }
+
+  const urls = text.match(URL_PATTERN) ?? [];
+  for (const url of urls) {
+    if (!allowedLink || !url.startsWith(allowedLink)) {
+      return { allowed: false, reason: `output contains a link not on the allowlist: ${url}` };
     }
   }
 

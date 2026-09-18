@@ -8,6 +8,7 @@ import { startDeadLetterWatcher, startLeadEventsWorker } from "./queue/worker.js
 import { createLLMProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
+import { assertKeyringConfigured } from "./lib/tokenVault.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -30,6 +31,11 @@ function loadLLMProviderOrFallback(): LLMProvider {
 }
 
 async function main() {
+  // R1-10: fail at boot, not at the first token write in production —
+  // this gates the whole account-connection flow, unlike the LLM provider
+  // below, which has a real degrade-gracefully path.
+  assertKeyringConfigured(config.tokenKeyring);
+
   const pool = getPool();
   const boss = await getBoss();
   const llmProvider = loadLLMProviderOrFallback();

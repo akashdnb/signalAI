@@ -35,4 +35,15 @@ describe("verifyWebhookSignature", () => {
     const body = Buffer.from("{}");
     expect(verifyWebhookSignature(body, "not-a-real-signature", APP_SECRET)).toBe(false);
   });
+
+  it("rejects a sha256= header whose value isn't valid hex, without throwing (R1-14)", () => {
+    const body = Buffer.from("{}");
+    expect(() => verifyWebhookSignature(body, "sha256=not-hex-zz", APP_SECRET)).not.toThrow();
+    expect(verifyWebhookSignature(body, "sha256=not-hex-zz", APP_SECRET)).toBe(false);
+  });
+
+  it("rejects an odd-length hex value", () => {
+    const body = Buffer.from("{}");
+    expect(verifyWebhookSignature(body, "sha256=abc", APP_SECRET)).toBe(false);
+  });
 });

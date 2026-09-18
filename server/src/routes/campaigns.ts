@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import { createCampaign, listCampaigns, setCampaignEnabled } from "../db/campaigns.js";
+import { listMilestones, setCampaignMilestones } from "../db/milestones.js";
 
 export const campaignsRouter = Router();
 
@@ -40,4 +41,36 @@ campaignsRouter.patch("/tenants/:tenantId/campaigns/:campaignId/enabled", async 
     return res.status(404).json({ error: "campaign not found for this tenant" });
   }
   return res.status(200).json({ id: campaignId, enabled });
+});
+
+// The creator's entire configuration surface for the Milestone Engine
+// (roadmap B8): an ordered plain-language goal list, replaced wholesale
+// on each save rather than edited row by row.
+campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/milestones", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const { milestones } = req.body ?? {};
+
+  if (
+    !Array.isArray(milestones) ||
+    milestones.length === 0 ||
+    !milestones.every(
+      (m) =>
+        typeof m === "object" &&
+        m !== null &&
+        typeof m.goalDescription === "string" &&
+        m.goalDescription.trim().length > 0 &&
+        (m.captureField === undefined || typeof m.captureField === "string"),
+    )
+  ) {
+    return res.status(400).json({ error: "milestones must be a non-empty array of { goalDescription, captureField? }" });
+  }
+
+  const saved = await setCampaignMilestones(getPool(), tenantId, campaignId, milestones);
+  return res.status(200).json(saved);
+});
+
+campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/milestones", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const milestones = await listMilestones(getPool(), tenantId, campaignId);
+  return res.status(200).json(milestones);
 });

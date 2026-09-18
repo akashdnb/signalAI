@@ -81,6 +81,7 @@ describe("app", () => {
       sequence: 1,
     });
     await insertPii(pool, {
+      tenantId: tenant.id,
       leadEventId: event!.id,
       leadId: lead.id,
       commentText: "DM me the word LINK",

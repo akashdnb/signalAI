@@ -1,7 +1,7 @@
 import type { Campaign } from "../db/campaigns.js";
 import type { LLMProvider } from "../llm/provider.js";
 import { classifyInput, validateOutput } from "../lib/guardrails.js";
-import { renderTemplate } from "../lib/messageComposer.js";
+import { appendCtaLink, renderTemplate } from "../lib/messageComposer.js";
 
 export type ReplyTier = "comment" | "dm";
 
@@ -22,12 +22,11 @@ export interface PreparedReply {
 }
 
 function ruleBasedReply(ctx: ReplyContext): PreparedReply {
-  const text = renderTemplate(ctx.campaign.defaultReplyTemplate, {
+  const substituted = renderTemplate(ctx.campaign.defaultReplyTemplate, {
     username: ctx.username,
     keyword: ctx.matchedKeyword,
-    ctaLink: ctx.ctaLink,
   });
-  return { text, engine: "rule_based" };
+  return { text: appendCtaLink(substituted, ctx.ctaLink), engine: "rule_based" };
 }
 
 function buildSystemPrompt(ctx: ReplyContext): string {
@@ -70,12 +69,16 @@ export async function generateReply(ctx: ReplyContext, provider: LLMProvider): P
       userMessage: ctx.sourceText,
     });
 
-    const outputCheck = validateOutput(generated, ctx.tier);
+    // Compose (append the CTA) BEFORE validating (R2-01 fix): a reply that
+    // validates at 299 characters previously shipped at ~325 once a link
+    // was appended afterward — the exact guarantee the comment-tier limit
+    // exists to enforce, silently bypassed on every send with a CTA.
+    const text = appendCtaLink(generated, ctx.ctaLink);
+    const outputCheck = validateOutput(text, ctx.tier, ctx.ctaLink);
     if (!outputCheck.allowed) {
       return { ...ruleBasedReply(ctx), fellBackReason: outputCheck.reason };
     }
 
-    const text = renderTemplate(generated, { ctaLink: ctx.ctaLink });
     return { text, engine: "ai_generated" };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

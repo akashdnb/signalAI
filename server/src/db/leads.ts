@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Queryable } from "./types.js";
 
 export interface Lead {
   id: string;
@@ -41,7 +41,7 @@ function toLead(row: LeadRow): Lead {
  * there is no variant of this lookup that can cross a tenant boundary.
  */
 export async function findOrCreateLeadByInstagramUserId(
-  pool: Pool,
+  pool: Queryable,
   tenantId: string,
   instagramUserId: string,
 ): Promise<Lead> {
@@ -56,7 +56,7 @@ export async function findOrCreateLeadByInstagramUserId(
   return toLead(result.rows[0]!);
 }
 
-export async function getLead(pool: Pool, tenantId: string, leadId: string): Promise<Lead | null> {
+export async function getLead(pool: Queryable, tenantId: string, leadId: string): Promise<Lead | null> {
   const result = await pool.query<LeadRow>(
     `select * from leads where id = $1 and tenant_id = $2`,
     [leadId, tenantId],
@@ -64,8 +64,21 @@ export async function getLead(pool: Pool, tenantId: string, leadId: string): Pro
   return result.rows[0] ? toLead(result.rows[0]) : null;
 }
 
+export async function setActiveMilestone(
+  pool: Queryable,
+  tenantId: string,
+  leadId: string,
+  milestoneId: string,
+): Promise<void> {
+  await pool.query(`update leads set active_milestone_id = $3 where id = $1 and tenant_id = $2`, [
+    leadId,
+    tenantId,
+    milestoneId,
+  ]);
+}
+
 export async function updateMessagingWindow(
-  pool: Pool,
+  pool: Queryable,
   tenantId: string,
   leadId: string,
   lastInboundAt: Date,
@@ -84,7 +97,7 @@ export async function updateMessagingWindow(
  * has gotten). Concurrent webhook deliveries for the same lead each get a
  * unique, strictly increasing number, never a collision.
  */
-export async function nextSequence(pool: Pool, tenantId: string, leadId: string): Promise<number> {
+export async function nextSequence(pool: Queryable, tenantId: string, leadId: string): Promise<number> {
   const result = await pool.query<{ next_sequence: string }>(
     `update leads set next_sequence = next_sequence + 1
      where id = $1 and tenant_id = $2
@@ -110,7 +123,7 @@ export async function nextSequence(pool: Pool, tenantId: string, leadId: string)
  * of ever reaching the dead letter queue.
  */
 export async function isSequenceStale(
-  pool: Pool,
+  pool: Queryable,
   tenantId: string,
   leadId: string,
   sequence: number,
@@ -130,7 +143,7 @@ export async function isSequenceStale(
  * workers ever processing the same lead concurrently in the first place).
  */
 export async function advanceSequence(
-  pool: Pool,
+  pool: Queryable,
   tenantId: string,
   leadId: string,
   sequence: number,

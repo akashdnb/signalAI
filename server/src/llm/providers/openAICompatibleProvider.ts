@@ -12,7 +12,15 @@ export interface OpenAICompatibleConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** Single-digit seconds for the comment tier (R2-02): a hung provider under key_strict_fifo freezes that lead's entire conversation for as long as the socket stays open, since only one job per lead can be active at a time. */
+  timeoutMs?: number;
+  /** R2-03: caps a runaway (and fully billed) generation that the comment-tier length check would reject anyway. */
+  maxTokens?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_MAX_TOKENS = 500;
+const MAX_ERROR_BODY_CHARS = 200;
 
 export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): LLMProvider {
   return {
@@ -26,15 +34,25 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
         },
         body: JSON.stringify({
           model: config.model,
+          max_tokens: config.maxTokens ?? DEFAULT_MAX_TOKENS,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userMessage },
           ],
         }),
+        signal: AbortSignal.timeout(config.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
 
       if (!res.ok) {
-        throw new Error(`${config.name} generateReply failed: ${res.status} ${await res.text()}`);
+        // R2-04: the raw body can echo request context back (some APIs
+        // include it in error detail) and this string is destined for
+        // fellBackReason — logs and possibly a lead's audit trail. Truncate
+        // here; a caller wanting the full body should read it from the
+        // error tracker, not from this message.
+        const bodyText = await res.text();
+        const truncated =
+          bodyText.length > MAX_ERROR_BODY_CHARS ? `${bodyText.slice(0, MAX_ERROR_BODY_CHARS)}…` : bodyText;
+        throw new Error(`${config.name} generateReply failed: ${res.status} ${truncated}`);
       }
 
       const body = (await res.json()) as {

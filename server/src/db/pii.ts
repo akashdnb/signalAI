@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import type { Queryable } from "./types.js";
 
 /**
  * Meta's Data Deletion Callback is app-scoped, not tenant-scoped — the same
@@ -9,7 +10,7 @@ import type { Pool } from "pg";
  * (which remains itself tenant-scoped) for every match.
  */
 export async function findLeadsByInstagramUserIdAcrossTenants(
-  pool: Pool,
+  pool: Queryable,
   instagramUserId: string,
 ): Promise<Array<{ tenantId: string; leadId: string }>> {
   const result = await pool.query<{ tenant_id: string; id: string }>(
@@ -20,8 +21,9 @@ export async function findLeadsByInstagramUserIdAcrossTenants(
 }
 
 export async function insertPii(
-  pool: Pool,
+  pool: Queryable,
   params: {
+    tenantId: string;
     leadEventId: string;
     leadId: string;
     commentText?: string;
@@ -31,9 +33,10 @@ export async function insertPii(
   },
 ): Promise<void> {
   await pool.query(
-    `insert into lead_pii (lead_event_id, lead_id, comment_text, dm_text, username, phone)
-     values ($1, $2, $3, $4, $5, $6)`,
+    `insert into lead_pii (tenant_id, lead_event_id, lead_id, comment_text, dm_text, username, phone)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
     [
+      params.tenantId,
       params.leadEventId,
       params.leadId,
       params.commentText ?? null,
@@ -55,6 +58,13 @@ export async function insertPii(
  *
  * Returns false if no lead matched (leadId, tenantId) — the caller's signal
  * that there was nothing to delete under that tenant.
+ *
+ * R1-17: scrubbing `instagram_user_id` means the same person commenting
+ * again creates a fresh lead, and their data starts accumulating again —
+ * deletion does not "stick" as a permanent block. This is a deliberate
+ * default (a new interaction is a new lawful basis to process it), not an
+ * oversight — recorded here since "why did their data come back" is a
+ * question that will get asked.
  */
 export async function hardScrubLead(pool: Pool, tenantId: string, leadId: string): Promise<boolean> {
   const client = await pool.connect();
@@ -76,8 +86,15 @@ export async function hardScrubLead(pool: Pool, tenantId: string, leadId: string
     await client.query(
       `update lead_pii
        set comment_text = null, dm_text = null, username = null, phone = null, deleted_at = now()
-       where lead_id = $1`,
-      [leadId],
+       where lead_id = $1 and tenant_id = $2`,
+      [leadId, tenantId],
+    );
+
+    // Captured facts (email, phone, budget — B8 Milestone Engine) are PII
+    // too, and belong to this same scrub, not a separate deletion path.
+    await client.query(
+      `update lead_captured_facts set facts = '{}', deleted_at = now() where lead_id = $1 and tenant_id = $2`,
+      [leadId, tenantId],
     );
 
     await client.query("COMMIT");

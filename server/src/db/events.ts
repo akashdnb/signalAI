@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Queryable } from "./types.js";
 
 export interface LeadEvent {
   id: string;
@@ -56,7 +56,7 @@ export interface EventForReply {
 
 /** Everything the reply engine needs for one event, joined once rather than three separate round trips. */
 export async function getEventForReply(
-  pool: Pool,
+  pool: Queryable,
   tenantId: string,
   leadEventId: string,
 ): Promise<EventForReply | null> {
@@ -89,7 +89,7 @@ export async function getEventForReply(
 }
 
 export async function insertEventIdempotent(
-  pool: Pool,
+  pool: Queryable,
   params: {
     tenantId: string;
     leadId: string;

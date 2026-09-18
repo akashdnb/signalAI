@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import type { Queryable } from "./types.js";
 
 export type ReplyMode = "rule_based" | "ai_generated";
 
@@ -84,7 +85,7 @@ export async function getCampaign(pool: Pool, tenantId: string, campaignId: stri
 
 /** Only what the matcher needs, for the hot ingestion path — not the full row. */
 export async function listActiveCampaignKeywords(
-  pool: Pool,
+  pool: Queryable,
   tenantId: string,
 ): Promise<Array<{ id: string; keywords: string[] }>> {
   const result = await pool.query<{ id: string; keywords: string[] }>(

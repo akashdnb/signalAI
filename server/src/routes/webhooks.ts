@@ -1,12 +1,19 @@
+import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
 import { verifyWebhookSignature } from "../lib/webhookSignature.js";
 import { parseInstagramWebhookPayload } from "../lib/instagramWebhookParser.js";
-import { ingestWebhookEvent } from "../services/webhookIngestService.js";
+import { ingestWebhookEvents } from "../services/webhookIngestService.js";
 import { getPool } from "../db/pool.js";
 import { getBoss } from "../queue/boss.js";
 
 export const webhooksRouter = Router();
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 // Meta's subscription verification handshake.
 webhooksRouter.get("/webhooks/instagram", (req, res) => {
@@ -14,7 +21,11 @@ webhooksRouter.get("/webhooks/instagram", (req, res) => {
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode === "subscribe" && token === config.metaWebhookVerifyToken) {
+  if (
+    mode === "subscribe" &&
+    typeof token === "string" &&
+    timingSafeStringEqual(token, config.metaWebhookVerifyToken)
+  ) {
     return res.status(200).send(challenge);
   }
   return res.sendStatus(403);
@@ -38,9 +49,7 @@ webhooksRouter.post("/webhooks/instagram", async (req, res) => {
     const events = parseInstagramWebhookPayload(req.body);
     const pool = getPool();
     const boss = await getBoss();
-    for (const event of events) {
-      await ingestWebhookEvent(pool, boss, event);
-    }
+    await ingestWebhookEvents(pool, boss, events);
     return res.sendStatus(200);
   } catch (err) {
     // eslint-disable-next-line no-console

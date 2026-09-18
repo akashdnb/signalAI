@@ -1,4 +1,4 @@
-import type { PgBoss, Job } from "pg-boss";
+import type { PgBoss, Job, JobWithMetadata } from "pg-boss";
 import type { Pool } from "pg";
 import { advanceSequence, isSequenceStale } from "../db/leads.js";
 import { LEAD_EVENTS_DLQ, LEAD_EVENTS_QUEUE, type LeadEventJob } from "./leadEventsQueue.js";
@@ -50,11 +50,27 @@ export type DeadLetterHandler = (job: LeadEventJob) => Promise<void>;
  * A permanently-failed job under key_strict_fifo blocks its own lead
  * indefinitely, so this must exist before the queue is trusted with real
  * traffic — a wedged lead needs an operator alert, not silence.
+ *
+ * Verified empirically (not assumed): dead-lettering does NOT by itself
+ * unblock the singletonKey. The source job is left behind in the source
+ * queue's table with state='failed', and key_strict_fifo treats a job in
+ * that state as still occupying the key forever — a second job for the
+ * same lead sits at state='created' and is never fetched. `includeMetadata`
+ * exposes `sourceName`/`sourceId` (the original queue and job id) on the
+ * DLQ job specifically so this handler can delete that source row, which
+ * is what actually frees the key for the next job.
  */
 export function startDeadLetterWatcher(boss: PgBoss, onDeadLetter: DeadLetterHandler): Promise<string> {
-  return boss.work<LeadEventJob>(LEAD_EVENTS_DLQ, async (jobs: Job<LeadEventJob>[]) => {
-    for (const job of jobs) {
-      await onDeadLetter(job.data);
-    }
-  });
+  return boss.work(
+    LEAD_EVENTS_DLQ,
+    { includeMetadata: true } as const,
+    async (jobs: JobWithMetadata<LeadEventJob>[]) => {
+      for (const job of jobs) {
+        if (job.sourceName && job.sourceId) {
+          await boss.deleteJob(job.sourceName, job.sourceId);
+        }
+        await onDeadLetter(job.data);
+      }
+    },
+  );
 }

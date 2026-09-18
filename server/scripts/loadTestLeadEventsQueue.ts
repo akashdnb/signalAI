@@ -8,29 +8,33 @@
  *
  * Run: DATABASE_URL=... npx tsx scripts/loadTestLeadEventsQueue.ts [leadCount]
  *
- * Shares the real `lead-events`/`lead-events-dlq` queues with the app and
- * with the vitest suite. A killed or timed-out run can leave orphaned jobs
- * behind that a later vitest run's DLQ-watcher test will then pick up as
- * false failures. If that happens: `DROP SCHEMA pgboss CASCADE` on the test
- * DB and let the next `boss.start()` reprovision it, rather than debugging
- * the test.
+ * R1-13 fix: uses its own uniquely-suffixed queue names rather than the
+ * app's real `lead-events`/`lead-events-dlq` — a killed or timed-out run
+ * used to leave orphaned jobs behind on the shared queue that a later
+ * vitest run's DLQ-watcher test would then pick up as a false failure.
+ * This is a deliberately minimal, standalone re-implementation (not a
+ * reuse of src/queue/*) since the point is measuring pg-boss's own
+ * key_strict_fifo throughput, not exercising the app's reply pipeline.
  */
 import { PgBoss } from "pg-boss";
 import { getPool, closePool } from "../src/db/pool.js";
 import { createTenant } from "../src/db/tenants.js";
 import { findOrCreateLeadByInstagramUserId } from "../src/db/leads.js";
-import { ensureQueues, enqueueLeadEvent } from "../src/queue/leadEventsQueue.js";
-import { startLeadEventsWorker } from "../src/queue/worker.js";
 
 async function main() {
   const leadCount = Number(process.argv[2] ?? 3000);
+  const runId = Date.now();
+  const queueName = `lead-events-loadtest-${runId}`;
+  const dlqName = `${queueName}-dlq`;
+
   const pool = getPool();
   const boss = new PgBoss(process.env.DATABASE_URL!);
   await boss.start();
-  await ensureQueues(boss);
+  await boss.createQueue(dlqName);
+  await boss.createQueue(queueName, { policy: "key_strict_fifo", deadLetter: dlqName });
 
   console.log(`Provisioning ${leadCount} distinct leads (one event apiece)...`);
-  const tenant = await createTenant(pool, `load-test-${Date.now()}`);
+  const tenant = await createTenant(pool, `load-test-${runId}`);
 
   const leadIds: string[] = [];
   const provisionStart = Date.now();
@@ -44,12 +48,7 @@ async function main() {
   const enqueueStart = Date.now();
   await Promise.all(
     leadIds.map((leadId, i) =>
-      enqueueLeadEvent(boss, {
-        tenantId: tenant.id,
-        leadId,
-        leadEventId: `load-evt-${i}`,
-        sequence: 1,
-      }),
+      boss.send(queueName, { leadId, leadEventId: `load-evt-${i}` }, { singletonKey: leadId }),
     ),
   );
   const enqueueMs = Date.now() - enqueueStart;
@@ -60,18 +59,20 @@ async function main() {
   let lastProgressLog = processStart;
 
   await new Promise<void>((resolve) => {
-    startLeadEventsWorker(boss, pool, async () => {
-      processed += 1;
-      const now = Date.now();
-      if (now - lastProgressLog > 2000) {
-        lastProgressLog = now;
-        console.log(`  ...${processed}/${leadCount} processed (${now - processStart}ms elapsed)`);
-      }
-      if (processed >= leadCount) resolve();
-    }).catch((err) => {
-      console.error("Worker registration failed:", err);
-      resolve();
-    });
+    boss
+      .work(queueName, { batchSize: 50, localConcurrency: 1 }, async (jobs) => {
+        processed += jobs.length;
+        const now = Date.now();
+        if (now - lastProgressLog > 2000) {
+          lastProgressLog = now;
+          console.log(`  ...${processed}/${leadCount} processed (${now - processStart}ms elapsed)`);
+        }
+        if (processed >= leadCount) resolve();
+      })
+      .catch((err) => {
+        console.error("Worker registration failed:", err);
+        resolve();
+      });
 
     // Safety timeout so this never hangs the terminal forever.
     setTimeout(() => {
@@ -84,6 +85,8 @@ async function main() {
   console.log(`\nResult: ${processed}/${leadCount} jobs processed in ${processMs}ms`);
   console.log(`Throughput: ${((processed / processMs) * 1000).toFixed(1)} jobs/sec`);
 
+  await boss.deleteQueue(queueName).catch(() => undefined);
+  await boss.deleteQueue(dlqName).catch(() => undefined);
   await boss.stop({ graceful: false });
   await closePool();
 }
