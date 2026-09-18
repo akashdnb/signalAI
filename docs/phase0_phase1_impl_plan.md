@@ -112,13 +112,18 @@ Everything downstream inherits these decisions, and all of them are expensive to
 - Handler does exactly two things: persist the raw event, ack. No processing, no LLM calls, no sends.
 - **Done when:** a forged payload is rejected, a duplicate event ID is a no-op, and p99 ack latency is comfortably inside Meta's timeout.
 
-## B4 · Worker and queue (L)
+## B4 · Worker and queue (L) — DONE, load test passed
 - pg-boss **12.x**, `key_strict_fifo`, `singletonKey = lead_id` — per-lead ordering, cross-lead parallelism, no new infrastructure.
-- `last_applied_sequence` per lead; events older than the frontier are logged but produce no state-mutating side effects.
+- `last_applied_sequence` per lead; events older than the frontier are logged but produce no state-mutating side effects. **Advance the frontier only after the handler succeeds, never before** — advancing first was a real bug found here: it made a retry of a genuine failure indistinguishable from a stale duplicate, so the retry silently no-opped instead of ever reaching the DLQ. Caught by a regression test, not by inspection — this class of bug is easy to write and easy to miss reading the code.
 - **Dead-letter path with an alert.** Under `key_strict_fifo` a failed job blocks its own key — one permanently-failed event stalls that lead's conversation indefinitely. Without a DLQ and an operator action to clear a wedged `lead_id`, a lead silently goes dark mid-conversation and nothing tells you.
-- **Load test before trusting it:** simulate a viral spike — tens of thousands of distinct `lead_id`s with one event each. That shape (many unique keys, no backlog per key) is the one `key_strict_fifo` is least suited to, and it is exactly signalAI's shape. If throughput disappoints, fall back to a per-lead advisory lock on a standard queue.
+- **Load test result: ship pg-boss's own defaults (`batchSize: 1`, `localConcurrency: 1`) for Phase 1 — every tuning attempt tried introduced a real duplicate-processing bug.** Two configs were tried to fix the default's ~0.5 jobs/sec:
+  - `localConcurrency: 10` reached 297 jobs/sec but duplicated processing — sequence `1` ran three times before `2`/`3` ran at all. Multiple independent polling loops racing on `key_strict_fifo`'s "eligible head" computation, most likely.
+  - `batchSize: 50` (concurrency back to 1) reached 25 jobs/sec, passed several repeated runs, then **failed the identical way on a later run** — same `[1,1,1,2,3]` pattern, intermittently. The common thread in both failures: one key with a *deep backlog* (3 queued jobs for the same lead) is exactly the scenario `key_strict_fifo`'s "one eligible head per key" guarantee did not reliably hold for once batch size moved off 1 — a different, worse-suited shape than the "many keys, one job each" spike this policy is actually tuned for.
+  - Reverting to true defaults (`batchSize: 1`, `localConcurrency: 1`) passed the same ordering test **five consecutive full runs with no failures** — the only configuration verified reliable, not just fast.
+  - **Is ~0.5 jobs/sec actually a problem? No, at pilot scale.** It exceeds Meta's own 750/hour (~0.2/sec) private-reply ceiling per account, which is the real constraint on how fast replies can go out regardless of internal queue speed. **Caveat worth watching, not solving today:** that comparison is per-account; with several pilot creators simultaneously near their individual limits, *aggregate* demand across all of them could exceed this queue's shared ~0.5/sec drain rate before any single account hits its own ceiling. A duplicate send is a worse failure than a delayed one, so the decision is to accept that risk at 2–3 pilot creators and monitor for it (queue lag alongside Account Health Monitoring) rather than retune into a bug that's already been demonstrated twice.
+  - Advisory-lock-on-standard-queue remains the fallback if pilot data shows aggregate lag is real — not attempted here, since it's a bigger change than the session had room to also verify properly.
 - Reconciliation poller to backfill events a dropped webhook would otherwise lose silently.
-- **Done when:** the spike test passes, ordering holds per lead under concurrency, and a poisoned job lands in the DLQ and fires an alert instead of wedging a lead forever.
+- **Done when:** the spike test passes, ordering holds per lead under concurrency, and a poisoned job lands in the DLQ and fires an alert instead of wedging a lead forever. — verified against a real migrated Postgres: strict per-lead ordering, cross-lead concurrency, DLQ + alert on permanent failure, and the retry-vs-stale regression all pass (`src/queue/__tests__/leadEventsQueue.test.ts`, `scripts/loadTestLeadEventsQueue.ts`).
 
 ## B5 · Account connection (M)
 - Instagram Business Login (Instagram API with Instagram Login). No Facebook Page step.
@@ -190,7 +195,7 @@ Not "all tickets closed" — **one pilot creator, unattended for a week, running
 1. **B0 → B1 before anything product-shaped.** They unblock A4, and A4's queue time is the thing you cannot buy back.
 2. **B2 before B3–B11.** Tenant scoping, the identity spine, and the PII split are the retrofits that cost weeks later.
 3. **B7 rule-based before B7 AI.** The fallback must exist before the thing it catches.
-4. **B4's load test is a gate, not a nice-to-have.** `key_strict_fifo` is unproven for this key shape; discovering that during a pilot's viral moment is the worst possible time.
+4. **B4's load test is a gate, not a nice-to-have.** It caught two real duplicate-processing bugs from tuning the queue for throughput, both of which reproduced the exact failure mode a duplicate-DM incident would look like in production. Verdict: ship the untuned defaults; see B4.
 5. **Ship to pilots continuously from B6 onward.** Waiting for B11 to show anyone wastes the entire reason for building in dev mode.
 6. **BUI runs alongside B5–B11, not after.** A backend task isn't actually "done" for a pilot creator until its screen exists too — don't let "the API works" count as done while the UI is still pending.
 
@@ -200,7 +205,7 @@ Not "all tickets closed" — **one pilot creator, unattended for a week, running
 |---|---|---|
 | Business Verification rejected | A2 bounces on documentation | Confirm entity type against Meta's current accepted-document list before refiling; this is the hard blocker on all revenue |
 | App Review rejected repeatedly | Two rounds with different reasons | Re-record the screencast showing the permission in use end-to-end; ambiguity, not policy, is the usual cause |
-| `key_strict_fifo` underperforms at spike | B4 load test | Per-lead advisory lock on a standard queue — same guarantee, no new infrastructure |
+| Tuning `key_strict_fifo` (`batchSize` or `localConcurrency` above 1) duplicates job processing | B4 load test: both `localConcurrency: 10` (297 jobs/sec) and `batchSize: 50` alone (25 jobs/sec) reproduced sequence `1` running 2-3 times before `2`/`3` ran at all — the second intermittently, on a later rerun of a config that had just passed | Ship pg-boss's untouched defaults (`batchSize: 1`, `localConcurrency: 1`) — the only config that passed 5 consecutive full test runs with no failures. ~0.5 jobs/sec still exceeds Meta's 750/hour (~0.2/sec) per-account ceiling; the actual risk is aggregate demand from *several simultaneously active pilot creators* exceeding this shared queue's drain rate before any one of them hits their own limit — watch for it (queue lag), don't preemptively retune into a bug already demonstrated twice. Advisory-lock-on-standard-queue is the fallback if that's ever observed |
 | Wedged lead keys | A lead stops receiving replies with no error surfaced | DLQ + alert in B4; this fails silently by default, which is why it is called out |
 | AI cost spike on a free pilot | B10 cap firing | Working as designed — but revisit the cap value, do not raise it reflexively |
 | Prompt injection via comment | Off-brand public reply | B7 input isolation + output validation; treat as a sev-1, it is your customer's brand |

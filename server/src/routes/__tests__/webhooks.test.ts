@@ -1,0 +1,169 @@
+import { createHmac, randomBytes } from "node:crypto";
+import request from "supertest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { createApp } from "../../app.js";
+import { getPool, closePool } from "../../db/pool.js";
+import { createTenant } from "../../db/tenants.js";
+import { upsertToken } from "../../db/tokens.js";
+import { stopBoss } from "../../queue/boss.js";
+import { resetDb } from "../../__tests__/helpers/db.js";
+
+const APP_SECRET = "test-webhook-secret";
+const VERIFY_TOKEN = "test-verify-token";
+
+function sign(body: Buffer): string {
+  return `sha256=${createHmac("sha256", APP_SECRET).update(body).digest("hex")}`;
+}
+
+describe("webhooks route", () => {
+  beforeAll(() => {
+    process.env.META_APP_SECRET = APP_SECRET;
+    process.env.META_WEBHOOK_VERIFY_TOKEN = VERIFY_TOKEN;
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
+    }
+  });
+
+  beforeEach(async () => {
+    await resetDb(getPool());
+  });
+
+  afterAll(async () => {
+    await stopBoss();
+    await closePool();
+  });
+
+  it("GET handshake succeeds with the correct verify token and echoes the challenge", async () => {
+    const app = createApp();
+    const res = await request(app)
+      .get("/webhooks/instagram")
+      .query({ "hub.mode": "subscribe", "hub.verify_token": VERIFY_TOKEN, "hub.challenge": "abc123" });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBe("abc123");
+  });
+
+  it("GET handshake fails with the wrong verify token", async () => {
+    const app = createApp();
+    const res = await request(app)
+      .get("/webhooks/instagram")
+      .query({ "hub.mode": "subscribe", "hub.verify_token": "wrong", "hub.challenge": "abc123" });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects a POST with a missing or forged signature", async () => {
+    const app = createApp();
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({ entry: [] }));
+
+    expect(res.status).toBe(403);
+  });
+
+  it("ingests a real comment event: resolves tenant, creates lead, stores PII, opens the messaging window", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "unused-in-this-test",
+    });
+
+    const payload = {
+      entry: [
+        {
+          id: "acct-1",
+          time: Math.floor(Date.now() / 1000),
+          changes: [
+            {
+              field: "comments",
+              value: { id: "comment-1", text: "DM me LINK", from: { id: "user-1", username: "real_handle" } },
+            },
+          ],
+        },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+
+    const app = createApp();
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    expect(res.status).toBe(200);
+
+    const lead = await pool.query(
+      "select id, instagram_user_id, last_inbound_at, window_open_until from leads where tenant_id = $1",
+      [tenant.id],
+    );
+    expect(lead.rows).toHaveLength(1);
+    expect(lead.rows[0].instagram_user_id).toBe("user-1");
+    expect(lead.rows[0].window_open_until).not.toBeNull();
+
+    const pii = await pool.query("select comment_text, username from lead_pii where lead_id = $1", [
+      lead.rows[0].id,
+    ]);
+    expect(pii.rows[0]).toMatchObject({ comment_text: "DM me LINK", username: "real_handle" });
+  });
+
+  it("is idempotent: redelivering the identical webhook does not create a second event or lead", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "unused-in-this-test",
+    });
+
+    const payload = {
+      entry: [
+        {
+          id: "acct-1",
+          changes: [
+            { field: "comments", value: { id: "comment-dup", text: "hi", from: { id: "user-1" } } },
+          ],
+        },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    for (let i = 0; i < 2; i++) {
+      const res = await request(app)
+        .post("/webhooks/instagram")
+        .set("Content-Type", "application/json")
+        .set("X-Hub-Signature-256", sign(body))
+        .send(body.toString("utf8"));
+      expect(res.status).toBe(200);
+    }
+
+    const events = await pool.query("select count(*)::int as count from lead_events where tenant_id = $1", [
+      tenant.id,
+    ]);
+    expect(events.rows[0].count).toBe(1);
+  });
+
+  it("acks an event for an unconnected/unknown account without creating any lead", async () => {
+    const payload = {
+      entry: [{ id: "unknown-acct", changes: [{ field: "comments", value: { id: "c1", from: { id: "u1" } } }] }],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    expect(res.status).toBe(200);
+    const leads = await getPool().query("select count(*)::int as count from leads");
+    expect(leads.rows[0].count).toBe(0);
+  });
+});

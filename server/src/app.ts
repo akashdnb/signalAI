@@ -2,17 +2,37 @@ import express from "express";
 import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
 import { dataDeletionRouter } from "./routes/dataDeletion.js";
+import { webhooksRouter } from "./routes/webhooks.js";
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      rawBody?: Buffer;
+    }
+  }
+}
 
 export function createApp() {
   const app = express();
 
   // Meta's Data Deletion Callback posts form-encoded, not JSON.
   app.use(express.urlencoded({ extended: false }));
-  app.use(express.json());
+
+  // Webhook signature verification needs the exact raw bytes Meta signed —
+  // capture them here before json() discards access to the original buffer.
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        (req as express.Request).rawBody = buf;
+      },
+    }),
+  );
 
   app.use(healthRouter);
   app.use(legalRouter);
   app.use(dataDeletionRouter);
+  app.use(webhooksRouter);
 
   return app;
 }

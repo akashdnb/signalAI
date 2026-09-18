@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPool, closePool } from "../pool.js";
 import { createTenant } from "../tenants.js";
-import { findOrCreateLeadByInstagramUserId, tryAdvanceSequence } from "../leads.js";
+import { advanceSequence, findOrCreateLeadByInstagramUserId, isSequenceStale } from "../leads.js";
 import { insertEventIdempotent } from "../events.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
@@ -62,14 +62,35 @@ describe("leads and events", () => {
     expect(second).toBeNull(); // retry of the same webhook delivery, not a new event
   });
 
-  it("tryAdvanceSequence rejects a stale (already-superseded) sequence", async () => {
+  it("advanceSequence rejects moving backward once a later sequence has landed", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
 
-    expect(await tryAdvanceSequence(pool, tenant.id, lead.id, 5)).toBe(true);
+    expect(await advanceSequence(pool, tenant.id, lead.id, 5)).toBe(true);
     // A retry of an older event arriving after a newer one already landed.
-    expect(await tryAdvanceSequence(pool, tenant.id, lead.id, 3)).toBe(false);
-    expect(await tryAdvanceSequence(pool, tenant.id, lead.id, 6)).toBe(true);
+    expect(await advanceSequence(pool, tenant.id, lead.id, 3)).toBe(false);
+    expect(await advanceSequence(pool, tenant.id, lead.id, 6)).toBe(true);
+  });
+
+  it("isSequenceStale distinguishes a genuine retry from a superseded duplicate", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+
+    // Nothing applied yet — sequence 1 is not stale, it's the next one due.
+    expect(await isSequenceStale(pool, tenant.id, lead.id, 1)).toBe(false);
+
+    await advanceSequence(pool, tenant.id, lead.id, 1);
+
+    // A RETRY of the same sequence that just "succeeded" must not look
+    // stale — this is exactly the bug that let a failed handler's retry
+    // silently no-op instead of ever reaching the dead letter queue.
+    // (In practice advanceSequence only runs after the handler succeeds,
+    // so this scenario is about sequence 1 arriving twice, not a failure
+    // retry — the failure-retry case is covered by the queue integration
+    // test instead, since it depends on ordering the two calls correctly.)
+    expect(await isSequenceStale(pool, tenant.id, lead.id, 2)).toBe(false);
+    expect(await isSequenceStale(pool, tenant.id, lead.id, 1)).toBe(true);
   });
 });

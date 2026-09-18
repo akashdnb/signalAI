@@ -79,12 +79,57 @@ export async function updateMessagingWindow(
 }
 
 /**
- * Advances the per-lead ordering frontier (roadmap: pg-boss key_strict_fifo,
- * singletonKey = lead_id). Returns false if `sequence` is not newer than what
- * is already applied — the caller's signal to skip state-mutating side
- * effects for a retry that arrived after a newer event already landed.
+ * Atomically issues the next sequence number for a lead at ingestion time
+ * (distinct from last_applied_sequence, which tracks how far the worker
+ * has gotten). Concurrent webhook deliveries for the same lead each get a
+ * unique, strictly increasing number, never a collision.
  */
-export async function tryAdvanceSequence(
+export async function nextSequence(pool: Pool, tenantId: string, leadId: string): Promise<number> {
+  const result = await pool.query<{ next_sequence: string }>(
+    `update leads set next_sequence = next_sequence + 1
+     where id = $1 and tenant_id = $2
+     returning next_sequence`,
+    [leadId, tenantId],
+  );
+  if (!result.rows[0]) {
+    throw new Error(`Lead ${leadId} not found for tenant ${tenantId}`);
+  }
+  return Number(result.rows[0].next_sequence);
+}
+
+/**
+ * Read-only check against the per-lead ordering frontier — call BEFORE
+ * running the handler. True means a newer (or equal) event already applied,
+ * so this one is superseded and the handler should be skipped.
+ *
+ * Deliberately not combined with advanceSequence into one "check and
+ * commit" step: this needs to stay a peek, because committing the advance
+ * before the handler runs would make a *retry of a genuine failure* look
+ * indistinguishable from a stale duplicate — the retry's own sequence would
+ * already equal the frontier, and it would silently no-op forever instead
+ * of ever reaching the dead letter queue.
+ */
+export async function isSequenceStale(
+  pool: Pool,
+  tenantId: string,
+  leadId: string,
+  sequence: number,
+): Promise<boolean> {
+  const result = await pool.query<{ last_applied_sequence: string }>(
+    `select last_applied_sequence from leads where id = $1 and tenant_id = $2`,
+    [leadId, tenantId],
+  );
+  const current = result.rows[0] ? Number(result.rows[0].last_applied_sequence) : 0;
+  return current >= sequence;
+}
+
+/**
+ * Commits the ordering frontier forward — call AFTER the handler succeeds,
+ * never before. Returns false if something else already advanced past this
+ * sequence in between (defense in depth; key_strict_fifo should prevent two
+ * workers ever processing the same lead concurrently in the first place).
+ */
+export async function advanceSequence(
   pool: Pool,
   tenantId: string,
   leadId: string,
