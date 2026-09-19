@@ -4,14 +4,15 @@ import { saveSession } from "../api";
 
 /**
  * Lands here via a top-level browser redirect from the server's
- * /auth/instagram/callback (see server's routes/auth.ts) — tenantId is a
- * query param, the session token is a URL FRAGMENT (`#token=...`), never
- * a query param, so it's never sent in a Referer header. Read once, saved
- * to localStorage, then immediately stripped from the visible URL via
- * history.replaceState (via navigate(..., {replace:true})) so it never
- * sits in browser history either.
+ * GET /auth/email/verify (see server's routes/authEmail.ts) — tenantId is
+ * a query param, the session token is a URL FRAGMENT (`#token=...`),
+ * never a query param, so it's never sent in a Referer header or logged
+ * anywhere on the way here (R11-01). Read once, saved to localStorage,
+ * then immediately stripped from the visible URL via
+ * navigate(..., {replace: true}) (history.replaceState under the hood)
+ * so it never sits in browser history either.
  */
-export function ConnectedPage() {
+export function LoginVerifyPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -20,7 +21,7 @@ export function ConnectedPage() {
     const token = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("token");
 
     if (!tenantId || !token) {
-      navigate("/connect?error=connection_failed", { replace: true });
+      navigate("/login?error=verification_failed", { replace: true });
       return;
     }
 
@@ -30,7 +31,7 @@ export function ConnectedPage() {
 
   return (
     <div className="page page-narrow">
-      <p>Finishing up your connection…</p>
+      <p>Signing you in…</p>
     </div>
   );
 }

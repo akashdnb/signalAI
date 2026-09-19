@@ -1,5 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
+/**
+ * Identity Refactor U3: the SERVER session token only ever identifies a
+ * user (`userId` lives inside the signed token itself, opaque to the
+ * client). `tenantId` here is a client-side convenience — which workspace
+ * to default to — not a security boundary: the server re-checks real
+ * membership via tenant_members on every request regardless of what
+ * tenantId this object claims, so there's nothing to protect by the client
+ * also tracking a userId it has no use for.
+ */
 export interface Session {
   tenantId: string;
   token: string;
@@ -76,8 +85,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function connectStartUrl(tenantName: string): string {
-  return `${API_BASE}/auth/instagram/start?tenantName=${encodeURIComponent(tenantName)}`;
+/** Identity Refactor U2: unauthenticated — there's no session yet at login time. Always resolves the same way regardless of outcome (server-side enumeration resistance); the caller just shows "check your inbox". */
+export async function requestMagicLink(email: string): Promise<void> {
+  await request("/auth/email/request", { method: "POST", body: JSON.stringify({ email }) });
 }
 
 export interface TenantSummary {
@@ -147,6 +157,13 @@ export interface PreviewResult {
 
 export const api = {
   getTenant: (tenantId: string) => request<TenantSummary>(`/tenants/${tenantId}`),
+  // Identity Refactor U4/U6: connecting Instagram is authenticated (the
+  // caller's session must be a member of tenantId) and is reached via a
+  // top-level navigation, which can't carry an Authorization header — this
+  // authenticated JSON call mints a short-lived one-time link first, and
+  // the caller navigates the browser to the URL it returns.
+  startInstagramConnect: (tenantId: string) =>
+    request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, { method: "POST" }),
   getAccountHealth: (tenantId: string) => request<AccountHealth>(`/tenants/${tenantId}/account`),
   getLeads: (tenantId: string) => request<LeadListItem[]>(`/tenants/${tenantId}/leads`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
