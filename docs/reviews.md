@@ -105,8 +105,8 @@ Reviewed: reply engines, message composer, swappable LLM provider. *Scope note: 
 - [x] **R2-05 [MED]** `src/lib/guardrails.ts:65-77` — `validateOutput` has no link policy, so an AI-generated reply can post an arbitrary URL publicly under the client's brand. This is the concrete half of what R1-05 argued for: the load-bearing control is constraining output, and a link allowlist (the campaign's own CTA and nothing else) is the single highest-value rule to add. It also closes the one injection outcome that actually matters commercially — an attacker getting a creator's account to publish their link. **Related:** with B7 landed, R1-05's false positives now have a measurable cost — a customer asking "does this act as a moisturizer?" trips the input classifier and receives the generic rule-based template instead of a real answer, silently. That is a lost lead per false positive, so R1-05 should be treated as higher priority than its severity tag suggested.
   ↳ **Fixed.** `validateOutput` now takes `allowedLink` and rejects any `https?://` URL in the output that isn't a prefix match on it (including rejecting any link at all when no CTA is allowlisted). Both call sites pass `ctx.ctaLink` — the same link that was just appended by `appendCtaLink`, so the CTA itself never trips its own policy. See R1-05 for the input-side companion fix.
 
-- [ ] **R2-06 [MED]** `src/services/replyEngine.ts:57-83` — placement note for B10, before it is built: the per-account AI spend ceiling belongs here, inside `generateReply` and *before* the `provider.generateReply` call at line 68, reusing the existing fallback so an exhausted cap degrades to the rule-based reply exactly like every other failure mode. Putting it in the worker or the route instead would leave the AI path reachable from any future caller.
-  ↳ **Not yet actionable — B10 isn't built yet.** Left unticked deliberately; will place the ceiling check exactly here, before `provider.generateReply`, when B10 lands.
+- [x] **R2-06 [MED]** `src/services/replyEngine.ts:57-83` — placement note for B10, before it is built: the per-account AI spend ceiling belongs here, inside `generateReply` and *before* the `provider.generateReply` call at line 68, reusing the existing fallback so an exhausted cap degrades to the rule-based reply exactly like every other failure mode. Putting it in the worker or the route instead would leave the AI path reachable from any future caller.
+  ↳ **Fixed, now that B10 has landed.** `generateReply` takes an `AiSpendGuard` (`src/services/aiSpendGuard.ts`) and calls `spendGuard.tryConsume()` immediately before `provider.generateReply`, falling back to the existing rule-based reply (with `capExceeded: true`) on refusal — same shape `runMilestoneCheck` uses. Any future caller of `generateReply` is capped by construction, exactly as this item asked. See Round 6/7/8's B10 entries for the fuller implementation history (atomic reservation, refund-on-transport-failure, etc.) — this item was the original placement note those built on.
 
 ### Low
 
@@ -412,3 +412,28 @@ Reviewed: session token issue/verify, `requireTenantSession` mounting, Stripe ev
 - `src/routes/billing.ts:101-110` — **the dedup marker is recorded after the handler succeeds, not before.** Marking an event seen up front would let a transient failure permanently burn the dedup slot: the 500 triggers Stripe's retry, which would then be skipped as an already-processed duplicate while nothing had actually happened. R10-03 only asked for dedup; getting the ordering right is what makes it safe.
 - `src/routes/billing.ts:136-137` — cancellation only applies when the deleted subscription is still the tenant's current one, closing R10-02 exactly as described.
 - `src/lib/session.ts:34-39` + `src/index.ts:49` — an empty `SESSION_SECRET` would make every session forgeable via an HMAC with an empty key; failing at boot rather than at first use is the same treatment the token keyring got, applied consistently.
+
+---
+
+## Round 12 — BUI React frontend + round 11 fixes (commit `7f36c3f`)
+
+Reviewed: client app (connect/connected/dashboard, campaigns, billing panels), API client, CORS, session versioning.
+
+**Overall:** the frontend closes the last unbuilt piece of Phase 1, and the two Round 11 items are properly done — `ConnectedPage` reads the fragment, saves, and strips it via `navigate(..., {replace: true})`, and session versioning gives per-tenant revocation. The API client is well factored: one place attaches the bearer header, and a 401/403 clears the session rather than leaving a dead token in place. CORS is present, with preflight handled. Findings are small.
+
+### Medium
+
+- [ ] **R12-01 [MED]** `server/src/app.ts:31` — **`Access-Control-Allow-Origin` falls back to `*` when `WEB_APP_ORIGIN` is unset**, which is what a misconfigured production deploy will silently do. The practical exposure is limited — the session is a bearer token in `localStorage`, which is origin-scoped and unreachable from an attacker's page, and there are no cookies crossing this boundary by design — so this is not a credential leak. But it does let any origin script the API with a token obtained some other way, and a wildcard is not something to arrive at by default. Require the origin explicitly and fail at boot when it is missing, the same treatment `SESSION_SECRET` already gets.
+
+- [ ] **R12-02 [MED]** `server/src/app.ts:31` — reads `process.env.WEB_APP_ORIGIN` directly rather than going through `config.ts`, which is exactly what R9-03 flagged for the Telegram settings and which was fixed there. The consequence is the same: no boot-time validation, and a typo surfaces as a silently permissive wildcard instead of a startup failure. Worth moving now while there is only one offender again.
+
+### Low
+
+- [ ] **R12-03 [LOW]** `client/src/api.ts:10-25` — the session token lives in `localStorage`, so any script executing on the app's origin can read it. This is the accepted trade-off for a cross-origin SPA bearer token and the alternative (a cookie) was deliberately rejected for good reasons recorded in `session.ts` — so no change is being asked for here. It is worth one line in `api.ts` recording that the choice is deliberate, because "move the token to a cookie for safety" is a natural-looking future change that would reintroduce the CSRF surface the bearer design was chosen to avoid.
+
+### Noted, no action — good calls worth keeping
+
+- `client/src/pages/ConnectedPage.tsx:5-13,20-28` — the fragment is parsed from `window.location.hash`, consumed once, and the URL replaced rather than pushed, so the token reaches neither the server, the `Referer` header, nor a surviving history entry. This is the step R11-01 warned lived nowhere; the comment now states the whole chain, which is what stops a future refactor from turning the redirect into a query parameter.
+- `client/src/api.ts:36-51` — one chokepoint attaches `Authorization`, so no call site can forget it, and adding a route cannot accidentally ship unauthenticated.
+- `client/src/api.ts:61-62` — a 401/403 clears the stored session. With R11-02's revocation now real, an actively revoked session degrades to "reconnect" instead of an error loop on every request.
+- `server/src/app.ts:24-35` — the CORS block records *why* no cookies cross this boundary and that only the `Authorization` header needs allowing. Preflight returns 204 rather than falling through to a 404, which is the part that is usually missed in a hand-rolled CORS middleware.
