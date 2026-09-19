@@ -1,4 +1,5 @@
 import express from "express";
+import { config } from "./config.js";
 import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
 import { dataDeletionRouter } from "./routes/dataDeletion.js";
@@ -27,8 +28,16 @@ export function createApp(options?: { llmProvider?: LLMProvider }) {
   // a bearer token (Authorization header), specifically to avoid the
   // SameSite=None/Access-Control-Allow-Credentials surface a cross-origin
   // session cookie would need — so this only needs to allow the header.
+  //
+  // R12-01/R12-02 fix: no longer falls back to "*" when unconfigured — a
+  // wildcard here would let any origin script this API with a bearer
+  // token obtained some other way, and that's not something to arrive at
+  // silently. Routed through config.ts (R12-02) rather than reading
+  // process.env directly, and validated at boot (assertWebAppOriginConfigured
+  // in index.ts) with the same "fail at boot, not silently" treatment
+  // SESSION_SECRET already gets.
   app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", process.env.WEB_APP_ORIGIN ?? "*");
+    res.header("Access-Control-Allow-Origin", config.webAppOrigin);
     res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") return res.sendStatus(204);

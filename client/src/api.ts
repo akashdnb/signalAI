@@ -7,6 +7,14 @@ export interface Session {
 
 const SESSION_KEY = "signalai.session";
 
+// R12-03: kept in localStorage deliberately, not moved to a cookie — any
+// script on this origin can read it (the accepted trade-off for a
+// bearer-token session), but a cookie was already rejected on purpose in
+// the server's session.ts: a cross-origin cookie needs SameSite=None plus
+// Access-Control-Allow-Credentials, which is exactly the CSRF/CORS
+// surface this design was chosen to avoid. "Move it to a cookie for
+// safety" looks like a natural hardening step; it would reopen that gap.
+
 export function loadSession(): Session | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);

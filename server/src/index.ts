@@ -1,7 +1,7 @@
 import "./lib/sentryInit.js"; // must be the first import — see sentryInit.ts for why a statement here wasn't enough
 import { Sentry } from "./lib/sentry.js";
 import { createApp } from "./app.js";
-import { config } from "./config.js";
+import { config, assertWebAppOriginConfigured } from "./config.js";
 import { getPool } from "./db/pool.js";
 import { getBoss } from "./queue/boss.js";
 import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
@@ -47,6 +47,9 @@ async function main() {
   // R10-01: an empty SESSION_SECRET would make every tenant session
   // forgeable — this gates every dashboard/campaigns/billing route.
   assertSessionSecretConfigured(config.sessionSecret);
+  // R12-01: an unset WEB_APP_ORIGIN used to silently fall back to a
+  // wildcard CORS origin — fail at boot instead.
+  assertWebAppOriginConfigured(config.webAppOrigin);
 
   const pool = getPool();
   const boss = await getBoss();

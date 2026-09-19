@@ -62,6 +62,22 @@ describe("app", () => {
     expect(res.body).toEqual({ status: "ok" });
   });
 
+  // R12-01/R12-02 regression: CORS used to fall back to a wildcard when
+  // WEB_APP_ORIGIN was unset — it must now echo the configured origin,
+  // and never silently widen to "*" when unset.
+  it("echoes the configured WEB_APP_ORIGIN as Access-Control-Allow-Origin, never a wildcard", async () => {
+    const original = process.env.WEB_APP_ORIGIN;
+    process.env.WEB_APP_ORIGIN = "https://app.example.com";
+    const configured = await request(createApp()).get("/health");
+    expect(configured.headers["access-control-allow-origin"]).toBe("https://app.example.com");
+
+    delete process.env.WEB_APP_ORIGIN;
+    const unconfigured = await request(createApp()).get("/health");
+    expect(unconfigured.headers["access-control-allow-origin"]).not.toBe("*");
+
+    process.env.WEB_APP_ORIGIN = original;
+  });
+
   it("GET /privacy and /terms are reachable", async () => {
     const app = createApp();
     const privacy = await request(app).get("/privacy");

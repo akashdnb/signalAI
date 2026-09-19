@@ -55,6 +55,13 @@ export const config = {
   get sessionSecret() {
     return process.env.SESSION_SECRET ?? "";
   },
+  // R12-01/R12-02: the exact origin BUI is served from, echoed as
+  // Access-Control-Allow-Origin (see app.ts). Routed through config like
+  // every other setting; validated at boot via assertWebAppOriginConfigured
+  // below rather than falling back to a silently permissive "*".
+  get webAppOrigin() {
+    return process.env.WEB_APP_ORIGIN ?? "";
+  },
   // B10: hard per-account daily cap on AI-generated calls. Default chosen
   // to comfortably cover a real pilot conversation volume while still
   // bounding a viral-Reel worst case to a fixed cost (max_tokens is
@@ -71,4 +78,11 @@ export const config = {
 
 export function isProduction(): boolean {
   return config.nodeEnv === "production";
+}
+
+/** R12-01: an unset WEB_APP_ORIGIN used to silently fall back to "*" in app.ts's CORS middleware — fail at boot instead, same treatment SESSION_SECRET and the token keyring already get. */
+export function assertWebAppOriginConfigured(origin: string): void {
+  if (!origin) {
+    throw new Error("No WEB_APP_ORIGIN configured — refusing to fall back to a wildcard CORS origin");
+  }
 }
