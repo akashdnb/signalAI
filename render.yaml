@@ -50,3 +50,32 @@ services:
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+
+  # BUI — the creator-facing React SPA (client/). A static site: Vite builds
+  # to client/dist and Render just serves those files, so there's no
+  # spin-down behaviour to worry about the way there is for the web service.
+  - type: web
+    name: signalai-bui
+    runtime: static
+    rootDir: client
+    # Same --include=dev reasoning as the server above: `build` runs
+    # `tsc -b && vite build`, and both vite and typescript are
+    # devDependencies.
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    routes:
+      # NOT optional. The server's OAuth callback does a top-level browser
+      # redirect to /connected#token=..., and /dashboard/:tenantId is a
+      # client-side route — both are direct loads of paths with no file
+      # behind them. Without this rewrite Render serves 404 and the entire
+      # connect flow breaks, not merely deep links.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Inlined by Vite AT BUILD TIME, not read at runtime — changing it
+      # needs a rebuild, not a restart. Defaults to http://localhost:3000
+      # in src/api.ts, so leaving it unset fails silently against the
+      # viewer's own machine. Set it to the signalai-server URL.
+      - key: VITE_API_BASE_URL
+        sync: false
