@@ -95,13 +95,47 @@ describe("instagramOAuth", () => {
     expect(parsed.searchParams.get("grant_type")).toBe("ig_refresh_token");
   });
 
-  it("fetchInstagramProfile returns id and username", async () => {
+  // The account id must come from `user_id` (the Instagram professional
+  // account id, matching a webhook's entry.id) and NOT from `id` (the
+  // app-scoped id). Storing `id` made every inbound webhook fail to resolve
+  // a tenant and get silently dropped, with no error anywhere.
+  it("uses user_id, not the app-scoped id, as the account id", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
-      json: async () => ({ id: "acct-1", username: "real_handle" }),
+      json: async () => ({ id: "38839853485630499", user_id: "17841408728501893", username: "real_handle" }),
     });
 
     const profile = await fetchInstagramProfile("token");
-    expect(profile).toEqual({ id: "acct-1", username: "real_handle" });
+    expect(profile).toEqual({ id: "17841408728501893", username: "real_handle" });
+  });
+
+  it("requests the user_id field rather than id", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ user_id: "17841408728501893", username: "h" }),
+    });
+
+    await fetchInstagramProfile("token");
+    const requested = new URL(String((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]));
+    expect(requested.searchParams.get("fields")).toContain("user_id");
+  });
+
+  it("coerces a numeric user_id to a string, since entry.id arrives as one", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ user_id: 17841408728501893, username: "h" }),
+    });
+
+    const profile = await fetchInstagramProfile("token");
+    expect(typeof profile.id).toBe("string");
+  });
+
+  it("throws rather than storing an unidentifiable account", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "app-scoped-only", username: "h" }),
+    });
+
+    await expect(fetchInstagramProfile("token")).rejects.toThrow(/user_id/);
   });
 });
