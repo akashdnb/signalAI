@@ -53,6 +53,18 @@ authRouter.get("/auth/instagram/start", async (req, res) => {
     return res.status(401).json({ error: "invalid or expired connect link — please try connecting again" });
   }
 
+  // R15-01 fix: verifyOAuthState only checks signature + expiry, not
+  // single-use — a captured connect URL (referrer leak, shared screen)
+  // was replayable for its whole 10-minute window, letting an attacker
+  // mint their own OAuth state/nonce off it, authorize with their own
+  // Instagram account, and attach it to the victim's tenant. The connect
+  // token already carries a nonce (from createOAuthState above); spending
+  // it here — in the same spent_oauth_nonces table the OAuth CSRF nonce
+  // below uses — makes the connect link single-use the same way.
+  if (!(await trySpendNonce(getPool(), connectPayload.nonce))) {
+    return res.status(401).json({ error: "invalid or expired connect link — please try connecting again" });
+  }
+
   const { state, nonce } = createOAuthState(config.metaAppSecret, tenantId);
 
   // R1-02: binds the state to this browser and makes it single-use — a

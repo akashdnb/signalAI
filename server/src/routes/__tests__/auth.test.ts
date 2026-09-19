@@ -138,6 +138,24 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     expect(after.rows[0].count).toBe(before.rows[0].count); // no new tenant minted
   });
 
+  // R15-01 fix: verifyOAuthState alone only checks signature + expiry, so a
+  // captured connect URL used to stay valid for its whole 10-minute window —
+  // a second visit minted a brand new OAuth state/nonce off the same
+  // connect token just as readily as the first.
+  it("start rejects a replayed connectToken — single use (R15-01)", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const app = createApp();
+
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+
+    const first = await request(app).get(startUrl);
+    expect(first.status).toBe(302);
+
+    const second = await request(app).get(startUrl);
+    expect(second.status).toBe(401);
+  });
+
   it("start sets an HttpOnly nonce cookie, scoped to /auth/instagram, bound to the redirect's state (R1-02, R4-04)", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
