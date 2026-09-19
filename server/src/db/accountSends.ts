@@ -2,6 +2,16 @@ import type { Pool } from "pg";
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour — Meta's binding ceiling is hourly, not per-second
 
+// R8-02: an arbitrary, fixed namespace for this module's advisory locks —
+// scoping by (namespace, hashtext(account_id)) instead of hashtext(account_id)
+// alone means this lock key space can never collide with an advisory lock
+// taken elsewhere in the app for an unrelated purpose. hashtext() collisions
+// BETWEEN two different account ids remain possible (it's a 32-bit hash) —
+// harmless here since the lock is only ever held for one fast statement,
+// so a collision just serializes two unrelated accounts' reservations
+// against each other rather than causing incorrect behavior.
+const ADVISORY_LOCK_NAMESPACE = 771_001;
+
 export async function countRecentSends(pool: Pool, instagramAccountId: string): Promise<number> {
   const result = await pool.query<{ count: string }>(
     `select count(*)::int as count from account_sends
@@ -47,7 +57,10 @@ export async function tryReserveSend(
   const client = await pool.connect();
   try {
     await client.query("begin");
-    await client.query("select pg_advisory_xact_lock(hashtext($1))", [instagramAccountId]);
+    await client.query("select pg_advisory_xact_lock($1, hashtext($2))", [
+      ADVISORY_LOCK_NAMESPACE,
+      instagramAccountId,
+    ]);
     const result = await client.query(
       `insert into account_sends (tenant_id, instagram_account_id)
        select $1, $2
@@ -69,9 +82,14 @@ export async function tryReserveSend(
 }
 
 /**
- * R6-06 fix: same shape as R5-03's spent-nonce pruning — this table is
- * only ever queried over the last hour, so anything older is pure bloat.
- * Called once at boot alongside the other sweeps.
+ * R6-06 originally added this to prune rows older than the rate-limit
+ * window, on the reasoning that the table is "only ever queried over the
+ * last hour." That stopped being true once B11 needed a durable "DMs
+ * sent" analytics number sourced from this same table (see
+ * src/db/analytics.ts) — pruning it would make the dashboard wrong, not
+ * just save space. Left unused by the boot/maintenance sweeps for that
+ * reason; kept in case an operator ever wants to run a manual archive
+ * pass once analytics gets its own warehouse export.
  */
 export async function pruneOldSends(pool: Pool, olderThanHours = 24): Promise<number> {
   const result = await pool.query(`delete from account_sends where sent_at < now() - ($1 || ' hours')::interval`, [

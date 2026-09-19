@@ -266,7 +266,7 @@ Reviewed: Instagram send, hourly rate limiter, messaging-window enforcement, sen
 ### Low
 
 - [x] **R6-06 [LOW]** `src/db/accountSends.ts` — `account_sends` grows without bound and is only ever read over a one-hour window. Same shape as R5-03: add a periodic delete of rows older than the window to the existing boot sweep, before the table becomes the largest in the database and the `count(*)` starts mattering.
-  ↳ **Fixed.** New `pruneOldSends` (default cutoff 24h), run once at boot alongside `pruneExpiredNonces`/`sweepWedgedLeadEventJobs`. Test covers the delete-old-keep-recent case.
+  ↳ **Fixed**, then **deliberately reverted during B11.** `pruneOldSends` was added and wired to the boot sweep as described. It was then unwired (function kept, no longer called) once B11's analytics work needed a durable, un-pruned "DMs sent" count sourced from this exact table — see the current `pruneOldSends` docstring and `index.ts`'s R8-01 note for the full reasoning. The premise "only ever read over a one-hour window" stopped being true; correctness of the analytics number now outweighs the original storage-bloat concern at Phase 1's realistic pilot scale (a handful of accounts, each capped at 750 sends/hour). Left unticked would misstate history, so recording the reversal here rather than silently leaving a stale "Fixed" claim.
 
 ### Noted, no action — good calls worth keeping
 
@@ -306,3 +306,26 @@ Reviewed: AI spend guard, atomic send reservation, send/advancement ordering, pr
 - `src/db/accountSends.ts:28-30` — reserving before the send and accepting a wasted slot when the send then fails, with the reasoning stated: one lost slot beats double-DMing a lead. Correct direction for the trade-off, and it is the kind of thing that gets "optimised" backwards.
 - `src/services/replyEngine.ts` — `capExceeded` as a distinct signal from `fellBackReason`. Cap exhaustion is an operator-actionable event; every other fallback is not. Keeping them separable is what makes alerting on it possible without noise.
 - `src/services/aiSpendGuard.ts:11-27` — the guard as a swappable interface with `ALLOW_ALL_SPEND_GUARD` as the test seam, keeping `replyEngine`/`milestoneEngine` persistence-agnostic. Same pattern as `LLMProvider`, applied consistently.
+
+---
+
+## Round 8 — round 7 fixes (commit `b6282ea`)
+
+Reviewed: advisory-lock send reservation, AI cap refund, prune wiring, race-magnitude comment.
+
+**Overall:** all four Round 7 items are fixed properly, and R7-02's fix is better than what the item asked for — see the notes below. Only two low-severity observations remain, both about the pruning/locking mechanics rather than the logic.
+
+### Low
+
+- [x] **R8-01 [LOW]** `src/index.ts:84-104` — **all three prunes run only at boot, and this process is designed to stay up for weeks.** `pruneExpiredNonces`, `pruneOldSends` and `pruneOldAiCallUsage` are each called once in the startup path, so on a Render instance that is not redeployed for a month, `account_sends` and `ai_call_usage` accumulate a month of rows — and `ai_call_usage` is counted on *every single AI reply*, so the table the spend guard reads most often is the one that grows fastest. Boot-time pruning is the right thing to have; it is just not sufficient on its own. pg-boss already provides scheduling, so registering these as a periodic job costs little and makes the guarantee independent of deploy cadence.
+  ↳ **Fixed exactly as prescribed, with one deliberate scope change.** New `src/queue/maintenanceQueue.ts` registers an hourly pg-boss schedule (`17 * * * *`) running `pruneExpiredNonces` + `pruneOldAiCallUsage`; boot-time pruning stays too, as belt-and-suspenders for the gap before the first tick. `pruneOldSends`/`account_sends` is deliberately excluded from both boot and periodic pruning now — B11's analytics work (in progress) needed a durable "DMs sent" count sourced from that same table, and pruning it would make the dashboard wrong, not just save space. Documented on `pruneOldSends` itself and in `index.ts` at the removed call site. Test triggers the worker directly (not via real cron timing) and asserts both prunes actually ran.
+
+- [x] **R8-02 [LOW]** `src/db/accountSends.ts` (`pg_advisory_xact_lock(hashtext($1))`) — `hashtext` returns a 32-bit int, so two different `instagram_account_id` values can collide onto the same lock key and serialise against each other despite being unrelated accounts. This is a throughput issue, never a correctness one (the lock is still held for a single fast statement), and at Phase 1 scale it is invisible — worth a comment rather than a change today. Also note `hashtext` is an internal Postgres function rather than part of the documented API; the two-argument `pg_advisory_xact_lock(int4, int4)` form with an explicit namespace key would be more stable across versions if this ever matters.
+  ↳ **Fixed exactly as prescribed.** Switched to the two-key `pg_advisory_xact_lock($namespace, hashtext($account_id))` form with a fixed module-level namespace constant, documented as (a) preventing collision with any advisory lock taken elsewhere in the app for an unrelated purpose, and (b) still not eliminating hashtext collisions between two different account ids — noted explicitly as an accepted, harmless-at-this-scale throughput cost, per the finding's own analysis.
+
+### Noted, no action — good calls worth keeping
+
+- `src/db/accountSends.ts` `tryReserveSend` — `pg_advisory_xact_lock` scoped to the transaction, taken before the count-and-insert, released automatically on commit or rollback. This is the fix R7-01 asked for and it makes the docstring's claim true rather than approximately true; the comment now also explains precisely *why* `insert ... select ... where (count) < limit` alone was insufficient under `READ COMMITTED`. That explanation is the part worth protecting — the statement looks atomic, which is exactly why it was wrong.
+- `src/services/aiSpendGuard.ts:23-34` — **the refund distinguishes a transport failure (never billed → refund) from an output-validation or parse rejection (the call completed and was billed → stays counted).** R7-02 only asked for the refund; getting this distinction right is the difference between a correct cost control and one that silently under-counts every rejected generation. The docstring states the rule explicitly, which is what will stop someone widening the refund to "any failure".
+- `src/services/aiSpendGuard.ts:51,60-64` — the guard is constructed per job invocation (`leadEventReplyHandler.ts:107`), so the mutable `reservationId` closure cannot alias across concurrent leads, and `release()` is null-guarded and clears the id, making it idempotent. Both are easy to get wrong if the guard is ever hoisted to a longer-lived scope; it should stay per-invocation.
+- `src/services/aiSpendGuard.ts:12-21` — the accepted-race comment now states the real magnitude (up to N−1 over the cap, not one) *and* why the race is tolerated here but was not in `tryReserveSend`. Documenting the asymmetry is more useful than making both atomic would have been.

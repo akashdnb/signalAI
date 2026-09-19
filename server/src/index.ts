@@ -13,8 +13,8 @@ import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
 import { assertKeyringConfigured } from "./lib/tokenVault.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
-import { pruneOldSends } from "./db/accountSends.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
+import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -49,6 +49,8 @@ async function main() {
   await ensureQueues(boss);
   await ensureTokenRefreshQueue(boss);
   await ensureDataDeletionQueue(boss);
+  await ensureMaintenanceQueue(boss);
+  await startMaintenanceWorker(boss, pool);
 
   await startLeadEventsWorker(
     boss,
@@ -79,25 +81,22 @@ async function main() {
     Sentry.captureMessage(`Swept ${swept} wedged lead-event job(s) on boot`, { level: "warning" });
   }
 
-  // R5-03: spent_oauth_nonces has no other cleanup path — rows are only
-  // ever useful for the state's own 10-minute lifetime.
+  // R5-03/R8-01: spent_oauth_nonces has no other cleanup path — rows are
+  // only ever useful for the state's own 10-minute lifetime. This boot-time
+  // pass plus the recurring maintenance job above (which does the same
+  // prune hourly) means it's bounded regardless of how long this process
+  // stays up between deploys.
   const prunedNonces = await pruneExpiredNonces(pool);
   if (prunedNonces > 0) {
     // eslint-disable-next-line no-console
     console.log(`Pruned ${prunedNonces} expired OAuth nonce(s) on boot`);
   }
 
-  // R6-06: same shape as R5-03 — account_sends is only ever queried over
-  // the trailing hour, so anything older is pure bloat.
-  const prunedSends = await pruneOldSends(pool);
-  if (prunedSends > 0) {
-    // eslint-disable-next-line no-console
-    console.log(`Pruned ${prunedSends} expired account_sends row(s) on boot`);
-  }
-
-  // R7-04: same shape as the two prunes above — ai_call_usage is read on
-  // every single AI reply, so unbounded growth here is worse than its
-  // sibling tables, not just as bad.
+  // R7-04: ai_call_usage is read on every single AI reply, so unbounded
+  // growth here is worse than its sibling tables, not just as bad.
+  // (account_sends is deliberately not pruned — see accountSends.ts's
+  // pruneOldSends docstring: it's now the durable source for the "DMs
+  // sent" analytics number, so pruning it would make the dashboard wrong.)
   const prunedAiCalls = await pruneOldAiCallUsage(pool);
   if (prunedAiCalls > 0) {
     // eslint-disable-next-line no-console
