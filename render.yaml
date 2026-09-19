@@ -4,7 +4,11 @@ services:
     env: node
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run build && npm run migrate:up
+    buildCommand: npm ci --include=dev && npm run build && npm run migrate:up
+    # --include=dev is required: NODE_ENV=production (below) makes npm omit
+    # devDependencies, and the build needs typescript, @types/*, and
+    # node-pg-migrate. npm ci rather than npm install so the lockfile is
+    # authoritative and a deploy can't silently resolve different versions.
     startCommand: npm start
     healthCheckPath: /health
     envVars:

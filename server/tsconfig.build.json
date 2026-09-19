@@ -1,0 +1,8 @@
+{
+  // Production build only. Extends the root config but drops test files:
+  // compiling them would ship test code into dist/ and make the deployed
+  // image depend on vitest/supertest types, which are (correctly) dev-only.
+  // `npm run typecheck` still uses tsconfig.json, so tests stay type-checked.
+  "extends": "./tsconfig.json",
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]
+}

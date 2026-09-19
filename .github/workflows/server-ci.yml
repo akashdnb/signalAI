@@ -38,7 +38,12 @@ jobs:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: server/package-lock.json
-      - run: npm install
+      - run: npm ci
       - run: npm run typecheck
+      # Runs the real production build, not just a typecheck: `typecheck` uses
+      # tsconfig.json (which includes tests), while the deploy uses
+      # tsconfig.build.json. Only this step exercises what Render actually runs,
+      # and its absence is why a broken build reached the deploy.
+      - run: npm run build
       - run: npx node-pg-migrate up --migration-file-language sql
       - run: npm test
