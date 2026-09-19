@@ -90,3 +90,52 @@ describe("parseInstagramWebhookPayload", () => {
     ).toEqual([]); // no comment id
   });
 });
+
+describe("outbound DM echoes are not ingested", () => {
+  const ACCOUNT = "17841408728501893";
+
+  it("skips a messaging event flagged is_echo", () => {
+    const events = parseInstagramWebhookPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: ACCOUNT,
+          time: 1,
+          messaging: [
+            { sender: { id: "lead-1" }, timestamp: 1, message: { mid: "m1", text: "hi", is_echo: true } },
+          ],
+        },
+      ],
+    });
+    expect(events).toHaveLength(0);
+  });
+
+  it("skips a message sent by the connected account itself", () => {
+    const events = parseInstagramWebhookPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: ACCOUNT,
+          time: 1,
+          messaging: [{ sender: { id: ACCOUNT }, timestamp: 1, message: { mid: "m2", text: "our reply" } }],
+        },
+      ],
+    });
+    expect(events).toHaveLength(0);
+  });
+
+  it("still ingests a genuine inbound DM from a lead", () => {
+    const events = parseInstagramWebhookPayload({
+      object: "instagram",
+      entry: [
+        {
+          id: ACCOUNT,
+          time: 1,
+          messaging: [{ sender: { id: "lead-1" }, timestamp: 1, message: { mid: "m3", text: "hello" } }],
+        },
+      ],
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.instagramUserId).toBe("lead-1");
+  });
+});

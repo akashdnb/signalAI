@@ -66,6 +66,19 @@ export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEve
         const messageId = typeof message.mid === "string" ? message.mid : undefined;
         if (!instagramUserId || !messageId) continue;
 
+        // Meta echoes the business's OWN outbound DMs back as messaging
+        // events. Ingested naively they create a "lead" whose
+        // instagram_user_id is the business account itself, open a 24h
+        // messaging window against ourselves, and inflate Unique Leads
+        // Generated — observed live: sending one reply produced a second
+        // lead for account 17841408728501893.
+        //
+        // Two checks on purpose: `is_echo` is the documented flag, and
+        // sender-is-the-account is a structural backstop that holds even if
+        // the flag is absent, since a message *from* the connected account
+        // is by definition outbound.
+        if (message.is_echo === true || instagramUserId === instagramAccountId) continue;
+
         const timestamp = typeof item.timestamp === "number" ? new Date(item.timestamp) : entryTime;
 
         events.push({
