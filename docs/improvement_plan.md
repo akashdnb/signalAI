@@ -4,6 +4,7 @@ Items are independent unless noted. Each carries its own steps, sizes (**S** ≤
 
 1. [Identity Refactor](#identity-refactor--email-login-instagram-as-a-connected-channel) — email login, Instagram as a connected channel
 2. [Keyword Matching](#keyword-matching--exact-word-and-contains) — exact, word and contains
+3. [UI Restructuring](#ui-restructuring--shell-primitives-and-states) — shell, primitives and states
 
 ---
 
@@ -198,3 +199,90 @@ Note the live test used keyword `test`, which is squarely in this trap.
 - **Default for new campaigns: `word`.** Stated above; the alternative is keeping `contains` for consistency with existing behaviour, which optimises for a consistency nobody experiences.
 - **Whether `exact` ignores surrounding whitespace and punctuation** — I would say yes (`" LINK! "` matches `link`), otherwise `exact` is unusable in practice and every creator picks `word` by default, which makes the mode pointless.
 - **Multi-keyword semantics stay OR** (any keyword matches). AND across keywords is a different feature and not obviously wanted.
+
+
+---
+
+# UI Restructuring — shell, primitives and states
+
+## What exists today
+
+~1,000 lines of client: four flat routes, three components, and 328 lines of hand-rolled CSS.
+
+The CSS is better than it sounds — it already has a custom-property token layer (`--bg`, `--text`, `--accent`, `--border`, semantic ok/error pairs) and reusable classes (`.card`, `.btn-primary`, `.stat-grid`, `.table`, `.pill`, `.banner`). That is the right foundation and should be extended, not thrown away.
+
+The structure is the problem.
+
+## The structural issues, which matter more than the styling
+
+1. **No app shell.** No persistent navigation, no header carrying account context. Every page renders standalone. The moment Leads, Campaigns, Milestones, Settings and Billing become real destinations, there is nowhere to put them.
+2. **One route renders the entire product.** `/dashboard/:tenantId` shows analytics, leads, campaigns and billing simultaneously. You cannot link to a lead, a campaign, or the billing page. Bookmarking is useless and the back button does nothing meaningful — which will matter the first time a creator wants to send you a link to the thing that looks wrong.
+3. **All-or-nothing loading.** `DashboardPage` fires four endpoints through `Promise.all` into a single error state, so one slow or failing endpoint blanks the whole dashboard. There is no loading state and no skeleton — the screen is simply empty until everything resolves.
+4. **No empty states.** A newly connected creator has zero leads and zero campaigns and sees empty tables. This is the single most important screen for activation and it currently says nothing about what to do next.
+5. **Auth guard lives inside the page component** rather than in routing, so every new screen re-implements it and one omission is an unguarded page.
+6. **No dark mode**, though the token layer is already shaped for it — most of that work is done.
+7. **Mobile is unaddressed.** Instagram creators check things on phones.
+
+"Modern and cool" mostly falls out of fixing 1–4. Visual polish on top of a flat, stateless, unlinkable app reads as a nicer version of the same frustration.
+
+## Approach
+
+**Keep CSS custom properties. Add headless primitives. Do not adopt a component library.**
+
+- Tailwind would mean rewriting every file for a system this small, and the existing tokens already do that job.
+- MUI/Chakra bring bundle weight and a recognisable generic look that actively works against "cool" — and a creator-facing product competing on feel should not look like an admin console.
+- **Radix primitives** (unstyled, accessible) for dialog, dropdown, tooltip, tabs, toast. They supply focus management, keyboard handling and ARIA — the parts that are genuinely hard and that hand-rolled components always get wrong — while leaving appearance entirely to our tokens.
+
+## Steps
+
+### V1 · App shell and routing (M)
+- Layout component: sidebar (or top nav on mobile) with Overview / Campaigns / Leads / Settings, header showing the connected account and its health.
+- Nested routes under `/dashboard/:tenantId`, so every destination is linkable: `/campaigns/:id`, `/leads/:id`.
+- Route-level auth guard replacing the in-component check.
+- **Done when:** every screen is reachable by URL, the back button behaves, and no page implements its own auth check.
+
+### V2 · Token system and dark mode (S)
+- Extend the existing custom properties into full scales: type, spacing, radii, elevation, plus state colours beyond ok/error.
+- Dark theme via `prefers-color-scheme` with an explicit override, defining every token in both.
+- **Done when:** no hard-coded colour or pixel value remains outside the token block, and the app is legible in both themes.
+
+### V3 · Primitives (M)
+- `Button`, `Input`, `Select`, `Dialog`, `Toast`, `Table`, `Card`, `Badge`, `Skeleton` — built on Radix where behaviour is non-trivial.
+- Replace ad-hoc class usage across the three existing components.
+- **Done when:** `CampaignEditor` (currently the largest file at 264 lines) is composed from primitives rather than bespoke markup, and every interactive element is keyboard-reachable.
+
+### V4 · Loading, error and empty states (M)
+- Split the `Promise.all` so each panel loads, fails and retries independently.
+- Skeletons while loading; per-panel error with retry; **empty states that teach** — "No campaigns yet. Create one and comment your keyword on a post to see it fire."
+- **Done when:** killing one endpoint degrades one panel instead of the page, and a brand-new account sees guidance rather than empty tables.
+
+### V5 · Screens (M)
+- **Overview**: account health, the four analytics numbers as real stat tiles, recent activity.
+- **Campaigns**: list plus detail, with the [[#Keyword Matching — exact, word, and contains|match mode]] selector from that item.
+- **Leads**: list plus a detail view with the lead timeline — the CRM surface [[signalAI_roadmap]] Phase 2A builds on.
+- **Settings**: connected account, billing, danger zone (disconnect, delete).
+- **Done when:** each is a real destination with its own URL, not a panel on one page.
+
+### V6 · Responsive and motion (S)
+- Mobile layout down to ~380px; nav collapses; tables become cards.
+- Motion only where it communicates state (panel entry, toast, skeleton shimmer), all of it honouring `prefers-reduced-motion`.
+- **Done when:** the dashboard is usable one-handed on a phone.
+
+### V7 · Charts (deferred)
+- Not now. The four current analytics values are numbers, and a number is better as a number. Revisit when [[signalAI_roadmap]] Phase 4's funnel and per-milestone drop-off exist, which is data with shape worth drawing.
+- When that happens, load the `dataviz` skill before writing any chart code.
+
+## Sequencing — read this before starting
+
+**Do the [[#Identity Refactor — email login, Instagram as a connected channel|Identity Refactor]] first, or at least U6.** It adds a login screen and demotes "connect Instagram" from the app's entry point to an action inside Settings. Building the shell against today's connect-is-the-front-door model means rebuilding the navigation, the auth guard and the empty states immediately afterwards.
+
+If both are wanted in parallel, V2 (tokens) is the one piece with no dependency on either model and can start any time.
+
+## Risks
+
+| Risk | Response |
+|---|---|
+| Rewrite scope creeps past what works | V1–V4 are structural and bounded; V5 is the only step that touches product surface, and it reuses existing API calls |
+| Hand-rolled dialogs/menus break keyboard and screen-reader use | Radix for anything with focus or keyboard behaviour — that is the whole reason it is in the plan |
+| Dark mode ships half-done | V2's done-condition is every token defined in both themes, not "dark mode added" |
+| Polish before structure | V6 deliberately sits after states and screens; a beautiful blank screen is still a blank screen |
