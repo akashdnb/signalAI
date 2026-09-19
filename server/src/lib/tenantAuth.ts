@@ -2,47 +2,53 @@ import type { NextFunction, Request, Response } from "express";
 import { config } from "../config.js";
 import { verifySessionToken } from "./session.js";
 import { getPool } from "../db/pool.js";
-import { getTenantSessionVersion } from "../db/tenants.js";
+import { getUserSessionVersion } from "../db/users.js";
+import { isTenantMember } from "../db/tenantMembers.js";
+
+export interface AuthenticatedSession {
+  userId: string;
+}
 
 /**
- * R10-01 fix: gates every route that reads or writes one tenant's data.
- * Requires an `Authorization: Bearer <token>` header whose token verifies
- * and whose `tenantId` matches the `:tenantId` route param — a request
- * carrying a valid session for a DIFFERENT tenant is rejected exactly like
- * one with no session at all, not silently scoped to the wrong tenant.
- *
- * R11-02 fix: also requires the token's `sessionVersion` to match the
- * tenant's CURRENT value in the database. Without this, the only way to
- * invalidate one leaked 30-day token was rotating SESSION_SECRET, which
- * signs out every tenant at once — `bumpSessionVersion` (db/tenants.ts)
- * now makes that a single per-tenant update instead.
+ * Verifies the bearer session on its own, with no notion of which tenant
+ * (if any) the caller is asking about — shared by `requireTenantSession`
+ * below (which additionally checks membership against a `:tenantId` route
+ * param) and `/auth/instagram/start` (Identity Refactor U4), which checks
+ * membership against a `tenantId` QUERY param instead, so it can't reuse
+ * the route-param-shaped middleware directly.
  */
-export async function requireTenantSession(req: Request, res: Response, next: NextFunction) {
+export async function verifyBearerSession(req: Request): Promise<AuthenticatedSession | null> {
   const header = req.header("authorization");
   const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length) : undefined;
-
-  if (!token) {
-    return res.status(401).json({ error: "missing session" });
-  }
+  if (!token) return null;
 
   const payload = verifySessionToken(config.sessionSecret, token);
-  if (!payload) {
-    return res.status(401).json({ error: "invalid or expired session" });
+  if (!payload) return null;
+
+  // Requires the token's sessionVersion to match the user's CURRENT value.
+  // Without this, the only way to invalidate one leaked 30-day token was
+  // rotating SESSION_SECRET, which signs out every user at once.
+  const currentVersion = await getUserSessionVersion(getPool(), payload.userId);
+  if (currentVersion === null || payload.sessionVersion !== currentVersion) return null;
+
+  return { userId: payload.userId };
+}
+
+/**
+ * Gates every route that reads or writes one tenant's data. Verifies the
+ * bearer session, then checks `tenant_members` for `:tenantId` — a valid
+ * session for a user who is not a member of that tenant is rejected
+ * exactly like one with no session at all, never silently rescoped to a
+ * tenant the caller IS a member of.
+ */
+export async function requireTenantSession(req: Request, res: Response, next: NextFunction) {
+  const session = await verifyBearerSession(req);
+  if (!session) {
+    return res.status(401).json({ error: "missing or invalid session" });
   }
 
-  if (payload.tenantId !== req.params.tenantId) {
-    return res.status(403).json({ error: "session does not match this tenant" });
-  }
-
-  // currentVersion === null covers both "this tenant no longer exists" and
-  // an edge case that shouldn't happen in practice; either way there is no
-  // session to be valid, so it's folded into the same rejection rather
-  // than distinguished from "revoked" — that distinction isn't this
-  // middleware's to make, and a route-specific 404 for a genuinely missing
-  // tenant still happens further down, past this check.
-  const currentVersion = await getTenantSessionVersion(getPool(), payload.tenantId);
-  if (currentVersion === null || payload.sessionVersion !== currentVersion) {
-    return res.status(401).json({ error: "invalid or expired session" });
+  if (!(await isTenantMember(getPool(), req.params.tenantId!, session.userId))) {
+    return res.status(403).json({ error: "not a member of this tenant" });
   }
 
   return next();

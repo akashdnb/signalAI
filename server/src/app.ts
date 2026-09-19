@@ -5,6 +5,7 @@ import { legalRouter } from "./routes/legal.js";
 import { dataDeletionRouter } from "./routes/dataDeletion.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { authRouter } from "./routes/auth.js";
+import { authEmailRouter } from "./routes/authEmail.js";
 import { campaignsRouter } from "./routes/campaigns.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
@@ -21,6 +22,12 @@ declare global {
 
 export function createApp(options?: { llmProvider?: LLMProvider }) {
   const app = express();
+
+  // Render terminates TLS and proxies to this process — without this,
+  // req.ip is the proxy's address for every request, which would make
+  // authEmail.ts's per-IP magic-link rate limit count all traffic as one
+  // IP instead of rate-limiting the actual caller.
+  app.set("trust proxy", true);
 
   // BUI (the creator-facing React app) runs on a different origin in dev
   // (Vite's dev server) and, until a reverse proxy is set up, in
@@ -63,6 +70,7 @@ export function createApp(options?: { llmProvider?: LLMProvider }) {
   app.use(dataDeletionRouter);
   app.use(webhooksRouter);
   app.use(authRouter);
+  app.use(authEmailRouter);
   app.use(campaignsRouter);
   app.use(billingRouter);
   app.use(dashboardRouter(options?.llmProvider));

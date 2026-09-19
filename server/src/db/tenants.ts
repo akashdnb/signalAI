@@ -1,24 +1,25 @@
 import type { Pool } from "pg";
+import { addTenantMember } from "./tenantMembers.js";
 
 export type BillingStatus = "none" | "active" | "canceled";
 
 export interface Tenant {
   id: string;
   name: string;
+  ownerUserId: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   billingStatus: BillingStatus;
-  sessionVersion: number;
   createdAt: Date;
 }
 
 interface TenantRow {
   id: string;
   name: string;
+  owner_user_id: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   billing_status: BillingStatus;
-  session_version: number;
   created_at: Date;
 }
 
@@ -26,17 +27,50 @@ function toTenant(row: TenantRow): Tenant {
   return {
     id: row.id,
     name: row.name,
+    ownerUserId: row.owner_user_id,
     stripeCustomerId: row.stripe_customer_id,
     stripeSubscriptionId: row.stripe_subscription_id,
     billingStatus: row.billing_status,
-    sessionVersion: row.session_version,
     createdAt: row.created_at,
   };
 }
 
+/**
+ * @deprecated Identity Refactor U4 removed every production caller of
+ * this — a tenant is now only ever created via `createTenantForUser`,
+ * alongside its owner membership. Kept only for building pre-refactor-shaped
+ * test fixtures (orphan tenants with no owner) for U7's cleanup script.
+ */
 export async function createTenant(pool: Pool, name: string): Promise<Tenant> {
   const result = await pool.query<TenantRow>(`insert into tenants (name) values ($1) returning *`, [name]);
   return toTenant(result.rows[0]!);
+}
+
+/**
+ * Identity Refactor U6: the one place a workspace comes into existence now
+ * — a user's first login (see routes/authEmail.ts), not the Instagram
+ * connect flow. Tenant creation, owner_user_id, and the tenant_members row
+ * land in one transaction so a crash between them can never produce a
+ * tenant with no owner or an owner with no membership row.
+ */
+export async function createTenantForUser(pool: Pool, name: string, ownerUserId: string): Promise<Tenant> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query<TenantRow>(
+      `insert into tenants (name, owner_user_id) values ($1, $2) returning *`,
+      [name, ownerUserId],
+    );
+    const tenant = toTenant(result.rows[0]!);
+    await addTenantMember(client, tenant.id, ownerUserId, "owner");
+    await client.query("COMMIT");
+    return tenant;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getTenant(pool: Pool, tenantId: string): Promise<Tenant | null> {
@@ -68,17 +102,4 @@ export async function setBillingStatus(
     `update tenants set billing_status = $2, stripe_subscription_id = coalesce($3, stripe_subscription_id) where id = $1`,
     [tenantId, billingStatus, stripeSubscriptionId ?? null],
   );
-}
-
-/** R11-02: the value every session token's `sessionVersion` is checked against (lib/tenantAuth.ts) — a lightweight lookup, not the full row, since this runs on every authenticated request. */
-export async function getTenantSessionVersion(pool: Pool, tenantId: string): Promise<number | null> {
-  const result = await pool.query<{ session_version: number }>(`select session_version from tenants where id = $1`, [
-    tenantId,
-  ]);
-  return result.rows[0] ? result.rows[0].session_version : null;
-}
-
-/** R11-02: revokes every session issued for this tenant before now — a single-tenant alternative to rotating SESSION_SECRET, which would sign out every tenant at once. Not yet wired to a route; the primitive exists so [[Phase 6]]'s user management has something to call. */
-export async function bumpSessionVersion(pool: Pool, tenantId: string): Promise<void> {
-  await pool.query(`update tenants set session_version = session_version + 1 where id = $1`, [tenantId]);
 }

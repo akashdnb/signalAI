@@ -3,14 +3,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { createTenant, getTenant } from "../../db/tenants.js";
-import { createSessionToken } from "../../lib/session.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
+import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 
 const SESSION_SECRET = "test-session-secret";
-
-function authHeader(tenantId: string) {
-  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId, 1)}` };
-}
 
 const mockCreate = vi.fn();
 const mockConstructEvent = vi.fn();
@@ -51,30 +47,34 @@ describe("billing routes (B11)", () => {
   });
 
   it("POST checkout returns 503 when billing isn't configured", async () => {
+    const pool = getPool();
     vi.mocked(isBillingConfigured).mockReturnValue(false);
-    const tenant = await createTenant(getPool(), "creator-a");
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     const app = createApp();
 
-    const res = await request(app).post(`/tenants/${tenant.id}/billing/checkout`).set(authHeader(tenant.id));
+    const res = await request(app).post(`/tenants/${tenant.id}/billing/checkout`).set(authHeader);
     expect(res.status).toBe(503);
   });
 
-  // R11-02: requireTenantSession itself rejects a session for a tenant
-  // that doesn't exist (getTenantSessionVersion returns null) before the
-  // route's own 404 check ever runs — 401, not 404, is now correct here.
-  it("rejects a session for an unknown tenant with 401, before the route's own not-found check", async () => {
+  // requireTenantSession rejects a session for a tenant that doesn't
+  // exist (no membership can exist for it) before the route's own
+  // not-found check ever runs.
+  it("rejects a session for an unknown tenant with 403, before the route's own not-found check", async () => {
+    const pool = getPool();
+    const { authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     const app = createApp();
     const unknownId = "00000000-0000-0000-0000-000000000000";
-    const res = await request(app).post(`/tenants/${unknownId}/billing/checkout`).set(authHeader(unknownId));
-    expect(res.status).toBe(401);
+    const res = await request(app).post(`/tenants/${unknownId}/billing/checkout`).set(authHeader);
+    expect(res.status).toBe(403);
   });
 
   it("POST checkout creates a Stripe Checkout session and returns its URL", async () => {
-    const tenant = await createTenant(getPool(), "creator-a");
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     mockCreate.mockResolvedValue({ url: "https://checkout.stripe.com/session/abc" });
     const app = createApp();
 
-    const res = await request(app).post(`/tenants/${tenant.id}/billing/checkout`).set(authHeader(tenant.id));
+    const res = await request(app).post(`/tenants/${tenant.id}/billing/checkout`).set(authHeader);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ url: "https://checkout.stripe.com/session/abc" });
     expect(mockCreate).toHaveBeenCalledWith(
@@ -83,9 +83,10 @@ describe("billing routes (B11)", () => {
   });
 
   it("GET billing status reports none before checkout, and whether billing is configured", async () => {
-    const tenant = await createTenant(getPool(), "creator-a");
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     const app = createApp();
-    const res = await request(app).get(`/tenants/${tenant.id}/billing`).set(authHeader(tenant.id));
+    const res = await request(app).get(`/tenants/${tenant.id}/billing`).set(authHeader);
     expect(res.body).toEqual({ billingStatus: "none", billingConfigured: true });
   });
 
@@ -93,16 +94,15 @@ describe("billing routes (B11)", () => {
   // and reports on a paid subscription — must not be reachable without a
   // session for the tenant in the URL.
   it("rejects checkout and status requests with no session, or a session for a different tenant", async () => {
-    const tenant = await createTenant(getPool(), "creator-a");
-    const otherTenant = await createTenant(getPool(), "creator-b");
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { authHeader: otherAuthHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
     const app = createApp();
 
     const noSession = await request(app).post(`/tenants/${tenant.id}/billing/checkout`);
     expect(noSession.status).toBe(401);
 
-    const wrongSession = await request(app)
-      .get(`/tenants/${tenant.id}/billing`)
-      .set(authHeader(otherTenant.id));
+    const wrongSession = await request(app).get(`/tenants/${tenant.id}/billing`).set(otherAuthHeader);
     expect(wrongSession.status).toBe(403);
   });
 

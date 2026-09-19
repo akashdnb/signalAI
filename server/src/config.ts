@@ -58,6 +58,23 @@ export const config = {
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },
+  // Identity Refactor U2: the API server's OWN public base URL, used to
+  // build the magic-link verify URL emailed to a signing-in user
+  // (GET /auth/email/verify). Distinct from appBaseUrl (BUI's URL, where
+  // that same request eventually redirects to) — the two happen to be
+  // different hosts in every real deployment of this project.
+  get apiBaseUrl() {
+    return stripTrailingSlashes(process.env.API_BASE_URL ?? "http://localhost:3000");
+  },
+  // Identity Refactor U2: optional, unlike every other setting below this
+  // point being "genuinely optional" — see lib/resend.ts's docstring for
+  // why an unconfigured Resend still has a real (not silent) fallback.
+  get resendApiKey() {
+    return process.env.RESEND_API_KEY ?? "";
+  },
+  get resendFromAddress() {
+    return process.env.RESEND_FROM_ADDRESS ?? "signalAI <onboarding@resend.dev>";
+  },
   // R9-03: routed through config like every other setting, rather than
   // read directly from process.env in telegram.ts — a typo'd env var name
   // is then at least consistent with how every other misconfiguration in
@@ -69,8 +86,9 @@ export const config = {
   get telegramChatId() {
     return process.env.TELEGRAM_CHAT_ID ?? "";
   },
-  // R10-01: signs the bearer session token issued at the end of a
-  // successful Instagram connection (see lib/session.ts) — gates every
+  // R10-01, superseded by the Identity Refactor: signs the bearer session
+  // token issued at the end of magic-link email verification (see
+  // lib/session.ts and routes/authEmail.ts) — gates every
   // dashboard/campaigns/billing route, so this is validated at boot the
   // same way the token keyring is.
   get sessionSecret() {
@@ -136,6 +154,7 @@ export function assertRequiredConfig(): void {
     ["SESSION_SECRET", config.sessionSecret],
     ["WEB_APP_ORIGIN", config.webAppOrigin],
     ["APP_BASE_URL", process.env.APP_BASE_URL ?? ""],
+    ["API_BASE_URL", process.env.API_BASE_URL ?? ""],
   ]
     .filter(([, value]) => !value)
     .map(([name]) => name);
