@@ -469,3 +469,42 @@ What remains before a pilot creator can actually use this is outside the code:
 - **Track A (Phase 0)** — legal entity, Business Verification, App Review. Still the critical path to serving anyone, and nothing in this repo advances it.
 - **Two live-payload verifications** flagged in-code rather than found by review: `instagramWebhookParser.ts` and `instagramSend.ts` are both written against Meta's published shapes and neither has been exercised against a real app. The plan's A6 pilot-tester step is where that gets confirmed.
 - **The B4 load test** (`scripts/loadTestLeadEventsQueue.ts`) has a runbook but no recorded result. The plan treats it as a gate, not a nice-to-have.
+
+---
+
+## Round 14 — Identity Refactor U1–U8 (branch `identity-refactor`, uncommitted working tree)
+
+Reviewed: users/tenant_members/magic_link_tokens schema, magic-link request and verify routes, session and tenant-auth changes, Instagram start/callback rework, the two cleanup scripts, BUI login pages.
+
+**Overall: the best-executed change in this log.** Nearly every lesson from Rounds 1–13 was applied unprompted — the token is hashed at rest, spent via a single atomic `update … where used_at is null and expires_at > now() returning` (the `trySpendNonce` shape), `trust proxy` is set so `req.ip` is the caller rather than Render's proxy, `API_BASE_URL` was added to `assertRequiredConfig`, and the rate limiter carries a written justification for why a check-then-insert race is acceptable *here* and was not for the Instagram send limiter. 113 non-DB tests pass; typecheck clean. Findings below are mostly operational.
+
+### High
+
+- [ ] **R14-01 [HIGH]** `server/src/config.ts:157` — **`API_BASE_URL` is now required at boot and is not set on Render, so merging this will fail the deploy.** The live service has 13 env vars and that is not one of them. This is `assertRequiredConfig` working exactly as designed — the process refuses to start rather than emailing magic links pointing at `http://localhost:3000` — but it converts into a failed deploy the moment the branch lands. Set `API_BASE_URL=https://signalai-server.onrender.com` (the **server**, distinct from `APP_BASE_URL`, which is BUI) *before* merging, not after. `RESEND_API_KEY` is also absent; that one degrades rather than crashes, but the degraded path is "read the sign-in link out of Render's logs", which is the login path itself.
+
+- [ ] **R14-02 [HIGH]** Branch `identity-refactor` — **39 changed files and zero commits.** The entire refactor exists only in the working tree: one `git checkout`, `git stash`, or crashed editor from gone, no bisectable history, no incremental review, and no way to revert one step without unpicking all eight. It also disables the release gate designed in this very plan — "merge only once a phase is genuinely done" cannot work when there is nothing committed to merge. Commit per step (U1…U8) with the plan's step IDs in the messages; the work is good enough to deserve a history that survives.
+
+### Medium
+
+- [ ] **R14-03 [MED]** `server/src/routes/authEmail.ts:88-113` — **a transient failure after the token is spent permanently burns the sign-in link.** `spendMagicLinkToken` marks the token used at line 88; anything throwing in the `try` at 93–108 (user upsert, tenant creation, a pool hiccup) redirects to `/login?error=verification_failed` with the link already dead. Spending *before* the work is the security-correct order here — it is what stops a slow operation being a replay window — so the fix is not to reorder but to make the consequence explicit: that error must tell the user their link is no longer valid and to request a new one. A user who re-clicks the same link gets `invalid_or_expired` and reasonably concludes the system is broken.
+
+- [ ] **R14-04 [MED]** `server/src/db/magicLinkTokens.ts` — **`magic_link_tokens` has no prune, while all three sibling tables have one.** `spent_oauth_nonces`, `account_sends` and `ai_call_usage` are each pruned from the maintenance queue; this table is both the newest and the worst candidate to skip, because `countRecentTokensForEmail`/`ForIp` scan it on *every* sign-in request, so it is the one that grows fastest and is read most. Add it to `maintenanceQueue.ts` alongside the others — the convention is already there, it just needs one more line.
+
+- [ ] **R14-05 [MED]** `server/src/routes/authEmail.ts:101` — the bootstrap tenant is named `` `${spent.email}'s workspace` ``, putting the user's email address into a display field. It will render in the BUI header, appear in any tenant listing, and land anywhere tenant names are logged — a PII placement that the rest of this codebase is careful about (B2 separates PII precisely so it can be scrubbed, and tenant names are not scrubbable). Use the local part, or "My workspace", and let the user rename it.
+
+### Low
+
+- [x] **R14-06 [LOW]** — **WITHDRAWN BY THE REVIEWER, not a real finding.** I claimed `listTenantsForUser` had no ordering; it has
+  `order by created_at` (`server/src/db/tenantMembers.ts:35`). I inferred the gap from the `tenants[0]!` call site in
+  `authEmail.ts` without opening the function it calls — an inference written up as a finding, which is the failure mode this
+  log exists to catch in implementation code and should hold reviews to as well. Original text kept below for the record.
+
+  ↳ *Original claim:* `tenants[0]!.tenantId` picks a tenant with no `order by` in `listTenantsForUser`, so which workspace a multi-tenant user lands in is database order. Harmless while every user has exactly one, and precisely the shape this refactor exists to enable — worth an explicit ordering (oldest membership, or a `last_active_tenant_id`) before [[signalAI_roadmap]] Phase 6 makes multi-membership normal.
+
+### Noted, no action — good calls worth keeping
+
+- `server/src/app.ts:30` — `app.set("trust proxy", true)`. Without it `req.ip` behind Render's proxy is the proxy's own address for every caller, which would have silently converted `MAX_REQUESTS_PER_IP = 20` into a *global* limit throttling all users at once while providing no per-attacker protection. Easy to omit, invisible when wrong.
+- `server/src/db/magicLinkTokens.ts:25-40` — the atomic spend combining "exists, unexpired, unused" and "mark used" into one statement, so two concurrent clicks cannot both succeed. Same shape as `trySpendNonce`; applied without being asked.
+- `server/src/db/magicLinkTokens.ts:42-50` — the rate limiter documents *why* its race is tolerable here (a single-use short-lived credential; worst case a few extra emails) and contrasts it with the send limiter, which guards a hard external ceiling and was made atomic. Recording the asymmetry is more valuable than making both atomic.
+- `server/src/routes/authEmail.ts:26-40` — enumeration resistance done properly: one generic response for every outcome, the only distinguishable failure is malformed input, and timing is kept similar by running the identical insert-on-conflict for new and returning users rather than by an artificial delay.
+- `server/scripts/claimLegacyTenants.ts:86`, `cleanupSelfLeads.ts:39` — both default to dry-run and require `--apply`. Deletion-by-default would have been the easy mistake; these are production data scripts and the safe default is the whole point.
