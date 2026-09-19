@@ -104,6 +104,7 @@ Sizes as in the Phase 0/1 plan: **S** ≤ 1 day · **M** 2–4 days · **L** 1�
 - Drop `tenants.session_version`, remove `tenantName` handling, delete the dead resolve-by-profile path.
 - Update `auth.ts`'s "connecting Instagram *is* the signup" comment — it will otherwise outlive the design it describes and mislead the next reader.
 - **Done when:** no reference to the old model remains in code or comments.
+- **Ship the `DROP COLUMN` migration in its own later deploy, not bundled with U1's migration.** (Round 15 finding, R15-02: this branch shipped it bundled anyway, since production was empty and pre-refactor code was about to be fully replaced in the same deploy — but the reasoning generalizes and next time there will be data and users.) Render's deploy has a real overlap window — migrations run, then the new instance boots, then traffic switches, then the old instance drains — during which the *old* code is still serving reads against the *new* schema. An additive migration (new table, new nullable column) is safe through that window; the old code simply doesn't know the new thing exists yet. A `DROP COLUMN` is not: any old-code path still reading that column throws for the entire overlap, not just until the new instance takes over. The rule is expand/contract: ship the migration that adds the replacement, ship the code that stops reading the old column, deploy, confirm it's healthy, *then* ship the `DROP COLUMN` as a separate deploy.
 
 ---
 
