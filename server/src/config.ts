@@ -88,6 +88,49 @@ export function assertWebAppOriginConfigured(origin: string): void {
 }
 
 /**
+ * Every externally-facing setting the server cannot function without, checked
+ * in ONE place at boot.
+ *
+ * Added after the same failure recurred seven times across different
+ * settings, each found from a downstream symptom rather than from the
+ * server: an unset WEB_APP_ORIGIN silently became a wildcard CORS origin, an
+ * unset INSTAGRAM_CLIENT_ID produced an authorize URL Instagram answered with
+ * "this page isn't available", and an unset META_WEBHOOK_VERIFY_TOKEN made
+ * the subscription handshake return 403, which Meta reports as "the callback
+ * URL or verify token couldn't be validated". In all three the deploy
+ * succeeded and the health check stayed green.
+ *
+ * Adding a getter above without adding it here (when it is required) is the
+ * way this recurs, so the list is deliberately exhaustive rather than
+ * per-feature. Genuinely optional settings — Stripe, Telegram, Sentry — are
+ * excluded on purpose: those degrade gracefully by design.
+ */
+export function assertRequiredConfig(): void {
+  const missing = [
+    ["DATABASE_URL", process.env.DATABASE_URL ?? ""],
+    ["META_APP_SECRET", config.metaAppSecret],
+    ["META_WEBHOOK_VERIFY_TOKEN", config.metaWebhookVerifyToken],
+    ["INSTAGRAM_CLIENT_ID", config.instagramClientId],
+    ["INSTAGRAM_REDIRECT_URI", config.instagramRedirectUri],
+    ["SESSION_SECRET", config.sessionSecret],
+    ["WEB_APP_ORIGIN", config.webAppOrigin],
+    ["APP_BASE_URL", process.env.APP_BASE_URL ?? ""],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (config.tokenKeyring.size === 0) missing.push("TOKEN_ENCRYPTION_KEYS");
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required configuration: ${missing.join(", ")}. ` +
+        "The server refuses to start rather than run with a setting that would " +
+        "fail later, in someone else's browser, as an unrelated-looking error.",
+    );
+  }
+}
+
+/**
  * Both default to "" and were the only externally-facing settings without a
  * boot check. Unset, the server started normally and built an authorize URL
  * reading `?client_id=&redirect_uri=&scope=...`, which Instagram answers with

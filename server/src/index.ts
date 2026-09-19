@@ -1,7 +1,7 @@
 import "./lib/sentryInit.js"; // must be the first import — see sentryInit.ts for why a statement here wasn't enough
 import { Sentry } from "./lib/sentry.js";
 import { createApp } from "./app.js";
-import { config, assertInstagramOAuthConfigured, assertWebAppOriginConfigured } from "./config.js";
+import { config, assertRequiredConfig } from "./config.js";
 import { getPool } from "./db/pool.js";
 import { getBoss } from "./queue/boss.js";
 import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
@@ -11,8 +11,6 @@ import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs
 import { createLLMProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
-import { assertKeyringConfigured } from "./lib/tokenVault.js";
-import { assertSessionSecretConfigured } from "./lib/session.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
@@ -40,21 +38,15 @@ function loadLLMProviderOrFallback(): LLMProvider {
 }
 
 async function main() {
-  // R1-10: fail at boot, not at the first token write in production —
-  // this gates the whole account-connection flow, unlike the LLM provider
-  // below, which has a real degrade-gracefully path.
-  assertKeyringConfigured(config.tokenKeyring);
-  // R10-01: an empty SESSION_SECRET would make every tenant session
-  // forgeable — this gates every dashboard/campaigns/billing route.
-  assertSessionSecretConfigured(config.sessionSecret);
-  // R12-01: an unset WEB_APP_ORIGIN used to silently fall back to a
-  // wildcard CORS origin — fail at boot instead.
-  assertWebAppOriginConfigured(config.webAppOrigin);
-
-  // Unset, these produced an authorize URL with empty client_id/redirect_uri
-  // that Instagram answers with "this page isn't available" — a failure that
-  // surfaces only in a creator's browser, long after a deploy reports success.
-  assertInstagramOAuthConfigured(config.instagramClientId, config.instagramRedirectUri);
+  // Every required setting is checked in one place (see config.ts for why,
+  // and for what counts as required). Each of these previously failed far
+  // from its cause — an empty keyring at the first token write, an empty
+  // SESSION_SECRET as forgeable sessions, an unset WEB_APP_ORIGIN as a
+  // wildcard CORS origin, unset Instagram credentials as a dead authorize
+  // URL, an unset verify token as a webhook Meta refuses to validate. The
+  // LLM provider is deliberately NOT here: it has a real degrade-gracefully
+  // path, and so do Stripe, Telegram and Sentry.
+  assertRequiredConfig();
 
   const pool = getPool();
   const boss = await getBoss();
