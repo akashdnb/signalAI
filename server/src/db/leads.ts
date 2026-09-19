@@ -9,6 +9,8 @@ export interface Lead {
   windowOpenUntil: Date | null;
   lastAppliedSequence: number;
   createdAt: Date;
+  /** Only populated by findOrCreateLeadByInstagramUserId (B11: "new lead" Telegram alert) — absent from every other lookup. */
+  isNew?: boolean;
 }
 
 interface LeadRow {
@@ -20,6 +22,7 @@ interface LeadRow {
   window_open_until: Date | null;
   last_applied_sequence: string; // bigint comes back as string from pg
   created_at: Date;
+  is_new?: boolean;
 }
 
 function toLead(row: LeadRow): Lead {
@@ -32,6 +35,7 @@ function toLead(row: LeadRow): Lead {
     windowOpenUntil: row.window_open_until,
     lastAppliedSequence: Number(row.last_applied_sequence),
     createdAt: row.created_at,
+    ...(row.is_new !== undefined ? { isNew: row.is_new } : {}),
   };
 }
 
@@ -39,6 +43,11 @@ function toLead(row: LeadRow): Lead {
  * Identity spine entry point: resolves an inbound Instagram event to its
  * lead, minting one on first contact. Every caller must supply tenantId —
  * there is no variant of this lookup that can cross a tenant boundary.
+ *
+ * `is_new` (via the classic `xmax = 0` upsert trick — true only when this
+ * statement's own INSERT branch fired, false when it hit the ON CONFLICT
+ * UPDATE branch instead) is what B11's "new lead" Telegram alert keys off,
+ * in webhookIngestService.ts.
  */
 export async function findOrCreateLeadByInstagramUserId(
   pool: Queryable,
@@ -50,7 +59,7 @@ export async function findOrCreateLeadByInstagramUserId(
      values ($1, $2)
      on conflict (tenant_id, instagram_user_id) where instagram_user_id is not null
      do update set tenant_id = excluded.tenant_id
-     returning *`,
+     returning *, (xmax = 0) as is_new`,
     [tenantId, instagramUserId],
   );
   return toLead(result.rows[0]!);

@@ -15,6 +15,7 @@ import { assertKeyringConfigured } from "./lib/tokenVault.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
+import { sendTelegramAlert } from "./lib/telegram.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -61,14 +62,14 @@ async function main() {
 
   // R1-04 fix: this used to be console.error only — stdout in a Render
   // container nobody is watching, which didn't meet B4's own done-condition
-  // ("fires an alert instead of wedging a lead forever"). Telegram alerting
-  // (B11) will add a second channel here once it exists; Sentry alone
-  // already closes the "nobody finds out" gap this finding was about.
+  // ("fires an alert instead of wedging a lead forever"). B11 adds
+  // Telegram as a second channel alongside Sentry.
   await startDeadLetterWatcher(boss, pool, async (job) => {
     const message = `Lead event permanently failed, wedged at ${LEAD_EVENTS_DLQ}`;
     // eslint-disable-next-line no-console
     console.error(message, job);
     Sentry.captureMessage(message, { level: "error", extra: { job } });
+    await sendTelegramAlert(`🚨 ${message}\n${JSON.stringify(job)}`);
   });
 
   // R3-08: catches up on any wedged keys whose failure happened while no
@@ -112,6 +113,7 @@ async function main() {
         level: "error",
         extra: { failures },
       });
+      await sendTelegramAlert(`⚠️ Token refresh failure(s) — Account Health Monitoring:\n${JSON.stringify(failures)}`);
     }
   });
 
