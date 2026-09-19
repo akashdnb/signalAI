@@ -440,3 +440,32 @@ Reviewed: client app (connect/connected/dashboard, campaigns, billing panels), A
 - `client/src/api.ts:36-51` — one chokepoint attaches `Authorization`, so no call site can forget it, and adding a route cannot accidentally ship unauthenticated.
 - `client/src/api.ts:61-62` — a 401/403 clears the stored session. With R11-02's revocation now real, an actively revoked session degrades to "reconnect" instead of an error loop on every request.
 - `server/src/app.ts:24-35` — the CORS block records *why* no cookies cross this boundary and that only the `Authorization` header needs allowing. Preflight returns 204 rather than falling through to a 404, which is the part that is usually missed in a hand-rolled CORS middleware.
+
+---
+
+## Round 13 — round 12 fixes (commit `0658a01`)
+
+Reviewed: CORS origin configuration and boot validation, deliberate-tradeoff comment.
+
+**No new findings.** All three Round 12 items are fixed as described, and there are no open items from this round.
+
+- R12-01: the wildcard fallback is gone; `Access-Control-Allow-Origin` is now the configured origin only.
+- R12-02: routed through `config.ts` rather than `process.env`, matching every other setting.
+- R12-03: the `localStorage` trade-off is recorded at the point someone would be tempted to "fix" it.
+
+### Noted, no action — good calls worth keeping
+
+- `server/src/config.ts:83-86` + `server/src/index.ts:50-52` — `assertWebAppOriginConfigured` throws at boot rather than letting an unset value degrade to a permissive default. This is now the third setting given the same fail-at-boot treatment (`SESSION_SECRET`, the token keyring, and now the CORS origin), and the consistency is the point: the codebase's rule is that a missing security-relevant setting stops the process rather than silently weakening it. Worth stating as a convention somewhere, so the fourth one gets it for free.
+- `server/src/app.ts:32-38` — the comment explains not just what changed but why a wildcard was wrong *given this specific auth design* (any origin could script the API with a bearer token obtained another way). That framing is what keeps it from being relaxed again by someone reasoning only about cookies.
+
+---
+
+## Phase 1 status at Round 13
+
+Engineering milestones B0–B11 and the BUI frontend are all committed, and **there are no open blocker or high-severity findings**. Review items across 13 rounds: 63 raised, 63 resolved.
+
+What remains before a pilot creator can actually use this is outside the code:
+
+- **Track A (Phase 0)** — legal entity, Business Verification, App Review. Still the critical path to serving anyone, and nothing in this repo advances it.
+- **Two live-payload verifications** flagged in-code rather than found by review: `instagramWebhookParser.ts` and `instagramSend.ts` are both written against Meta's published shapes and neither has been exercised against a real app. The plan's A6 pilot-tester step is where that gets confirmed.
+- **The B4 load test** (`scripts/loadTestLeadEventsQueue.ts`) has a runbook but no recorded result. The plan treats it as a gate, not a nice-to-have.
