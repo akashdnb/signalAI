@@ -1,5 +1,26 @@
 import { loadKeyring } from "./lib/tokenVault.js";
 
+/**
+ * A trailing slash on either URL setting is invisible in the dashboard and
+ * breaks something different in each case, both silently and both AFTER a
+ * successful OAuth:
+ *
+ *  - APP_BASE_URL: redirects become `https://host//connected`, and a path of
+ *    `//connected` does not match BUI's `/connected` route, so the router
+ *    falls through to its catch-all and bounces the user back to the connect
+ *    page — looking exactly like a failed login despite the token being
+ *    stored.
+ *  - WEB_APP_ORIGIN: echoed verbatim as Access-Control-Allow-Origin. A
+ *    browser's Origin header never carries a trailing slash, so the values
+ *    don't match and EVERY cross-origin API call is blocked.
+ *
+ * Normalising here means the env value merely has to be right, not perfectly
+ * formatted.
+ */
+function stripTrailingSlashes(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
 // Getters, not a frozen object: read live so tests (and anything else that
 // sets process.env after this module first loads) see the current value.
 export const config = {
@@ -35,7 +56,7 @@ export const config = {
     return process.env.STRIPE_WEBHOOK_SECRET ?? "";
   },
   get appBaseUrl() {
-    return process.env.APP_BASE_URL ?? "http://localhost:3000";
+    return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },
   // R9-03: routed through config like every other setting, rather than
   // read directly from process.env in telegram.ts — a typo'd env var name
@@ -60,7 +81,7 @@ export const config = {
   // every other setting; validated at boot via assertWebAppOriginConfigured
   // below rather than falling back to a silently permissive "*".
   get webAppOrigin() {
-    return process.env.WEB_APP_ORIGIN ?? "";
+    return stripTrailingSlashes(process.env.WEB_APP_ORIGIN ?? "");
   },
   // B10: hard per-account daily cap on AI-generated calls. Default chosen
   // to comfortably cover a real pilot conversation volume while still
