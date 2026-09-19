@@ -1,3 +1,4 @@
+import type { Pool } from "pg";
 import type { Queryable } from "./types.js";
 
 export interface Lead {
@@ -151,6 +152,56 @@ export async function isSequenceStale(
  * sequence in between (defense in depth; key_strict_fifo should prevent two
  * workers ever processing the same lead concurrently in the first place).
  */
+export interface LeadListItem {
+  id: string;
+  instagramUserId: string | null;
+  username: string | null;
+  activeMilestoneId: string | null;
+  lastInboundAt: Date | null;
+  windowOpenUntil: Date | null;
+  createdAt: Date;
+}
+
+/**
+ * BUI: the "lead list from B2" on the pilot dashboard. `username` is a
+ * lateral pull of that lead's most recent non-deleted `lead_pii` row —
+ * the creator's own dashboard is one of the few places this is
+ * appropriate to surface at all, and only the latest handle, not history.
+ */
+export async function listLeadsForTenant(pool: Pool, tenantId: string, limit = 100): Promise<LeadListItem[]> {
+  const result = await pool.query<{
+    id: string;
+    instagram_user_id: string | null;
+    username: string | null;
+    active_milestone_id: string | null;
+    last_inbound_at: Date | null;
+    window_open_until: Date | null;
+    created_at: Date;
+  }>(
+    `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, l.created_at,
+            p.username
+     from leads l
+     left join lateral (
+       select username from lead_pii
+       where lead_id = l.id and deleted_at is null and username is not null
+       order by created_at desc limit 1
+     ) p on true
+     where l.tenant_id = $1
+     order by coalesce(l.last_inbound_at, l.created_at) desc
+     limit $2`,
+    [tenantId, limit],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    instagramUserId: row.instagram_user_id,
+    username: row.username,
+    activeMilestoneId: row.active_milestone_id,
+    lastInboundAt: row.last_inbound_at,
+    windowOpenUntil: row.window_open_until,
+    createdAt: row.created_at,
+  }));
+}
+
 export async function advanceSequence(
   pool: Queryable,
   tenantId: string,

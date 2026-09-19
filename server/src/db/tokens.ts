@@ -100,6 +100,38 @@ export async function getSoleConnectedAccount(
   return result.rows[0] ? { instagramAccountId: result.rows[0].instagram_account_id } : null;
 }
 
+export interface AccountHealth {
+  instagramAccountId: string;
+  status: "healthy" | "error";
+  lastError: string | null;
+  lastCheckedAt: Date;
+  expiresAt: Date | null;
+}
+
+/** BUI: the "visible Account Health status" the roadmap calls for on the connect screen — never returns the token itself. */
+export async function getAccountHealth(pool: Pool, tenantId: string): Promise<AccountHealth | null> {
+  const result = await pool.query<{
+    instagram_account_id: string;
+    status: "healthy" | "error";
+    last_error: string | null;
+    last_checked_at: Date;
+    expires_at: Date | null;
+  }>(
+    `select instagram_account_id, status, last_error, last_checked_at, expires_at
+     from meta_tokens where tenant_id = $1 order by created_at limit 1`,
+    [tenantId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    instagramAccountId: row.instagram_account_id,
+    status: row.status,
+    lastError: row.last_error,
+    lastCheckedAt: row.last_checked_at,
+    expiresAt: row.expires_at,
+  };
+}
+
 /**
  * Decrypts on the way out — the plaintext token should only ever exist in
  * memory for the duration of the Graph API call that needs it.

@@ -1,3 +1,5 @@
+import { config } from "../config.js";
+
 /**
  * B11: Telegram alerts for new leads and the operational alarms from B4,
  * B5, and B10. Modeled on the same graceful-degradation pattern as
@@ -9,8 +11,8 @@ const TELEGRAM_API_BASE = "https://api.telegram.org";
 const SEND_TIMEOUT_MS = 5000;
 
 export async function sendTelegramAlert(text: string): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = config.telegramBotToken;
+  const chatId = config.telegramChatId;
 
   if (!token || !chatId) {
     // eslint-disable-next-line no-console

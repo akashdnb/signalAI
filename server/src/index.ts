@@ -15,6 +15,7 @@ import { assertKeyringConfigured } from "./lib/tokenVault.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
+import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
 
 /**
@@ -52,6 +53,8 @@ async function main() {
   await ensureDataDeletionQueue(boss);
   await ensureMaintenanceQueue(boss);
   await startMaintenanceWorker(boss, pool);
+  await ensureAlertsQueue(boss);
+  await startAlertsWorker(boss);
 
   await startLeadEventsWorker(
     boss,
@@ -117,7 +120,7 @@ async function main() {
     }
   });
 
-  const app = createApp();
+  const app = createApp({ llmProvider });
   app.listen(config.port, () => {
     // eslint-disable-next-line no-console
     console.log(`signalAI server listening on :${config.port} (${config.nodeEnv})`);

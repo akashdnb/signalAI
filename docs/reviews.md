@@ -329,3 +329,33 @@ Reviewed: advisory-lock send reservation, AI cap refund, prune wiring, race-magn
 - `src/services/aiSpendGuard.ts:23-34` — **the refund distinguishes a transport failure (never billed → refund) from an output-validation or parse rejection (the call completed and was billed → stays counted).** R7-02 only asked for the refund; getting this distinction right is the difference between a correct cost control and one that silently under-counts every rejected generation. The docstring states the rule explicitly, which is what will stop someone widening the refund to "any failure".
 - `src/services/aiSpendGuard.ts:51,60-64` — the guard is constructed per job invocation (`leadEventReplyHandler.ts:107`), so the mutable `reservationId` closure cannot alias across concurrent leads, and `release()` is null-guarded and clears the id, making it idempotent. Both are easy to get wrong if the guard is ever hoisted to a longer-lived scope; it should stay per-invocation.
 - `src/services/aiSpendGuard.ts:12-21` — the accepted-race comment now states the real magnitude (up to N−1 over the cap, not one) *and* why the race is tolerated here but was not in `tryReserveSend`. Documenting the asymmetry is more useful than making both atomic would have been.
+
+---
+
+## Round 9 — round 8 fixes + B11 Telegram alerts (commits `292d28e`, `be2c4b0`)
+
+Reviewed: periodic maintenance job, stable advisory-lock keys, Telegram alert channel, new-lead notification.
+
+**Overall:** R8-01 and R8-02 are both fixed well, and the maintenance job keeps boot-time pruning as a deliberate belt-and-suspenders rather than replacing it. The Telegram client itself follows the established graceful-degradation pattern correctly. The problem is where the new-lead alert is called from.
+
+### High
+
+- [x] **R9-01 [HIGH]** `src/services/webhookIngestService.ts:127-128` — **the new-lead Telegram alert is awaited inside the webhook request path, re-introducing exactly what B3 was designed to avoid.** `ingestOneEvent` is awaited by `ingestWebhookEvents`, which is awaited by the route before `res.sendStatus(200)` — so every new lead now adds an external HTTP round-trip, with a 5-second timeout, to Meta's ack latency. B3's whole contract is "verify, persist, ack — no external calls", and the durable event pipeline exists precisely so that work like this happens in a worker. It degrades worst under the load that matters: a viral Reel is *mostly* new leads, so nearly every event in the batch pays the round-trip, and Telegram rate-limits messages to a single chat at roughly 20/minute, so those calls start slowing and failing exactly when the burst arrives. A slow ack means Meta retries, which means redelivery, which means more alerts. Enqueue the alert as a job (the queue is already there and `lead.isNew` is already computed) rather than awaiting it inline. The instinct to send only after a successful commit is right and should be kept — it just belongs on the other side of the queue boundary.
+  ↳ **Fixed, and better than "send after commit."** New `alerts` queue (`src/queue/alertsQueue.ts`): `enqueueNewLeadAlert` is a local `boss.send()` (no external call) riding the SAME transaction as the rest of the ingest, via the existing `asPgBossDb` adapter — so it commits or rolls back atomically with everything else, with no separate post-commit step needed. The actual Telegram send happens in `startAlertsWorker`, entirely off the request path. Test asserts the enqueue happens (not the Telegram send) so the ack path's speed is what's actually verified; a separate `alertsQueue.test.ts` covers the worker sending for real.
+
+### Medium
+
+- [x] **R9-02 [MED]** `src/services/webhookIngestService.ts:128` + `src/lib/telegram.ts:17` — **the alert sends a lead's username to Telegram, creating a PII copy that the Data Deletion Callback can never reach.** The whole point of B2's PII/event-fact separation is that `hardScrubLead` can overwrite content fields on request; a Telegram chat history is a third-party store outside that boundary, and the roadmap is explicit that a deletion which leaves recoverable copies "doesn't satisfy erasure". The same string is also written to stdout by the unconfigured-path `console.warn`, so in local dev every new lead's username lands in the process log too. Alert on the *fact* of a new lead with a `lead_id` and a dashboard link; keep the identity behind the login where it can be scrubbed.
+  ↳ **Fixed exactly as prescribed.** The alert job payload carries only `tenantId`/`leadId`; the Telegram message text is `"👋 New lead: {appBaseUrl}/tenants/{tenantId}/leads/{leadId}"` — no username, no comment text. Test asserts the enqueued job's serialized payload never contains the test's own username string.
+
+### Low
+
+- [x] **R9-03 [LOW]** `src/lib/telegram.ts:12-13` — reads `process.env.TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` directly rather than going through `config.ts` like every other setting. That skips boot-time validation, so a typo'd env var surfaces as silent "not configured" warnings at runtime instead of a startup failure — and silent is the worst outcome for an alerting channel, since the thing that tells you something is wrong is itself the thing that is wrong. Move them into `config` with the others.
+  ↳ **Fixed.** Added `config.telegramBotToken`/`config.telegramChatId`; `telegram.ts` reads through those instead of `process.env` directly. (Boot-time validation itself is out of scope here — matches the Sentry DSN, which also isn't hard-validated at boot; only the token keyring gets that treatment today.)
+
+### Noted, no action — good calls worth keeping
+
+- `src/queue/maintenanceQueue.ts:12-25` — the recurring prune keeps boot-time pruning as well, explicitly as belt-and-suspenders for a long gap between the first schedule tick and the next deploy. Removing the boot call as "now redundant" would be the natural future cleanup and would be wrong.
+- `src/queue/maintenanceQueue.ts:7-10` — scheduling at `17 * * * *` rather than the hour mark, with the reasoning noted. Costs nothing, and the habit is right.
+- `src/queue/maintenanceQueue.ts:23-24` — `account_sends` deliberately excluded from the periodic prune because it has become a durable analytics source, with a pointer to where that reasoning lives. Documenting the *exception* is what stops someone folding it back in for consistency.
+- `src/lib/telegram.ts:33-38` — an alerting-channel failure never propagates to the caller, with Sentry named as the primary channel. Correct: an alert failing to send must not fail the thing it was alerting about.

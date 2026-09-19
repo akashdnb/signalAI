@@ -7,7 +7,7 @@ import { insertPii } from "../db/pii.js";
 import { listActiveCampaignKeywords } from "../db/campaigns.js";
 import { findMatchingCampaign } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
-import { sendTelegramAlert } from "../lib/telegram.js";
+import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
 import type { ParsedWebhookEvent } from "../lib/instagramWebhookParser.js";
 
 const MESSAGING_WINDOW_HOURS = 24;
@@ -119,14 +119,16 @@ async function ingestOneEvent(
       { client },
     );
 
-    await client.query("COMMIT");
-
-    // B11: sent only after a successful commit — sending it earlier (e.g.
-    // right after findOrCreateLeadByInstagramUserId) would alert on a lead
-    // that later rolled back if anything else in this transaction failed.
+    // R9-01/R9-02 fix: enqueues a fast local job (no external Telegram
+    // call, no PII — see alertsQueue.ts) on the SAME transaction as
+    // everything else here, so it commits or rolls back atomically with
+    // the lead/event/enqueue above rather than needing a separate
+    // post-commit step.
     if (lead.isNew) {
-      await sendTelegramAlert(`👋 New lead on Instagram (tenant ${tenantId}): ${event.username ?? event.instagramUserId}`);
+      await enqueueNewLeadAlert(boss, { tenantId, leadId: lead.id }, { client });
     }
+
+    await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

@@ -112,3 +112,36 @@ export async function setCampaignEnabled(
   );
   return result.rowCount === 1;
 }
+
+/**
+ * BUI: "reply-engine mode toggle per campaign," plus the CTA link and the
+ * rule-based template — the rest of the creator's per-campaign reply
+ * configuration beyond enabled/disabled and milestones. Each field is
+ * `coalesce`d against its current value so a partial PATCH only ever
+ * touches the fields it explicitly sent.
+ */
+export async function updateCampaignReplyConfig(
+  pool: Pool,
+  tenantId: string,
+  campaignId: string,
+  updates: { replyMode?: ReplyMode; ctaLink?: string | null; defaultReplyTemplate?: string },
+): Promise<Campaign | null> {
+  const result = await pool.query<CampaignRow>(
+    `update campaigns set
+       reply_mode = coalesce($3, reply_mode),
+       cta_link = case when $4::boolean then $5 else cta_link end,
+       default_reply_template = coalesce($6, default_reply_template),
+       updated_at = now()
+     where id = $1 and tenant_id = $2
+     returning *`,
+    [
+      campaignId,
+      tenantId,
+      updates.replyMode ?? null,
+      updates.ctaLink !== undefined, // whether the caller sent ctaLink at all — coalesce can't distinguish "sent null" from "not sent"
+      updates.ctaLink ?? null,
+      updates.defaultReplyTemplate ?? null,
+    ],
+  );
+  return result.rows[0] ? toCampaign(result.rows[0]) : null;
+}
