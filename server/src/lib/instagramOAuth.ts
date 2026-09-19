@@ -25,7 +25,15 @@ export function buildAuthorizationUrl(config: InstagramOAuthConfig, state: strin
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "instagram_business_basic,instagram_business_manage_messages");
+  // All three are listed as required by the Instagram use case's "Add required
+  // messaging permissions" step. manage_comments was missing: without it the
+  // granted token cannot receive comment webhooks or post public comment
+  // replies, which is the trigger the entire product is built on — the DM half
+  // would have worked and the comment half would have failed silently.
+  url.searchParams.set(
+    "scope",
+    "instagram_business_basic,instagram_business_manage_comments,instagram_business_manage_messages",
+  );
   url.searchParams.set("state", state);
   return url.toString();
 }

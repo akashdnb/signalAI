@@ -31,7 +31,14 @@ describe("instagramOAuth", () => {
     expect(url.searchParams.get("redirect_uri")).toBe(config.redirectUri);
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("state")).toBe("state-abc");
-    expect(url.searchParams.get("scope")).toContain("instagram_business_manage_messages");
+    // All three are required by the Instagram use case setup; manage_comments
+    // was once missing, which would have broken the comment trigger while
+    // leaving the DM path working — asserted individually so a future edit
+    // can't silently drop one again.
+    const scope = url.searchParams.get("scope") ?? "";
+    expect(scope).toContain("instagram_business_basic");
+    expect(scope).toContain("instagram_business_manage_comments");
+    expect(scope).toContain("instagram_business_manage_messages");
   });
 
   it("exchangeCodeForShortLivedToken posts to the token endpoint and returns the parsed token", async () => {
