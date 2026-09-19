@@ -196,6 +196,9 @@ export async function runMilestoneCheck(
       responseFormat: "json_object", // R3-07: use the provider's native JSON mode, not just prose + regex recovery
     });
   } catch (err) {
+    // R7-02: refund — this call never completed/was never billed. Same
+    // reasoning as replyEngine.ts.
+    await spendGuard.release();
     const message = err instanceof Error ? err.message : String(err);
     return fallbackResult(`provider error: ${message}`);
   }

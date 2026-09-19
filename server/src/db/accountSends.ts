@@ -21,13 +21,22 @@ export async function countRecentSends(pool: Pool, instagramAccountId: string): 
  * record left a DM the lead already received uncounted and unprotected
  * against a retry re-sending it.
  *
- * This makes reservation and recording the same atomic statement, done
- * BEFORE the send: `insert ... select ... where (count) < limit` only
- * inserts (and only returns a row) when a slot is actually available,
- * so two concurrent callers cannot both win the same slot. Calling this
- * counts as "sent" even if the send that follows then fails — an
- * accepted, and cheap, over-count (one wasted slot) against the
+ * Reservation and recording are the same statement, done BEFORE the send.
+ * Calling this counts as "sent" even if the send that follows then fails —
+ * an accepted, and cheap, over-count (one wasted slot) against the
  * alternative of double-sending a lead a message it already got.
+ *
+ * R7-01 fix: `insert ... select ... where (count) < limit` alone is NOT
+ * atomic under Postgres' default READ COMMITTED — each statement reads
+ * `count(*)` against its own snapshot and nothing locks the counted rows,
+ * so two truly concurrent callers can both observe `count < limit` and
+ * both insert. A transaction-scoped advisory lock keyed by the account id
+ * (`pg_advisory_xact_lock`, released automatically at commit/rollback)
+ * forces callers for the SAME account to serialize around the
+ * count-and-insert, which is what actually makes "two concurrent callers
+ * cannot both win the same slot" true rather than merely narrowing the
+ * race window. Different accounts take different lock keys and never
+ * contend with each other.
  */
 export async function tryReserveSend(
   pool: Pool,
@@ -35,17 +44,28 @@ export async function tryReserveSend(
   instagramAccountId: string,
   hourlyLimit: number,
 ): Promise<boolean> {
-  const result = await pool.query(
-    `insert into account_sends (tenant_id, instagram_account_id)
-     select $1, $2
-     where (
-       select count(*) from account_sends
-       where instagram_account_id = $2 and sent_at > now() - ($3 || ' milliseconds')::interval
-     ) < $4
-     returning id`,
-    [tenantId, instagramAccountId, RATE_LIMIT_WINDOW_MS, hourlyLimit],
-  );
-  return (result.rowCount ?? 0) > 0;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [instagramAccountId]);
+    const result = await client.query(
+      `insert into account_sends (tenant_id, instagram_account_id)
+       select $1, $2
+       where (
+         select count(*) from account_sends
+         where instagram_account_id = $2 and sent_at > now() - ($3 || ' milliseconds')::interval
+       ) < $4
+       returning id`,
+      [tenantId, instagramAccountId, RATE_LIMIT_WINDOW_MS, hourlyLimit],
+    );
+    await client.query("commit");
+    return (result.rowCount ?? 0) > 0;
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /**

@@ -82,25 +82,33 @@ export async function generateReply(
     };
   }
 
+  let generated: string;
   try {
-    const generated = await provider.generateReply({
+    generated = await provider.generateReply({
       systemPrompt: buildSystemPrompt(ctx),
       userMessage: ctx.sourceText,
     });
-
-    // Compose (append the CTA) BEFORE validating (R2-01 fix): a reply that
-    // validates at 299 characters previously shipped at ~325 once a link
-    // was appended afterward — the exact guarantee the comment-tier limit
-    // exists to enforce, silently bypassed on every send with a CTA.
-    const text = appendCtaLink(generated, ctx.ctaLink);
-    const outputCheck = validateOutput(text, ctx.tier, ctx.ctaLink);
-    if (!outputCheck.allowed) {
-      return { ...ruleBasedReply(ctx), fellBackReason: outputCheck.reason };
-    }
-
-    return { text, engine: "ai_generated" };
   } catch (err) {
+    // R7-02: this call never completed, so it was never actually billed —
+    // refund the reservation rather than letting a provider outage burn
+    // real cap on calls that produced nothing, potentially locking the
+    // account out for the rest of the 24h window even after recovery.
+    await spendGuard.release();
     const message = err instanceof Error ? err.message : String(err);
     return { ...ruleBasedReply(ctx), fellBackReason: `provider error: ${message}` };
   }
+
+  // Compose (append the CTA) BEFORE validating (R2-01 fix): a reply that
+  // validates at 299 characters previously shipped at ~325 once a link
+  // was appended afterward — the exact guarantee the comment-tier limit
+  // exists to enforce, silently bypassed on every send with a CTA.
+  const text = appendCtaLink(generated, ctx.ctaLink);
+  const outputCheck = validateOutput(text, ctx.tier, ctx.ctaLink);
+  if (!outputCheck.allowed) {
+    // The call itself completed (and was billed) — only a transport
+    // failure above is refunded, not a rejected-but-real generation.
+    return { ...ruleBasedReply(ctx), fellBackReason: outputCheck.reason };
+  }
+
+  return { text, engine: "ai_generated" };
 }

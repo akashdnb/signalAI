@@ -5,7 +5,7 @@ import type { AiSpendGuard } from "../aiSpendGuard.js";
 import { generateReply, type ReplyContext } from "../replyEngine.js";
 
 function spendGuard(allow: boolean): AiSpendGuard {
-  return { tryConsume: vi.fn(async () => allow) };
+  return { tryConsume: vi.fn(async () => allow), release: vi.fn(async () => {}) };
 }
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -111,6 +111,30 @@ describe("generateReply", () => {
 
     expect(result.engine).toBe("rule_based");
     expect(result.fellBackReason).toContain("provider unreachable");
+  });
+
+  // R7-02 regression: consuming a cap slot for a call that never completed
+  // (a transport failure, not a real generation) would let a provider
+  // outage burn real cap for zero replies and potentially lock the account
+  // out for the rest of the 24h window even after the provider recovers.
+  it("refunds the spend guard reservation when the provider throws (outage)", async () => {
+    const provider = mockProvider(vi.fn().mockRejectedValue(new Error("provider unreachable")));
+    const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+    const guard = spendGuard(true);
+
+    await generateReply(ctx, provider, guard);
+
+    expect(guard.release).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT refund the spend guard when the call completed but output validation rejected it", async () => {
+    const provider = mockProvider(vi.fn().mockResolvedValue("I recommend taking medication for that"));
+    const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+    const guard = spendGuard(true);
+
+    await generateReply(ctx, provider, guard);
+
+    expect(guard.release).not.toHaveBeenCalled(); // this call was real and billed, not refundable
   });
 
   it("appends the CTA link to an AI-generated reply, same as a rule-based one", async () => {

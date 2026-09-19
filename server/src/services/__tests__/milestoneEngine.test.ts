@@ -5,7 +5,7 @@ import type { AiSpendGuard } from "../aiSpendGuard.js";
 import { runMilestoneCheck } from "../milestoneEngine.js";
 
 function spendGuard(allow: boolean): AiSpendGuard {
-  return { tryConsume: vi.fn(async () => allow) };
+  return { tryConsume: vi.fn(async () => allow), release: vi.fn(async () => {}) };
 }
 
 function makeMilestone(overrides: Partial<Milestone> = {}): Milestone {
@@ -130,6 +130,33 @@ describe("runMilestoneCheck", () => {
     );
 
     expect(result.fellBackReason).toContain("provider down");
+  });
+
+  // R7-02 regression — same reasoning as replyEngine.test.ts.
+  it("refunds the spend guard reservation when the provider throws", async () => {
+    const provider = mockProvider(vi.fn().mockRejectedValue(new Error("provider down")));
+    const guard = spendGuard(true);
+
+    await runMilestoneCheck(
+      { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "hello", tier: "comment" },
+      provider,
+      guard,
+    );
+
+    expect(guard.release).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT refund the spend guard when the call completed but returned unparseable output", async () => {
+    const provider = mockProvider(vi.fn().mockResolvedValue("not json at all"));
+    const guard = spendGuard(true);
+
+    await runMilestoneCheck(
+      { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "hello", tier: "comment" },
+      provider,
+      guard,
+    );
+
+    expect(guard.release).not.toHaveBeenCalled(); // this call was real and billed, not refundable
   });
 
   it("includes the current goal in the system prompt, and keeps it separate from the untrusted user message", async () => {

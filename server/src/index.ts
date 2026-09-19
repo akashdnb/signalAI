@@ -14,6 +14,7 @@ import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js
 import { assertKeyringConfigured } from "./lib/tokenVault.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldSends } from "./db/accountSends.js";
+import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -92,6 +93,15 @@ async function main() {
   if (prunedSends > 0) {
     // eslint-disable-next-line no-console
     console.log(`Pruned ${prunedSends} expired account_sends row(s) on boot`);
+  }
+
+  // R7-04: same shape as the two prunes above — ai_call_usage is read on
+  // every single AI reply, so unbounded growth here is worse than its
+  // sibling tables, not just as bad.
+  const prunedAiCalls = await pruneOldAiCallUsage(pool);
+  if (prunedAiCalls > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`Pruned ${prunedAiCalls} expired ai_call_usage row(s) on boot`);
   }
 
   await startTokenRefreshWorker(boss, pool, config.tokenKeyring, async (results) => {
