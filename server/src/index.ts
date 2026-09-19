@@ -1,7 +1,7 @@
 import "./lib/sentryInit.js"; // must be the first import — see sentryInit.ts for why a statement here wasn't enough
 import { Sentry } from "./lib/sentry.js";
 import { createApp } from "./app.js";
-import { config, assertWebAppOriginConfigured } from "./config.js";
+import { config, assertInstagramOAuthConfigured, assertWebAppOriginConfigured } from "./config.js";
 import { getPool } from "./db/pool.js";
 import { getBoss } from "./queue/boss.js";
 import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
@@ -50,6 +50,11 @@ async function main() {
   // R12-01: an unset WEB_APP_ORIGIN used to silently fall back to a
   // wildcard CORS origin — fail at boot instead.
   assertWebAppOriginConfigured(config.webAppOrigin);
+
+  // Unset, these produced an authorize URL with empty client_id/redirect_uri
+  // that Instagram answers with "this page isn't available" — a failure that
+  // surfaces only in a creator's browser, long after a deploy reports success.
+  assertInstagramOAuthConfigured(config.instagramClientId, config.instagramRedirectUri);
 
   const pool = getPool();
   const boss = await getBoss();

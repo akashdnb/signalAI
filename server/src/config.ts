@@ -86,3 +86,22 @@ export function assertWebAppOriginConfigured(origin: string): void {
     throw new Error("No WEB_APP_ORIGIN configured — refusing to fall back to a wildcard CORS origin");
   }
 }
+
+/**
+ * Both default to "" and were the only externally-facing settings without a
+ * boot check. Unset, the server started normally and built an authorize URL
+ * reading `?client_id=&redirect_uri=&scope=...`, which Instagram answers with
+ * "Sorry, this page isn't available" — a dead end that looks like a Meta
+ * problem, not a missing env var, because nothing anywhere said otherwise.
+ * Same fail-at-boot rule the keyring, session secret, and CORS origin follow:
+ * a missing externally-facing setting stops the process rather than producing
+ * a broken artifact.
+ */
+export function assertInstagramOAuthConfigured(clientId: string, redirectUri: string): void {
+  if (!clientId) {
+    throw new Error("No INSTAGRAM_CLIENT_ID configured — the OAuth authorize URL would be built with an empty client_id");
+  }
+  if (!redirectUri) {
+    throw new Error("No INSTAGRAM_REDIRECT_URI configured — the OAuth authorize URL would be built with an empty redirect_uri");
+  }
+}
