@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
-import { createTenant } from "../db/tenants.js";
+import { createTenant, getTenantSessionVersion } from "../db/tenants.js";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { upsertToken } from "../db/tokens.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
@@ -156,9 +156,17 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
     // fragment is never sent in the Referer header or to the server on
     // the next request, unlike a query string, so it doesn't ride along
     // on the app's own asset requests or leak to anything the /connected
-    // page might link out to. The frontend is expected to read it once
-    // and immediately strip it from the visible URL (history.replaceState).
-    const sessionToken = createSessionToken(config.sessionSecret, tenantId);
+    // page might link out to. BUI (ConnectedPage) reads it once and
+    // immediately strips it from the visible URL/history via
+    // navigate(..., {replace: true}) — the fragment must never persist as
+    // its own history entry (R11-01).
+    //
+    // R11-02: reads the tenant's CURRENT session_version rather than
+    // assuming 1 — if it had been bumped (a prior revocation), a stale
+    // freshly-minted token would otherwise be issued that a bump was
+    // specifically meant to invalidate.
+    const sessionVersion = (await getTenantSessionVersion(pool, tenantId)) ?? 1;
+    const sessionToken = createSessionToken(config.sessionSecret, tenantId, sessionVersion);
     return res.redirect(`${config.appBaseUrl}/connected?tenantId=${tenantId}#token=${sessionToken}`);
   } catch (err) {
     // eslint-disable-next-line no-console

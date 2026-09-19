@@ -3,7 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
-import { createTenant } from "../../db/tenants.js";
+import { createTenant, bumpSessionVersion } from "../../db/tenants.js";
 import { upsertToken, markTokenError } from "../../db/tokens.js";
 import { createCampaign } from "../../db/campaigns.js";
 import { setCampaignMilestones, recordMilestoneAdvancement } from "../../db/milestones.js";
@@ -19,7 +19,7 @@ import type { LLMProvider } from "../../llm/provider.js";
 const SESSION_SECRET = "test-session-secret";
 
 function authHeader(tenantId: string) {
-  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId)}` };
+  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId, 1)}` };
 }
 
 describe("dashboard routes (BUI backend surface)", () => {
@@ -39,18 +39,23 @@ describe("dashboard routes (BUI backend surface)", () => {
     await closePool();
   });
 
-  it("GET /tenants/:id returns the tenant summary, 404s for an unknown one", async () => {
+  it("GET /tenants/:id returns the tenant summary for a real tenant", async () => {
     const tenant = await createTenant(getPool(), "creator-a");
     const app = createApp();
 
     const found = await request(app).get(`/tenants/${tenant.id}`).set(authHeader(tenant.id));
     expect(found.status).toBe(200);
     expect(found.body).toMatchObject({ id: tenant.id, name: "creator-a", billingStatus: "none" });
+  });
 
+  // R11-02: requireTenantSession rejects a session for a tenant that
+  // doesn't exist before the route's own 404 check ever runs.
+  it("rejects a session for an unknown tenant with 401", async () => {
+    const app = createApp();
     const missing = await request(app)
       .get(`/tenants/00000000-0000-0000-0000-000000000000`)
       .set(authHeader("00000000-0000-0000-0000-000000000000"));
-    expect(missing.status).toBe(404);
+    expect(missing.status).toBe(401);
   });
 
   it("GET /tenants/:id/account reports not connected, then healthy, then error", async () => {
@@ -235,5 +240,22 @@ describe("dashboard routes (BUI backend surface)", () => {
 
     const wrongTenantSession = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader(otherTenant.id));
     expect(wrongTenantSession.status).toBe(403);
+  });
+
+  // R11-02 regression: a session issued before bumpSessionVersion must
+  // stop working immediately, without waiting for its 30-day expiry or
+  // rotating SESSION_SECRET (which would sign out every other tenant too).
+  it("rejects a session issued before the tenant's session_version was bumped (revocation)", async () => {
+    const tenant = await createTenant(getPool(), "creator-a");
+    const app = createApp();
+    const staleHeader = authHeader(tenant.id); // minted while session_version was still 1
+
+    const beforeBump = await request(app).get(`/tenants/${tenant.id}/leads`).set(staleHeader);
+    expect(beforeBump.status).toBe(200);
+
+    await bumpSessionVersion(getPool(), tenant.id);
+
+    const afterBump = await request(app).get(`/tenants/${tenant.id}/leads`).set(staleHeader);
+    expect(afterBump.status).toBe(401);
   });
 });

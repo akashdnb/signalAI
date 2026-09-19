@@ -4,6 +4,7 @@ import { getPool, closePool } from "../../db/pool.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createOAuthState } from "../../lib/oauthState.js";
 import { verifySessionToken } from "../../lib/session.js";
+import { bumpSessionVersion } from "../../db/tenants.js";
 
 const SESSION_SECRET_FOR_TESTS = "test-session-secret";
 
@@ -298,5 +299,28 @@ describe("auth routes", () => {
     const res = await request(app).get("/auth/instagram/callback").query({ code: "only-code" });
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe(`${APP_BASE_URL}/connect?error=missing_params`);
+  });
+
+  // R11-02 regression: the callback must read the tenant's CURRENT
+  // session_version, not assume 1 — otherwise a freshly-minted token from
+  // a reconnect would carry a stale version a prior revocation was meant
+  // to invalidate, and requireTenantSession would reject it immediately.
+  it("mints a session carrying the tenant's current (bumped) session_version, not a stale default", async () => {
+    const pool = getPool();
+    mockSuccessfulExchange();
+    const app = createApp();
+    const agent = request.agent(app);
+
+    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const state = extractState(start.headers.location);
+    const tenantRow = await pool.query("select id from tenants where name = 'creator-a'");
+    const tenantId = tenantRow.rows[0].id;
+
+    await bumpSessionVersion(pool, tenantId); // simulates a revocation that happened before this connect completed
+
+    const res = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
+    const token = new URL(res.headers.location).hash.replace(/^#token=/, "");
+    const payload = verifySessionToken(SESSION_SECRET_FOR_TESTS, token);
+    expect(payload?.sessionVersion).toBe(2);
   });
 });

@@ -9,7 +9,7 @@ import { resetDb } from "../../__tests__/helpers/db.js";
 const SESSION_SECRET = "test-session-secret";
 
 function authHeader(tenantId: string) {
-  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId)}` };
+  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId, 1)}` };
 }
 
 describe("campaigns routes", () => {

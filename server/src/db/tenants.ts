@@ -8,6 +8,7 @@ export interface Tenant {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   billingStatus: BillingStatus;
+  sessionVersion: number;
   createdAt: Date;
 }
 
@@ -17,6 +18,7 @@ interface TenantRow {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   billing_status: BillingStatus;
+  session_version: number;
   created_at: Date;
 }
 
@@ -27,6 +29,7 @@ function toTenant(row: TenantRow): Tenant {
     stripeCustomerId: row.stripe_customer_id,
     stripeSubscriptionId: row.stripe_subscription_id,
     billingStatus: row.billing_status,
+    sessionVersion: row.session_version,
     createdAt: row.created_at,
   };
 }
@@ -65,4 +68,17 @@ export async function setBillingStatus(
     `update tenants set billing_status = $2, stripe_subscription_id = coalesce($3, stripe_subscription_id) where id = $1`,
     [tenantId, billingStatus, stripeSubscriptionId ?? null],
   );
+}
+
+/** R11-02: the value every session token's `sessionVersion` is checked against (lib/tenantAuth.ts) — a lightweight lookup, not the full row, since this runs on every authenticated request. */
+export async function getTenantSessionVersion(pool: Pool, tenantId: string): Promise<number | null> {
+  const result = await pool.query<{ session_version: number }>(`select session_version from tenants where id = $1`, [
+    tenantId,
+  ]);
+  return result.rows[0] ? result.rows[0].session_version : null;
+}
+
+/** R11-02: revokes every session issued for this tenant before now — a single-tenant alternative to rotating SESSION_SECRET, which would sign out every tenant at once. Not yet wired to a route; the primitive exists so [[Phase 6]]'s user management has something to call. */
+export async function bumpSessionVersion(pool: Pool, tenantId: string): Promise<void> {
+  await pool.query(`update tenants set session_version = session_version + 1 where id = $1`, [tenantId]);
 }

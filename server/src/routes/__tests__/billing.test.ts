@@ -9,7 +9,7 @@ import { resetDb } from "../../__tests__/helpers/db.js";
 const SESSION_SECRET = "test-session-secret";
 
 function authHeader(tenantId: string) {
-  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId)}` };
+  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId, 1)}` };
 }
 
 const mockCreate = vi.fn();
@@ -59,11 +59,14 @@ describe("billing routes (B11)", () => {
     expect(res.status).toBe(503);
   });
 
-  it("POST checkout 404s for an unknown tenant", async () => {
+  // R11-02: requireTenantSession itself rejects a session for a tenant
+  // that doesn't exist (getTenantSessionVersion returns null) before the
+  // route's own 404 check ever runs — 401, not 404, is now correct here.
+  it("rejects a session for an unknown tenant with 401, before the route's own not-found check", async () => {
     const app = createApp();
     const unknownId = "00000000-0000-0000-0000-000000000000";
     const res = await request(app).post(`/tenants/${unknownId}/billing/checkout`).set(authHeader(unknownId));
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
   });
 
   it("POST checkout creates a Stripe Checkout session and returns its URL", async () => {

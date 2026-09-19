@@ -19,6 +19,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export interface SessionPayload {
   tenantId: string;
   issuedAt: number;
+  /** R11-02: checked against tenants.session_version in requireTenantSession — bumping that column revokes every token issued before the bump, for one tenant, without rotating SESSION_SECRET (which would sign out everyone). */
+  sessionVersion: number;
 }
 
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — a login session, not a CSRF token; long-lived on purpose
@@ -38,8 +40,8 @@ export function assertSessionSecretConfigured(secret: string): void {
   }
 }
 
-export function createSessionToken(secret: string, tenantId: string): string {
-  const payload: SessionPayload = { tenantId, issuedAt: Date.now() };
+export function createSessionToken(secret: string, tenantId: string, sessionVersion: number): string {
+  const payload: SessionPayload = { tenantId, issuedAt: Date.now(), sessionVersion };
   const encodedPayload = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
   const signature = createHmac("sha256", secret).update(encodedPayload).digest();
   return `${encodedPayload}.${base64UrlEncode(signature)}`;
