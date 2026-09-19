@@ -3,9 +3,17 @@ import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { getTenant, getTenantByStripeCustomerId, setBillingStatus, setStripeCustomerId } from "../db/tenants.js";
 import { getStripeClient, isBillingConfigured } from "../lib/stripeClient.js";
+import { requireTenantSession } from "../lib/tenantAuth.js";
+import { isWebhookEventAlreadyProcessed, recordWebhookEventProcessed } from "../db/stripeWebhookEvents.js";
 import { Sentry } from "../lib/sentry.js";
 
 export const billingRouter = Router();
+
+// R10-01 fix: the two tenant-scoped routes below are gated on the bearer
+// session. /billing/webhook is deliberately excluded — it's Stripe's own
+// call, authenticated by its signature instead (see that route), and
+// doesn't match this "/tenants/:tenantId" prefix regardless.
+billingRouter.use("/tenants/:tenantId", requireTenantSession);
 
 /**
  * B11: Single Flat Plan via Stripe Checkout (roadmap Phase 1 Billing) —
@@ -91,6 +99,17 @@ billingRouter.post("/billing/webhook", async (req, res) => {
 
   const pool = getPool();
   try {
+    // R10-03 fix: recorded AFTER processing succeeds, not before — marking
+    // an event "seen" before its handler actually completes would let a
+    // transient failure (this whole block throwing, below) permanently
+    // burn the dedup slot: Stripe's retry (triggered by our own 500) would
+    // then be wrongly treated as an already-processed duplicate and
+    // skipped, even though nothing ever actually happened. Checked first
+    // so a genuine redelivery of an event we already finished is a no-op.
+    if (await isWebhookEventAlreadyProcessed(pool, event.id)) {
+      return res.sendStatus(200);
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
@@ -109,7 +128,13 @@ billingRouter.post("/billing/webhook", async (req, res) => {
         const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
         if (customerId) {
           const tenant = await getTenantByStripeCustomerId(pool, customerId);
-          if (tenant) {
+          // R10-02 fix: only cancel if the deleted subscription is still
+          // the tenant's CURRENT one. Stripe doesn't guarantee ordering —
+          // cancel, resubscribe, then a retried/delayed deletion event for
+          // the OLD subscription arriving after the new
+          // checkout.session.completed would otherwise mark a paying
+          // tenant canceled.
+          if (tenant && tenant.stripeSubscriptionId === subscription.id) {
             await setBillingStatus(pool, tenant.id, "canceled");
           }
         }
@@ -120,6 +145,7 @@ billingRouter.post("/billing/webhook", async (req, res) => {
         // plan, no metered usage, no invoice-level logic in Phase 1.
         break;
     }
+    await recordWebhookEventProcessed(pool, event.id, event.type);
     return res.sendStatus(200);
   } catch (err) {
     // eslint-disable-next-line no-console

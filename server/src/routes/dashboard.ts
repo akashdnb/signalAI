@@ -7,6 +7,7 @@ import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
 import { getCampaign, updateCampaignReplyConfig, type ReplyMode } from "../db/campaigns.js";
 import { generateReply } from "../services/replyEngine.js";
 import type { LLMProvider } from "../llm/provider.js";
+import { requireTenantSession } from "../lib/tenantAuth.js";
 
 const UNCONFIGURED_PREVIEW_PROVIDER: LLMProvider = {
   name: "unconfigured",
@@ -24,6 +25,10 @@ const UNCONFIGURED_PREVIEW_PROVIDER: LLMProvider = {
  */
 export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_PROVIDER) {
   const router = Router();
+
+  // R10-01 fix: every route here reads or writes one tenant's data —
+  // gated on the bearer session issued at connect time.
+  router.use("/tenants/:tenantId", requireTenantSession);
 
   router.get("/tenants/:tenantId", async (req, res) => {
     const tenant = await getTenant(getPool(), req.params.tenantId);

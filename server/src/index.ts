@@ -12,6 +12,7 @@ import { createLLMProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
 import { assertKeyringConfigured } from "./lib/tokenVault.js";
+import { assertSessionSecretConfigured } from "./lib/session.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
@@ -43,6 +44,9 @@ async function main() {
   // this gates the whole account-connection flow, unlike the LLM provider
   // below, which has a real degrade-gracefully path.
   assertKeyringConfigured(config.tokenKeyring);
+  // R10-01: an empty SESSION_SECRET would make every tenant session
+  // forgeable — this gates every dashboard/campaigns/billing route.
+  assertSessionSecretConfigured(config.sessionSecret);
 
   const pool = getPool();
   const boss = await getBoss();

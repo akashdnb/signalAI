@@ -2,12 +2,15 @@ import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import { createCampaign, listCampaigns, setCampaignEnabled } from "../db/campaigns.js";
 import { listMilestones, setCampaignMilestones } from "../db/milestones.js";
+import { requireTenantSession } from "../lib/tenantAuth.js";
 
 export const campaignsRouter = Router();
 
-// No session/auth layer exists yet (Phase 1 has none) — tenantId is
-// explicit on every call, matching the rest of the data-access layer, so
-// wiring in real auth later changes callers, not this contract.
+// R10-01 fix: every route below reads or writes one tenant's campaign
+// config — gated on the bearer session issued at connect time (see
+// lib/tenantAuth.ts), matching the session's tenantId against :tenantId.
+campaignsRouter.use("/tenants/:tenantId", requireTenantSession);
+
 campaignsRouter.post("/tenants/:tenantId/campaigns", async (req, res) => {
   const { tenantId } = req.params;
   const { name, keywords } = req.body ?? {};

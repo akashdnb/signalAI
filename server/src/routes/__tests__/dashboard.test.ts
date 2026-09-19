@@ -13,10 +13,18 @@ import { insertPii } from "../../db/pii.js";
 import { tryReserveSend } from "../../db/accountSends.js";
 import { recordDeadLetterEvent } from "../../db/deadLetterEvents.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
+import { createSessionToken } from "../../lib/session.js";
 import type { LLMProvider } from "../../llm/provider.js";
+
+const SESSION_SECRET = "test-session-secret";
+
+function authHeader(tenantId: string) {
+  return { Authorization: `Bearer ${createSessionToken(SESSION_SECRET, tenantId)}` };
+}
 
 describe("dashboard routes (BUI backend surface)", () => {
   beforeAll(() => {
+    process.env.SESSION_SECRET = SESSION_SECRET;
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
     }
@@ -35,11 +43,13 @@ describe("dashboard routes (BUI backend surface)", () => {
     const tenant = await createTenant(getPool(), "creator-a");
     const app = createApp();
 
-    const found = await request(app).get(`/tenants/${tenant.id}`);
+    const found = await request(app).get(`/tenants/${tenant.id}`).set(authHeader(tenant.id));
     expect(found.status).toBe(200);
     expect(found.body).toMatchObject({ id: tenant.id, name: "creator-a", billingStatus: "none" });
 
-    const missing = await request(app).get(`/tenants/00000000-0000-0000-0000-000000000000`);
+    const missing = await request(app)
+      .get(`/tenants/00000000-0000-0000-0000-000000000000`)
+      .set(authHeader("00000000-0000-0000-0000-000000000000"));
     expect(missing.status).toBe(404);
   });
 
@@ -48,15 +58,15 @@ describe("dashboard routes (BUI backend surface)", () => {
     const keyring = new Map([["v1", randomBytes(32)]]);
     const app = createApp();
 
-    const before = await request(app).get(`/tenants/${tenant.id}/account`);
+    const before = await request(app).get(`/tenants/${tenant.id}/account`).set(authHeader(tenant.id));
     expect(before.body).toEqual({ connected: false });
 
     await upsertToken(getPool(), keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "t" });
-    const healthy = await request(app).get(`/tenants/${tenant.id}/account`);
+    const healthy = await request(app).get(`/tenants/${tenant.id}/account`).set(authHeader(tenant.id));
     expect(healthy.body).toMatchObject({ connected: true, instagramAccountId: "acct-1", status: "healthy" });
 
     await markTokenError(getPool(), tenant.id, "acct-1", "refresh failed");
-    const errored = await request(app).get(`/tenants/${tenant.id}/account`);
+    const errored = await request(app).get(`/tenants/${tenant.id}/account`).set(authHeader(tenant.id));
     expect(errored.body).toMatchObject({ connected: true, status: "error", lastError: "refresh failed" });
   });
 
@@ -76,7 +86,7 @@ describe("dashboard routes (BUI backend surface)", () => {
     });
     await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, username: "real_handle" });
 
-    const res = await request(app).get(`/tenants/${tenant.id}/leads`);
+    const res = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader(tenant.id));
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0]).toMatchObject({ id: lead.id, username: "real_handle" });
@@ -104,7 +114,7 @@ describe("dashboard routes (BUI backend surface)", () => {
       failureOutput: null,
     });
 
-    const res = await request(app).get(`/tenants/${tenant.id}/analytics`);
+    const res = await request(app).get(`/tenants/${tenant.id}/analytics`).set(authHeader(tenant.id));
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ commentsReceived: 1, dmsSent: 1, dmFailures: 1, uniqueLeads: 1 });
   });
@@ -121,7 +131,9 @@ describe("dashboard routes (BUI backend surface)", () => {
     await recordMilestoneAdvancement(pool, tenant.id, lead.id, campaign.id, milestones[0]!.id);
 
     const app = createApp();
-    const res = await request(app).get(`/tenants/${tenant.id}/campaigns/${campaign.id}/dropoff`);
+    const res = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${campaign.id}/dropoff`)
+      .set(authHeader(tenant.id));
     expect(res.status).toBe(200);
     expect(res.body).toEqual([
       { milestoneId: milestones[0]!.id, ordinal: 0, goalDescription: "capture email", advancedCount: 1 },
@@ -138,12 +150,14 @@ describe("dashboard routes (BUI backend surface)", () => {
 
     const res = await request(app)
       .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader(tenant.id))
       .send({ replyMode: "ai_generated", ctaLink: "https://example.com/offer" });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ replyMode: "ai_generated", ctaLink: "https://example.com/offer" });
 
     const wrongTenant = await request(app)
       .patch(`/tenants/${otherTenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader(otherTenant.id))
       .send({ replyMode: "rule_based" });
     expect(wrongTenant.status).toBe(404);
   });
@@ -156,6 +170,7 @@ describe("dashboard routes (BUI backend surface)", () => {
 
     const res = await request(app)
       .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader(tenant.id))
       .send({ replyMode: "not-a-real-mode" });
     expect(res.status).toBe(400);
   });
@@ -172,6 +187,7 @@ describe("dashboard routes (BUI backend surface)", () => {
 
     const res = await request(app)
       .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+      .set(authHeader(tenant.id))
       .send({ sampleText: "send the LINK please", sampleUsername: "curious_customer" });
 
     expect(res.status).toBe(200);
@@ -187,6 +203,7 @@ describe("dashboard routes (BUI backend surface)", () => {
 
     const res = await request(app)
       .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+      .set(authHeader(tenant.id))
       .send({ sampleText: "send the LINK please" });
 
     expect(res.status).toBe(200);
@@ -199,7 +216,24 @@ describe("dashboard routes (BUI backend surface)", () => {
     const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
     const app = createApp();
 
-    const res = await request(app).post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`).send({});
+    const res = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+      .set(authHeader(tenant.id))
+      .send({});
     expect(res.status).toBe(400);
+  });
+
+  // R10-01 regression: no route here should be reachable without a
+  // session for the exact tenant in the URL.
+  it("rejects every route with no session, and with a session for a different tenant", async () => {
+    const tenant = await createTenant(getPool(), "creator-a");
+    const otherTenant = await createTenant(getPool(), "creator-b");
+    const app = createApp();
+
+    const noSession = await request(app).get(`/tenants/${tenant.id}/leads`);
+    expect(noSession.status).toBe(401);
+
+    const wrongTenantSession = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader(otherTenant.id));
+    expect(wrongTenantSession.status).toBe(403);
   });
 });

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { createTenant } from "../db/tenants.js";
@@ -13,6 +13,7 @@ import {
   fetchInstagramProfile,
 } from "../lib/instagramOAuth.js";
 import { Sentry } from "../lib/sentry.js";
+import { createSessionToken } from "../lib/session.js";
 
 export const authRouter = Router();
 
@@ -69,17 +70,29 @@ authRouter.get("/auth/instagram/start", async (req, res) => {
   return res.redirect(url);
 });
 
+/**
+ * BUI: a real browser lands on this URL via a top-level navigation
+ * (Instagram's own redirect), not a fetch from the SPA — so every outcome
+ * here redirects back into the app rather than returning raw JSON, which
+ * would otherwise leave the creator staring at a blank API response after
+ * connecting. `/connect` is the retry screen (with a short `error` code
+ * that doesn't leak internals); `/connected` is the success screen.
+ */
+function redirectToConnectError(res: Response, error: string) {
+  return res.redirect(`${config.appBaseUrl}/connect?error=${encodeURIComponent(error)}`);
+}
+
 authRouter.get("/auth/instagram/callback", async (req, res) => {
   const code = req.query.code;
   const state = req.query.state;
 
   if (typeof code !== "string" || typeof state !== "string") {
-    return res.status(400).json({ error: "missing code or state" });
+    return redirectToConnectError(res, "missing_params");
   }
 
   const statePayload = verifyOAuthState(config.metaAppSecret, state);
   if (!statePayload) {
-    return res.status(403).json({ error: "invalid or expired state" });
+    return redirectToConnectError(res, "invalid_state");
   }
 
   // R1-02: the state's signature alone isn't enough — it must also match
@@ -89,7 +102,7 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
   const cookieNonce = parseCookie(req.header("cookie"), OAUTH_NONCE_COOKIE);
   res.clearCookie(OAUTH_NONCE_COOKIE, { path: "/auth/instagram" }); // must match the path it was set with (R4-04)
   if (!cookieNonce || !nonceMatches(cookieNonce, statePayload.nonce)) {
-    return res.status(403).json({ error: "missing or mismatched oauth session — please restart the connection" });
+    return redirectToConnectError(res, "session_mismatch");
   }
 
   // R4-02: the cookie clear above is a client-side courtesy — it asks the
@@ -98,7 +111,7 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
   // holding both, any number of times, inside the state's validity window.
   // This is the actual single-use enforcement.
   if (!(await trySpendNonce(getPool(), statePayload.nonce))) {
-    return res.status(403).json({ error: "this connection link has already been used" });
+    return redirectToConnectError(res, "already_used");
   }
 
   try {
@@ -137,11 +150,20 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),
     });
 
-    return res.status(200).json({ connected: true, instagramAccountId: profile.id, username: profile.username });
+    // R10-01: this is the one moment BUI has proven it's talking to the
+    // real Instagram-connected browser for this tenant — issue the bearer
+    // session here. Carried in the URL FRAGMENT, not a query param: a
+    // fragment is never sent in the Referer header or to the server on
+    // the next request, unlike a query string, so it doesn't ride along
+    // on the app's own asset requests or leak to anything the /connected
+    // page might link out to. The frontend is expected to read it once
+    // and immediately strip it from the visible URL (history.replaceState).
+    const sessionToken = createSessionToken(config.sessionSecret, tenantId);
+    return res.redirect(`${config.appBaseUrl}/connected?tenantId=${tenantId}#token=${sessionToken}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Instagram OAuth callback failed:", err);
     Sentry.captureException(err);
-    return res.status(502).json({ error: "failed to complete Instagram connection" });
+    return redirectToConnectError(res, "connection_failed");
   }
 });

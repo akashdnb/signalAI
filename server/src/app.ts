@@ -23,13 +23,14 @@ export function createApp(options?: { llmProvider?: LLMProvider }) {
 
   // BUI (the creator-facing React app) runs on a different origin in dev
   // (Vite's dev server) and, until a reverse proxy is set up, in
-  // production too. No cookies cross this boundary (the OAuth nonce
-  // cookie is scoped to /auth/instagram, same-origin with the Meta
-  // redirect) — this only needs to allow the API calls themselves.
+  // production too. No cookies cross this boundary — R10-01's session is
+  // a bearer token (Authorization header), specifically to avoid the
+  // SameSite=None/Access-Control-Allow-Credentials surface a cross-origin
+  // session cookie would need — so this only needs to allow the header.
   app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", process.env.WEB_APP_ORIGIN ?? "*");
     res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });

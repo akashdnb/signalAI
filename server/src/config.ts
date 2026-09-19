@@ -48,6 +48,13 @@ export const config = {
   get telegramChatId() {
     return process.env.TELEGRAM_CHAT_ID ?? "";
   },
+  // R10-01: signs the bearer session token issued at the end of a
+  // successful Instagram connection (see lib/session.ts) — gates every
+  // dashboard/campaigns/billing route, so this is validated at boot the
+  // same way the token keyring is.
+  get sessionSecret() {
+    return process.env.SESSION_SECRET ?? "";
+  },
   // B10: hard per-account daily cap on AI-generated calls. Default chosen
   // to comfortably cover a real pilot conversation volume while still
   // bounding a viral-Reel worst case to a fixed cost (max_tokens is

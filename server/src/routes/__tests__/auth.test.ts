@@ -3,6 +3,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { getPool, closePool } from "../../db/pool.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createOAuthState } from "../../lib/oauthState.js";
+import { verifySessionToken } from "../../lib/session.js";
+
+const SESSION_SECRET_FOR_TESTS = "test-session-secret";
+
+/** Extracts and verifies the `#token=` fragment from a /connected redirect, asserting it authenticates the given tenant (R10-01). */
+function expectValidSessionTokenFor(location: string, tenantId: string): void {
+  const token = new URL(location).hash.replace(/^#token=/, "");
+  expect(token).toBeTruthy();
+  const payload = verifySessionToken(SESSION_SECRET_FOR_TESTS, token);
+  expect(payload?.tenantId).toBe(tenantId);
+}
 
 vi.mock("../../lib/instagramOAuth.js", async () => {
   const actual = await vi.importActual<typeof import("../../lib/instagramOAuth.js")>(
@@ -24,6 +35,7 @@ import {
 import { createApp } from "../../app.js";
 
 const APP_SECRET = "test-app-secret";
+const APP_BASE_URL = "https://app.example.com";
 
 /** Extracts the `state` query param from a redirect Location header. */
 function extractState(location: string): string {
@@ -42,6 +54,8 @@ describe("auth routes", () => {
     process.env.INSTAGRAM_CLIENT_ID = "test-client-id";
     process.env.INSTAGRAM_REDIRECT_URI = "https://example.com/auth/instagram/callback";
     process.env.TOKEN_ENCRYPTION_KEYS = "v1:YE23jw59vZdWaiGV2o9eF4fjuoPcXwsvdwJVi79Q6tQ=";
+    process.env.APP_BASE_URL = APP_BASE_URL;
+    process.env.SESSION_SECRET = SESSION_SECRET_FOR_TESTS;
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
     }
@@ -113,7 +127,10 @@ describe("auth routes", () => {
     expect(tokenRow.rows[0].tenant_id).not.toBe(victimTenantId);
   });
 
-  it("callback completes the connection end-to-end (real cookie from /start, real redirect state)", async () => {
+  // BUI: a real browser lands on the callback URL via a top-level
+  // navigation (Instagram's own redirect), not a fetch — every outcome
+  // redirects back into the app rather than returning raw JSON.
+  it("callback completes the connection end-to-end and redirects to the app's success screen", async () => {
     const pool = getPool();
     mockSuccessfulExchange();
 
@@ -127,8 +144,9 @@ describe("auth routes", () => {
 
     const res = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ connected: true, instagramAccountId: "acct-1", username: "real_handle" });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain(`${APP_BASE_URL}/connected?tenantId=${tenantId}`);
+    expectValidSessionTokenFor(res.headers.location, tenantId);
 
     const tokenRow = await pool.query(
       "select tenant_id, encrypted_token, status from meta_tokens where instagram_account_id = 'acct-1'",
@@ -138,13 +156,14 @@ describe("auth routes", () => {
     expect(tokenRow.rows[0].status).toBe("healthy");
   });
 
-  it("callback rejects a forged or expired state before ever calling Instagram", async () => {
+  it("callback rejects a forged or expired state before ever calling Instagram, redirecting to the retry screen", async () => {
     const app = createApp();
     const res = await request(app)
       .get("/auth/instagram/callback")
       .query({ code: "auth-code", state: "forged.state" });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`${APP_BASE_URL}/connect?error=invalid_state`);
     expect(exchangeCodeForShortLivedToken).not.toHaveBeenCalled();
   });
 
@@ -158,7 +177,8 @@ describe("auth routes", () => {
       .get("/auth/instagram/callback")
       .query({ code: "auth-code", state });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`${APP_BASE_URL}/connect?error=session_mismatch`);
     expect(exchangeCodeForShortLivedToken).not.toHaveBeenCalled();
   });
 
@@ -170,13 +190,15 @@ describe("auth routes", () => {
     const state = extractState(start.headers.location);
 
     const first = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
-    expect(first.status).toBe(200);
+    expect(first.status).toBe(302);
+    expect(first.headers.location).toContain("/connected");
 
     // Same browser/agent (same cookie jar) replaying the identical URL —
     // the cookie was cleared on first use, so this must fail even though
     // the state string itself is still within its 10-minute validity.
     const replay = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
-    expect(replay.status).toBe(403);
+    expect(replay.status).toBe(302);
+    expect(replay.headers.location).toBe(`${APP_BASE_URL}/connect?error=session_mismatch`);
   });
 
   // R4-02 regression: "single-use" was previously enforced by asking the
@@ -195,14 +217,16 @@ describe("auth routes", () => {
     const nonceValue = setCookieHeader.split(";")[0]!.split("=")[1]!;
 
     const first = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
-    expect(first.status).toBe(200);
+    expect(first.status).toBe(302);
+    expect(first.headers.location).toContain("/connected");
 
     const replayFromDifferentClient = await request(app)
       .get("/auth/instagram/callback")
       .set("Cookie", `ig_oauth_nonce=${nonceValue}`)
       .query({ code: "auth-code", state });
 
-    expect(replayFromDifferentClient.status).toBe(403);
+    expect(replayFromDifferentClient.status).toBe(302);
+    expect(replayFromDifferentClient.headers.location).toBe(`${APP_BASE_URL}/connect?error=already_used`);
   });
 
   // R5-01 regression: /start always mints a fresh tenant, which is correct
@@ -224,7 +248,8 @@ describe("auth routes", () => {
     const firstCallback = await firstAgent
       .get("/auth/instagram/callback")
       .query({ code: "auth-code", state: firstState });
-    expect(firstCallback.status).toBe(200);
+    expect(firstCallback.status).toBe(302);
+    expect(firstCallback.headers.location).toContain("/connected");
 
     const originalRow = await pool.query(
       "select tenant_id from meta_tokens where instagram_account_id = 'acct-1'",
@@ -241,16 +266,37 @@ describe("auth routes", () => {
     const secondCallback = await secondAgent
       .get("/auth/instagram/callback")
       .query({ code: "auth-code", state: secondState });
-    expect(secondCallback.status).toBe(200);
+    expect(secondCallback.status).toBe(302);
+    // Redirects to the ORIGINAL tenant's id, not the freshly-minted one.
+    expect(secondCallback.headers.location).toContain(`${APP_BASE_URL}/connected?tenantId=${originalTenantId}`);
+    expectValidSessionTokenFor(secondCallback.headers.location, originalTenantId);
 
     const rows = await pool.query("select tenant_id from meta_tokens where instagram_account_id = 'acct-1'");
     expect(rows.rowCount).toBe(1); // never two rows for the same account
     expect(rows.rows[0].tenant_id).toBe(originalTenantId); // reused, not a new tenant
   });
 
-  it("callback rejects a request missing code or state", async () => {
+  it("callback redirects to the retry screen when Instagram's own token exchange fails", async () => {
+    const pool = getPool();
+    const app = createApp();
+    const agent = request.agent(app);
+    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const state = extractState(start.headers.location);
+
+    vi.mocked(exchangeCodeForShortLivedToken).mockRejectedValue(new Error("Instagram rejected the code"));
+
+    const res = await agent.get("/auth/instagram/callback").query({ code: "bad-code", state });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`${APP_BASE_URL}/connect?error=connection_failed`);
+
+    const tokens = await pool.query("select count(*)::int as count from meta_tokens");
+    expect(tokens.rows[0].count).toBe(0);
+  });
+
+  it("callback rejects a request missing code or state, redirecting to the retry screen", async () => {
     const app = createApp();
     const res = await request(app).get("/auth/instagram/callback").query({ code: "only-code" });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`${APP_BASE_URL}/connect?error=missing_params`);
   });
 });
