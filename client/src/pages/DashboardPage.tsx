@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { api, clearSession, loadSession, type AccountHealth, type Analytics, type LeadListItem, type TenantSummary } from "../api";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ApiError, api, clearSession, loadSession, type AccountHealth, type Analytics, type LeadListItem, type TenantSummary } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
 import { BillingPanel } from "../components/BillingPanel";
 
@@ -12,17 +12,24 @@ function formatDate(iso: string | null | undefined): string {
 export function DashboardPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [leads, setLeads] = useState<LeadListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const justConnected = searchParams.get("connected") === "1";
 
   useEffect(() => {
     const session = loadSession();
+    // Identity Refactor U6: an expired/revoked session (401/403 from the API
+    // calls below) also clears storage — see api.ts's `request` — and lands
+    // back here on the next render with no session, so this guard handles
+    // both "never logged in" and "session just died" the same way.
     if (!tenantId || !session || session.tenantId !== tenantId) {
-      navigate("/connect", { replace: true });
+      navigate("/login", { replace: true });
       return;
     }
 
@@ -41,7 +48,12 @@ export function DashboardPage() {
         setAnalytics(an);
         setLeads(l);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load dashboard");
+        if (cancelled) return;
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Failed to load dashboard");
       }
     }
     load();
@@ -52,7 +64,20 @@ export function DashboardPage() {
 
   function handleLogout() {
     clearSession();
-    navigate("/connect", { replace: true });
+    navigate("/login", { replace: true });
+  }
+
+  async function handleConnectInstagram() {
+    if (!tenantId) return;
+    setConnecting(true);
+    setError(null);
+    try {
+      const { url } = await api.startInstagramConnect(tenantId);
+      window.location.href = url;
+    } catch (err) {
+      setConnecting(false);
+      setError(err instanceof Error ? err.message : "Couldn't start the Instagram connection");
+    }
   }
 
   if (!tenantId) return null;
@@ -70,13 +95,30 @@ export function DashboardPage() {
       </header>
 
       {error && <div className="banner banner-error">{error}</div>}
+      {justConnected && (
+        <div className="banner banner-ok">
+          Instagram connected.{" "}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => setSearchParams({}, { replace: true })}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <section className="card">
         <h2>Account Health</h2>
         {account === null ? (
           <p className="muted">Loading…</p>
         ) : !account.connected ? (
-          <p className="muted">No Instagram account connected.</p>
+          <div>
+            <p className="muted">No Instagram account connected.</p>
+            <button className="btn-primary" onClick={handleConnectInstagram} disabled={connecting}>
+              {connecting ? "Redirecting to Instagram…" : "Connect Instagram"}
+            </button>
+          </div>
         ) : (
           <dl className="kv">
             <dt>Instagram account</dt>

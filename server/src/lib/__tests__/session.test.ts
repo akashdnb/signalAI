@@ -4,22 +4,22 @@ import { assertSessionSecretConfigured, createSessionToken, verifySessionToken }
 const SECRET = "test-session-secret";
 
 describe("session tokens (R10-01)", () => {
-  it("round-trips a tenantId and sessionVersion through a created token", () => {
-    const token = createSessionToken(SECRET, "tenant-1", 3);
+  it("round-trips a userId and sessionVersion through a created token", () => {
+    const token = createSessionToken(SECRET, "user-1", 3);
     const payload = verifySessionToken(SECRET, token);
-    expect(payload?.tenantId).toBe("tenant-1");
+    expect(payload?.userId).toBe("user-1");
     expect(payload?.sessionVersion).toBe(3);
   });
 
   it("rejects a token signed with a different secret", () => {
-    const token = createSessionToken("other-secret", "tenant-1", 1);
+    const token = createSessionToken("other-secret", "user-1", 1);
     expect(verifySessionToken(SECRET, token)).toBeNull();
   });
 
   it("rejects a tampered payload even if the signature format looks right", () => {
-    const token = createSessionToken(SECRET, "tenant-1", 1);
+    const token = createSessionToken(SECRET, "user-1", 1);
     const [, signature] = token.split(".");
-    const tampered = `${Buffer.from(JSON.stringify({ tenantId: "victim-tenant", issuedAt: Date.now(), sessionVersion: 1 })).toString("base64url")}.${signature}`;
+    const tampered = `${Buffer.from(JSON.stringify({ userId: "victim-user", issuedAt: Date.now(), sessionVersion: 1 })).toString("base64url")}.${signature}`;
     expect(verifySessionToken(SECRET, tampered)).toBeNull();
   });
 
@@ -29,7 +29,7 @@ describe("session tokens (R10-01)", () => {
 
   it("rejects an expired token", () => {
     vi.useFakeTimers();
-    const token = createSessionToken(SECRET, "tenant-1", 1);
+    const token = createSessionToken(SECRET, "user-1", 1);
     vi.advanceTimersByTime(31 * 24 * 60 * 60 * 1000);
     expect(verifySessionToken(SECRET, token)).toBeNull();
     vi.useRealTimers();

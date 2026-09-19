@@ -2,19 +2,10 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPool, closePool } from "../../db/pool.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
+import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 import { createOAuthState } from "../../lib/oauthState.js";
-import { verifySessionToken } from "../../lib/session.js";
-import { bumpSessionVersion } from "../../db/tenants.js";
 
 const SESSION_SECRET_FOR_TESTS = "test-session-secret";
-
-/** Extracts and verifies the `#token=` fragment from a /connected redirect, asserting it authenticates the given tenant (R10-01). */
-function expectValidSessionTokenFor(location: string, tenantId: string): void {
-  const token = new URL(location).hash.replace(/^#token=/, "");
-  expect(token).toBeTruthy();
-  const payload = verifySessionToken(SESSION_SECRET_FOR_TESTS, token);
-  expect(payload?.tenantId).toBe(tenantId);
-}
 
 vi.mock("../../lib/instagramOAuth.js", async () => {
   const actual = await vi.importActual<typeof import("../../lib/instagramOAuth.js")>(
@@ -37,25 +28,41 @@ import { createApp } from "../../app.js";
 
 const APP_SECRET = "test-app-secret";
 const APP_BASE_URL = "https://app.example.com";
+const API_BASE_URL = "https://api.example.com";
 
 /** Extracts the `state` query param from a redirect Location header. */
 function extractState(location: string): string {
   return new URL(location).searchParams.get("state")!;
 }
 
-function mockSuccessfulExchange() {
+function mockSuccessfulExchange(igAccountId = "acct-1") {
   vi.mocked(exchangeCodeForShortLivedToken).mockResolvedValue({ access_token: "short", user_id: "u1" });
   vi.mocked(exchangeForLongLivedToken).mockResolvedValue({ access_token: "long-lived-token", expires_in: 5184000 });
-  vi.mocked(fetchInstagramProfile).mockResolvedValue({ id: "acct-1", username: "real_handle" });
+  vi.mocked(fetchInstagramProfile).mockResolvedValue({ id: igAccountId, username: "real_handle" });
 }
 
-describe("auth routes", () => {
+/**
+ * Mints a connect link (the authenticated JSON step BUI does before the
+ * top-level navigation — see routes/auth.ts's docstring on `/connect-link`)
+ * and returns just the path+query, ready to `.get()` against the app
+ * directly with the given agent (so cookies from the resulting redirect
+ * are captured the same way a real browser would).
+ */
+async function mintStartUrl(app: import("express").Express, tenantId: string, authHeader: { Authorization: string }) {
+  const res = await request(app).post(`/tenants/${tenantId}/instagram/connect-link`).set(authHeader);
+  expect(res.status).toBe(200);
+  const url = new URL(res.body.url);
+  return url.pathname + url.search;
+}
+
+describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
   beforeAll(() => {
     process.env.META_APP_SECRET = APP_SECRET;
     process.env.INSTAGRAM_CLIENT_ID = "test-client-id";
     process.env.INSTAGRAM_REDIRECT_URI = "https://example.com/auth/instagram/callback";
     process.env.TOKEN_ENCRYPTION_KEYS = "v1:YE23jw59vZdWaiGV2o9eF4fjuoPcXwsvdwJVi79Q6tQ=";
     process.env.APP_BASE_URL = APP_BASE_URL;
+    process.env.API_BASE_URL = API_BASE_URL;
     process.env.SESSION_SECRET = SESSION_SECRET_FOR_TESTS;
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
@@ -74,20 +81,69 @@ describe("auth routes", () => {
     await closePool();
   });
 
-  it("start redirects to Instagram's authorize URL and creates a new tenant for a fresh signup", async () => {
+  it("connect-link requires a session — 401 with none", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     const app = createApp();
-    const res = await request(app).get("/auth/instagram/start").query({ tenantName: "new-creator" });
+
+    const res = await request(app).post(`/tenants/${tenant.id}/instagram/connect-link`);
+    expect(res.status).toBe(401);
+  });
+
+  it("connect-link requires the caller to be a member of tenantId — 403 for a real tenant the session isn't a member of", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const { authHeader: otherAuthHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-b");
+    const app = createApp();
+
+    const res = await request(app).post(`/tenants/${tenant.id}/instagram/connect-link`).set(otherAuthHeader);
+    expect(res.status).toBe(403);
+  });
+
+  it("start rejects a request with no tenantId or connectToken", async () => {
+    const app = createApp();
+    const noTenant = await request(app).get("/auth/instagram/start").query({ connectToken: "x" });
+    expect(noTenant.status).toBe(400);
+
+    const noToken = await request(app).get("/auth/instagram/start").query({ tenantId: "some-id" });
+    expect(noToken.status).toBe(400);
+  });
+
+  it("start rejects a connectToken minted for a DIFFERENT tenantId than the one in the query", async () => {
+    const pool = getPool();
+    const { tenant: tenantA } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const { tenant: tenantB, authHeader: authHeaderB } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-b");
+    const app = createApp();
+
+    const startUrl = await mintStartUrl(app, tenantB.id, authHeaderB);
+    const tamperedUrl = startUrl.replace(`tenantId=${tenantB.id}`, `tenantId=${tenantA.id}`);
+
+    const res = await request(app).get(tamperedUrl);
+    expect(res.status).toBe(401);
+  });
+
+  it("start redirects to Instagram's authorize URL and creates no new tenant", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const app = createApp();
+
+    const before = await pool.query("select count(*)::int as count from tenants");
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const res = await request(app).get(startUrl);
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain("https://www.instagram.com/oauth/authorize");
 
-    const tenants = await getPool().query("select count(*)::int as count from tenants where name = 'new-creator'");
-    expect(tenants.rows[0].count).toBe(1);
+    const after = await pool.query("select count(*)::int as count from tenants");
+    expect(after.rows[0].count).toBe(before.rows[0].count); // no new tenant minted
   });
 
   it("start sets an HttpOnly nonce cookie, scoped to /auth/instagram, bound to the redirect's state (R1-02, R4-04)", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     const app = createApp();
-    const res = await request(app).get("/auth/instagram/start").query({ tenantName: "new-creator" });
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const res = await request(app).get(startUrl);
 
     const setCookie = res.headers["set-cookie"]?.[0] ?? "";
     expect(setCookie).toContain("ig_oauth_nonce=");
@@ -95,64 +151,33 @@ describe("auth routes", () => {
     expect(setCookie).toContain("Path=/auth/instagram");
   });
 
-  it("start rejects a request with no tenantName", async () => {
-    const app = createApp();
-    const res = await request(app).get("/auth/instagram/start");
-    expect(res.status).toBe(400);
-  });
-
-  // R4-01 regression: a tenantId query param used to let anyone who knew
-  // (or guessed/leaked) a tenant UUID attach their own Instagram account
-  // to someone else's tenant — the R1-02 cookie only proves "same browser
-  // started and finished," never "entitled to this tenant." Dropped
-  // entirely: every /start call mints a fresh tenant now.
-  it("does not accept a tenantId query param — every start mints a fresh tenant regardless (R4-01)", async () => {
-    const pool = getPool();
-    const victimTenant = await pool.query("insert into tenants (name) values ('victim-tenant') returning id");
-    const victimTenantId = victimTenant.rows[0].id;
-
-    mockSuccessfulExchange();
-    const app = createApp();
-    const agent = request.agent(app);
-
-    // An attacker who learned the victim's tenant id tries to attach
-    // their own Instagram account to it via the old query param.
-    const start = await agent.get("/auth/instagram/start").query({ tenantName: "attacker", tenantId: victimTenantId });
-    const state = extractState(start.headers.location);
-    await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
-
-    const tokenRow = await pool.query(
-      "select tenant_id from meta_tokens where instagram_account_id = 'acct-1'",
-    );
-    // The token attached to a freshly-minted tenant, never to the victim's.
-    expect(tokenRow.rows[0].tenant_id).not.toBe(victimTenantId);
-  });
-
   // BUI: a real browser lands on the callback URL via a top-level
   // navigation (Instagram's own redirect), not a fetch — every outcome
-  // redirects back into the app rather than returning raw JSON.
-  it("callback completes the connection end-to-end and redirects to the app's success screen", async () => {
+  // redirects back into the app rather than returning raw JSON. No
+  // session is issued here anymore (U5) — the caller was already logged
+  // in before starting the flow, and stays logged in throughout.
+  it("callback completes the connection end-to-end and redirects to the dashboard, with no new session issued", async () => {
     const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     mockSuccessfulExchange();
 
     const app = createApp();
     const agent = request.agent(app); // persists cookies across requests, like a real browser
 
-    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const start = await agent.get(startUrl);
     const state = extractState(start.headers.location);
-    const tenantRow = await pool.query("select id from tenants where name = 'creator-a'");
-    const tenantId = tenantRow.rows[0].id;
 
     const res = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
 
     expect(res.status).toBe(302);
-    expect(res.headers.location).toContain(`${APP_BASE_URL}/connected?tenantId=${tenantId}`);
-    expectValidSessionTokenFor(res.headers.location, tenantId);
+    expect(res.headers.location).toBe(`${APP_BASE_URL}/dashboard/${tenant.id}?connected=1`);
+    expect(res.headers.location).not.toContain("#token="); // no session minted here
 
     const tokenRow = await pool.query(
       "select tenant_id, encrypted_token, status from meta_tokens where instagram_account_id = 'acct-1'",
     );
-    expect(tokenRow.rows[0].tenant_id).toBe(tenantId);
+    expect(tokenRow.rows[0].tenant_id).toBe(tenant.id);
     expect(tokenRow.rows[0].encrypted_token.toString("utf8")).not.toContain("long-lived-token");
     expect(tokenRow.rows[0].status).toBe("healthy");
   });
@@ -184,15 +209,18 @@ describe("auth routes", () => {
   });
 
   it("callback rejects a replay of the same state+cookie pair after it has already been used once", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     mockSuccessfulExchange();
     const app = createApp();
     const agent = request.agent(app);
-    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const start = await agent.get(startUrl);
     const state = extractState(start.headers.location);
 
     const first = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
     expect(first.status).toBe(302);
-    expect(first.headers.location).toContain("/connected");
+    expect(first.headers.location).toContain("/dashboard/");
 
     // Same browser/agent (same cookie jar) replaying the identical URL —
     // the cookie was cleared on first use, so this must fail even though
@@ -209,17 +237,20 @@ describe("auth routes", () => {
   // (no shared cookie jar with the original request) after the real user
   // already completed the flow once.
   it("rejects a replay of the same nonce presented by a different client with a manually-set cookie", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     mockSuccessfulExchange();
     const app = createApp();
     const agent = request.agent(app);
-    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const start = await agent.get(startUrl);
     const state = extractState(start.headers.location);
     const setCookieHeader = start.headers["set-cookie"]![0]!;
     const nonceValue = setCookieHeader.split(";")[0]!.split("=")[1]!;
 
     const first = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
     expect(first.status).toBe(302);
-    expect(first.headers.location).toContain("/connected");
+    expect(first.headers.location).toContain("/dashboard/");
 
     const replayFromDifferentClient = await request(app)
       .get("/auth/instagram/callback")
@@ -230,58 +261,76 @@ describe("auth routes", () => {
     expect(replayFromDifferentClient.headers.location).toBe(`${APP_BASE_URL}/connect?error=already_used`);
   });
 
-  // R5-01 regression: /start always mints a fresh tenant, which is correct
-  // for a first connection but was silently splitting a creator across two
-  // tenants on every reconnect (expired token, failed refresh, clicking
-  // "connect" again) — findTenantByInstagramAccountId has no ORDER BY and
-  // takes rows[0], so inbound webhooks would then route to an arbitrary
-  // one of the two. The fix resolves the tenant from the OAuth-returned
-  // account id, reusing the original tenant instead of the freshly-minted
-  // one whenever that account is already connected somewhere.
-  it("reconnecting the same Instagram account re-attaches to its original tenant, not a new one (R5-01)", async () => {
+  // Identity Refactor U5: reconnecting the SAME tenant to the SAME
+  // Instagram account (token refresh, retry after a failure) must update
+  // the one meta_tokens row, not create a second.
+  it("reconnecting the same tenant to the same Instagram account updates the one token row", async () => {
     const pool = getPool();
-    mockSuccessfulExchange();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     const app = createApp();
 
-    const firstAgent = request.agent(app);
-    const firstStart = await firstAgent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
-    const firstState = extractState(firstStart.headers.location);
-    const firstCallback = await firstAgent
-      .get("/auth/instagram/callback")
-      .query({ code: "auth-code", state: firstState });
-    expect(firstCallback.status).toBe(302);
-    expect(firstCallback.headers.location).toContain("/connected");
-
-    const originalRow = await pool.query(
-      "select tenant_id from meta_tokens where instagram_account_id = 'acct-1'",
-    );
-    const originalTenantId = originalRow.rows[0].tenant_id;
-
-    // A reconnect: same real Instagram account (mock always returns
-    // acct-1), but a brand new browser session/agent — exactly what
-    // happens when a creator clicks "connect" again after a token issue.
     mockSuccessfulExchange();
+    const firstAgent = request.agent(app);
+    const firstStartUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const firstStart = await firstAgent.get(firstStartUrl);
+    const firstState = extractState(firstStart.headers.location);
+    const first = await firstAgent.get("/auth/instagram/callback").query({ code: "auth-code", state: firstState });
+    expect(first.status).toBe(302);
+
+    mockSuccessfulExchange(); // same acct-1
     const secondAgent = request.agent(app);
-    const secondStart = await secondAgent.get("/auth/instagram/start").query({ tenantName: "creator-a-again" });
+    const secondStartUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const secondStart = await secondAgent.get(secondStartUrl);
     const secondState = extractState(secondStart.headers.location);
-    const secondCallback = await secondAgent
-      .get("/auth/instagram/callback")
-      .query({ code: "auth-code", state: secondState });
-    expect(secondCallback.status).toBe(302);
-    // Redirects to the ORIGINAL tenant's id, not the freshly-minted one.
-    expect(secondCallback.headers.location).toContain(`${APP_BASE_URL}/connected?tenantId=${originalTenantId}`);
-    expectValidSessionTokenFor(secondCallback.headers.location, originalTenantId);
+    const second = await secondAgent.get("/auth/instagram/callback").query({ code: "auth-code", state: secondState });
+    expect(second.status).toBe(302);
+    expect(second.headers.location).toBe(`${APP_BASE_URL}/dashboard/${tenant.id}?connected=1`);
 
     const rows = await pool.query("select tenant_id from meta_tokens where instagram_account_id = 'acct-1'");
-    expect(rows.rowCount).toBe(1); // never two rows for the same account
-    expect(rows.rows[0].tenant_id).toBe(originalTenantId); // reused, not a new tenant
+    expect(rows.rowCount).toBe(1);
+    expect(rows.rows[0].tenant_id).toBe(tenant.id);
+  });
+
+  // Identity Refactor U5: the resolve-by-profile.id heuristic (R5-01) is
+  // gone — an account already attached to a DIFFERENT tenant is now a
+  // named error, not something silently re-parented.
+  it("rejects connecting an Instagram account that's already attached to a different tenant", async () => {
+    const pool = getPool();
+    const { tenant: tenantA, authHeader: authHeaderA } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const { tenant: tenantB, authHeader: authHeaderB } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-b");
+    const app = createApp();
+
+    mockSuccessfulExchange("shared-acct");
+    const agentA = request.agent(app);
+    const startUrlA = await mintStartUrl(app, tenantA.id, authHeaderA);
+    const startA = await agentA.get(startUrlA);
+    const stateA = extractState(startA.headers.location);
+    const callbackA = await agentA.get("/auth/instagram/callback").query({ code: "auth-code", state: stateA });
+    expect(callbackA.status).toBe(302);
+    expect(callbackA.headers.location).toContain("/dashboard/");
+
+    mockSuccessfulExchange("shared-acct"); // tenant B tries to connect the SAME Instagram account
+    const agentB = request.agent(app);
+    const startUrlB = await mintStartUrl(app, tenantB.id, authHeaderB);
+    const startB = await agentB.get(startUrlB);
+    const stateB = extractState(startB.headers.location);
+    const callbackB = await agentB.get("/auth/instagram/callback").query({ code: "auth-code", state: stateB });
+
+    expect(callbackB.status).toBe(302);
+    expect(callbackB.headers.location).toBe(`${APP_BASE_URL}/connect?error=account_already_connected`);
+
+    const rows = await pool.query("select tenant_id from meta_tokens where instagram_account_id = 'shared-acct'");
+    expect(rows.rowCount).toBe(1);
+    expect(rows.rows[0].tenant_id).toBe(tenantA.id); // never re-parented to tenant B
   });
 
   it("callback redirects to the retry screen when Instagram's own token exchange fails", async () => {
     const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
     const app = createApp();
     const agent = request.agent(app);
-    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const start = await agent.get(startUrl);
     const state = extractState(start.headers.location);
 
     vi.mocked(exchangeCodeForShortLivedToken).mockRejectedValue(new Error("Instagram rejected the code"));
@@ -299,28 +348,5 @@ describe("auth routes", () => {
     const res = await request(app).get("/auth/instagram/callback").query({ code: "only-code" });
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe(`${APP_BASE_URL}/connect?error=missing_params`);
-  });
-
-  // R11-02 regression: the callback must read the tenant's CURRENT
-  // session_version, not assume 1 — otherwise a freshly-minted token from
-  // a reconnect would carry a stale version a prior revocation was meant
-  // to invalidate, and requireTenantSession would reject it immediately.
-  it("mints a session carrying the tenant's current (bumped) session_version, not a stale default", async () => {
-    const pool = getPool();
-    mockSuccessfulExchange();
-    const app = createApp();
-    const agent = request.agent(app);
-
-    const start = await agent.get("/auth/instagram/start").query({ tenantName: "creator-a" });
-    const state = extractState(start.headers.location);
-    const tenantRow = await pool.query("select id from tenants where name = 'creator-a'");
-    const tenantId = tenantRow.rows[0].id;
-
-    await bumpSessionVersion(pool, tenantId); // simulates a revocation that happened before this connect completed
-
-    const res = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
-    const token = new URL(res.headers.location).hash.replace(/^#token=/, "");
-    const payload = verifySessionToken(SESSION_SECRET_FOR_TESTS, token);
-    expect(payload?.sessionVersion).toBe(2);
   });
 });

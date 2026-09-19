@@ -1,10 +1,10 @@
 import { Router, type Response } from "express";
 import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
-import { createTenant, getTenantSessionVersion } from "../db/tenants.js";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { upsertToken } from "../db/tokens.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
+import { requireTenantSession } from "../lib/tenantAuth.js";
 import { OAUTH_NONCE_COOKIE, createOAuthState, nonceMatches, parseCookie, verifyOAuthState } from "../lib/oauthState.js";
 import {
   buildAuthorizationUrl,
@@ -13,30 +13,45 @@ import {
   fetchInstagramProfile,
 } from "../lib/instagramOAuth.js";
 import { Sentry } from "../lib/sentry.js";
-import { createSessionToken } from "../lib/session.js";
 
 export const authRouter = Router();
 
-// Starts the connect flow. Phase 1 has no separate signup step —
-// connecting Instagram *is* the signup — so this always mints a fresh
-// tenant. R4-01 fix: an earlier version also accepted an existing
-// `tenantId` from the query string to support reconnection, but nothing
-// authenticated the caller as that tenant's owner — the R1-02 cookie
-// binding proves "the same browser started and finished the flow," not
-// "this browser is entitled to that tenant." Anyone who learned a tenant
-// UUID (a URL, a support thread, a screenshot) could attach their own
-// Instagram account to someone else's tenant. Dropped entirely rather
-// than gated, since Phase 1 has no session system to gate it with —
-// reconnection-after-failure is an operator task until real auth exists.
-authRouter.get("/auth/instagram/start", async (req, res) => {
-  const pool = getPool();
-  const tenantName = req.query.tenantName;
+/**
+ * Identity Refactor U4/U6: connecting Instagram is now an action inside the
+ * dashboard, gated by a real session — but `/start` itself is reached via
+ * a top-level browser navigation (`window.location.href`, so Instagram's
+ * own redirect can eventually land back on `/callback`), and a navigation
+ * cannot carry an `Authorization` header. This route is hit via a JSON
+ * fetch (which CAN carry one) from BUI, authenticated the normal way via
+ * `requireTenantSession`, and mints a short-lived, tenantId-bound
+ * "connect token" for `/start` to redeem — reusing `createOAuthState`
+ * as-is, since its shape (`{tenantId, nonce, issuedAt}`, signed, 10-minute
+ * expiry) is exactly a "prove an authenticated, membership-checked
+ * request minted this recently" token, whatever it's used for. Its own
+ * `nonce` is not the OAuth CSRF nonce below — that's a second, distinct
+ * token, minted only after this one verifies.
+ */
+authRouter.post("/tenants/:tenantId/instagram/connect-link", requireTenantSession, (req, res) => {
+  const { tenantId } = req.params;
+  const { state: connectToken } = createOAuthState(config.metaAppSecret, tenantId!);
+  const url = `${config.apiBaseUrl}/auth/instagram/start?tenantId=${tenantId}&connectToken=${encodeURIComponent(connectToken)}`;
+  return res.status(200).json({ url });
+});
 
-  if (typeof tenantName !== "string" || tenantName.length === 0) {
-    return res.status(400).json({ error: "tenantName is required" });
+authRouter.get("/auth/instagram/start", async (req, res) => {
+  const tenantId = req.query.tenantId;
+  const connectToken = req.query.connectToken;
+  if (typeof tenantId !== "string" || !tenantId) {
+    return res.status(400).json({ error: "tenantId is required" });
   }
-  const tenant = await createTenant(pool, tenantName);
-  const tenantId = tenant.id;
+  if (typeof connectToken !== "string" || !connectToken) {
+    return res.status(400).json({ error: "connectToken is required" });
+  }
+
+  const connectPayload = verifyOAuthState(config.metaAppSecret, connectToken);
+  if (!connectPayload || connectPayload.tenantId !== tenantId) {
+    return res.status(401).json({ error: "invalid or expired connect link — please try connecting again" });
+  }
 
   const { state, nonce } = createOAuthState(config.metaAppSecret, tenantId);
 
@@ -76,7 +91,7 @@ authRouter.get("/auth/instagram/start", async (req, res) => {
  * here redirects back into the app rather than returning raw JSON, which
  * would otherwise leave the creator staring at a blank API response after
  * connecting. `/connect` is the retry screen (with a short `error` code
- * that doesn't leak internals); `/connected` is the success screen.
+ * that doesn't leak internals).
  */
 function redirectToConnectError(res: Response, error: string) {
   return res.redirect(`${config.appBaseUrl}/connect?error=${encodeURIComponent(error)}`);
@@ -126,22 +141,18 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
     const profile = await fetchInstagramProfile(longLived.access_token);
 
     const pool = getPool();
+    const tenantId = statePayload.tenantId;
 
-    // R5-01 fix: `/start` always mints a fresh tenant (see the comment
-    // there), which is correct for a genuinely new connection but wrong
-    // for a reconnect — using statePayload.tenantId unconditionally would
-    // silently split one creator across two tenants every time they
-    // reconnect (expired token, failed refresh, clicking "connect" again).
-    // `profile.id` comes from the OAuth exchange itself, not from anything
-    // the caller supplied, so it's the attacker-uncontrollable identifier
-    // that actually determines which tenant this account belongs to: if
-    // it's already connected somewhere, reuse that tenant and let the
-    // fresh one from `/start` go unused, rather than creating a second
-    // home for the same account. meta_tokens' global unique index on
-    // instagram_account_id (migration 1758240000016) backs this up at the
-    // data layer too.
+    // Identity Refactor U5 fix: the resolve-by-profile.id heuristic (R5-01)
+    // only existed because `/start` used to mint tenants blindly, making
+    // "which tenant does this account really belong to" ambiguous after
+    // the fact. Now the tenant is known and authenticated up front (U4),
+    // so an account already attached elsewhere is a real conflict, not
+    // something to silently re-parent around.
     const existingTenantId = await findTenantByInstagramAccountId(pool, profile.id);
-    const tenantId = existingTenantId ?? statePayload.tenantId;
+    if (existingTenantId && existingTenantId !== tenantId) {
+      return redirectToConnectError(res, "account_already_connected");
+    }
 
     await upsertToken(pool, config.tokenKeyring, {
       tenantId,
@@ -150,24 +161,10 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),
     });
 
-    // R10-01: this is the one moment BUI has proven it's talking to the
-    // real Instagram-connected browser for this tenant — issue the bearer
-    // session here. Carried in the URL FRAGMENT, not a query param: a
-    // fragment is never sent in the Referer header or to the server on
-    // the next request, unlike a query string, so it doesn't ride along
-    // on the app's own asset requests or leak to anything the /connected
-    // page might link out to. BUI (ConnectedPage) reads it once and
-    // immediately strips it from the visible URL/history via
-    // navigate(..., {replace: true}) — the fragment must never persist as
-    // its own history entry (R11-01).
-    //
-    // R11-02: reads the tenant's CURRENT session_version rather than
-    // assuming 1 — if it had been bumped (a prior revocation), a stale
-    // freshly-minted token would otherwise be issued that a bump was
-    // specifically meant to invalidate.
-    const sessionVersion = (await getTenantSessionVersion(pool, tenantId)) ?? 1;
-    const sessionToken = createSessionToken(config.sessionSecret, tenantId, sessionVersion);
-    return res.redirect(`${config.appBaseUrl}/connected?tenantId=${tenantId}#token=${sessionToken}`);
+    // No session is issued here anymore — the caller was already logged
+    // in before starting this flow (U4), and that session stays valid
+    // throughout. This redirect just returns them to their dashboard.
+    return res.redirect(`${config.appBaseUrl}/dashboard/${tenantId}?connected=1`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Instagram OAuth callback failed:", err);

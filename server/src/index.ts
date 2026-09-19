@@ -13,6 +13,7 @@ import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
+import { pruneExpiredMagicLinkTokens } from "./db/magicLinkTokens.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
 import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
@@ -109,6 +110,15 @@ async function main() {
   if (prunedAiCalls > 0) {
     // eslint-disable-next-line no-console
     console.log(`Pruned ${prunedAiCalls} expired ai_call_usage row(s) on boot`);
+  }
+
+  // R14-04: magic_link_tokens is scanned on every /auth/email/request
+  // (the per-email/per-IP rate-limit counts) — same reasoning as
+  // ai_call_usage above, just for the sign-in path instead of the AI path.
+  const prunedMagicLinkTokens = await pruneExpiredMagicLinkTokens(pool);
+  if (prunedMagicLinkTokens > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`Pruned ${prunedMagicLinkTokens} expired magic_link_token row(s) on boot`);
   }
 
   await startTokenRefreshWorker(boss, pool, config.tokenKeyring, async (results) => {
