@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: signalai-server
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run build && npm run migrate:up
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Database, hosted on Neon (see docs/signalAI_roadmap.md Tech Stack) —
+      # not Render's own Postgres, which expires after 30 days.
+      - key: DATABASE_URL
+        sync: false
+      # From the Meta Developer App (Instagram Business Login).
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: INSTAGRAM_CLIENT_ID
+        sync: false
+      - key: INSTAGRAM_REDIRECT_URI
+        sync: false
+      # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+      - key: TOKEN_ENCRYPTION_KEYS
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      # Where BUI is deployed — used for OAuth/Stripe redirects and CORS.
+      - key: APP_BASE_URL
+        sync: false
+      - key: WEB_APP_ORIGIN
+        sync: false
+      - key: AI_DAILY_CALL_CAP
+        value: "300"
+      # Optional — leave unset to run without billing/alerts.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
