@@ -151,6 +151,8 @@ export interface LeadListItem {
   id: string;
   instagramUserId: string | null;
   username: string | null;
+  /** The most recent event's type for this lead — 'comment' means their last contact was a public comment, 'message' means a DM (including a shared post/Reel, which arrives as a message event). */
+  lastEventType: "comment" | "message" | string | null;
   activeMilestoneId: string | null;
   lastInboundAt: string | null;
   windowOpenUntil: string | null;

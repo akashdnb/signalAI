@@ -93,7 +93,32 @@ describe("dashboard routes (BUI backend surface)", () => {
     const res = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
-    expect(res.body[0]).toMatchObject({ id: lead.id, username: "real_handle" });
+    expect(res.body[0]).toMatchObject({ id: lead.id, username: "real_handle", lastEventType: "comment" });
+  });
+
+  // A DM (or a shared Reel, which also arrives as a `message` event) never
+  // carries a username in Meta's webhook payload — distinguishing it from
+  // a comment-triggered lead in the dashboard is the whole point of
+  // lastEventType.
+  it("GET /tenants/:id/leads reports lastEventType and leaves username null for a DM-only lead", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const event = await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-dm",
+      eventType: "message",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
+    await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, dmText: "hi" });
+
+    const res = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: lead.id, username: null, lastEventType: "message" });
   });
 
   it("GET /tenants/:id/analytics reports the four numbers sourced from their durable tables", async () => {

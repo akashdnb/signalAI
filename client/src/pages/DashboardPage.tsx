@@ -9,6 +9,12 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString();
 }
 
+function formatLastContactVia(lastEventType: string | null): string {
+  if (lastEventType === "comment") return "Comment";
+  if (lastEventType === "message") return "DM";
+  return "—";
+}
+
 export function DashboardPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
@@ -181,6 +187,7 @@ export function DashboardPage() {
               <tr>
                 <th>Username</th>
                 <th>Last contact</th>
+                <th>Via</th>
                 <th>Messaging window</th>
                 <th>First seen</th>
               </tr>
@@ -190,6 +197,7 @@ export function DashboardPage() {
                 <tr key={lead.id}>
                   <td>{lead.username ?? "(unknown)"}</td>
                   <td>{formatDate(lead.lastInboundAt)}</td>
+                  <td>{formatLastContactVia(lead.lastEventType)}</td>
                   <td>
                     {lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? (
                       <span className="pill pill-ok">open</span>

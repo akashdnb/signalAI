@@ -47,6 +47,35 @@ export async function insertPii(
   );
 }
 
+/** Whether any non-deleted event for this lead already carries a username — checked before spending a Graph API call on profile resolution, so a lead that commented once (and so already has one) never triggers a lookup for a later DM. */
+export async function hasKnownUsername(pool: Queryable, tenantId: string, leadId: string): Promise<boolean> {
+  const result = await pool.query(
+    `select 1 from lead_pii where tenant_id = $1 and lead_id = $2 and deleted_at is null and username is not null limit 1`,
+    [tenantId, leadId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Backfills a profile-resolved username (see lib/instagramProfile.ts) onto
+ * the specific event that lacked one at ingestion time — reusing the
+ * existing lead_pii row rather than a second place username can live,
+ * which is what keeps this covered by hardScrubLead's existing scrub
+ * below for free. Only fills a currently-null username: never overwrites
+ * one a comment on the same lead already supplied.
+ */
+export async function backfillLeadPiiUsername(
+  pool: Queryable,
+  tenantId: string,
+  leadEventId: string,
+  username: string,
+): Promise<void> {
+  await pool.query(
+    `update lead_pii set username = $3 where tenant_id = $1 and lead_event_id = $2 and username is null`,
+    [tenantId, leadEventId, username],
+  );
+}
+
 /**
  * The real implementation behind the Data Deletion Callback (see
  * src/lib/deletionService.ts, which still stubs this until it's wired in).

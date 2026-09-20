@@ -16,6 +16,7 @@ import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "./db/emailOtpCodes.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
 import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
+import { ensureUsernameResolutionQueue, startUsernameResolutionWorker } from "./queue/usernameResolutionQueue.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
 
 /**
@@ -60,6 +61,8 @@ async function main() {
   await startMaintenanceWorker(boss, pool);
   await ensureAlertsQueue(boss);
   await startAlertsWorker(boss);
+  await ensureUsernameResolutionQueue(boss);
+  await startUsernameResolutionWorker(boss, pool, config.tokenKeyring);
 
   await startLeadEventsWorker(
     boss,

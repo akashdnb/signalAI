@@ -8,6 +8,7 @@ import { listActiveCampaignKeywords } from "../db/campaigns.js";
 import { findMatchingCampaign } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
+import { enqueueUsernameResolution } from "../queue/usernameResolutionQueue.js";
 import type { ParsedWebhookEvent } from "../lib/instagramWebhookParser.js";
 
 const MESSAGING_WINDOW_HOURS = 24;
@@ -121,6 +122,23 @@ async function ingestOneEvent(
       dmText: event.dmText,
       username: event.username,
     });
+
+    // Meta's Messaging webhook never carries a username (only the sender's
+    // IGSID) — unlike Comments, whose `from` object does. Without this, a
+    // lead whose first (or only) contact is a DM or a shared Reel shows up
+    // as "(unknown)" forever. Deferred to a queued job rather than an
+    // inline Graph API call: this function's whole job is to persist and
+    // ack fast (see the docstring above), and the profile lookup needs the
+    // account's token and an external round-trip. The worker itself
+    // no-ops if a comment on the same lead already supplied a username by
+    // the time it runs.
+    if (!event.username) {
+      await enqueueUsernameResolution(
+        boss,
+        { tenantId, leadId: lead.id, leadEventId: inserted.id, instagramUserId: event.instagramUserId },
+        { client },
+      );
+    }
 
     const windowOpenUntil = new Date(event.occurredAt.getTime() + MESSAGING_WINDOW_HOURS * 60 * 60 * 1000);
     await updateMessagingWindow(client, tenantId, lead.id, event.occurredAt, windowOpenUntil);

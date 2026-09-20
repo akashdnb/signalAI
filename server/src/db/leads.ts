@@ -156,6 +156,8 @@ export interface LeadListItem {
   id: string;
   instagramUserId: string | null;
   username: string | null;
+  /** The most recent lead_event's type for this lead ('comment' | 'message') — lets the dashboard show whether the last contact was a public comment or a DM. Null only for a lead with no events at all, which shouldn't happen outside a test. */
+  lastEventType: string | null;
   activeMilestoneId: string | null;
   lastInboundAt: Date | null;
   windowOpenUntil: Date | null;
@@ -167,25 +169,34 @@ export interface LeadListItem {
  * lateral pull of that lead's most recent non-deleted `lead_pii` row —
  * the creator's own dashboard is one of the few places this is
  * appropriate to surface at all, and only the latest handle, not history.
+ * `lastEventType` is the same lateral-join shape, pulled from lead_events
+ * instead — distinguishing a comment-triggered lead from a DM-only one is
+ * otherwise invisible in this list.
  */
 export async function listLeadsForTenant(pool: Pool, tenantId: string, limit = 100): Promise<LeadListItem[]> {
   const result = await pool.query<{
     id: string;
     instagram_user_id: string | null;
     username: string | null;
+    last_event_type: string | null;
     active_milestone_id: string | null;
     last_inbound_at: Date | null;
     window_open_until: Date | null;
     created_at: Date;
   }>(
     `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, l.created_at,
-            p.username
+            p.username, e.event_type as last_event_type
      from leads l
      left join lateral (
        select username from lead_pii
        where lead_id = l.id and deleted_at is null and username is not null
        order by created_at desc limit 1
      ) p on true
+     left join lateral (
+       select event_type from lead_events
+       where lead_id = l.id
+       order by occurred_at desc limit 1
+     ) e on true
      where l.tenant_id = $1
      order by coalesce(l.last_inbound_at, l.created_at) desc
      limit $2`,
@@ -195,6 +206,7 @@ export async function listLeadsForTenant(pool: Pool, tenantId: string, limit = 1
     id: row.id,
     instagramUserId: row.instagram_user_id,
     username: row.username,
+    lastEventType: row.last_event_type,
     activeMilestoneId: row.active_milestone_id,
     lastInboundAt: row.last_inbound_at,
     windowOpenUntil: row.window_open_until,
