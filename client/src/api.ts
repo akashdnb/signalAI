@@ -139,7 +139,13 @@ export interface Campaign {
 export interface ObservedMedia {
   mediaId: string;
   commentCount: number;
-  lastSeenAt: string;
+  lastSeenAt: string | null;
+  /** Cached Graph API metadata — null until enriched (see server's routes/campaigns.ts), which happens lazily whenever the picker loads an entry it doesn't have this for yet. */
+  caption: string | null;
+  mediaType: string | null;
+  thumbnailUrl: string | null;
+  permalink: string | null;
+  postedAt: string | null;
 }
 
 export interface Milestone {
@@ -232,6 +238,14 @@ export const api = {
   // has actually received a comment on, derived from ingested events
   // rather than a Graph API media-listing call.
   listObservedMedia: (tenantId: string) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media`),
+  // Resolves a pasted post/Reel URL against the connected account's own
+  // media and adds it as a known post — usable for targeting even before
+  // any comment on it has arrived.
+  addKnownMediaByUrl: (tenantId: string, url: string) =>
+    request<ObservedMedia>(`/tenants/${tenantId}/known-media`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
   setCampaignTargetMedia: (tenantId: string, campaignId: string, targetMediaIds: string[]) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/target-media`, {
       method: "PUT",

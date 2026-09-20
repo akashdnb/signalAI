@@ -12,6 +12,7 @@ import {
   ensureUsernameResolutionQueue,
   enqueueUsernameResolution,
   startUsernameResolutionWorker,
+  USERNAME_RESOLUTION_QUEUE,
 } from "../usernameResolutionQueue.js";
 
 vi.mock("../../lib/instagramProfile.js", () => ({
@@ -60,6 +61,13 @@ describe("usernameResolutionQueue worker", () => {
     boss = new PgBoss(process.env.DATABASE_URL!);
     await boss.start();
     await ensureUsernameResolutionQueue(boss);
+    // resetDb doesn't touch the pgboss schema, and other test files (e.g.
+    // webhookIngestService.usernameResolution.test.ts) enqueue jobs on this
+    // same queue without ever running a worker to consume them — without
+    // this, a growing backlog of stale jobs (referencing tenants/leads
+    // resetDb just truncated) sits ahead of this file's own job in the
+    // queue and can push a real job past this suite's poll timeouts.
+    await getPool().query("delete from pgboss.job where name = $1", [USERNAME_RESOLUTION_QUEUE]);
   });
 
   afterEach(async () => {

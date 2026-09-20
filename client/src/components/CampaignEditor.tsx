@@ -33,6 +33,9 @@ export function CampaignEditor({
   const [targetMediaIds, setTargetMediaIds] = useState<string[]>(campaign.targetMediaIds);
   const [savingTargetMedia, setSavingTargetMedia] = useState(false);
   const [targetMediaError, setTargetMediaError] = useState<string | null>(null);
+  const [addUrl, setAddUrl] = useState("");
+  const [addingUrl, setAddingUrl] = useState(false);
+  const [addUrlError, setAddUrlError] = useState<string | null>(null);
 
   const [sampleText, setSampleText] = useState("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -108,6 +111,26 @@ export function CampaignEditor({
       setTargetMediaError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingTargetMedia(false);
+    }
+  }
+
+  async function addPostByUrl(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addUrl.trim()) return;
+    setAddingUrl(true);
+    setAddUrlError(null);
+    try {
+      const added = await api.addKnownMediaByUrl(tenantId, addUrl.trim());
+      setObservedMedia((prev) => [added, ...prev.filter((m) => m.mediaId !== added.mediaId)]);
+      // Adding a post is a declaration of intent to target it — check it
+      // for this campaign right away; the person still has to hit "Save
+      // post targeting" below for that to stick.
+      setTargetMediaIds((prev) => (prev.includes(added.mediaId) ? prev : [...prev, added.mediaId]));
+      setAddUrl("");
+    } catch (err) {
+      setAddUrlError(err instanceof Error ? err.message : "Failed to add that post");
+    } finally {
+      setAddingUrl(false);
     }
   }
 
@@ -235,11 +258,24 @@ export function CampaignEditor({
         <h4>Posts this campaign replies to</h4>
         <p className="muted small">
           Pick which post(s) trigger this campaign. Leave nothing checked to match every post — that's the default,
-          and how every campaign behaved before post-targeting existed. Only posts we've actually seen a comment on
-          are listed here.
+          and how every campaign behaved before post-targeting existed.
         </p>
+
+        <form onSubmit={addPostByUrl} className="inline-form">
+          <input
+            type="text"
+            placeholder="Paste a post or Reel URL to add it"
+            value={addUrl}
+            onChange={(e) => setAddUrl(e.target.value)}
+          />
+          <button type="submit" className="btn-secondary" disabled={!addUrl.trim() || addingUrl}>
+            {addingUrl ? "Adding…" : "Add post"}
+          </button>
+        </form>
+        {addUrlError && <div className="banner banner-error">{addUrlError}</div>}
+
         {observedMedia.length === 0 ? (
-          <p className="muted">No comments observed yet on any post — nothing to pick from.</p>
+          <p className="muted">No posts yet — they'll show up here once someone comments, or add one by URL above.</p>
         ) : (
           <ul className="list">
             {observedMedia.map((m) => (
@@ -250,8 +286,27 @@ export function CampaignEditor({
                     checked={targetMediaIds.includes(m.mediaId)}
                     onChange={() => toggleTargetMedia(m.mediaId)}
                   />
-                  {m.mediaId}
-                  <span className="muted"> — {m.commentCount} comment{m.commentCount === 1 ? "" : "s"}</span>
+                  {m.thumbnailUrl && (
+                    <img
+                      src={m.thumbnailUrl}
+                      alt=""
+                      style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4, flexShrink: 0 }}
+                    />
+                  )}
+                  <span>
+                    {m.caption ? m.caption.split("\n")[0]!.slice(0, 80) : m.mediaId}
+                  </span>
+                  <span className="muted">
+                    {" — "}
+                    {m.commentCount > 0
+                      ? `${m.commentCount} comment${m.commentCount === 1 ? "" : "s"}`
+                      : "added by URL, no comments yet"}
+                  </span>
+                  {m.permalink && (
+                    <a href={m.permalink} target="_blank" rel="noreferrer" className="link-button" onClick={(e) => e.stopPropagation()}>
+                      View ↗
+                    </a>
+                  )}
                 </label>
               </li>
             ))}

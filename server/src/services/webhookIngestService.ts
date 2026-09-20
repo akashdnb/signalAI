@@ -91,9 +91,9 @@ async function ingestOneEvent(
     //
     // mediaId/commentId are recorded on EVERY comment event, matched or
     // not — this is what lets the campaign editor offer "posts we've seen
-    // a comment on" as a picker (listObservedMedia) without a separate
-    // Graph API media-listing call, and commentId is what the worker needs
-    // to post a public reply to this exact comment.
+    // a comment on" as a picker (listKnownMediaForTenant) without a
+    // separate Graph API media-listing call for THIS media, and commentId
+    // is what the worker needs to post a public reply to this exact comment.
     let attributes: Record<string, unknown> = {};
     if (event.eventType === "comment" && event.mediaId) attributes.mediaId = event.mediaId;
     if (event.eventType === "comment" && event.commentId) attributes.commentId = event.commentId;
