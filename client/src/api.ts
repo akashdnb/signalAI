@@ -85,9 +85,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Identity Refactor U2: unauthenticated — there's no session yet at login time. Always resolves the same way regardless of outcome (server-side enumeration resistance); the caller just shows "check your inbox". */
-export async function requestMagicLink(email: string): Promise<void> {
+/** Unauthenticated — there's no session yet at login time. Always resolves the same way regardless of outcome (server-side enumeration resistance); the caller just shows "check your inbox". */
+export async function requestOtp(email: string): Promise<void> {
   await request("/auth/email/request", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+/**
+ * Verifies the 6-digit code and returns the session directly in the JSON
+ * body — a plain fetch from the same page the code was entered on, not a
+ * redirect. `ApiError.message` carries the server's `error` code
+ * (`invalid_or_expired_code` | `too_many_attempts`) for the caller to map
+ * to copy.
+ */
+export async function verifyOtp(email: string, code: string): Promise<Session> {
+  return request<Session>("/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) });
 }
 
 export interface TenantSummary {

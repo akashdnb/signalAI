@@ -25,7 +25,7 @@ export function createApp(options?: { llmProvider?: LLMProvider }) {
 
   // Render terminates TLS and proxies to this process — without this,
   // req.ip is the proxy's address for every request, which would make
-  // authEmail.ts's per-IP magic-link rate limit count all traffic as one
+  // authEmail.ts's per-IP sign-in rate limit count all traffic as one
   // IP instead of rate-limiting the actual caller.
   app.set("trust proxy", true);
 

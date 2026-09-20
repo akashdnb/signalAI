@@ -7,20 +7,20 @@ import { verifySessionToken } from "../../lib/session.js";
 import { listTenantsForUser } from "../../db/tenantMembers.js";
 import { getUserByEmail } from "../../db/users.js";
 
-vi.mock("../../lib/resend.js", () => ({ sendMagicLinkEmail: vi.fn(async () => {}) }));
-import { sendMagicLinkEmail } from "../../lib/resend.js";
+vi.mock("../../lib/resend.js", () => ({ sendOtpEmail: vi.fn(async () => {}) }));
+import { sendOtpEmail } from "../../lib/resend.js";
 
 const SESSION_SECRET = "test-session-secret";
 const APP_BASE_URL = "https://app.example.com";
 const API_BASE_URL = "https://api.example.com";
 
-/** Pulls the raw token out of the URL sendMagicLinkEmail was called with — standing in for "the user clicked the link in their inbox". */
-function tokenFromLastEmail(): string {
-  const [, verifyUrl] = vi.mocked(sendMagicLinkEmail).mock.calls.at(-1)!;
-  return new URL(verifyUrl).searchParams.get("token")!;
+/** Pulls the raw code out of the call sendOtpEmail was made with — standing in for "the user read the code out of their inbox". */
+function codeFromLastEmail(): string {
+  const [, code] = vi.mocked(sendOtpEmail).mock.calls.at(-1)!;
+  return code;
 }
 
-describe("authEmail routes (Identity Refactor U2)", () => {
+describe("authEmail routes (email OTP)", () => {
   beforeAll(() => {
     process.env.SESSION_SECRET = SESSION_SECRET;
     process.env.APP_BASE_URL = APP_BASE_URL;
@@ -32,11 +32,11 @@ describe("authEmail routes (Identity Refactor U2)", () => {
 
   beforeEach(async () => {
     await resetDb(getPool());
-    vi.mocked(sendMagicLinkEmail).mockClear();
+    vi.mocked(sendOtpEmail).mockClear();
   });
 
   afterEach(() => {
-    vi.mocked(sendMagicLinkEmail).mockResolvedValue(undefined);
+    vi.mocked(sendOtpEmail).mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -47,18 +47,18 @@ describe("authEmail routes (Identity Refactor U2)", () => {
     const app = createApp();
     const res = await request(app).post("/auth/email/request").send({ email: "not-an-email" });
     expect(res.status).toBe(400);
-    expect(sendMagicLinkEmail).not.toHaveBeenCalled();
+    expect(sendOtpEmail).not.toHaveBeenCalled();
   });
 
-  it("sends a magic link for a new email and creates the user", async () => {
+  it("sends a 6-digit code for a new email and creates the user", async () => {
     const app = createApp();
     const res = await request(app).post("/auth/email/request").send({ email: "new@example.com" });
 
     expect(res.status).toBe(200);
-    expect(sendMagicLinkEmail).toHaveBeenCalledTimes(1);
-    const [emailArg, verifyUrl] = vi.mocked(sendMagicLinkEmail).mock.calls[0]!;
+    expect(sendOtpEmail).toHaveBeenCalledTimes(1);
+    const [emailArg, code] = vi.mocked(sendOtpEmail).mock.calls[0]!;
     expect(emailArg).toBe("new@example.com");
-    expect(verifyUrl).toContain(`${API_BASE_URL}/auth/email/verify?token=`);
+    expect(code).toMatch(/^\d{6}$/);
 
     expect(await getUserByEmail(getPool(), "new@example.com")).not.toBeNull();
   });
@@ -86,36 +86,34 @@ describe("authEmail routes (Identity Refactor U2)", () => {
     expect(sixth.status).toBe(429);
   });
 
-  it("verify redirects to the login-error screen for a missing token", async () => {
+  it("verify rejects a malformed request (missing/invalid email or code)", async () => {
     const app = createApp();
-    const res = await request(app).get("/auth/email/verify");
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe(`${APP_BASE_URL}/login?error=missing_token`);
+    const noCode = await request(app).post("/auth/email/verify").send({ email: "a@b.com" });
+    expect(noCode.status).toBe(400);
+
+    const badCode = await request(app).post("/auth/email/verify").send({ email: "a@b.com", code: "12" });
+    expect(badCode.status).toBe(400);
   });
 
-  it("verify redirects to the login-error screen for an unknown token", async () => {
+  it("verify rejects an unknown code for an email that never requested one", async () => {
     const app = createApp();
-    const res = await request(app).get("/auth/email/verify").query({ token: "not-a-real-token" });
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe(`${APP_BASE_URL}/login?error=invalid_or_expired`);
+    const res = await request(app).post("/auth/email/verify").send({ email: "nobody@example.com", code: "000000" });
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "invalid_or_expired_code" });
   });
 
-  it("verify spends the token, creates a workspace on first login, and issues a valid session in the URL fragment", async () => {
+  it("verify spends the code, creates a workspace on first login, and returns a valid session directly in the JSON body", async () => {
     const pool = getPool();
     const app = createApp();
     await request(app).post("/auth/email/request").send({ email: "first-timer@example.com" });
-    const token = tokenFromLastEmail();
+    const code = codeFromLastEmail();
 
-    const res = await request(app).get("/auth/email/verify").query({ token });
-    expect(res.status).toBe(302);
+    const res = await request(app).post("/auth/email/verify").send({ email: "first-timer@example.com", code });
+    expect(res.status).toBe(200);
 
-    const location = new URL(res.headers.location);
-    expect(location.origin + location.pathname).toBe(`${APP_BASE_URL}/login/verify`);
-    const tenantId = location.searchParams.get("tenantId");
+    const { tenantId, token } = res.body;
     expect(tenantId).toBeTruthy();
-
-    const sessionToken = location.hash.replace(/^#token=/, "");
-    const payload = verifySessionToken(SESSION_SECRET, sessionToken);
+    const payload = verifySessionToken(SESSION_SECRET, token);
     expect(payload).not.toBeNull();
 
     const user = await getUserByEmail(pool, "first-timer@example.com");
@@ -129,50 +127,81 @@ describe("authEmail routes (Identity Refactor U2)", () => {
     const app = createApp();
 
     await request(app).post("/auth/email/request").send({ email: "returning@example.com" });
-    const firstToken = tokenFromLastEmail();
-    const first = await request(app).get("/auth/email/verify").query({ token: firstToken });
-    const firstTenantId = new URL(first.headers.location).searchParams.get("tenantId");
+    const firstCode = codeFromLastEmail();
+    const first = await request(app).post("/auth/email/verify").send({ email: "returning@example.com", code: firstCode });
 
     await request(app).post("/auth/email/request").send({ email: "returning@example.com" });
-    const secondToken = tokenFromLastEmail();
-    const second = await request(app).get("/auth/email/verify").query({ token: secondToken });
-    const secondTenantId = new URL(second.headers.location).searchParams.get("tenantId");
+    const secondCode = codeFromLastEmail();
+    const second = await request(app)
+      .post("/auth/email/verify")
+      .send({ email: "returning@example.com", code: secondCode });
 
-    expect(secondTenantId).toBe(firstTenantId);
+    expect(second.body.tenantId).toBe(first.body.tenantId);
 
     const user = await getUserByEmail(pool, "returning@example.com");
     const memberships = await listTenantsForUser(pool, user!.id);
     expect(memberships).toHaveLength(1); // still just the one workspace
   });
 
-  it("a token can only be used once", async () => {
+  it("a code can only be used once", async () => {
     const app = createApp();
     await request(app).post("/auth/email/request").send({ email: "single-use@example.com" });
-    const token = tokenFromLastEmail();
+    const code = codeFromLastEmail();
 
-    const first = await request(app).get("/auth/email/verify").query({ token });
-    expect(first.status).toBe(302);
-    expect(first.headers.location).toContain("/login/verify");
+    const first = await request(app).post("/auth/email/verify").send({ email: "single-use@example.com", code });
+    expect(first.status).toBe(200);
 
-    const replay = await request(app).get("/auth/email/verify").query({ token });
-    expect(replay.status).toBe(302);
-    expect(replay.headers.location).toBe(`${APP_BASE_URL}/login?error=invalid_or_expired`);
+    const replay = await request(app).post("/auth/email/verify").send({ email: "single-use@example.com", code });
+    expect(replay.status).toBe(401);
+    expect(replay.body).toEqual({ error: "invalid_or_expired_code" });
   });
 
-  it("an expired token is rejected even though it was never used", async () => {
+  it("an expired code is rejected even though it was never used", async () => {
     const pool = getPool();
     const app = createApp();
     await request(app).post("/auth/email/request").send({ email: "expired@example.com" });
-    await pool.query("update magic_link_tokens set expires_at = now() - interval '1 minute'");
-    const token = tokenFromLastEmail();
+    await pool.query("update email_otp_codes set expires_at = now() - interval '1 minute'");
+    const code = codeFromLastEmail();
 
-    const res = await request(app).get("/auth/email/verify").query({ token });
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe(`${APP_BASE_URL}/login?error=invalid_or_expired`);
+    const res = await request(app).post("/auth/email/verify").send({ email: "expired@example.com", code });
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "invalid_or_expired_code" });
+  });
+
+  // Brute-force protection: a 6-digit code has only 1,000,000 values, so
+  // the verify endpoint caps guesses against one held code independent of
+  // the request-rate limit (which only bounds how many codes get issued).
+  it("locks out a code after 5 wrong guesses, even with a correct code still outstanding", async () => {
+    const app = createApp();
+    await request(app).post("/auth/email/request").send({ email: "brute-force@example.com" });
+    const realCode = codeFromLastEmail();
+    const wrongCode = realCode === "000000" ? "111111" : "000000";
+
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app).post("/auth/email/verify").send({ email: "brute-force@example.com", code: wrongCode });
+      expect(res.status).toBe(401);
+    }
+
+    const lockedOut = await request(app)
+      .post("/auth/email/verify")
+      .send({ email: "brute-force@example.com", code: realCode });
+    expect(lockedOut.status).toBe(401);
+    expect(lockedOut.body).toEqual({ error: "too_many_attempts" });
+  });
+
+  it("requesting a new code invalidates the previous one", async () => {
+    const app = createApp();
+    await request(app).post("/auth/email/request").send({ email: "superseded@example.com" });
+    const firstCode = codeFromLastEmail();
+
+    await request(app).post("/auth/email/request").send({ email: "superseded@example.com" });
+
+    const res = await request(app).post("/auth/email/verify").send({ email: "superseded@example.com", code: firstCode });
+    expect(res.status).toBe(401);
   });
 
   it("still returns the generic response when the email fails to send", async () => {
-    vi.mocked(sendMagicLinkEmail).mockRejectedValueOnce(new Error("Resend is down"));
+    vi.mocked(sendOtpEmail).mockRejectedValueOnce(new Error("Resend is down"));
     const app = createApp();
     const res = await request(app).post("/auth/email/request").send({ email: "will-fail@example.com" });
     expect(res.status).toBe(200); // does not leak that sending failed

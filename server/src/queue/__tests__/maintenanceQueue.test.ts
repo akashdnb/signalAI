@@ -5,7 +5,7 @@ import { createTenant } from "../../db/tenants.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { trySpendNonce } from "../../db/oauthNonces.js";
 import { recordAiCall } from "../../db/aiCallUsage.js";
-import { createMagicLinkToken } from "../../db/magicLinkTokens.js";
+import { createOtpCode } from "../../db/emailOtpCodes.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker, MAINTENANCE_QUEUE } from "../maintenanceQueue.js";
 
 function sleep(ms: number) {
@@ -51,7 +51,7 @@ describe("maintenance queue (R8-01 periodic pruning)", () => {
     expect(schedules.some((s) => s.name === MAINTENANCE_QUEUE)).toBe(true);
   });
 
-  it("prunes expired nonces, old AI call usage, and old magic-link tokens when the job runs", async () => {
+  it("prunes expired nonces, old AI call usage, and old email OTP codes when the job runs", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
 
@@ -61,8 +61,8 @@ describe("maintenance queue (R8-01 periodic pruning)", () => {
     await recordAiCall(pool, tenant.id, "acct-old");
     await pool.query(`update ai_call_usage set called_at = now() - interval '48 hours'`);
 
-    await createMagicLinkToken(pool, "old@example.com", null);
-    await pool.query(`update magic_link_tokens set created_at = now() - interval '48 hours'`);
+    await createOtpCode(pool, "test-secret", "old@example.com", null);
+    await pool.query(`update email_otp_codes set created_at = now() - interval '48 hours'`);
 
     await startMaintenanceWorker(boss, pool);
     await boss.send(MAINTENANCE_QUEUE, {});
@@ -81,7 +81,7 @@ describe("maintenance queue (R8-01 periodic pruning)", () => {
     const aiRows = await pool.query("select count(*)::int as count from ai_call_usage");
     expect(aiRows.rows[0].count).toBe(0); // actually deleted, not merely outside the 24h read window
 
-    const tokenRows = await pool.query("select count(*)::int as count from magic_link_tokens");
-    expect(tokenRows.rows[0].count).toBe(0);
+    const codeRows = await pool.query("select count(*)::int as count from email_otp_codes");
+    expect(codeRows.rows[0].count).toBe(0);
   }, 15000);
 });

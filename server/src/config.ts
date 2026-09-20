@@ -58,11 +58,12 @@ export const config = {
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },
-  // Identity Refactor U2: the API server's OWN public base URL, used to
-  // build the magic-link verify URL emailed to a signing-in user
-  // (GET /auth/email/verify). Distinct from appBaseUrl (BUI's URL, where
-  // that same request eventually redirects to) — the two happen to be
-  // different hosts in every real deployment of this project.
+  // Identity Refactor U2: the API server's OWN public base URL. Used to
+  // build the Instagram connect-link redirect target (routes/auth.ts) —
+  // distinct from appBaseUrl (BUI's URL) because the two are different
+  // hosts in every real deployment of this project. No longer used by
+  // sign-in itself: the email-OTP flow (routes/authEmail.ts) is a plain
+  // JSON POST from the SPA, not a server-built redirect URL.
   get apiBaseUrl() {
     return stripTrailingSlashes(process.env.API_BASE_URL ?? "http://localhost:3000");
   },
@@ -87,9 +88,9 @@ export const config = {
     return process.env.TELEGRAM_CHAT_ID ?? "";
   },
   // R10-01, superseded by the Identity Refactor: signs the bearer session
-  // token issued at the end of magic-link email verification (see
-  // lib/session.ts and routes/authEmail.ts) — gates every
-  // dashboard/campaigns/billing route, so this is validated at boot the
+  // token issued at the end of email-OTP verification (see lib/session.ts
+  // and routes/authEmail.ts) — gates every dashboard/campaigns/billing
+  // route, so this is validated at boot the
   // same way the token keyring is.
   get sessionSecret() {
     return process.env.SESSION_SECRET ?? "";

@@ -6,7 +6,7 @@ import { createSessionToken } from "../../lib/session.js";
 /**
  * Test-only fixture matching the post-Identity-Refactor model: a real user,
  * owning a real tenant via `tenant_members`, with a session token minted
- * the same way `routes/authEmail.ts` does after a real magic-link verify.
+ * the same way `routes/authEmail.ts` does after a real email-OTP verify.
  * One random-emailed user per call, so cross-tenant tests naturally get
  * two independent identities without asking for it explicitly.
  */
