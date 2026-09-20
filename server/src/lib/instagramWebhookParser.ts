@@ -20,6 +20,8 @@ export interface ParsedWebhookEvent {
   commentText?: string;
   dmText?: string;
   username?: string;
+  mediaId?: string; // the post/Reel the comment was left on — absent for message events
+  commentId?: string; // Meta's own comment id — needed to post a public reply to this exact comment
 }
 
 export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEvent[] {
@@ -44,6 +46,9 @@ export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEve
         const commentId = typeof value.id === "string" ? value.id : undefined;
         if (!instagramUserId || !commentId) continue;
 
+        const media = isRecord(value.media) ? value.media : {};
+        const mediaId = typeof media.id === "string" ? media.id : undefined;
+
         events.push({
           instagramAccountId,
           instagramUserId,
@@ -52,6 +57,8 @@ export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEve
           occurredAt: entryTime,
           commentText: typeof value.text === "string" ? value.text : undefined,
           username: typeof from.username === "string" ? from.username : undefined,
+          mediaId,
+          commentId,
         });
       }
     }

@@ -17,7 +17,7 @@ import {
 import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
-import { sendInstagramMessage } from "../lib/instagramSend.js";
+import { sendInstagramCommentReply, sendInstagramMessage } from "../lib/instagramSend.js";
 import { Sentry } from "../lib/sentry.js";
 import { generateReply } from "./replyEngine.js";
 import { runMilestoneCheck } from "./milestoneEngine.js";
@@ -78,23 +78,42 @@ export function createLeadEventReplyHandler(
     const lead = await getLead(pool, job.tenantId, job.leadId);
     if (!lead || !lead.instagramUserId) return { advance: true };
 
-    if (!lead.windowOpenUntil || lead.windowOpenUntil.getTime() < Date.now()) {
-      // Nothing more can happen for this event once the 24h messaging
-      // window has closed — there's no "retry later", so this event is
-      // simply done.
+    // Each delivery channel has its own readiness precondition, checked
+    // independently: a DM needs the 24h messaging window open; a public
+    // comment reply needs the comment id captured at ingestion (absent
+    // only for events ingested before mediaId/commentId capture existed)
+    // and has no window of its own. A campaign can want either, or both.
+    const wantsDm = campaign.replyChannel === "dm" || campaign.replyChannel === "both";
+    const wantsComment = campaign.replyChannel === "comment" || campaign.replyChannel === "both";
+    const dmWindowOpen = !!lead.windowOpenUntil && lead.windowOpenUntil.getTime() >= Date.now();
+    const dmReady = wantsDm && dmWindowOpen;
+    const commentReady = wantsComment && !!event.commentId;
+
+    if (!dmReady && !commentReady) {
+      // Nothing deliverable for this event right now — DM's window is the
+      // only one of the two preconditions that can ever become true later
+      // (it doesn't, once closed), so there's no "retry later" here either.
       return { advance: true };
     }
 
     const account = await getSoleConnectedAccount(pool, job.tenantId);
     if (!account) return { advance: true }; // token was revoked/disconnected since the event was matched
 
+    // The 750/hour ceiling this reserves against is Meta's DM/private-reply
+    // limit specifically — it does not apply to a public comment reply, so
+    // this gate only runs when a DM is actually going to be attempted.
     // R6-02/R6-03 fix: a single atomic reserve-and-record, replacing a
     // separate count-then-later-record pair. key_strict_fifo runs
     // different leads on the SAME account concurrently by design — the
     // exact viral-Reel burst this limiter exists to survive — so a
     // check-then-act count could let N concurrent workers each see a slot
     // free and each send. See accountSends.ts for the full reasoning.
-    if (!(await tryReserveSend(pool, job.tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT))) {
+    //
+    // A 'both' campaign whose DM leg is rate-limited defers the WHOLE
+    // event, including the comment leg that isn't itself capped — the
+    // alternative (send the comment now, DM later) risks the comment being
+    // sent twice on retry, since nothing here makes a resend idempotent.
+    if (dmReady && !(await tryReserveSend(pool, job.tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT))) {
       await enqueueLeadEvent(boss, job, { delaySeconds: RATE_LIMIT_RETRY_DELAY_SECONDS });
       return { advance: false };
     }
@@ -191,13 +210,21 @@ export function createLeadEventReplyHandler(
     const token = await getDecryptedToken(pool, keyring, job.tenantId, account.instagramAccountId);
     if (!token) return { advance: true }; // disconnected between the reservation above and now; the reserved slot goes unused
 
-    await sendInstagramMessage(token, lead.instagramUserId, replyText);
+    let delivered = false;
+    if (dmReady) {
+      await sendInstagramMessage(token, lead.instagramUserId, replyText);
+      delivered = true;
+    }
+    if (commentReady) {
+      await sendInstagramCommentReply(token, event.commentId!, replyText);
+      delivered = true;
+    }
 
-    // R6-01: only commit milestone advancement once the send actually
-    // succeeded — a throw above propagates out of this handler and the
-    // job retries with nothing committed yet, so the retry redoes the
-    // LLM/milestone work cleanly instead of skipping ahead.
-    if (commitMilestoneAdvancement) {
+    // R6-01: only commit milestone advancement once at least one channel
+    // actually delivered — a throw above propagates out of this handler
+    // and the job retries with nothing committed yet, so the retry redoes
+    // the LLM/milestone work cleanly instead of skipping ahead.
+    if (commitMilestoneAdvancement && delivered) {
       await commitMilestoneAdvancement();
     }
 

@@ -212,7 +212,11 @@ describe("webhooks route", () => {
 
     expect(res.status).toBe(200);
     const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
-    expect(event.rows[0].attributes).toEqual({});
+    // commentId is still recorded even without a campaign match — it's what
+    // lets a public comment reply be posted later and what the post-picker
+    // (listObservedMedia) is built from; there's just no mediaId here since
+    // this payload's comment carries no `media` object.
+    expect(event.rows[0].attributes).toEqual({ commentId: "c-nomatch" });
   });
 
   it("ignores a disabled campaign's keyword", async () => {
@@ -242,7 +246,7 @@ describe("webhooks route", () => {
       .send(body.toString("utf8"));
 
     const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
-    expect(event.rows[0].attributes).toEqual({});
+    expect(event.rows[0].attributes).toEqual({ commentId: "c-disabled" });
   });
 
   it("acks an event for an unconnected/unknown account without creating any lead", async () => {

@@ -38,3 +38,36 @@ export async function sendInstagramMessage(
     throw new Error(`Instagram send failed: ${res.status} ${bodyText.slice(0, 200)}`);
   }
 }
+
+/**
+ * Posts a PUBLIC reply under a comment (Meta's `POST /{ig-comment-id}/replies`)
+ * — distinct from `sendInstagramMessage` above, which sends a private DM.
+ * This is what campaigns.reply_channel 'comment'/'both' actually deliver on;
+ * `guardrails.ts`'s comment-tier length cap already assumes this reply is
+ * visible to everyone, not just the commenter.
+ *
+ * Requires the `instagram_manage_comments` permission, which is separate
+ * from `instagram_business_manage_messages` (Tech Stack) and is not yet
+ * part of this app's requested scope — VERIFY the field/endpoint shape
+ * against a real payload and confirm the permission is granted during
+ * Phase 0 pilot testing (A6), same caveat as instagramWebhookParser.ts,
+ * before enabling reply_channel 'comment'/'both' for a real tenant.
+ */
+export async function sendInstagramCommentReply(accessToken: string, commentId: string, text: string): Promise<void> {
+  const url = `${GRAPH_BASE_URL}/v21.0/${encodeURIComponent(commentId)}/replies`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ message: text }),
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text();
+    throw new Error(`Instagram comment reply failed: ${res.status} ${bodyText.slice(0, 200)}`);
+  }
+}

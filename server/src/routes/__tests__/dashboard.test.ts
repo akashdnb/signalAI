@@ -179,6 +179,27 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("PATCH reply-config updates replyChannel and rejects an invalid one", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    expect(campaign.replyChannel).toBe("dm"); // default preserves today's behaviour
+    const app = createApp();
+
+    const invalid = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ replyChannel: "carrier-pigeon" });
+    expect(invalid.status).toBe(400);
+
+    const both = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ replyChannel: "both" });
+    expect(both.status).toBe(200);
+    expect(both.body.replyChannel).toBe("both");
+  });
+
   it("POST preview returns both a rule-based and an AI-generated sample reply, regardless of the campaign's current mode", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

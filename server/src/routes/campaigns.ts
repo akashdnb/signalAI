@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { getPool } from "../db/pool.js";
-import { createCampaign, listCampaigns, setCampaignEnabled } from "../db/campaigns.js";
+import { createCampaign, listCampaigns, setCampaignEnabled, setCampaignTargetMediaIds } from "../db/campaigns.js";
 import { listMilestones, setCampaignMilestones } from "../db/milestones.js";
+import { listObservedMedia } from "../db/events.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 
 export const campaignsRouter = Router();
@@ -76,4 +77,25 @@ campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/milestones", async
   const { tenantId, campaignId } = req.params;
   const milestones = await listMilestones(getPool(), tenantId, campaignId);
   return res.status(200).json(milestones);
+});
+
+// Backs the campaign editor's post-targeting picker: posts this tenant has
+// actually received a comment on, so a creator can pick which post(s) a
+// campaign matches without a separate Graph API media-listing call.
+campaignsRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
+  const media = await listObservedMedia(getPool(), req.params.tenantId);
+  return res.status(200).json(media);
+});
+
+campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/target-media", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const { targetMediaIds } = req.body ?? {};
+
+  if (!Array.isArray(targetMediaIds) || !targetMediaIds.every((id) => typeof id === "string")) {
+    return res.status(400).json({ error: "targetMediaIds must be an array of strings (empty = every post)" });
+  }
+
+  const updated = await setCampaignTargetMediaIds(getPool(), tenantId, campaignId, targetMediaIds);
+  if (!updated) return res.status(404).json({ error: "campaign not found for this tenant" });
+  return res.status(200).json(updated);
 });

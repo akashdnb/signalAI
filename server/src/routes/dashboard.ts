@@ -4,7 +4,7 @@ import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant } from "../db/leads.js";
 import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
-import { getCampaign, updateCampaignReplyConfig, type ReplyMode } from "../db/campaigns.js";
+import { getCampaign, updateCampaignReplyConfig, type ReplyChannel, type ReplyMode } from "../db/campaigns.js";
 import { generateReply } from "../services/replyEngine.js";
 import type { LLMProvider } from "../llm/provider.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
@@ -59,10 +59,11 @@ export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_
   });
 
   const VALID_REPLY_MODES: ReplyMode[] = ["rule_based", "ai_generated"];
+  const VALID_REPLY_CHANNELS: ReplyChannel[] = ["dm", "comment", "both"];
 
   router.patch("/tenants/:tenantId/campaigns/:campaignId/reply-config", async (req, res) => {
     const { tenantId, campaignId } = req.params;
-    const { replyMode, ctaLink, defaultReplyTemplate } = req.body ?? {};
+    const { replyMode, ctaLink, defaultReplyTemplate, replyChannel } = req.body ?? {};
 
     if (replyMode !== undefined && !VALID_REPLY_MODES.includes(replyMode)) {
       return res.status(400).json({ error: `replyMode must be one of ${VALID_REPLY_MODES.join(", ")}` });
@@ -73,11 +74,15 @@ export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_
     if (defaultReplyTemplate !== undefined && typeof defaultReplyTemplate !== "string") {
       return res.status(400).json({ error: "defaultReplyTemplate must be a string" });
     }
+    if (replyChannel !== undefined && !VALID_REPLY_CHANNELS.includes(replyChannel)) {
+      return res.status(400).json({ error: `replyChannel must be one of ${VALID_REPLY_CHANNELS.join(", ")}` });
+    }
 
     const updated = await updateCampaignReplyConfig(getPool(), tenantId, campaignId, {
       replyMode,
       ctaLink,
       defaultReplyTemplate,
+      replyChannel,
     });
     if (!updated) return res.status(404).json({ error: "campaign not found for this tenant" });
     return res.status(200).json(updated);

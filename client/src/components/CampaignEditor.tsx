@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Campaign, type Dropoff, type Milestone, type PreviewResult } from "../api";
+import { api, type Campaign, type Dropoff, type Milestone, type ObservedMedia, type PreviewResult, type ReplyChannel } from "../api";
 
 interface MilestoneDraft {
   goalDescription: string;
@@ -18,6 +18,7 @@ export function CampaignEditor({
   const [replyMode, setReplyMode] = useState(campaign.replyMode);
   const [ctaLink, setCtaLink] = useState(campaign.ctaLink ?? "");
   const [defaultReplyTemplate, setDefaultReplyTemplate] = useState(campaign.defaultReplyTemplate);
+  const [replyChannel, setReplyChannel] = useState<ReplyChannel>(campaign.replyChannel);
   const [savingConfig, setSavingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -26,6 +27,11 @@ export function CampaignEditor({
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
 
   const [dropoff, setDropoff] = useState<Dropoff[] | null>(null);
+
+  const [observedMedia, setObservedMedia] = useState<ObservedMedia[]>([]);
+  const [targetMediaIds, setTargetMediaIds] = useState<string[]>(campaign.targetMediaIds);
+  const [savingTargetMedia, setSavingTargetMedia] = useState(false);
+  const [targetMediaError, setTargetMediaError] = useState<string | null>(null);
 
   const [sampleText, setSampleText] = useState("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -36,15 +42,18 @@ export function CampaignEditor({
     setReplyMode(campaign.replyMode);
     setCtaLink(campaign.ctaLink ?? "");
     setDefaultReplyTemplate(campaign.defaultReplyTemplate);
+    setReplyChannel(campaign.replyChannel);
+    setTargetMediaIds(campaign.targetMediaIds);
   }, [campaign]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ms, d] = await Promise.all([
+        const [ms, d, media] = await Promise.all([
           api.listMilestones(tenantId, campaign.id),
           api.getDropoff(tenantId, campaign.id),
+          api.listObservedMedia(tenantId),
         ]);
         if (cancelled) return;
         setMilestones(
@@ -53,6 +62,7 @@ export function CampaignEditor({
             : [{ goalDescription: "", captureField: "" }],
         );
         setDropoff(d);
+        setObservedMedia(media);
       } catch {
         if (!cancelled) setMilestones([{ goalDescription: "", captureField: "" }]);
       }
@@ -71,12 +81,30 @@ export function CampaignEditor({
         replyMode,
         ctaLink: ctaLink.trim() || null,
         defaultReplyTemplate,
+        replyChannel,
       });
       onChanged();
     } catch (err) {
       setConfigError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingConfig(false);
+    }
+  }
+
+  function toggleTargetMedia(mediaId: string) {
+    setTargetMediaIds((prev) => (prev.includes(mediaId) ? prev.filter((id) => id !== mediaId) : [...prev, mediaId]));
+  }
+
+  async function saveTargetMedia() {
+    setSavingTargetMedia(true);
+    setTargetMediaError(null);
+    try {
+      await api.setCampaignTargetMedia(tenantId, campaign.id, targetMediaIds);
+      onChanged();
+    } catch (err) {
+      setTargetMediaError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingTargetMedia(false);
     }
   }
 
@@ -149,6 +177,26 @@ export function CampaignEditor({
             rows={2}
           />
         </label>
+
+        <h4>Reply channel</h4>
+        <label className="radio-row">
+          <input type="radio" checked={replyChannel === "dm"} onChange={() => setReplyChannel("dm")} />
+          Direct message only (private, sent to the commenter)
+        </label>
+        <label className="radio-row">
+          <input type="radio" checked={replyChannel === "comment"} onChange={() => setReplyChannel("comment")} />
+          Public comment reply only (posted publicly under the comment)
+        </label>
+        <label className="radio-row">
+          <input type="radio" checked={replyChannel === "both"} onChange={() => setReplyChannel("both")} />
+          Both
+        </label>
+        {(replyChannel === "comment" || replyChannel === "both") && (
+          <p className="muted small">
+            Public comment replies require Meta's <code>instagram_manage_comments</code> permission on this
+            connected account, in addition to messaging — confirm it's been approved before relying on this.
+          </p>
+        )}
         <label>
           CTA link (optional)
           <input type="text" value={ctaLink} onChange={(e) => setCtaLink(e.target.value)} placeholder="https://…" />
@@ -157,6 +205,38 @@ export function CampaignEditor({
         {configError && <div className="banner banner-error">{configError}</div>}
         <button className="btn-primary" onClick={saveReplyConfig} disabled={savingConfig}>
           {savingConfig ? "Saving…" : "Save reply settings"}
+        </button>
+      </div>
+
+      <div className="field-group">
+        <h4>Posts this campaign replies to</h4>
+        <p className="muted small">
+          Pick which post(s) trigger this campaign. Leave nothing checked to match every post — that's the default,
+          and how every campaign behaved before post-targeting existed. Only posts we've actually seen a comment on
+          are listed here.
+        </p>
+        {observedMedia.length === 0 ? (
+          <p className="muted">No comments observed yet on any post — nothing to pick from.</p>
+        ) : (
+          <ul className="list">
+            {observedMedia.map((m) => (
+              <li key={m.mediaId} className="list-item">
+                <label className="radio-row">
+                  <input
+                    type="checkbox"
+                    checked={targetMediaIds.includes(m.mediaId)}
+                    onChange={() => toggleTargetMedia(m.mediaId)}
+                  />
+                  {m.mediaId}
+                  <span className="muted"> — {m.commentCount} comment{m.commentCount === 1 ? "" : "s"}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        {targetMediaError && <div className="banner banner-error">{targetMediaError}</div>}
+        <button className="btn-primary" onClick={saveTargetMedia} disabled={savingTargetMedia}>
+          {savingTargetMedia ? "Saving…" : "Save post targeting"}
         </button>
       </div>
 

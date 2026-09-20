@@ -25,7 +25,7 @@ export async function ingestWebhookEvents(
   events: ParsedWebhookEvent[],
 ): Promise<void> {
   const tenantIdByAccount = new Map<string, string | null>();
-  const campaignsByTenant = new Map<string, Array<{ id: string; keywords: string[] }>>();
+  const campaignsByTenant = new Map<string, Array<{ id: string; keywords: string[]; targetMediaIds: string[] }>>();
 
   for (const event of events) {
     let tenantId = tenantIdByAccount.get(event.instagramAccountId);
@@ -60,7 +60,7 @@ async function ingestOneEvent(
   pool: Pool,
   boss: PgBoss,
   tenantId: string,
-  campaigns: Array<{ id: string; keywords: string[] }>,
+  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[] }>,
   event: ParsedWebhookEvent,
 ): Promise<void> {
   const client = await pool.connect();
@@ -76,11 +76,23 @@ async function ingestOneEvent(
     // to pay a queue round-trip for it. Every comment is still recorded
     // (analytics needs the full count) — matching only decides whether
     // the worker treats this as a trigger.
+    //
+    // mediaId/commentId are recorded on EVERY comment event, matched or
+    // not — this is what lets the campaign editor offer "posts we've seen
+    // a comment on" as a picker (listObservedMedia) without a separate
+    // Graph API media-listing call, and commentId is what the worker needs
+    // to post a public reply to this exact comment.
     let attributes: Record<string, unknown> = {};
-    if (event.eventType === "comment" && event.commentText) {
-      const match = findMatchingCampaign(event.commentText, campaigns);
-      if (match) {
-        attributes = { matchedCampaignId: match.campaignId, matchedKeyword: match.keyword };
+    if (event.eventType === "comment") {
+      if (event.mediaId) attributes.mediaId = event.mediaId;
+      if (event.commentId) attributes.commentId = event.commentId;
+
+      if (event.commentText) {
+        const match = findMatchingCampaign(event.commentText, event.mediaId, campaigns);
+        if (match) {
+          attributes.matchedCampaignId = match.campaignId;
+          attributes.matchedKeyword = match.keyword;
+        }
       }
     }
 

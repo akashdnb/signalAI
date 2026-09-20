@@ -52,6 +52,8 @@ export interface EventForReply {
   commentText: string | null;
   dmText: string | null;
   username: string | null;
+  /** Meta's own comment id — required to post a public reply to this exact comment (replyChannel 'comment'/'both'). Null for older events ingested before this was captured. */
+  commentId: string | null;
 }
 
 /** Everything the reply engine needs for one event, joined once rather than three separate round trips. */
@@ -63,7 +65,7 @@ export async function getEventForReply(
   const result = await pool.query<{
     lead_id: string;
     event_type: string;
-    attributes: { matchedCampaignId?: string; matchedKeyword?: string };
+    attributes: { matchedCampaignId?: string; matchedKeyword?: string; commentId?: string };
     comment_text: string | null;
     dm_text: string | null;
     username: string | null;
@@ -85,7 +87,36 @@ export async function getEventForReply(
     commentText: row.comment_text,
     dmText: row.dm_text,
     username: row.username,
+    commentId: row.attributes.commentId ?? null,
   };
+}
+
+export interface ObservedMedia {
+  mediaId: string;
+  commentCount: number;
+  lastSeenAt: Date;
+}
+
+/**
+ * Posts this tenant has actually received a comment on, derived from
+ * ingested events rather than a Graph API media-listing call (that's
+ * roadmap Phase 2A's Top Performing Posts) — this is what backs the
+ * campaign editor's post-targeting picker (campaigns.target_media_ids).
+ */
+export async function listObservedMedia(pool: Queryable, tenantId: string): Promise<ObservedMedia[]> {
+  const result = await pool.query<{ media_id: string; comment_count: string; last_seen_at: Date }>(
+    `select attributes->>'mediaId' as media_id, count(*)::bigint as comment_count, max(occurred_at) as last_seen_at
+     from lead_events
+     where tenant_id = $1 and event_type = 'comment' and attributes->>'mediaId' is not null
+     group by attributes->>'mediaId'
+     order by max(occurred_at) desc`,
+    [tenantId],
+  );
+  return result.rows.map((row) => ({
+    mediaId: row.media_id,
+    commentCount: Number(row.comment_count),
+    lastSeenAt: row.last_seen_at,
+  }));
 }
 
 export async function insertEventIdempotent(

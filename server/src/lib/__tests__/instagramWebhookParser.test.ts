@@ -15,6 +15,7 @@ describe("parseInstagramWebhookPayload", () => {
                 id: "comment-123",
                 text: "DM me LINK",
                 from: { id: "user-42", username: "real_handle" },
+                media: { id: "media-99", media_product_type: "FEED" },
               },
             },
           ],
@@ -31,7 +32,25 @@ describe("parseInstagramWebhookPayload", () => {
       eventType: "comment",
       commentText: "DM me LINK",
       username: "real_handle",
+      mediaId: "media-99",
+      commentId: "comment-123",
     });
+  });
+
+  it("parses a comment event with no media object without throwing", () => {
+    const payload = {
+      entry: [
+        {
+          id: "acct-1",
+          changes: [{ field: "comments", value: { id: "comment-1", from: { id: "user-1" } } }],
+        },
+      ],
+    };
+
+    const events = parseInstagramWebhookPayload(payload);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.mediaId).toBeUndefined();
+    expect(events[0]!.commentId).toBe("comment-1");
   });
 
   it("parses a message (DM) event", () => {

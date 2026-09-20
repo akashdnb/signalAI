@@ -105,6 +105,8 @@ export interface AccountHealth {
   expiresAt?: string | null;
 }
 
+export type ReplyChannel = "dm" | "comment" | "both";
+
 export interface Campaign {
   id: string;
   tenantId: string;
@@ -115,7 +117,15 @@ export interface Campaign {
   replyTemplates: string[];
   defaultReplyTemplate: string;
   ctaLink: string | null;
+  targetMediaIds: string[];
+  replyChannel: ReplyChannel;
   createdAt: string;
+}
+
+export interface ObservedMedia {
+  mediaId: string;
+  commentCount: number;
+  lastSeenAt: string;
 }
 
 export interface Milestone {
@@ -184,7 +194,12 @@ export const api = {
   updateReplyConfig: (
     tenantId: string,
     campaignId: string,
-    updates: { replyMode?: "rule_based" | "ai_generated"; ctaLink?: string | null; defaultReplyTemplate?: string },
+    updates: {
+      replyMode?: "rule_based" | "ai_generated";
+      ctaLink?: string | null;
+      defaultReplyTemplate?: string;
+      replyChannel?: ReplyChannel;
+    },
   ) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, {
       method: "PATCH",
@@ -194,6 +209,16 @@ export const api = {
     request<PreviewResult>(`/tenants/${tenantId}/campaigns/${campaignId}/preview`, {
       method: "POST",
       body: JSON.stringify({ sampleText, sampleUsername }),
+    }),
+
+  // Backs the campaign editor's post-targeting picker: posts this tenant
+  // has actually received a comment on, derived from ingested events
+  // rather than a Graph API media-listing call.
+  listObservedMedia: (tenantId: string) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media`),
+  setCampaignTargetMedia: (tenantId: string, campaignId: string, targetMediaIds: string[]) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/target-media`, {
+      method: "PUT",
+      body: JSON.stringify({ targetMediaIds }),
     }),
 
   listMilestones: (tenantId: string, campaignId: string) =>

@@ -12,12 +12,13 @@ import { getCapturedFacts } from "../../db/capturedFacts.js";
 import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import type { LLMProvider } from "../../llm/provider.js";
-import { sendInstagramMessage } from "../../lib/instagramSend.js";
+import { sendInstagramCommentReply, sendInstagramMessage } from "../../lib/instagramSend.js";
 import { enqueueLeadEvent } from "../../queue/leadEventsQueue.js";
 import { createLeadEventReplyHandler } from "../leadEventReplyHandler.js";
 
 vi.mock("../../lib/instagramSend.js", () => ({
   sendInstagramMessage: vi.fn(async () => {}),
+  sendInstagramCommentReply: vi.fn(async () => {}),
 }));
 
 vi.mock("../../queue/leadEventsQueue.js", async (importOriginal) => {
@@ -37,7 +38,14 @@ function mockProvider(replies: string[]): LLMProvider {
   };
 }
 
-async function seedMatchedEvent(pool: ReturnType<typeof getPool>, tenantId: string, campaignId: string, keyword: string, text: string) {
+async function seedMatchedEvent(
+  pool: ReturnType<typeof getPool>,
+  tenantId: string,
+  campaignId: string,
+  keyword: string,
+  text: string,
+  attributesOverrides: Record<string, unknown> = {},
+) {
   const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1");
   // Send preconditions (B9): an open messaging window and a connected
   // account are required before the handler will attempt any send at all.
@@ -51,7 +59,7 @@ async function seedMatchedEvent(pool: ReturnType<typeof getPool>, tenantId: stri
     eventType: "comment",
     occurredAt: new Date(),
     sequence: 1,
-    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword },
+    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
   });
   await insertPii(pool, {
     tenantId,
@@ -73,11 +81,13 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
   beforeEach(async () => {
     await resetDb(getPool());
     vi.mocked(sendInstagramMessage).mockClear();
+    vi.mocked(sendInstagramCommentReply).mockClear();
     vi.mocked(enqueueLeadEvent).mockClear();
   });
 
   afterEach(() => {
     vi.mocked(sendInstagramMessage).mockResolvedValue(undefined);
+    vi.mocked(sendInstagramCommentReply).mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -347,5 +357,110 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       "select count(*)::int as count from account_sends where instagram_account_id = 'acct-1'",
     );
     expect(rows.rows[0].count).toBe(1);
+  });
+
+  describe("reply channel", () => {
+    it("replyChannel 'comment': posts a public reply and never sends a DM", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyChannel: "comment" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {
+        commentId: "comment-1",
+      });
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(sendInstagramMessage).not.toHaveBeenCalled();
+      expect(sendInstagramCommentReply).toHaveBeenCalledWith("token-1", "comment-1", expect.any(String));
+
+      // Public comment replies aren't gated by the DM 750/hour ceiling.
+      const rows = await pool.query(
+        "select count(*)::int as count from account_sends where instagram_account_id = 'acct-1'",
+      );
+      expect(rows.rows[0].count).toBe(0);
+    });
+
+    it("replyChannel 'both': sends a DM and posts a public comment reply", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyChannel: "both" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {
+        commentId: "comment-1",
+      });
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(sendInstagramMessage).toHaveBeenCalledWith("token-1", "ig-user-1", expect.any(String));
+      expect(sendInstagramCommentReply).toHaveBeenCalledWith("token-1", "comment-1", expect.any(String));
+    });
+
+    it("replyChannel 'comment' with no captured commentId: advances without attempting a send", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyChannel: "comment" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link"); // no commentId
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(sendInstagramMessage).not.toHaveBeenCalled();
+      expect(sendInstagramCommentReply).not.toHaveBeenCalled();
+      expect(provider.generateReply).not.toHaveBeenCalled(); // never reaches generation — nothing was deliverable
+    });
+
+    it("replyChannel 'both' with a closed messaging window: still posts the public comment reply", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyChannel: "both" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {
+        commentId: "comment-1",
+      });
+      await updateMessagingWindow(pool, tenant.id, lead.id, new Date(0), new Date(0)); // slam the DM window shut
+
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(sendInstagramMessage).not.toHaveBeenCalled();
+      expect(sendInstagramCommentReply).toHaveBeenCalledWith("token-1", "comment-1", expect.any(String));
+    });
+
+    it("replyChannel 'both' deferred by the DM rate cap: does not post the comment reply either", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyChannel: "both" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {
+        commentId: "comment-1",
+      });
+
+      await pool.query(
+        `insert into account_sends (tenant_id, instagram_account_id) select $1, $2 from generate_series(1, 750)`,
+        [tenant.id, "acct-1"],
+      );
+
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: false });
+      expect(sendInstagramMessage).not.toHaveBeenCalled();
+      expect(sendInstagramCommentReply).not.toHaveBeenCalled();
+    });
   });
 });

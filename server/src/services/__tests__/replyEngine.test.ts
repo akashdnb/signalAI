@@ -19,6 +19,8 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     replyTemplates: [],
     defaultReplyTemplate: "Hi {{username}}, thanks for asking about {{keyword}}!",
     ctaLink: null,
+    targetMediaIds: [],
+    replyChannel: "dm",
     createdAt: new Date(),
     ...overrides,
   };
