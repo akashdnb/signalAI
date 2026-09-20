@@ -71,6 +71,31 @@ async function seedMatchedEvent(
   return { lead, event: event! };
 }
 
+/** Same shape as seedMatchedEvent, for a DM-triggered campaign match (triggerSource 'message'/'both') — eventType 'message', dmText instead of commentText, and deliberately no commentId (a DM never has one). */
+async function seedMatchedMessageEvent(
+  pool: ReturnType<typeof getPool>,
+  tenantId: string,
+  campaignId: string,
+  keyword: string,
+  dmText: string,
+) {
+  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1");
+  await updateMessagingWindow(pool, tenantId, lead.id, new Date(), new Date(Date.now() + 60 * 60 * 1000));
+  await upsertToken(pool, keyring, { tenantId, instagramAccountId: "acct-1", accessToken: "token-1" });
+
+  const event = await insertEventIdempotent(pool, {
+    tenantId,
+    leadId: lead.id,
+    metaEventId: `evt-${Math.random()}`,
+    eventType: "message",
+    occurredAt: new Date(),
+    sequence: 1,
+    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword },
+  });
+  await insertPii(pool, { tenantId, leadEventId: event!.id, leadId: lead.id, dmText, username: "real_handle" });
+  return { lead, event: event! };
+}
+
 describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
   beforeAll(() => {
     if (!process.env.DATABASE_URL) {
@@ -461,6 +486,41 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       expect(result).toEqual({ advance: false });
       expect(sendInstagramMessage).not.toHaveBeenCalled();
       expect(sendInstagramCommentReply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("message-triggered campaigns (triggerSource)", () => {
+    it("processes a message-triggered match and replies via DM using the DM text as the source", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "DM Trigger", ["PRICE"], { triggerSource: "message" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "PRICE", "what's the PRICE?");
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(sendInstagramMessage).toHaveBeenCalledWith("token-1", "ig-user-1", expect.any(String));
+    });
+
+    it("a 'both' reply-channel campaign never attempts a public comment reply for a message-triggered event", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "DM Trigger Both Channel", ["PRICE"], {
+        triggerSource: "message",
+        replyChannel: "both",
+      });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "PRICE", "what's the PRICE?");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(sendInstagramMessage).toHaveBeenCalledTimes(1);
+      expect(sendInstagramCommentReply).not.toHaveBeenCalled(); // no comment id on a DM event
     });
   });
 });

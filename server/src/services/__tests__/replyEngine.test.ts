@@ -21,6 +21,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     ctaLink: null,
     targetMediaIds: [],
     replyChannel: "dm",
+    triggerSource: "comment",
     createdAt: new Date(),
     ...overrides,
   };

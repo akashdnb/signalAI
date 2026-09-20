@@ -4,7 +4,7 @@ import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { findOrCreateLeadByInstagramUserId, nextSequence, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
-import { listActiveCampaignKeywords } from "../db/campaigns.js";
+import { listActiveCampaignKeywords, type TriggerSource } from "../db/campaigns.js";
 import { findMatchingCampaign } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
@@ -26,7 +26,10 @@ export async function ingestWebhookEvents(
   events: ParsedWebhookEvent[],
 ): Promise<void> {
   const tenantIdByAccount = new Map<string, string | null>();
-  const campaignsByTenant = new Map<string, Array<{ id: string; keywords: string[]; targetMediaIds: string[] }>>();
+  const campaignsByTenant = new Map<
+    string,
+    Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>
+  >();
 
   for (const event of events) {
     let tenantId = tenantIdByAccount.get(event.instagramAccountId);
@@ -61,7 +64,7 @@ async function ingestOneEvent(
   pool: Pool,
   boss: PgBoss,
   tenantId: string,
-  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[] }>,
+  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>,
   event: ParsedWebhookEvent,
 ): Promise<void> {
   const client = await pool.connect();
@@ -74,9 +77,17 @@ async function ingestOneEvent(
     // Keyword matching (Phase 1 Automation Engine) runs here, not deferred
     // to the worker: cheap deterministic string comparison against
     // non-PII data already loaded for this tenant, so there's no reason
-    // to pay a queue round-trip for it. Every comment is still recorded
-    // (analytics needs the full count) — matching only decides whether
-    // the worker treats this as a trigger.
+    // to pay a queue round-trip for it. Every comment/message is still
+    // recorded (analytics needs the full count) — matching only decides
+    // whether the worker treats this as a trigger.
+    //
+    // A campaign's trigger_source ('comment' | 'message' | 'both') decides
+    // which event types it's even a candidate for — distinct from
+    // reply_channel, which decides where the reply goes once triggered.
+    // `event.mediaId` is undefined for a message, which already makes
+    // findMatchingCampaign skip any post-scoped campaign (see
+    // keywordMatch.ts) — post-targeting simply doesn't apply to a DM,
+    // and that falls out of the existing check for free.
     //
     // mediaId/commentId are recorded on EVERY comment event, matched or
     // not — this is what lets the campaign editor offer "posts we've seen
@@ -84,16 +95,16 @@ async function ingestOneEvent(
     // Graph API media-listing call, and commentId is what the worker needs
     // to post a public reply to this exact comment.
     let attributes: Record<string, unknown> = {};
-    if (event.eventType === "comment") {
-      if (event.mediaId) attributes.mediaId = event.mediaId;
-      if (event.commentId) attributes.commentId = event.commentId;
+    if (event.eventType === "comment" && event.mediaId) attributes.mediaId = event.mediaId;
+    if (event.eventType === "comment" && event.commentId) attributes.commentId = event.commentId;
 
-      if (event.commentText) {
-        const match = findMatchingCampaign(event.commentText, event.mediaId, campaigns);
-        if (match) {
-          attributes.matchedCampaignId = match.campaignId;
-          attributes.matchedKeyword = match.keyword;
-        }
+    const sourceText = event.eventType === "comment" ? event.commentText : event.dmText;
+    if (sourceText) {
+      const eligible = campaigns.filter((c) => c.triggerSource === event.eventType || c.triggerSource === "both");
+      const match = findMatchingCampaign(sourceText, event.mediaId, eligible);
+      if (match) {
+        attributes.matchedCampaignId = match.campaignId;
+        attributes.matchedKeyword = match.keyword;
       }
     }
 

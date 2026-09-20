@@ -185,6 +185,114 @@ describe("webhooks route", () => {
     expect(event.rows[0].attributes).toMatchObject({ matchedCampaignId: campaign.id, matchedKeyword: "LINK" });
   });
 
+  it("a campaign defaulted to triggerSource 'comment' does NOT match the same keyword in a DM", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
+    await createCampaign(pool, tenant.id, "Comment Only", ["LINK"]); // default triggerSource: 'comment'
+
+    const payload = {
+      entry: [
+        {
+          id: "acct-1",
+          time: Math.floor(Date.now() / 1000),
+          messaging: [{ sender: { id: "u1" }, timestamp: Date.now(), message: { mid: "m1", text: "send the LINK" } }],
+        },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    expect(res.status).toBe(200);
+    const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
+    expect(event.rows[0].attributes.matchedCampaignId).toBeUndefined();
+  });
+
+  it("flags a DM that matches a campaign with triggerSource 'message'", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
+    const campaign = await createCampaign(pool, tenant.id, "DM Trigger", ["PRICE"], { triggerSource: "message" });
+
+    const payload = {
+      entry: [
+        {
+          id: "acct-1",
+          time: Math.floor(Date.now() / 1000),
+          messaging: [
+            { sender: { id: "u1" }, timestamp: Date.now(), message: { mid: "m2", text: "what's the PRICE?" } },
+          ],
+        },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(body))
+      .send(body.toString("utf8"));
+
+    expect(res.status).toBe(200);
+    const event = await pool.query("select attributes from lead_events where tenant_id = $1", [tenant.id]);
+    expect(event.rows[0].attributes).toMatchObject({ matchedCampaignId: campaign.id, matchedKeyword: "PRICE" });
+  });
+
+  it("a campaign with triggerSource 'both' matches the keyword in either a comment or a DM", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
+    const campaign = await createCampaign(pool, tenant.id, "Everywhere", ["GIVEAWAY"], { triggerSource: "both" });
+    const app = createApp();
+
+    const commentPayload = {
+      entry: [
+        { id: "acct-1", changes: [{ field: "comments", value: { id: "c1", text: "GIVEAWAY please", from: { id: "u1" } } }] },
+      ],
+    };
+    const commentBody = Buffer.from(JSON.stringify(commentPayload));
+    await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(commentBody))
+      .send(commentBody.toString("utf8"));
+
+    const dmPayload = {
+      entry: [
+        {
+          id: "acct-1",
+          time: Math.floor(Date.now() / 1000),
+          messaging: [{ sender: { id: "u2" }, timestamp: Date.now(), message: { mid: "m3", text: "is there a GIVEAWAY?" } }],
+        },
+      ],
+    };
+    const dmBody = Buffer.from(JSON.stringify(dmPayload));
+    await request(app)
+      .post("/webhooks/instagram")
+      .set("Content-Type", "application/json")
+      .set("X-Hub-Signature-256", sign(dmBody))
+      .send(dmBody.toString("utf8"));
+
+    const events = await pool.query(
+      "select event_type, attributes from lead_events where tenant_id = $1 order by event_type",
+      [tenant.id],
+    );
+    expect(events.rows).toHaveLength(2);
+    for (const row of events.rows) {
+      expect(row.attributes).toMatchObject({ matchedCampaignId: campaign.id, matchedKeyword: "GIVEAWAY" });
+    }
+  });
+
   it("records a non-matching comment for analytics but with no campaign match", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");

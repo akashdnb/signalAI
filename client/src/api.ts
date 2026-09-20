@@ -117,6 +117,8 @@ export interface AccountHealth {
 }
 
 export type ReplyChannel = "dm" | "comment" | "both";
+/** What kind of inbound event a campaign's keywords match against — distinct from ReplyChannel, which is where the reply goes once triggered. */
+export type TriggerSource = "comment" | "message" | "both";
 
 export interface Campaign {
   id: string;
@@ -130,6 +132,7 @@ export interface Campaign {
   ctaLink: string | null;
   targetMediaIds: string[];
   replyChannel: ReplyChannel;
+  triggerSource: TriggerSource;
   createdAt: string;
 }
 
@@ -212,6 +215,7 @@ export const api = {
       ctaLink?: string | null;
       defaultReplyTemplate?: string;
       replyChannel?: ReplyChannel;
+      triggerSource?: TriggerSource;
     },
   ) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, {

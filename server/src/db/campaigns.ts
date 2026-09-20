@@ -6,6 +6,9 @@ export type ReplyMode = "rule_based" | "ai_generated";
 /** Where a triggered reply is delivered: a private DM, a public reply under the comment, or both. Default 'dm' preserves every existing campaign's current behaviour. */
 export type ReplyChannel = "dm" | "comment" | "both";
 
+/** What kind of inbound event a campaign's keywords match against — a comment, a DM, or either. Distinct from ReplyChannel (where the reply goes, not what triggers it). Default 'comment' preserves every existing campaign's current behaviour, since DM-triggered matching didn't exist before this field. */
+export type TriggerSource = "comment" | "message" | "both";
+
 export interface Campaign {
   id: string;
   tenantId: string;
@@ -16,9 +19,10 @@ export interface Campaign {
   replyTemplates: string[];
   defaultReplyTemplate: string;
   ctaLink: string | null;
-  /** Which post(s) this campaign matches comments on. Empty = every post (today's behaviour). */
+  /** Which post(s) this campaign matches comments on. Empty = every post (today's behaviour). Irrelevant to a message-triggered match — a DM isn't "on" a post. */
   targetMediaIds: string[];
   replyChannel: ReplyChannel;
+  triggerSource: TriggerSource;
   createdAt: Date;
 }
 
@@ -34,6 +38,7 @@ interface CampaignRow {
   cta_link: string | null;
   target_media_ids: string[];
   reply_channel: ReplyChannel;
+  trigger_source: TriggerSource;
   created_at: Date;
 }
 
@@ -50,6 +55,7 @@ function toCampaign(row: CampaignRow): Campaign {
     ctaLink: row.cta_link,
     targetMediaIds: row.target_media_ids,
     replyChannel: row.reply_channel,
+    triggerSource: row.trigger_source,
     createdAt: row.created_at,
   };
 }
@@ -66,17 +72,19 @@ export async function createCampaign(
     ctaLink?: string;
     targetMediaIds?: string[];
     replyChannel?: ReplyChannel;
+    triggerSource?: TriggerSource;
   },
 ): Promise<Campaign> {
   const result = await pool.query<CampaignRow>(
-    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link, target_media_ids, reply_channel)
+    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link, target_media_ids, reply_channel, trigger_source)
      values ($1, $2, $3,
        coalesce($4, 'rule_based'),
        coalesce($5, array[]::text[]),
        coalesce($6, 'Thanks for your comment! We''ll be in touch shortly.'),
        $7,
        coalesce($8, array[]::text[]),
-       coalesce($9, 'dm'))
+       coalesce($9, 'dm'),
+       coalesce($10, 'comment'))
      returning *`,
     [
       tenantId,
@@ -88,6 +96,7 @@ export async function createCampaign(
       options?.ctaLink ?? null,
       options?.targetMediaIds ?? null,
       options?.replyChannel ?? null,
+      options?.triggerSource ?? null,
     ],
   );
   return toCampaign(result.rows[0]!);
@@ -113,12 +122,21 @@ export async function getCampaign(pool: Pool, tenantId: string, campaignId: stri
 export async function listActiveCampaignKeywords(
   pool: Queryable,
   tenantId: string,
-): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[] }>> {
-  const result = await pool.query<{ id: string; keywords: string[]; target_media_ids: string[] }>(
-    `select id, keywords, target_media_ids from campaigns where tenant_id = $1 and enabled = true`,
-    [tenantId],
-  );
-  return result.rows.map((row) => ({ id: row.id, keywords: row.keywords, targetMediaIds: row.target_media_ids }));
+): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>> {
+  const result = await pool.query<{
+    id: string;
+    keywords: string[];
+    target_media_ids: string[];
+    trigger_source: TriggerSource;
+  }>(`select id, keywords, target_media_ids, trigger_source from campaigns where tenant_id = $1 and enabled = true`, [
+    tenantId,
+  ]);
+  return result.rows.map((row) => ({
+    id: row.id,
+    keywords: row.keywords,
+    targetMediaIds: row.target_media_ids,
+    triggerSource: row.trigger_source,
+  }));
 }
 
 /**
@@ -163,7 +181,13 @@ export async function updateCampaignReplyConfig(
   pool: Pool,
   tenantId: string,
   campaignId: string,
-  updates: { replyMode?: ReplyMode; ctaLink?: string | null; defaultReplyTemplate?: string; replyChannel?: ReplyChannel },
+  updates: {
+    replyMode?: ReplyMode;
+    ctaLink?: string | null;
+    defaultReplyTemplate?: string;
+    replyChannel?: ReplyChannel;
+    triggerSource?: TriggerSource;
+  },
 ): Promise<Campaign | null> {
   const result = await pool.query<CampaignRow>(
     `update campaigns set
@@ -171,6 +195,7 @@ export async function updateCampaignReplyConfig(
        cta_link = case when $4::boolean then $5 else cta_link end,
        default_reply_template = coalesce($6, default_reply_template),
        reply_channel = coalesce($7, reply_channel),
+       trigger_source = coalesce($8, trigger_source),
        updated_at = now()
      where id = $1 and tenant_id = $2
      returning *`,
@@ -182,6 +207,7 @@ export async function updateCampaignReplyConfig(
       updates.ctaLink ?? null,
       updates.defaultReplyTemplate ?? null,
       updates.replyChannel ?? null,
+      updates.triggerSource ?? null,
     ],
   );
   return result.rows[0] ? toCampaign(result.rows[0]) : null;

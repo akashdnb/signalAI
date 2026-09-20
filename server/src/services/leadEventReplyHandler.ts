@@ -68,9 +68,15 @@ export function createLeadEventReplyHandler(
     const event = await getEventForReply(pool, job.tenantId, job.leadEventId);
     if (!event) return { advance: true }; // shouldn't happen outside a test/race, but never crash the worker over it
 
-    if (event.eventType !== "comment" || !event.matchedCampaignId || !event.matchedKeyword) {
+    if (!event.matchedCampaignId || !event.matchedKeyword) {
       return { advance: true }; // recorded for analytics already; not a trigger
     }
+    // A campaign's trigger_source decides whether a comment, a message, or
+    // either could match in the first place (webhookIngestService.ts) —
+    // matchedCampaignId being set at all is already proof this event type
+    // was an eligible trigger, so eventType itself gates nothing further
+    // here beyond choosing the right source text/tier below.
+    const isCommentTrigger = event.eventType === "comment";
 
     const campaign = await getCampaign(pool, job.tenantId, event.matchedCampaignId);
     if (!campaign || !campaign.enabled) return { advance: true }; // disabled between match-time and processing
@@ -119,7 +125,14 @@ export function createLeadEventReplyHandler(
     }
 
     const milestones = await listMilestones(pool, job.tenantId, campaign.id);
-    const sourceText = event.commentText ?? "";
+    const sourceText = (isCommentTrigger ? event.commentText : event.dmText) ?? "";
+    // Governs prompt length/strictness (guardrails.ts), not delivery — a
+    // message-triggered event is inherently private-origin, so it gets the
+    // fuller "dm" prompt even if the campaign's reply_channel also tries a
+    // public comment reply (which, for a DM-triggered event, never has a
+    // comment id to attach to and so never actually fires — see
+    // commentReady above).
+    const tier = isCommentTrigger ? "comment" : "dm";
     // B10: one guard per event, shared by whichever path below actually
     // calls the provider — rule-based replies never reach it, so they
     // never count against the cap.
@@ -140,7 +153,7 @@ export function createLeadEventReplyHandler(
           matchedKeyword: event.matchedKeyword,
           sourceText,
           username: event.username ?? undefined,
-          tier: "comment",
+          tier,
           ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,
@@ -170,7 +183,7 @@ export function createLeadEventReplyHandler(
           capturedFactsSoFar,
           sourceText,
           username: event.username ?? undefined,
-          tier: "comment",
+          tier,
           ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,

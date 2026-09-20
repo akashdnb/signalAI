@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Campaign, type Dropoff, type Milestone, type ObservedMedia, type PreviewResult, type ReplyChannel } from "../api";
+import { api, type Campaign, type Dropoff, type Milestone, type ObservedMedia, type PreviewResult, type ReplyChannel, type TriggerSource } from "../api";
 
 interface MilestoneDraft {
   goalDescription: string;
@@ -19,6 +19,7 @@ export function CampaignEditor({
   const [ctaLink, setCtaLink] = useState(campaign.ctaLink ?? "");
   const [defaultReplyTemplate, setDefaultReplyTemplate] = useState(campaign.defaultReplyTemplate);
   const [replyChannel, setReplyChannel] = useState<ReplyChannel>(campaign.replyChannel);
+  const [triggerSource, setTriggerSource] = useState<TriggerSource>(campaign.triggerSource);
   const [savingConfig, setSavingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -43,6 +44,7 @@ export function CampaignEditor({
     setCtaLink(campaign.ctaLink ?? "");
     setDefaultReplyTemplate(campaign.defaultReplyTemplate);
     setReplyChannel(campaign.replyChannel);
+    setTriggerSource(campaign.triggerSource);
     setTargetMediaIds(campaign.targetMediaIds);
   }, [campaign]);
 
@@ -82,6 +84,7 @@ export function CampaignEditor({
         ctaLink: ctaLink.trim() || null,
         defaultReplyTemplate,
         replyChannel,
+        triggerSource,
       });
       onChanged();
     } catch (err) {
@@ -151,6 +154,26 @@ export function CampaignEditor({
       <h3>{campaign.name}</h3>
 
       <div className="field-group">
+        <h4>Triggered by</h4>
+        <label className="radio-row">
+          <input type="radio" checked={triggerSource === "comment"} onChange={() => setTriggerSource("comment")} />
+          Comments only (a keyword in a public comment)
+        </label>
+        <label className="radio-row">
+          <input type="radio" checked={triggerSource === "message"} onChange={() => setTriggerSource("message")} />
+          Direct messages only (a keyword in a DM)
+        </label>
+        <label className="radio-row">
+          <input type="radio" checked={triggerSource === "both"} onChange={() => setTriggerSource("both")} />
+          Both
+        </label>
+        {(triggerSource === "message" || triggerSource === "both") && targetMediaIds.length > 0 && (
+          <p className="muted small">
+            Post targeting below only applies to the comment side of this campaign — a DM isn't tied to any post, so
+            it'll still match regardless of which posts are checked.
+          </p>
+        )}
+
         <h4>Reply mode</h4>
         <label className="radio-row">
           <input
