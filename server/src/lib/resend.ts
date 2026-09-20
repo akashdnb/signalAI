@@ -15,6 +15,15 @@ const SEND_TIMEOUT_MS = 8000;
  * stops being an acceptable substitute the moment a real user who isn't
  * also the log reader needs to sign in — configure RESEND_API_KEY before
  * that, not after.
+ *
+ * The fallback log also fires when Resend is CONFIGURED but the send still
+ * fails (observed live: Resend's shared sandbox sender 403s with
+ * "You can only send testing emails to your own email address" for every
+ * recipient but the account owner, until a custom domain is verified) —
+ * `RESEND_API_KEY` being set does not mean the code actually went anywhere,
+ * and the caller (authEmail.ts) already treats a thrown error here as
+ * "log and fail closed to the generic response", which used to mean the
+ * code was gone for good instead of merely not emailed.
  */
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   if (!config.resendApiKey) {
@@ -40,6 +49,8 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
 
   if (!res.ok) {
     const body = await res.text();
+    // eslint-disable-next-line no-console
+    console.warn(`[email-otp] Resend send failed for ${email} — sign-in code was: ${code}`);
     throw new Error(`Resend send failed: ${res.status} ${body.slice(0, 200)}`);
   }
 }

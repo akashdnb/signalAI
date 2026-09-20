@@ -40,14 +40,23 @@ describe("sendOtpEmail", () => {
     expect(body.html).toContain("123456");
   });
 
-  it("throws when the Resend API responds with an error", async () => {
+  it("throws when the Resend API responds with an error, but still logs the code as a fallback", async () => {
     process.env.RESEND_API_KEY = "re_test_key";
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 422,
       text: async () => "invalid from address",
     });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await expect(sendOtpEmail("a@b.com", "123456")).rejects.toThrow("Resend send failed");
+
+    // Regression: RESEND_API_KEY being set does not mean the code actually
+    // went anywhere (e.g. Resend's sandbox sender 403s for any recipient
+    // but the account owner) — the code must not be lost just because a
+    // send was attempted and failed.
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("a@b.com"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("123456"));
+    warnSpy.mockRestore();
   });
 });
