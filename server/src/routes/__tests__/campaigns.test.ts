@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../app.js";
@@ -7,19 +8,21 @@ import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 
 const SESSION_SECRET = "test-session-secret";
-// Must decode to the SAME key config.tokenKeyring loads from
-// TOKEN_ENCRYPTION_KEYS below — routes/campaigns.ts decrypts via
-// config.tokenKeyring (not a keyring passed in by the test), so
-// upsertToken here has to encrypt with a key the route can actually read.
-const TOKEN_KEY_B64 = "YE23jw59vZdWaiGV2o9eF4fjuoPcXwsvdwJVi79Q6tQ=";
-const keyring = new Map<string, Buffer>([["v1", Buffer.from(TOKEN_KEY_B64, "base64")]]);
+// Generated per test run, not a fixed literal (a hardcoded base64 string
+// here reads as a committed secret to scanners like GitGuardian even
+// though it's just a fake key) — and must decode to the SAME key
+// config.tokenKeyring loads from TOKEN_ENCRYPTION_KEYS below, since
+// routes/campaigns.ts decrypts via config.tokenKeyring, not a keyring the
+// test passes in directly.
+const TOKEN_KEY = randomBytes(32);
+const keyring = new Map<string, Buffer>([["v1", TOKEN_KEY]]);
 
 describe("campaigns routes", () => {
   const originalFetch = global.fetch;
 
   beforeAll(() => {
     process.env.SESSION_SECRET = SESSION_SECRET;
-    process.env.TOKEN_ENCRYPTION_KEYS = `v1:${TOKEN_KEY_B64}`;
+    process.env.TOKEN_ENCRYPTION_KEYS = `v1:${TOKEN_KEY.toString("base64")}`;
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
     }

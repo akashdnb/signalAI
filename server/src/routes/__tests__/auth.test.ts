@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPool, closePool } from "../../db/pool.js";
@@ -60,7 +61,10 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     process.env.META_APP_SECRET = APP_SECRET;
     process.env.INSTAGRAM_CLIENT_ID = "test-client-id";
     process.env.INSTAGRAM_REDIRECT_URI = "https://example.com/auth/instagram/callback";
-    process.env.TOKEN_ENCRYPTION_KEYS = "v1:YE23jw59vZdWaiGV2o9eF4fjuoPcXwsvdwJVi79Q6tQ=";
+    // Generated per test run rather than a fixed literal — a hardcoded
+    // base64 string here reads as a committed secret to scanners
+    // (GitGuardian etc.) even though it's just a fake test key.
+    process.env.TOKEN_ENCRYPTION_KEYS = `v1:${randomBytes(32).toString("base64")}`;
     process.env.APP_BASE_URL = APP_BASE_URL;
     process.env.API_BASE_URL = API_BASE_URL;
     process.env.SESSION_SECRET = SESSION_SECRET_FOR_TESTS;
