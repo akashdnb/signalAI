@@ -216,8 +216,8 @@ export function CampaignEditor({
         </label>
         {(replyChannel === "comment" || replyChannel === "both") && (
           <p className="muted small">
-            Public comment replies require Meta's <code>instagram_manage_comments</code> permission on this
-            connected account, in addition to messaging — confirm it's been approved before relying on this.
+            Public comment replies require Meta's <code>instagram_business_manage_comments</code> permission,
+            already requested alongside messaging — confirm it's been approved for this app before relying on this.
           </p>
         )}
         <label>

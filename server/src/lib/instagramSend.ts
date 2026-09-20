@@ -46,12 +46,14 @@ export async function sendInstagramMessage(
  * `guardrails.ts`'s comment-tier length cap already assumes this reply is
  * visible to everyone, not just the commenter.
  *
- * Requires the `instagram_manage_comments` permission, which is separate
- * from `instagram_business_manage_messages` (Tech Stack) and is not yet
- * part of this app's requested scope — VERIFY the field/endpoint shape
- * against a real payload and confirm the permission is granted during
- * Phase 0 pilot testing (A6), same caveat as instagramWebhookParser.ts,
- * before enabling reply_channel 'comment'/'both' for a real tenant.
+ * Requires `instagram_business_manage_comments`, already requested
+ * alongside `instagram_business_basic`/`instagram_business_manage_messages`
+ * in the OAuth scope (instagramOAuth.ts) — but a scope being requested
+ * isn't the same as Meta having approved it for this app in production
+ * (App Review, Phase 0). VERIFY the field/endpoint shape against a real
+ * payload and confirm the permission is actually granted during Phase 0
+ * pilot testing (A6), same caveat as instagramWebhookParser.ts, before
+ * enabling reply_channel 'comment'/'both' for a real tenant.
  */
 export async function sendInstagramCommentReply(accessToken: string, commentId: string, text: string): Promise<void> {
   const url = `${GRAPH_BASE_URL}/v21.0/${encodeURIComponent(commentId)}/replies`;
