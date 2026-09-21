@@ -23,12 +23,15 @@ create table customers (
 alter table leads add column customer_id uuid references customers(id);
 
 -- Backfill: mint one customer per lead that predates this migration, 1:1.
--- gen_random_uuid() in an UPDATE ... SET is evaluated per row, so this
--- assigns a distinct id to every existing lead before the matching
--- customers rows are inserted keyed by those same ids.
-update leads set customer_id = gen_random_uuid() where customer_id is null;
+-- The customers row must exist before any leads row references it — the
+-- FK isn't deferrable, so it's checked at the end of the UPDATE statement
+-- below, not at transaction commit. Reusing each lead's own id as its
+-- customer's id (rather than a fresh gen_random_uuid() per row) sidesteps
+-- needing to correlate a freshly generated id back to the specific lead
+-- it belongs to, which INSERT ... RETURNING doesn't guarantee order-wise.
 insert into customers (id, created_at)
-  select customer_id, created_at from leads where customer_id is not null;
+  select id, created_at from leads where customer_id is null;
+update leads set customer_id = id where customer_id is null;
 
 create index leads_customer_id_idx on leads (customer_id);
 
