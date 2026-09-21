@@ -156,6 +156,9 @@ export interface Milestone {
   captureField: string | null;
 }
 
+export type PipelineStage = "new" | "contacted" | "qualified" | "meeting_scheduled" | "won" | "lost";
+export type HandoffStatus = "ai" | "requested" | "human";
+
 export interface LeadListItem {
   id: string;
   instagramUserId: string | null;
@@ -166,6 +169,73 @@ export interface LeadListItem {
   lastInboundAt: string | null;
   windowOpenUntil: string | null;
   createdAt: string;
+  pipelineStage: PipelineStage;
+  ownerUserId: string | null;
+  handoffStatus: HandoffStatus;
+}
+
+export interface LeadDetail extends LeadListItem {
+  tenantId: string;
+  customerId: string | null;
+}
+
+export interface TenantMember {
+  userId: string;
+  email: string;
+  role: "owner";
+}
+
+export interface LeadNote {
+  id: string;
+  leadId: string;
+  authorUserId: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface Tag {
+  id: string;
+  tenantId: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface LeadTag {
+  tagId: string;
+  name: string;
+  source: "manual" | "automatic";
+}
+
+export type DealStage = "open" | "won" | "lost";
+
+export interface Deal {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  leadId: string;
+  stage: DealStage;
+  value: number | null;
+  currency: string;
+  ownerUserId: string | null;
+  wonAt: string | null;
+  lostAt: string | null;
+  createdAt: string;
+}
+
+export type TimelineEntry =
+  | { kind: "event"; occurredAt: string; eventType: string; text: string | null; username: string | null; matchedKeyword: string | null }
+  | { kind: "activity"; occurredAt: string; type: string; summary: string; actorUserId: string | null };
+
+export interface TopPost {
+  mediaId: string;
+  caption: string | null;
+  permalink: string | null;
+  commentCount: number;
+}
+
+export interface TopKeyword {
+  keyword: string;
+  matchCount: number;
 }
 
 export interface Analytics {
@@ -197,7 +267,50 @@ export const api = {
   startInstagramConnect: (tenantId: string) =>
     request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, { method: "POST" }),
   getAccountHealth: (tenantId: string) => request<AccountHealth>(`/tenants/${tenantId}/account`),
-  getLeads: (tenantId: string) => request<LeadListItem[]>(`/tenants/${tenantId}/leads`),
+  getLeads: (tenantId: string, filters?: { stage?: PipelineStage; ownerUserId?: string; q?: string; tagId?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.stage) params.set("stage", filters.stage);
+    if (filters?.ownerUserId) params.set("ownerUserId", filters.ownerUserId);
+    if (filters?.q) params.set("q", filters.q);
+    if (filters?.tagId) params.set("tagId", filters.tagId);
+    const qs = params.toString();
+    return request<LeadListItem[]>(`/tenants/${tenantId}/leads${qs ? `?${qs}` : ""}`);
+  },
+  getLead: (tenantId: string, leadId: string) => request<LeadDetail>(`/tenants/${tenantId}/leads/${leadId}`),
+  getLeadTimeline: (tenantId: string, leadId: string) =>
+    request<TimelineEntry[]>(`/tenants/${tenantId}/leads/${leadId}/timeline`),
+  updateLead: (tenantId: string, leadId: string, updates: { pipelineStage?: PipelineStage; ownerUserId?: string | null }) =>
+    request<LeadDetail>(`/tenants/${tenantId}/leads/${leadId}`, { method: "PATCH", body: JSON.stringify(updates) }),
+  handoffAction: (tenantId: string, leadId: string, action: "request" | "takeover" | "release") =>
+    request<LeadDetail>(`/tenants/${tenantId}/leads/${leadId}/handoff`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    }),
+
+  listMembers: (tenantId: string) => request<TenantMember[]>(`/tenants/${tenantId}/members`),
+
+  listLeadNotes: (tenantId: string, leadId: string) => request<LeadNote[]>(`/tenants/${tenantId}/leads/${leadId}/notes`),
+  addLeadNote: (tenantId: string, leadId: string, body: string) =>
+    request<LeadNote>(`/tenants/${tenantId}/leads/${leadId}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+
+  listTenantTags: (tenantId: string) => request<Tag[]>(`/tenants/${tenantId}/tags`),
+  listLeadTags: (tenantId: string, leadId: string) => request<LeadTag[]>(`/tenants/${tenantId}/leads/${leadId}/tags`),
+  addLeadTag: (tenantId: string, leadId: string, name: string) =>
+    request<Tag>(`/tenants/${tenantId}/leads/${leadId}/tags`, { method: "POST", body: JSON.stringify({ name }) }),
+  removeLeadTag: (tenantId: string, leadId: string, tagId: string) =>
+    request<void>(`/tenants/${tenantId}/leads/${leadId}/tags/${tagId}`, { method: "DELETE" }),
+
+  listLeadDeals: (tenantId: string, leadId: string) => request<Deal[]>(`/tenants/${tenantId}/leads/${leadId}/deals`),
+  createLeadDeal: (tenantId: string, leadId: string, value: number | null, currency?: string) =>
+    request<Deal>(`/tenants/${tenantId}/leads/${leadId}/deals`, {
+      method: "POST",
+      body: JSON.stringify({ value, currency }),
+    }),
+  updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
+    request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
+
+  getTopPosts: (tenantId: string) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts`),
+  getTopKeywords: (tenantId: string) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
@@ -250,6 +363,11 @@ export const api = {
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/target-media`, {
       method: "PUT",
       body: JSON.stringify({ targetMediaIds }),
+    }),
+  setCampaignReplyTemplates: (tenantId: string, campaignId: string, replyTemplates: string[]) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-templates`, {
+      method: "PUT",
+      body: JSON.stringify({ replyTemplates }),
     }),
 
   listMilestones: (tenantId: string, campaignId: string) =>

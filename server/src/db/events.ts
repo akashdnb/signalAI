@@ -91,6 +91,45 @@ export async function getEventForReply(
   };
 }
 
+export interface LeadEventForTimeline {
+  id: string;
+  eventType: string;
+  occurredAt: Date;
+  commentText: string | null;
+  dmText: string | null;
+  username: string | null;
+  matchedKeyword: string | null;
+}
+
+/** Phase 2A Lead Timeline's Meta-webhook-sourced half — see db/leadTimeline.ts for how this merges with lead_activity's CRM-sourced half. */
+export async function listEventsForLead(pool: Queryable, tenantId: string, leadId: string): Promise<LeadEventForTimeline[]> {
+  const result = await pool.query<{
+    id: string;
+    event_type: string;
+    occurred_at: Date;
+    attributes: { matchedKeyword?: string };
+    comment_text: string | null;
+    dm_text: string | null;
+    username: string | null;
+  }>(
+    `select e.id, e.event_type, e.occurred_at, e.attributes, p.comment_text, p.dm_text, p.username
+     from lead_events e
+     left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
+     where e.tenant_id = $1 and e.lead_id = $2
+     order by e.occurred_at`,
+    [tenantId, leadId],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    eventType: row.event_type,
+    occurredAt: row.occurred_at,
+    commentText: row.comment_text,
+    dmText: row.dm_text,
+    username: row.username,
+    matchedKeyword: row.attributes.matchedKeyword ?? null,
+  }));
+}
+
 export async function insertEventIdempotent(
   pool: Queryable,
   params: {

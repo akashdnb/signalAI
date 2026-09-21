@@ -9,6 +9,7 @@ import { authEmailRouter } from "./routes/authEmail.js";
 import { campaignsRouter } from "./routes/campaigns.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { leadsRouter } from "./routes/leads.js";
 import type { LLMProvider } from "./llm/provider.js";
 
 declare global {
@@ -74,6 +75,7 @@ export function createApp(options?: { llmProvider?: LLMProvider }) {
   app.use(campaignsRouter);
   app.use(billingRouter);
   app.use(dashboardRouter(options?.llmProvider));
+  app.use(leadsRouter);
 
   return app;
 }

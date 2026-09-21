@@ -49,6 +49,66 @@ export async function getTenantAnalytics(pool: Pool, tenantId: string): Promise<
   };
 }
 
+export interface TopPost {
+  mediaId: string;
+  caption: string | null;
+  permalink: string | null;
+  commentCount: number;
+}
+
+/**
+ * Phase 2A "Top Performing Posts" (carried from Phase 1's deferred list).
+ * Counts comment events by mediaId — mediaId is only ever captured on a
+ * comment event (webhookIngestService.ts), never a DM, so this is
+ * naturally comment-only without an extra filter. Left-joined against
+ * media_metadata for caption/permalink (Phase 1's post-targeting picker
+ * enrichment) — a post the cache hasn't enriched yet still shows up,
+ * just without those two fields, same graceful-degradation the picker
+ * itself already accepts.
+ */
+export async function getTopPosts(pool: Pool, tenantId: string, limit = 10): Promise<TopPost[]> {
+  const result = await pool.query<{
+    media_id: string;
+    caption: string | null;
+    permalink: string | null;
+    comment_count: string;
+  }>(
+    `select e.attributes->>'mediaId' as media_id, m.caption, m.permalink, count(*)::int as comment_count
+     from lead_events e
+     left join media_metadata m on m.tenant_id = e.tenant_id and m.media_id = e.attributes->>'mediaId'
+     where e.tenant_id = $1 and e.event_type = 'comment' and e.attributes->>'mediaId' is not null
+     group by e.attributes->>'mediaId', m.caption, m.permalink
+     order by comment_count desc
+     limit $2`,
+    [tenantId, limit],
+  );
+  return result.rows.map((row) => ({
+    mediaId: row.media_id,
+    caption: row.caption,
+    permalink: row.permalink,
+    commentCount: Number(row.comment_count),
+  }));
+}
+
+export interface TopKeyword {
+  keyword: string;
+  matchCount: number;
+}
+
+/** Phase 2A "Top Trigger Keywords" (carried from Phase 1's deferred list) — counts matched (not just received) events by the keyword that actually triggered a campaign. */
+export async function getTopKeywords(pool: Pool, tenantId: string, limit = 10): Promise<TopKeyword[]> {
+  const result = await pool.query<{ keyword: string; match_count: string }>(
+    `select attributes->>'matchedKeyword' as keyword, count(*)::int as match_count
+     from lead_events
+     where tenant_id = $1 and attributes->>'matchedKeyword' is not null
+     group by attributes->>'matchedKeyword'
+     order by match_count desc
+     limit $2`,
+    [tenantId, limit],
+  );
+  return result.rows.map((row) => ({ keyword: row.keyword, matchCount: Number(row.match_count) }));
+}
+
 export interface MilestoneDropoff {
   milestoneId: string;
   ordinal: number;

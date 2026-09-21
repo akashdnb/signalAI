@@ -24,8 +24,24 @@ export interface PreparedReply {
   capExceeded?: boolean;
 }
 
+/**
+ * Phase 2A "Multiple DM Variations": campaign.replyTemplates has existed
+ * on the schema since Phase 1 but was never read — every rule-based reply
+ * used defaultReplyTemplate regardless. Picking uniformly at random (not
+ * round-robin) needs no per-lead or per-campaign state to track which
+ * variant is "next", which matters here since this runs on the hot
+ * ingestion-adjacent path with no extra DB round trip to spare. Empty
+ * replyTemplates (every campaign created before this) falls back to
+ * defaultReplyTemplate exactly as before — no behavior change for them.
+ */
+function pickReplyTemplate(campaign: Campaign): string {
+  if (campaign.replyTemplates.length === 0) return campaign.defaultReplyTemplate;
+  const index = Math.floor(Math.random() * campaign.replyTemplates.length);
+  return campaign.replyTemplates[index]!;
+}
+
 function ruleBasedReply(ctx: ReplyContext): PreparedReply {
-  const substituted = renderTemplate(ctx.campaign.defaultReplyTemplate, {
+  const substituted = renderTemplate(pickReplyTemplate(ctx.campaign), {
     username: ctx.username,
     keyword: ctx.matchedKeyword,
   });

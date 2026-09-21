@@ -60,7 +60,7 @@ async function main() {
   await ensureMaintenanceQueue(boss);
   await startMaintenanceWorker(boss, pool);
   await ensureAlertsQueue(boss);
-  await startAlertsWorker(boss);
+  await startAlertsWorker(boss, pool);
   await ensureUsernameResolutionQueue(boss);
   await startUsernameResolutionWorker(boss, pool, config.tokenKeyring);
 

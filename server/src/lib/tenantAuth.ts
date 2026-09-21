@@ -9,6 +9,21 @@ export interface AuthenticatedSession {
   userId: string;
 }
 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      /**
+       * Set by requireTenantSession once membership is verified. Phase 2A
+       * is the first thing that needed "which user did this" past the
+       * auth check itself (notes/pipeline/handoff/tag activity all record
+       * an actor) — no route before it read this, so nothing set it.
+       */
+      tenantSession?: AuthenticatedSession;
+    }
+  }
+}
+
 /**
  * Verifies the bearer session on its own, with no notion of which tenant
  * (if any) the caller is asking about — shared by `requireTenantSession`
@@ -51,5 +66,6 @@ export async function requireTenantSession(req: Request, res: Response, next: Ne
     return res.status(403).json({ error: "not a member of this tenant" });
   }
 
+  req.tenantSession = session;
   return next();
 }

@@ -206,4 +206,28 @@ describe("generateReply", () => {
       expect(result.engine).toBe("ai_generated");
     });
   });
+
+  describe("Multiple DM Variations (Phase 2A)", () => {
+    it("still uses defaultReplyTemplate when replyTemplates is empty — no behavior change for existing campaigns", async () => {
+      const result = await generateReply(makeContext(), mockProvider(vi.fn()));
+      expect(result.text).toBe("Hi real_handle, thanks for asking about LINK!");
+    });
+
+    it("picks from replyTemplates instead of defaultReplyTemplate when variations are configured", async () => {
+      const ctx = makeContext({
+        campaign: makeCampaign({
+          replyTemplates: ["Variation A for {{keyword}}", "Variation B for {{keyword}}"],
+          defaultReplyTemplate: "Should never be used",
+        }),
+      });
+
+      const seen = new Set<string>();
+      for (let i = 0; i < 30; i++) {
+        const result = await generateReply(ctx, mockProvider(vi.fn()));
+        seen.add(result.text);
+      }
+
+      expect(seen).toEqual(new Set(["Variation A for LINK", "Variation B for LINK"]));
+    });
+  });
 });

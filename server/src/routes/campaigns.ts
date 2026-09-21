@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
-import { createCampaign, listCampaigns, setCampaignEnabled, setCampaignTargetMediaIds } from "../db/campaigns.js";
+import {
+  createCampaign,
+  listCampaigns,
+  setCampaignEnabled,
+  setCampaignTargetMediaIds,
+  setCampaignReplyTemplates,
+} from "../db/campaigns.js";
 import { listMilestones, setCampaignMilestones } from "../db/milestones.js";
 import { listKnownMediaForTenant, upsertMediaMetadata } from "../db/mediaMetadata.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
@@ -164,6 +170,20 @@ campaignsRouter.post("/tenants/:tenantId/known-media", async (req, res) => {
     permalink: metadata.permalink,
     postedAt: metadata.postedAt,
   });
+});
+
+// Phase 2A "Multiple DM Variations".
+campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/reply-templates", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const { replyTemplates } = req.body ?? {};
+
+  if (!Array.isArray(replyTemplates) || !replyTemplates.every((t) => typeof t === "string" && t.trim())) {
+    return res.status(400).json({ error: "replyTemplates must be an array of non-empty strings (empty array = use defaultReplyTemplate)" });
+  }
+
+  const updated = await setCampaignReplyTemplates(getPool(), tenantId, campaignId, replyTemplates);
+  if (!updated) return res.status(404).json({ error: "campaign not found for this tenant" });
+  return res.status(200).json(updated);
 });
 
 campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/target-media", async (req, res) => {

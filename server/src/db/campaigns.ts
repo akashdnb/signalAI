@@ -157,6 +157,25 @@ export async function setCampaignTargetMediaIds(
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
+/**
+ * Phase 2A "Multiple DM Variations" — replaced wholesale on each save,
+ * same shape as setCampaignTargetMediaIds. An empty array falls back to
+ * defaultReplyTemplate (see replyEngine.ts's pickReplyTemplate) — that's
+ * every existing campaign's current behavior, left unaffected.
+ */
+export async function setCampaignReplyTemplates(
+  pool: Pool,
+  tenantId: string,
+  campaignId: string,
+  replyTemplates: string[],
+): Promise<Campaign | null> {
+  const result = await pool.query<CampaignRow>(
+    `update campaigns set reply_templates = $3, updated_at = now() where id = $1 and tenant_id = $2 returning *`,
+    [campaignId, tenantId, replyTemplates],
+  );
+  return result.rows[0] ? toCampaign(result.rows[0]) : null;
+}
+
 export async function setCampaignEnabled(
   pool: Pool,
   tenantId: string,

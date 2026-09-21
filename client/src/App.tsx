@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ConnectPage } from "./pages/ConnectPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { loadSession } from "./api";
 
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/connect" element={<ConnectPage />} />
       <Route path="/dashboard/:tenantId" element={<DashboardPage />} />
+      <Route path="/dashboard/:tenantId/leads/:leadId" element={<LeadDetailPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

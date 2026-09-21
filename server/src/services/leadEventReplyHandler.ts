@@ -6,7 +6,7 @@ import type { LeadEventHandlerResult } from "../queue/worker.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { getEventForReply } from "../db/events.js";
 import { getCampaign } from "../db/campaigns.js";
-import { getLead, setActiveMilestone } from "../db/leads.js";
+import { getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
 import {
   getFirstMilestone,
   getMilestone,
@@ -83,6 +83,15 @@ export function createLeadEventReplyHandler(
 
     const lead = await getLead(pool, job.tenantId, job.leadId);
     if (!lead || !lead.instagramUserId) return { advance: true };
+
+    // Phase 2A Human Handoff: a human has claimed this conversation
+    // (handoffStatus 'human') — the worker stops generating/sending
+    // anything until it's released back to 'ai', so the bot and a person
+    // never reply over each other. 'requested' (Agent Escalation) is only
+    // a flag for attention and does NOT pause automation on its own — a
+    // creator still needs the AI to keep responding while they notice and
+    // pick it up.
+    if (lead.handoffStatus === "human") return { advance: true };
 
     // Each delivery channel has its own readiness precondition, checked
     // independently: a DM needs the 24h messaging window open; a public
@@ -218,6 +227,15 @@ export function createLeadEventReplyHandler(
         level: "warning",
         extra: { tenantId: job.tenantId, instagramAccountId: account.instagramAccountId },
       });
+
+      // Phase 2A Agent Escalation: the one automatic trigger for this
+      // phase — the AI ran out of budget for the day, a creator should
+      // know. Guarded on the lead still being 'ai' so this only fires
+      // once per lead (not on every subsequent capped event) and never
+      // overwrites a human's own 'human'/'requested' choice.
+      if (lead.handoffStatus === "ai") {
+        await updateHandoffStatus(pool, { tenantId: job.tenantId, leadId: job.leadId, status: "requested" });
+      }
     }
 
     const token = await getDecryptedToken(pool, keyring, job.tenantId, account.instagramAccountId);

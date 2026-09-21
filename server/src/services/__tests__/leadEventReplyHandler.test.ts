@@ -5,7 +5,7 @@ import { getPool, closePool } from "../../db/pool.js";
 import { createTenant } from "../../db/tenants.js";
 import { createCampaign } from "../../db/campaigns.js";
 import { setCampaignMilestones } from "../../db/milestones.js";
-import { findOrCreateLeadByInstagramUserId, getLead, updateMessagingWindow } from "../../db/leads.js";
+import { findOrCreateLeadByInstagramUserId, getLead, updateHandoffStatus, updateMessagingWindow } from "../../db/leads.js";
 import { insertEventIdempotent } from "../../db/events.js";
 import { insertPii } from "../../db/pii.js";
 import { getCapturedFacts } from "../../db/capturedFacts.js";
@@ -521,6 +521,59 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
 
       expect(sendInstagramMessage).toHaveBeenCalledTimes(1);
       expect(sendInstagramCommentReply).not.toHaveBeenCalled(); // no comment id on a DM event
+    });
+  });
+
+  describe("Human Handoff (Phase 2A)", () => {
+    it("skips generating or sending any reply once a human has taken over (handoffStatus 'human')", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "please send the LINK");
+      await updateHandoffStatus(pool, { tenantId: tenant.id, leadId: lead.id, status: "human" });
+
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(sendInstagramMessage).not.toHaveBeenCalled();
+      expect(sendInstagramCommentReply).not.toHaveBeenCalled();
+    });
+
+    it("keeps auto-replying while handoffStatus is merely 'requested' — escalation flags for attention, it doesn't pause automation", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "please send the LINK");
+      await updateHandoffStatus(pool, { tenantId: tenant.id, leadId: lead.id, status: "requested" });
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(sendInstagramMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("auto-escalates to 'requested' the first time the AI spend cap is exceeded, without overwriting an existing human/requested state", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
+
+      const provider = mockProvider(["unused"]);
+      // Cap of 0: the very first AI call for this account is already over budget.
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, 0);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "please send the LINK");
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("ai");
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("requested");
     });
   });
 });

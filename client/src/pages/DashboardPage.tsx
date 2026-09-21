@@ -1,8 +1,29 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ApiError, api, clearSession, loadSession, type AccountHealth, type Analytics, type LeadListItem, type TenantSummary } from "../api";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  ApiError,
+  api,
+  clearSession,
+  loadSession,
+  type AccountHealth,
+  type Analytics,
+  type LeadListItem,
+  type PipelineStage,
+  type TenantSummary,
+  type TopKeyword,
+  type TopPost,
+} from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
 import { BillingPanel } from "../components/BillingPanel";
+
+const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
+  { value: "new", label: "New" },
+  { value: "contacted", label: "Contacted" },
+  { value: "qualified", label: "Qualified" },
+  { value: "meeting_scheduled", label: "Meeting Scheduled" },
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
+];
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -24,9 +45,28 @@ export function DashboardPage() {
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [leads, setLeads] = useState<LeadListItem[] | null>(null);
+  const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
+  const [topKeywords, setTopKeywords] = useState<TopKeyword[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
+  const [search, setSearch] = useState("");
   const justConnected = searchParams.get("connected") === "1";
+
+  async function reloadLeads() {
+    if (!tenantId) return;
+    try {
+      const l = await api.getLeads(tenantId, { stage: stageFilter || undefined, q: search.trim() || undefined });
+      setLeads(l);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load leads");
+    }
+  }
+
+  useEffect(() => {
+    reloadLeads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageFilter, search]);
 
   useEffect(() => {
     const session = loadSession();
@@ -42,17 +82,19 @@ export function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [t, a, an, l] = await Promise.all([
+        const [t, a, an, posts, keywords] = await Promise.all([
           api.getTenant(tenantId!),
           api.getAccountHealth(tenantId!),
           api.getAnalytics(tenantId!),
-          api.getLeads(tenantId!),
+          api.getTopPosts(tenantId!),
+          api.getTopKeywords(tenantId!),
         ]);
         if (cancelled) return;
         setTenant(t);
         setAccount(a);
         setAnalytics(an);
-        setLeads(l);
+        setTopPosts(posts);
+        setTopKeywords(keywords);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -176,16 +218,79 @@ export function DashboardPage() {
       <CampaignsPanel tenantId={tenantId} />
 
       <section className="card">
+        <h2>Top Performing Posts</h2>
+        {topPosts === null ? (
+          <p className="muted">Loading…</p>
+        ) : topPosts.length === 0 ? (
+          <p className="muted">No comments yet.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Post</th>
+                <th>Comments</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topPosts.map((p) => (
+                <tr key={p.mediaId}>
+                  <td>
+                    {p.permalink ? (
+                      <a href={p.permalink} target="_blank" rel="noreferrer">
+                        {p.caption ?? p.mediaId}
+                      </a>
+                    ) : (
+                      p.caption ?? p.mediaId
+                    )}
+                  </td>
+                  <td>{p.commentCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {topKeywords && topKeywords.length > 0 && (
+          <>
+            <h3 style={{ marginTop: "1.25rem" }}>Top Trigger Keywords</h3>
+            <div>
+              {topKeywords.map((k) => (
+                <span className="tag-chip" key={k.keyword}>
+                  {k.keyword} ({k.matchCount})
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="card">
         <h2>Leads</h2>
+        <div className="filter-row">
+          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
+            <option value="">All stages</option>
+            {PIPELINE_STAGES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Search by username…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         {leads === null ? (
           <p className="muted">Loading…</p>
         ) : leads.length === 0 ? (
-          <p className="muted">No leads yet — they'll show up here as soon as someone comments on a tracked post.</p>
+          <p className="muted">No leads match this view yet.</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
                 <th>Username</th>
+                <th>Stage</th>
                 <th>Last contact</th>
                 <th>Via</th>
                 <th>Messaging window</th>
@@ -195,7 +300,10 @@ export function DashboardPage() {
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id}>
-                  <td>{lead.username ?? "(unknown)"}</td>
+                  <td>
+                    <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>{lead.username ?? "(unknown)"}</Link>
+                  </td>
+                  <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
                   <td>{formatDate(lead.lastInboundAt)}</td>
                   <td>{formatLastContactVia(lead.lastEventType)}</td>
                   <td>

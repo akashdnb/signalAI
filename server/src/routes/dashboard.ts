@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
-import { listLeadsForTenant } from "../db/leads.js";
+import { listLeadsForTenant, type PipelineStage } from "../db/leads.js";
 import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
 import { getCampaign, updateCampaignReplyConfig, type ReplyChannel, type ReplyMode, type TriggerSource } from "../db/campaigns.js";
 import { generateReply } from "../services/replyEngine.js";
@@ -42,8 +42,20 @@ export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_
     return res.status(200).json({ connected: true, ...health });
   });
 
+  const VALID_PIPELINE_STAGES: PipelineStage[] = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"];
+
+  // Phase 2A Lead Filters/Lead Search: all optional, all AND'd together.
   router.get("/tenants/:tenantId/leads", async (req, res) => {
-    const leads = await listLeadsForTenant(getPool(), req.params.tenantId);
+    const { stage, ownerUserId, q, tagId } = req.query;
+    if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) {
+      return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
+    }
+    const leads = await listLeadsForTenant(getPool(), req.params.tenantId, 100, {
+      stage: stage as PipelineStage | undefined,
+      ownerUserId: typeof ownerUserId === "string" ? ownerUserId : undefined,
+      q: typeof q === "string" ? q : undefined,
+      tagId: typeof tagId === "string" ? tagId : undefined,
+    });
     return res.status(200).json(leads);
   });
 

@@ -37,3 +37,27 @@ export async function listTenantsForUser(pool: Queryable, userId: string): Promi
   );
   return result.rows.map((row) => ({ tenantId: row.tenant_id, role: row.role }));
 }
+
+export interface TenantMemberSummary {
+  userId: string;
+  email: string;
+  role: TenantMemberRole;
+}
+
+/**
+ * Phase 2A Lead Ownership/Assignment: who a lead can be assigned to.
+ * Today this is always exactly one row (the owner from first login) — the
+ * feature is still worth shipping now, on the schema that already supports
+ * more members, rather than waiting for Phase 6 to actually add teammates.
+ */
+export async function listTenantMembers(pool: Queryable, tenantId: string): Promise<TenantMemberSummary[]> {
+  const result = await pool.query<{ user_id: string; email: string; role: TenantMemberRole }>(
+    `select tm.user_id, u.email, tm.role
+     from tenant_members tm
+     join users u on u.id = tm.user_id
+     where tm.tenant_id = $1
+     order by tm.created_at`,
+    [tenantId],
+  );
+  return result.rows.map((row) => ({ userId: row.user_id, email: row.email, role: row.role }));
+}

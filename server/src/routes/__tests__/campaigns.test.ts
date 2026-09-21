@@ -159,6 +159,48 @@ describe("campaigns routes", () => {
     expect(res.status).toBe(400);
   });
 
+  it("sets and clears a campaign's reply template variations (Phase 2A Multiple DM Variations)", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const create = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Reel", keywords: ["LINK"] });
+    expect(create.body.replyTemplates).toEqual([]);
+
+    const set = await request(app)
+      .put(`/tenants/${tenant.id}/campaigns/${create.body.id}/reply-templates`)
+      .set(authHeader)
+      .send({ replyTemplates: ["Hi {{username}}, here's the link!", "Thanks for asking, {{username}}!"] });
+    expect(set.status).toBe(200);
+    expect(set.body.replyTemplates).toEqual(["Hi {{username}}, here's the link!", "Thanks for asking, {{username}}!"]);
+
+    const cleared = await request(app)
+      .put(`/tenants/${tenant.id}/campaigns/${create.body.id}/reply-templates`)
+      .set(authHeader)
+      .send({ replyTemplates: [] });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.replyTemplates).toEqual([]);
+  });
+
+  it("rejects an empty-string reply template", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+    const create = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Reel", keywords: ["LINK"] });
+
+    const res = await request(app)
+      .put(`/tenants/${tenant.id}/campaigns/${create.body.id}/reply-templates`)
+      .set(authHeader)
+      .send({ replyTemplates: ["good one", "   "] });
+    expect(res.status).toBe(400);
+  });
+
   it("lists posts observed via inbound comments, most recent first", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

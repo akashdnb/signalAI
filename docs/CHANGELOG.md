@@ -4,6 +4,18 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-09-21 — Phase 2A: Lead Capture & CRM
+
+**Full Phase 2A feature set shipped** (migrations `1758240000029`–`1758240000033`)
+- Built ahead of Phase 1's own "Gate to Phase 2A" (App Review approval, pilot usage thresholds), at explicit direction, so it's ready to run in parallel with Phase 0's compliance track rather than wait on it.
+- New: `deals` (the Phase 2A Data Model Amendment — schema now, UI later), `leads.pipeline_stage`/`owner_user_id`/`handoff_status`, `lead_notes`, `tags`/`lead_tags`, `lead_activity` (a CRM-originated audit trail kept deliberately separate from `lead_events`, which is specifically the Meta-webhook-driven pg-boss-FIFO log — a dashboard click has no `meta_event_id`). Full detail in `claude_fixes/2026-09-21-phase-2a-lead-crm.md`.
+- Human Handoff actually pauses automation: `leadEventReplyHandler.ts` skips reply generation/sending while `handoffStatus === 'human'`, and auto-escalates to `'requested'` the first time a lead's AI spend cap is hit.
+- Multiple DM Variations: `campaign.replyTemplates` existed on the schema since Phase 1 but was never read — `replyEngine.ts` now picks one at random when the array is non-empty, unchanged behavior otherwise.
+- Email Alerts (Resend) shipped as a second channel alongside Telegram, sent to the tenant owner, best-effort.
+- New frontend: `LeadDetailPage.tsx` (pipeline/ownership/handoff/tags/notes/deals/timeline), dashboard lead filters + Top Performing Posts/Top Trigger Keywords, campaign editor's Reply Variations section.
+- Verified end-to-end in a real browser (Playwright against the live dev server + Postgres, not mocked) — full login flow, every new lead-detail action, campaign reply variations — zero console/HTTP errors. Backend: 400/400 tests passing, migrations re-verified against a DB with pre-existing rows (not just an empty one, after the Phase 1 backfill bug).
+- **Deliberately not built, not silently dropped:** Automatic Tags (only manual tagging shipped; `lead_tags.source` already distinguishes manual/automatic for a later auto-tagger) and Live Agent Takeover's actual reply-compose UI (pausing the bot works today; a human still replies from the Instagram app directly, not from this dashboard yet).
+
 ## 2026-09-21 — Customer/Lead identity split (Phase 1 complete)
 
 **Add the `customers`/`customer_id` foundation** (migration `1758240000028`)

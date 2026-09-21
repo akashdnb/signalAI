@@ -27,6 +27,12 @@ export function CampaignEditor({
   const [savingMilestones, setSavingMilestones] = useState(false);
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
 
+  // Phase 2A "Multiple DM Variations" — an empty list falls back to
+  // defaultReplyTemplate above (see server's replyEngine.ts).
+  const [replyTemplates, setReplyTemplates] = useState<string[]>(campaign.replyTemplates);
+  const [savingReplyTemplates, setSavingReplyTemplates] = useState(false);
+  const [replyTemplatesError, setReplyTemplatesError] = useState<string | null>(null);
+
   const [dropoff, setDropoff] = useState<Dropoff[] | null>(null);
 
   const [observedMedia, setObservedMedia] = useState<ObservedMedia[]>([]);
@@ -49,6 +55,7 @@ export function CampaignEditor({
     setReplyChannel(campaign.replyChannel);
     setTriggerSource(campaign.triggerSource);
     setTargetMediaIds(campaign.targetMediaIds);
+    setReplyTemplates(campaign.replyTemplates);
   }, [campaign]);
 
   useEffect(() => {
@@ -94,6 +101,21 @@ export function CampaignEditor({
       setConfigError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingConfig(false);
+    }
+  }
+
+  async function saveReplyTemplates() {
+    setSavingReplyTemplates(true);
+    setReplyTemplatesError(null);
+    try {
+      const trimmed = replyTemplates.map((t) => t.trim()).filter((t) => t.length > 0);
+      await api.setCampaignReplyTemplates(tenantId, campaign.id, trimmed);
+      setReplyTemplates(trimmed);
+      onChanged();
+    } catch (err) {
+      setReplyTemplatesError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingReplyTemplates(false);
     }
   }
 
@@ -223,6 +245,40 @@ export function CampaignEditor({
             rows={2}
           />
         </label>
+
+        <h4>Reply variations (optional)</h4>
+        <p className="muted small">
+          Add a few alternate rule-based replies and one is picked at random each time, instead of always using the
+          default template above. Leave empty to always use the default.
+        </p>
+        {replyTemplates.map((t, i) => (
+          <div key={i} className="milestone-row">
+            <input
+              type="text"
+              placeholder={`Variation ${i + 1}`}
+              value={t}
+              onChange={(e) => {
+                const next = [...replyTemplates];
+                next[i] = e.target.value;
+                setReplyTemplates(next);
+              }}
+            />
+            <button
+              type="button"
+              className="btn-secondary btn-small"
+              onClick={() => setReplyTemplates(replyTemplates.filter((_, idx) => idx !== i))}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button type="button" className="btn-secondary btn-small" onClick={() => setReplyTemplates([...replyTemplates, ""])}>
+          Add variation
+        </button>
+        {replyTemplatesError && <div className="banner banner-error">{replyTemplatesError}</div>}
+        <button className="btn-primary btn-small" onClick={saveReplyTemplates} disabled={savingReplyTemplates}>
+          {savingReplyTemplates ? "Saving…" : "Save variations"}
+        </button>
 
         <h4>Reply channel</h4>
         <label className="radio-row">
