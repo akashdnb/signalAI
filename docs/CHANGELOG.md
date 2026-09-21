@@ -4,6 +4,14 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-09-21 — Customer/Lead identity split (Phase 1 complete)
+
+**Add the `customers`/`customer_id` foundation** (migration `1758240000028`)
+- A full audit of `docs/signalAI_roadmap.md` Phase 1 against the codebase found every other checklist item already shipped and tested; this was the one gap, surfaced by reviewing an external CRM/Revenue Intelligence architecture doc against the roadmap (see `docs/architecture_and_ui_roadmap.md`).
+- Today `lead_id` *is* the identity everything keys on — that breaks once a real person can plausibly generate a second lead (a repeat Reel engager, a second campaign touch). Added a minimal `customers` table and a `customer_id` column on `leads`, minted 1:1 with each lead for now via `findOrCreateLeadByInstagramUserId` (`server/src/db/leads.ts`), gated on the insert actually firing (`is_new`/`xmax = 0`) so a flood of repeat comments from an existing lead never mints an orphan customer row. Rides the caller's existing transaction (`webhookIngestService.ts`), so a crash between the lead insert and the customer link can't leave a committed lead without one.
+- No behavior change — `customer_id` has zero consumers yet; it's the seam Phase 2A's CRM and Phase 3's identity resolution attach to. Pulled forward into Phase 1 rather than left for Phase 2A specifically because it's cheap now, on the small schema, and expensive to retrofit once tags/notes/ownership/pipeline all reference `lead_id` directly.
+- `resetDb` test helper (`server/src/__tests__/helpers/db.ts`) updated to truncate `customers` — it wasn't reachable by the existing truncate's cascade, which briefly leaked rows across tests in the same file.
+
 ## 2026-09-21 — Post-targeting UX, campaign trigger source, permission corrections
 
 **Enrich the post-targeting picker; let a post be added by URL** (migration `1758240000027`)

@@ -41,6 +41,28 @@ describe("leads and events", () => {
     expect(leadA.id).not.toBe(leadB.id);
   });
 
+  it("mints exactly one customer per new lead, and reuses it on every repeat contact", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+
+    const first = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    expect(first.customerId).not.toBeNull();
+
+    // Three more "comments" from the same already-known lead must never
+    // mint another customer row — this is the failure mode an unconditional
+    // customer insert would hit on a viral Reel's repeat commenters.
+    const second = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const third = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    expect(second.customerId).toBe(first.customerId);
+    expect(third.customerId).toBe(first.customerId);
+
+    const otherLead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-2");
+    expect(otherLead.customerId).not.toBe(first.customerId);
+
+    const { rows } = await pool.query<{ count: string }>("select count(*) from customers");
+    expect(Number(rows[0]!.count)).toBe(2); // one per distinct lead, no orphans
+  });
+
   it("insertEventIdempotent is a no-op on a duplicate meta_event_id", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");

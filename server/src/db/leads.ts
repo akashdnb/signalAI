@@ -4,6 +4,7 @@ import type { Queryable } from "./types.js";
 export interface Lead {
   id: string;
   tenantId: string;
+  customerId: string | null;
   instagramUserId: string | null;
   activeMilestoneId: string | null;
   lastInboundAt: Date | null;
@@ -17,6 +18,7 @@ export interface Lead {
 interface LeadRow {
   id: string;
   tenant_id: string;
+  customer_id: string | null;
   instagram_user_id: string | null;
   active_milestone_id: string | null;
   last_inbound_at: Date | null;
@@ -30,6 +32,7 @@ function toLead(row: LeadRow): Lead {
   return {
     id: row.id,
     tenantId: row.tenant_id,
+    customerId: row.customer_id,
     instagramUserId: row.instagram_user_id,
     activeMilestoneId: row.active_milestone_id,
     lastInboundAt: row.last_inbound_at,
@@ -63,7 +66,24 @@ export async function findOrCreateLeadByInstagramUserId(
      returning *, (xmax = 0) as is_new`,
     [tenantId, instagramUserId],
   );
-  return toLead(result.rows[0]!);
+  const row = result.rows[0]!;
+
+  if (row.is_new) {
+    // Customer/Lead split (roadmap Phase 1 Platform Foundations): mint one
+    // customer per genuinely new lead, gated on is_new (xmax = 0) rather
+    // than folded into the upsert above — a CTE there would run on every
+    // call regardless of which branch fires, minting an orphan customer
+    // row on every repeat comment from an already-known lead. This runs
+    // once per lead. The caller (ingestOneEvent) wraps this whole call in
+    // a transaction, so these two extra statements commit or roll back
+    // with the lead insert atomically — see the migration's column comment
+    // for why customer_id isn't NOT NULL.
+    const customer = await pool.query<{ id: string }>(`insert into customers default values returning id`);
+    row.customer_id = customer.rows[0]!.id;
+    await pool.query(`update leads set customer_id = $2 where id = $1`, [row.id, row.customer_id]);
+  }
+
+  return toLead(row);
 }
 
 export async function getLead(pool: Queryable, tenantId: string, leadId: string): Promise<Lead | null> {
