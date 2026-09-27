@@ -77,7 +77,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(authEmailRouter);
   app.use(campaignsRouter);
   app.use(billingRouter);
-  app.use(dashboardRouter(options?.llmProvider));
+  app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
   app.use(leadsRouter);
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);

@@ -5,8 +5,10 @@ import { getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant, type PipelineStage } from "../db/leads.js";
 import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
 import { getCampaign, updateCampaignReplyConfig, type ReplyChannel, type ReplyMode, type TriggerSource } from "../db/campaigns.js";
-import { generateReply } from "../services/replyEngine.js";
+import { generateReply, type RagDependencies } from "../services/replyEngine.js";
+import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
 import type { LLMProvider } from "../llm/provider.js";
+import type { EmbeddingProvider } from "../llm/embeddingProvider.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 
 const UNCONFIGURED_PREVIEW_PROVIDER: LLMProvider = {
@@ -23,7 +25,10 @@ const UNCONFIGURED_PREVIEW_PROVIDER: LLMProvider = {
  * campaign/milestone CRUD) since this router needs the LLM provider for
  * previews and campaigns.ts doesn't.
  */
-export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_PROVIDER) {
+export function dashboardRouter(
+  llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_PROVIDER,
+  embeddingProvider: EmbeddingProvider | null = null,
+) {
   const router = Router();
 
   // R10-01 fix: every route here reads or writes one tenant's data —
@@ -112,6 +117,16 @@ export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_
    * Uses ALLOW_ALL_SPEND_GUARD implicitly (no guard passed) deliberately —
    * a preview the creator triggers by hand is not a real customer event
    * and shouldn't burn B10's per-account cap.
+   *
+   * Phase 2C: now passes the SAME `rag` dependencies (Knowledge Base
+   * retrieval, Client Guardrails) the live leadEventReplyHandler.ts path
+   * uses — previously this called generateReply with no `rag` argument at
+   * all, so a preview could show a clean AI-generated reply while the real
+   * DM/comment path silently routed to the Grounded-Answer-Only Fallback
+   * or an escalation trigger, with nothing in the preview UI hinting why.
+   * `requiresHumanHandoff` is now surfaced in the response for the same
+   * reason `fellBackReason` already was — so that mismatch is visible
+   * here instead of only discoverable by testing the real thing.
    */
   router.post("/tenants/:tenantId/campaigns/:campaignId/preview", async (req, res) => {
     const { tenantId, campaignId } = req.params;
@@ -121,8 +136,12 @@ export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_
       return res.status(400).json({ error: "sampleText is required" });
     }
 
-    const campaign = await getCampaign(getPool(), tenantId, campaignId);
+    const pool = getPool();
+    const campaign = await getCampaign(pool, tenantId, campaignId);
     if (!campaign) return res.status(404).json({ error: "campaign not found for this tenant" });
+
+    const tenantGuardrailsConfig = await getGuardrailsConfig(pool, tenantId);
+    const rag: RagDependencies = { pool, embeddingProvider, tenantGuardrailsConfig };
 
     const previewCtx = {
       campaign,
@@ -133,12 +152,26 @@ export function dashboardRouter(llmProvider: LLMProvider = UNCONFIGURED_PREVIEW_
       ctaLink: campaign.ctaLink ?? undefined,
     };
 
-    const ruleBased = await generateReply({ ...previewCtx, campaign: { ...campaign, replyMode: "rule_based" } }, llmProvider);
-    const aiGenerated = await generateReply({ ...previewCtx, campaign: { ...campaign, replyMode: "ai_generated" } }, llmProvider);
+    const ruleBased = await generateReply(
+      { ...previewCtx, campaign: { ...campaign, replyMode: "rule_based" } },
+      llmProvider,
+      undefined,
+      rag,
+    );
+    const aiGenerated = await generateReply(
+      { ...previewCtx, campaign: { ...campaign, replyMode: "ai_generated" } },
+      llmProvider,
+      undefined,
+      rag,
+    );
 
     return res.status(200).json({
       ruleBased: { text: ruleBased.text },
-      aiGenerated: { text: aiGenerated.text, fellBackReason: aiGenerated.fellBackReason },
+      aiGenerated: {
+        text: aiGenerated.text,
+        fellBackReason: aiGenerated.fellBackReason,
+        requiresHumanHandoff: aiGenerated.requiresHumanHandoff,
+      },
     });
   });
 

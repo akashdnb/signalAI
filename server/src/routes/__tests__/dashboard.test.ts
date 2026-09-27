@@ -14,9 +14,20 @@ import { tryReserveSend } from "../../db/accountSends.js";
 import { recordDeadLetterEvent } from "../../db/deadLetterEvents.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant, sessionHeaderFor } from "../../__tests__/helpers/auth.js";
+import { upsertGuardrailsConfig } from "../../db/guardrailsConfig.js";
 import type { LLMProvider } from "../../llm/provider.js";
+import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
 
 const SESSION_SECRET = "test-session-secret";
+
+const mockQueryRelevantChunks = vi.fn();
+vi.mock("../../db/knowledgeBase.js", () => ({
+  queryRelevantChunks: (...args: unknown[]) => mockQueryRelevantChunks(...args),
+}));
+
+function fakeEmbeddingProvider(): EmbeddingProvider {
+  return { name: "fake", embed: vi.fn(async () => ({ vectors: [[1, 0]] })) };
+}
 
 describe("dashboard routes (BUI backend surface)", () => {
   beforeAll(() => {
@@ -29,6 +40,7 @@ describe("dashboard routes (BUI backend surface)", () => {
   beforeEach(async () => {
     await resetDb(getPool());
     await getPool().query("truncate table account_sends, dead_letter_events, milestone_advancements");
+    mockQueryRelevantChunks.mockReset().mockResolvedValue([]);
   });
 
   afterAll(async () => {
@@ -279,6 +291,100 @@ describe("dashboard routes (BUI backend surface)", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.aiGenerated.fellBackReason).toContain("provider error");
+  });
+
+  // Phase 2C: previously this route called generateReply with no `rag`
+  // argument at all, so a preview could show a clean AI reply while the
+  // real leadEventReplyHandler.ts path silently routed to the
+  // Grounded-Answer-Only Fallback or an escalation trigger — a mismatch a
+  // creator would only discover by testing the real thing.
+  describe("Phase 2C RAG integration", () => {
+    it("surfaces requiresHumanHandoff in the preview when the tenant has a knowledge base but nothing matches well enough", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "unrelated content", document_id: "doc-1", similarity: 0.1 },
+      ]);
+      const pool = getPool();
+      const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      const mockProvider: LLMProvider = { name: "mock", generateReply: vi.fn() };
+      const app = createApp({ llmProvider: mockProvider, embeddingProvider: fakeEmbeddingProvider() });
+
+      const res = await request(app)
+        .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+        .set(authHeader)
+        .send({ sampleText: "some off-topic question" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.aiGenerated.requiresHumanHandoff).toBe(true);
+      expect(mockProvider.generateReply).not.toHaveBeenCalled();
+    });
+
+    it("injects retrieved knowledge base content into the AI preview when retrieval matches well", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "Our refund window is 30 days.", document_id: "doc-1", similarity: 0.95 },
+      ]);
+      const pool = getPool();
+      const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "It's 30 days." });
+      const mockProvider: LLMProvider = { name: "mock", generateReply: generateReplyMock };
+      const app = createApp({ llmProvider: mockProvider, embeddingProvider: fakeEmbeddingProvider() });
+
+      const res = await request(app)
+        .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+        .set(authHeader)
+        .send({ sampleText: "what's your refund policy?" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.aiGenerated.text).toBe("It's 30 days.");
+      const call = generateReplyMock.mock.calls[0]![0];
+      expect(call.systemPrompt).toContain("Our refund window is 30 days.");
+    });
+
+    it("surfaces requiresHumanHandoff on a tenant-configured escalation trigger, before any provider call", async () => {
+      const pool = getPool();
+      const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+      await upsertGuardrailsConfig(pool, {
+        tenantId: tenant.id,
+        brandVoice: null,
+        forbiddenTopics: [],
+        escalationTriggers: ["talk to a lawyer"],
+      });
+
+      const mockProvider: LLMProvider = { name: "mock", generateReply: vi.fn() };
+      const app = createApp({ llmProvider: mockProvider, embeddingProvider: fakeEmbeddingProvider() });
+
+      const res = await request(app)
+        .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+        .set(authHeader)
+        .send({ sampleText: "I want to talk to a lawyer about this" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.aiGenerated.requiresHumanHandoff).toBe(true);
+      expect(mockProvider.generateReply).not.toHaveBeenCalled();
+    });
+
+    it("still works with no embeddingProvider configured — behaves exactly as before Phase 2C", async () => {
+      const pool = getPool();
+      const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      const mockProvider: LLMProvider = { name: "mock", generateReply: vi.fn().mockResolvedValue({ text: "Sure!" }) };
+      const app = createApp({ llmProvider: mockProvider }); // no embeddingProvider
+
+      const res = await request(app)
+        .post(`/tenants/${tenant.id}/campaigns/${campaign.id}/preview`)
+        .set(authHeader)
+        .send({ sampleText: "send the LINK please" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.aiGenerated.text).toBe("Sure!");
+      expect(res.body.aiGenerated.requiresHumanHandoff).toBeUndefined();
+      expect(mockQueryRelevantChunks).not.toHaveBeenCalled();
+    });
   });
 
   it("POST preview rejects an empty sampleText", async () => {

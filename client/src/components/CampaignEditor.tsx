@@ -469,6 +469,11 @@ export function CampaignEditor({
               {preview.aiGenerated.fellBackReason && (
                 <p className="muted small">Fell back to rule-based: {preview.aiGenerated.fellBackReason}</p>
               )}
+              {preview.aiGenerated.requiresHumanHandoff && (
+                <p className="banner banner-error">
+                  This would also hand the conversation to a human (pausing automation) for a real lead.
+                </p>
+              )}
             </div>
           </div>
         )}

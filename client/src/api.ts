@@ -288,7 +288,7 @@ export interface Dropoff {
 
 export interface PreviewResult {
   ruleBased: { text: string };
-  aiGenerated: { text: string; fellBackReason?: string };
+  aiGenerated: { text: string; fellBackReason?: string; requiresHumanHandoff?: boolean };
 }
 
 export type PlanTier = "trial" | "starter" | "growth";
