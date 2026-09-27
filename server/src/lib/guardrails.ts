@@ -43,6 +43,15 @@ function safeParseUrl(value: string): URL | null {
 }
 
 const MAX_COMMENT_REPLY_LENGTH = 300; // public comment replies: short/constrained, higher guardrail strictness
+// Instagram's own DM API hard-rejects anything longer than this (confirmed
+// live: "The length of the message sent is over 1000 characters", IGApiException
+// code 100/error_subcode 2534038) — not a style preference, a real send
+// failure. Left unenforced, an over-length AI reply throws inside
+// sendInstagramMessage AFTER validateOutput already approved it, which
+// exhausts retries and wedges the lead in the dead-letter queue (confirmed
+// live) rather than falling back to the rule-based reply like every other
+// guardrail rejection does.
+const MAX_DM_REPLY_LENGTH = 1000;
 
 /**
  * R5-02 fix: a raw `pathname.startsWith()` repeats R3-02's mistake one
@@ -175,6 +184,9 @@ export function validateOutput(
 
   if (tier === "comment" && text.length > MAX_COMMENT_REPLY_LENGTH) {
     return { allowed: false, reason: `comment reply exceeds ${MAX_COMMENT_REPLY_LENGTH} chars` };
+  }
+  if (tier === "dm" && text.length > MAX_DM_REPLY_LENGTH) {
+    return { allowed: false, reason: `dm reply exceeds ${MAX_DM_REPLY_LENGTH} chars (Instagram's own API limit)` };
   }
 
   return { allowed: true };

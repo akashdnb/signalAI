@@ -50,7 +50,7 @@ function buildSystemPrompt(ctx: MilestoneCheckContext, retrievedChunks: Retrieve
   const brevity =
     ctx.tier === "comment"
       ? "This reply is a PUBLIC comment reply, visible to everyone. Keep it short (under 300 characters)."
-      : "This reply is a private direct message. You may be more detailed.";
+      : "This reply is a private direct message. You may be more detailed, but keep it under 800 characters — Instagram rejects DMs over 1000 characters outright.";
 
   const captureInstruction = ctx.milestone.captureField
     ? `If the user's message satisfies the goal, extract their "${ctx.milestone.captureField}" as captured_value.`

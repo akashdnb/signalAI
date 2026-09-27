@@ -53,9 +53,28 @@ describe("validateOutput", () => {
     expect(validateOutput(long, "comment").allowed).toBe(false);
   });
 
-  it("allows the same long text for a DM, where the length cap doesn't apply", () => {
+  it("allows the same over-comment-length text for a DM, where the comment-tier cap doesn't apply", () => {
     const long = "a".repeat(301);
     expect(validateOutput(long, "dm").allowed).toBe(true);
+  });
+
+  // Confirmed live: Instagram's own DM API hard-rejects anything over 1000
+  // characters ("The length of the message sent is over 1000 characters",
+  // IGApiException code 100/error_subcode 2534038) — left unenforced here,
+  // that throw happens AFTER validateOutput already approved the reply,
+  // exhausting retries and wedging the lead in the dead-letter queue
+  // instead of falling back to the rule-based reply like every other
+  // guardrail rejection does.
+  it("rejects a DM reply over Instagram's own 1000-character API limit", () => {
+    const long = "a".repeat(1001);
+    const result = validateOutput(long, "dm");
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/1000/);
+  });
+
+  it("allows a DM reply at exactly Instagram's 1000-character limit", () => {
+    const exact = "a".repeat(1000);
+    expect(validateOutput(exact, "dm").allowed).toBe(true);
   });
 
   it("allows an ordinary reply with no link", () => {

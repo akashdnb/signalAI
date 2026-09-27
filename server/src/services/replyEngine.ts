@@ -74,7 +74,7 @@ function buildSystemPrompt(ctx: ReplyContext, retrievedChunks: RetrievedChunk[],
   const brevity =
     ctx.tier === "comment"
       ? "This reply is a PUBLIC comment reply, visible to everyone. Keep it short (under 300 characters) and generic — do not include sensitive details."
-      : "This reply is a private direct message. You may be more detailed.";
+      : "This reply is a private direct message. You may be more detailed, but keep it under 800 characters — Instagram rejects DMs over 1000 characters outright.";
 
   const parts = [
     `You are replying on behalf of a business's Instagram account to a comment containing the keyword "${ctx.matchedKeyword}".`,
