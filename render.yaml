@@ -50,6 +50,45 @@ services:
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      # AI-Generated Reply / Milestone Engine chat provider — any
+      # OpenAI-compatible /chat/completions host (Groq, Together, DeepSeek,
+      # hosted Ollama, Gemini's compat layer). Every ai_generated campaign
+      # fails closed to its rule-based reply if this is unset — not
+      # required for the app to boot, but required for AI replies to work.
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      # Phase 2C Knowledge Base: a SEPARATE OpenAI-compatible embeddings
+      # endpoint, independent of the chat provider above — not every chat
+      # host also serves embeddings. Optional: unset means Knowledge Base
+      # upload degrades to a clear 503, everything else is unaffected.
+      - key: EMBEDDING_BASE_URL
+        sync: false
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        sync: false
+      # Phase 2C Knowledge Base: Neon's S3-compatible object storage for
+      # uploaded source documents. AWS_ENDPOINT_URL_S3/AWS_REGION/
+      # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are the AWS SDK's own
+      # standard env var names — @aws-sdk/client-s3 reads them automatically,
+      # nothing in this codebase references them directly. Also optional —
+      # same graceful-503 degradation as the embeddings vars above.
+      - key: KB_S3_BUCKET
+        sync: false
+      - key: AWS_ENDPOINT_URL_S3
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
 
   # BUI — the creator-facing React SPA (client/). A static site: Vite builds
   # to client/dist and Render just serves those files, so there's no
