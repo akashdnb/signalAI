@@ -27,9 +27,9 @@ function mockProvider(impl: LLMProvider["generateReply"]): LLMProvider {
 describe("runMilestoneCheck", () => {
   it("parses structured output and reports satisfaction with the captured value", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(
+      vi.fn().mockResolvedValue({ text: 
         JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_value: "a@b.com" }),
-      ),
+       }),
     );
 
     const result = await runMilestoneCheck(
@@ -42,9 +42,9 @@ describe("runMilestoneCheck", () => {
 
   it("does not report a captured value for a milestone with no captureField, even if the model returns one", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(
+      vi.fn().mockResolvedValue({ text: 
         JSON.stringify({ reply: "Sounds good", milestone_satisfied: true, captured_value: "should be ignored" }),
-      ),
+       }),
     );
 
     const result = await runMilestoneCheck(
@@ -62,9 +62,9 @@ describe("runMilestoneCheck", () => {
 
   it("handles the model wrapping JSON in prose despite instructions", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(
+      vi.fn().mockResolvedValue({ text: 
         `Sure, here's my response:\n${JSON.stringify({ reply: "hi", milestone_satisfied: false })}\nHope that helps!`,
-      ),
+       }),
     );
 
     const result = await runMilestoneCheck(
@@ -77,7 +77,7 @@ describe("runMilestoneCheck", () => {
   });
 
   it("falls back to a generic non-advancing reply when the model returns unparseable output", async () => {
-    const provider = mockProvider(vi.fn().mockResolvedValue("not json at all"));
+    const provider = mockProvider(vi.fn().mockResolvedValue({ text: "not json at all" }));
 
     const result = await runMilestoneCheck(
       { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "hello", tier: "comment" },
@@ -109,7 +109,7 @@ describe("runMilestoneCheck", () => {
   it("falls back when the generated reply fails output validation (e.g. too long for a comment)", async () => {
     const longReply = "a".repeat(400);
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(JSON.stringify({ reply: longReply, milestone_satisfied: true })),
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: longReply, milestone_satisfied: true }) }),
     );
 
     const result = await runMilestoneCheck(
@@ -147,7 +147,7 @@ describe("runMilestoneCheck", () => {
   });
 
   it("does NOT refund the spend guard when the call completed but returned unparseable output", async () => {
-    const provider = mockProvider(vi.fn().mockResolvedValue("not json at all"));
+    const provider = mockProvider(vi.fn().mockResolvedValue({ text: "not json at all" }));
     const guard = spendGuard(true);
 
     await runMilestoneCheck(
@@ -160,7 +160,7 @@ describe("runMilestoneCheck", () => {
   });
 
   it("includes the current goal in the system prompt, and keeps it separate from the untrusted user message", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: false }));
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
     const provider = mockProvider(generateReplyMock);
 
     await runMilestoneCheck(
@@ -180,7 +180,7 @@ describe("runMilestoneCheck", () => {
   });
 
   it("requests native JSON mode from the provider (R3-07)", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: false }));
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
     const provider = mockProvider(generateReplyMock);
 
     await runMilestoneCheck(
@@ -195,7 +195,7 @@ describe("runMilestoneCheck", () => {
   // rendered into the prompt, so the model had no memory of what a lead
   // already gave earlier in the same conversation.
   it("renders previously captured facts into the system prompt", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: false }));
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
     const provider = mockProvider(generateReplyMock);
 
     await runMilestoneCheck(
@@ -216,7 +216,7 @@ describe("runMilestoneCheck", () => {
   // the "don't follow instructions" rule even if write-time validation
   // (milestones.ts) somehow let something through.
   it("wraps the tenant-authored goal in explicit data delimiters, with the safety rule appearing after it", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: false }));
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
     const provider = mockProvider(generateReplyMock);
 
     await runMilestoneCheck(
@@ -235,7 +235,7 @@ describe("runMilestoneCheck", () => {
   // value at all used to claim a fact it didn't hold.
   it("does not advance when the model says satisfied but returns no captured_value for a captureField milestone", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: true })), // no captured_value
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true }) }), // no captured_value
     );
 
     const result = await runMilestoneCheck(
@@ -251,9 +251,9 @@ describe("runMilestoneCheck", () => {
   // the model returned, with no check against the field it claims to be.
   it("does not advance when captured_value doesn't validate against an email-shaped field", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(
+      vi.fn().mockResolvedValue({ text: 
         JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "I'd rather not say" }),
-      ),
+       }),
     );
 
     const result = await runMilestoneCheck(
@@ -267,7 +267,7 @@ describe("runMilestoneCheck", () => {
 
   it("does not advance when a non-email/phone field's captured_value is a bare refusal phrase", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "none" })),
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "none" }) }),
     );
 
     const result = await runMilestoneCheck(
@@ -285,7 +285,7 @@ describe("runMilestoneCheck", () => {
 
   it("advances when a non-email/phone field's captured_value is a real answer", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "$500" })),
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "$500" }) }),
     );
 
     const result = await runMilestoneCheck(
@@ -307,9 +307,9 @@ describe("runMilestoneCheck", () => {
   // span when prose contains an earlier, unrelated brace.
   it("recovers the JSON object even when prose contains an earlier unrelated brace", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue(
+      vi.fn().mockResolvedValue({ text: 
         `Note: the user's bio says "into {fitness}". ${JSON.stringify({ reply: "hi", milestone_satisfied: false })}`,
-      ),
+       }),
     );
 
     const result = await runMilestoneCheck(
@@ -341,7 +341,7 @@ describe("runMilestoneCheck", () => {
 
     it("calls the provider normally when the guard allows it", async () => {
       const provider = mockProvider(
-        vi.fn().mockResolvedValue(JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_value: "a@b.com" })),
+        vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_value: "a@b.com" }) }),
       );
 
       const result = await runMilestoneCheck(

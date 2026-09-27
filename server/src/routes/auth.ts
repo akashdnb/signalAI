@@ -3,6 +3,8 @@ import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { upsertToken } from "../db/tokens.js";
+import { registerInstagramTrialUse } from "../db/instagramTrialHistory.js";
+import { endTrialImmediately } from "../db/tenants.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 import { OAUTH_NONCE_COOKIE, createOAuthState, nonceMatches, parseCookie, verifyOAuthState } from "../lib/oauthState.js";
@@ -172,6 +174,19 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
       accessToken: longLived.access_token,
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),
     });
+
+    // Phase 2B Trial-Abuse Guardrail: trial eligibility is tied to this
+    // Instagram account, not the email/signup that created the tenant.
+    // isFirstUse is true the very first time this account has ever
+    // connected, to any tenant — this tenant's trial stands. A false
+    // means the account already has trial history under a DIFFERENT
+    // tenant (firstTenantId !== tenantId); the same tenant reconnecting
+    // its own already-registered account is also `isFirstUse: false` but
+    // isn't abuse, so only the cross-tenant case ends the trial early.
+    const trialUse = await registerInstagramTrialUse(pool, profile.id, tenantId);
+    if (!trialUse.isFirstUse && trialUse.firstTenantId !== tenantId) {
+      await endTrialImmediately(pool, tenantId);
+    }
 
     // No session is issued here anymore — the caller was already logged
     // in before starting this flow (U4), and that session stays valid

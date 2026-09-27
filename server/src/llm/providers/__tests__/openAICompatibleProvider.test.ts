@@ -27,7 +27,8 @@ describe("openAICompatibleProvider", () => {
 
     const result = await provider.generateReply({ systemPrompt: "sys", userMessage: "user text" });
 
-    expect(result).toBe("the reply");
+    expect(result.text).toBe("the reply");
+    expect(result.usage).toBeUndefined(); // this mock response has no usage field
     const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(url).toBe("https://api.groq.com/openai/v1/chat/completions");
     expect(options.headers.Authorization).toBe("Bearer key-123");
@@ -76,6 +77,26 @@ describe("openAICompatibleProvider", () => {
     const [, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     const body = JSON.parse(options.body);
     expect(body.response_format).toBeUndefined();
+  });
+
+  it("extracts prompt/completion token usage when the response reports it (Phase 2B usage ledger)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "the reply" } }],
+        usage: { prompt_tokens: 42, completion_tokens: 17, total_tokens: 59 },
+      }),
+    });
+
+    const provider = createOpenAICompatibleProvider({
+      name: "groq",
+      baseUrl: "https://api.groq.com/openai/v1",
+      apiKey: "key",
+      model: "llama-3.1",
+    });
+
+    const result = await provider.generateReply({ systemPrompt: "sys", userMessage: "u" });
+    expect(result.usage).toEqual({ promptTokens: 42, completionTokens: 17 });
   });
 
   it("throws with the response body when the API call fails", async () => {

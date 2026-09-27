@@ -346,6 +346,83 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     expect(rows.rows[0].tenant_id).toBe(tenantA.id); // never re-parented to tenant B
   });
 
+  // Phase 2B Trial-Abuse Guardrail. The existing "already attached to a
+  // different tenant" check above already blocks the more obvious abuse
+  // shape (account currently connected elsewhere) before this guardrail's
+  // code ever runs — this test exercises the gap that check leaves open:
+  // an account previously connected to tenant A, then detached (no
+  // disconnect UI ships yet, but the token row can be removed — e.g. a
+  // future disconnect feature, or a Data Deletion Callback scrub), later
+  // reconnecting to a NEW tenant B. B can connect it (nothing blocks
+  // that), but shouldn't get a fresh trial off an account that already
+  // had one.
+  it("ends a new tenant's trial immediately when they connect an Instagram account that already had a trial under a different (now-detached) tenant", async () => {
+    const pool = getPool();
+    const { tenant: tenantA, authHeader: authHeaderA } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const app = createApp();
+
+    mockSuccessfulExchange("recycled-acct");
+    const agentA = request.agent(app);
+    const startUrlA = await mintStartUrl(app, tenantA.id, authHeaderA);
+    const startA = await agentA.get(startUrlA);
+    const stateA = extractState(startA.headers.location);
+    const callbackA = await agentA.get("/auth/instagram/callback").query({ code: "auth-code", state: stateA });
+    expect(callbackA.status).toBe(302);
+
+    const tenantABefore = await pool.query("select trial_ends_at from tenants where id = $1", [tenantA.id]);
+    const tenantAOriginalTrialEnd = tenantABefore.rows[0].trial_ends_at;
+
+    // Simulate the account being detached from tenant A (no disconnect UI
+    // ships yet, but the invariant this guardrail protects must hold once
+    // one does) — direct DB manipulation to isolate this test to the
+    // guardrail itself, not a disconnect feature this phase doesn't build.
+    await pool.query("delete from meta_tokens where instagram_account_id = 'recycled-acct'");
+
+    const { tenant: tenantB, authHeader: authHeaderB } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-b");
+    mockSuccessfulExchange("recycled-acct");
+    const agentB = request.agent(app);
+    const startUrlB = await mintStartUrl(app, tenantB.id, authHeaderB);
+    const startB = await agentB.get(startUrlB);
+    const stateB = extractState(startB.headers.location);
+    const callbackB = await agentB.get("/auth/instagram/callback").query({ code: "auth-code", state: stateB });
+
+    expect(callbackB.status).toBe(302);
+    expect(callbackB.headers.location).toContain("/dashboard/"); // connection itself still succeeds
+
+    const tenantBAfter = await pool.query("select trial_ends_at from tenants where id = $1", [tenantB.id]);
+    expect(new Date(tenantBAfter.rows[0].trial_ends_at).getTime()).toBeLessThanOrEqual(Date.now());
+
+    // Tenant A's own trial window is untouched by any of this.
+    const tenantAAfter = await pool.query("select trial_ends_at from tenants where id = $1", [tenantA.id]);
+    expect(tenantAAfter.rows[0].trial_ends_at).toEqual(tenantAOriginalTrialEnd);
+  });
+
+  it("does not touch trial_ends_at when the SAME tenant reconnects its own already-registered Instagram account", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const app = createApp();
+
+    mockSuccessfulExchange("acct-1");
+    const firstAgent = request.agent(app);
+    const firstStartUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const firstStart = await firstAgent.get(firstStartUrl);
+    const firstState = extractState(firstStart.headers.location);
+    await firstAgent.get("/auth/instagram/callback").query({ code: "auth-code", state: firstState });
+
+    const before = await pool.query("select trial_ends_at from tenants where id = $1", [tenant.id]);
+
+    mockSuccessfulExchange("acct-1"); // same tenant, same account, reconnecting
+    const secondAgent = request.agent(app);
+    const secondStartUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const secondStart = await secondAgent.get(secondStartUrl);
+    const secondState = extractState(secondStart.headers.location);
+    const second = await secondAgent.get("/auth/instagram/callback").query({ code: "auth-code", state: secondState });
+    expect(second.status).toBe(302);
+
+    const after = await pool.query("select trial_ends_at from tenants where id = $1", [tenant.id]);
+    expect(after.rows[0].trial_ends_at).toEqual(before.rows[0].trial_ends_at);
+  });
+
   it("callback redirects to the retry screen when Instagram's own token exchange fails", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");

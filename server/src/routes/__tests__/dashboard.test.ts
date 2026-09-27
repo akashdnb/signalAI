@@ -253,7 +253,7 @@ describe("dashboard routes (BUI backend surface)", () => {
       defaultReplyTemplate: "Hi {{username}}, thanks for {{keyword}}!",
     });
 
-    const mockProvider: LLMProvider = { name: "mock", generateReply: vi.fn().mockResolvedValue("Here's the info!") };
+    const mockProvider: LLMProvider = { name: "mock", generateReply: vi.fn().mockResolvedValue({ text: "Here's the info!" }) };
     const app = createApp({ llmProvider: mockProvider });
 
     const res = await request(app)

@@ -53,7 +53,7 @@ describe("generateReply", () => {
   });
 
   it("calls the provider and returns its output when the campaign is ai_generated and everything passes", async () => {
-    const provider = mockProvider(vi.fn().mockResolvedValue("Sure, here's the info you asked about!"));
+    const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Sure, here's the info you asked about!" }));
     const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
 
     const result = await generateReply(ctx, provider);
@@ -63,7 +63,7 @@ describe("generateReply", () => {
   });
 
   it("passes systemPrompt and userMessage as separate fields — never concatenates untrusted text into the system prompt", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue("ok");
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
     const provider = mockProvider(generateReplyMock);
     const ctx = makeContext({
       campaign: makeCampaign({ replyMode: "ai_generated" }),
@@ -82,7 +82,7 @@ describe("generateReply", () => {
   });
 
   it("falls back to the rule-based reply, unaltered, when the input looks like a prompt injection attempt", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue("should never be used");
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: "should never be used" });
     const provider = mockProvider(generateReplyMock);
     const ctx = makeContext({
       campaign: makeCampaign({ replyMode: "ai_generated" }),
@@ -97,7 +97,7 @@ describe("generateReply", () => {
   });
 
   it("falls back to the rule-based reply when the generated output fails output validation", async () => {
-    const provider = mockProvider(vi.fn().mockResolvedValue("I recommend taking medication for that"));
+    const provider = mockProvider(vi.fn().mockResolvedValue({ text: "I recommend taking medication for that" }));
     const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
 
     const result = await generateReply(ctx, provider);
@@ -131,7 +131,7 @@ describe("generateReply", () => {
   });
 
   it("does NOT refund the spend guard when the call completed but output validation rejected it", async () => {
-    const provider = mockProvider(vi.fn().mockResolvedValue("I recommend taking medication for that"));
+    const provider = mockProvider(vi.fn().mockResolvedValue({ text: "I recommend taking medication for that" }));
     const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
     const guard = spendGuard(true);
 
@@ -141,7 +141,7 @@ describe("generateReply", () => {
   });
 
   it("appends the CTA link to an AI-generated reply, same as a rule-based one", async () => {
-    const provider = mockProvider(vi.fn().mockResolvedValue("Here's what you asked for."));
+    const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Here's what you asked for." }));
     const ctx = makeContext({
       campaign: makeCampaign({ replyMode: "ai_generated" }),
       ctaLink: "https://example.com/offer",
@@ -152,7 +152,7 @@ describe("generateReply", () => {
   });
 
   it("keeps the comment-tier brevity instruction out of the DM tier's system prompt", async () => {
-    const generateReplyMock = vi.fn().mockResolvedValue("ok");
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
     const provider = mockProvider(generateReplyMock);
     const ctx = makeContext({
       campaign: makeCampaign({ replyMode: "ai_generated" }),
@@ -171,7 +171,7 @@ describe("generateReply", () => {
   // other failure mode.
   describe("AI spend cap (B10)", () => {
     it("falls back to the rule-based reply and flags capExceeded when the guard refuses", async () => {
-      const generateReplyMock = vi.fn().mockResolvedValue("should never be used");
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "should never be used" });
       const provider = mockProvider(generateReplyMock);
       const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
 
@@ -184,7 +184,7 @@ describe("generateReply", () => {
     });
 
     it("calls the provider normally when the guard allows it", async () => {
-      const provider = mockProvider(vi.fn().mockResolvedValue("Sure, here's the info!"));
+      const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Sure, here's the info!" }));
       const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
 
       const result = await generateReply(ctx, provider, spendGuard(true));
@@ -200,7 +200,7 @@ describe("generateReply", () => {
     });
 
     it("defaults to unmetered when no guard is supplied", async () => {
-      const provider = mockProvider(vi.fn().mockResolvedValue("ok"));
+      const provider = mockProvider(vi.fn().mockResolvedValue({ text: "ok" }));
       const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
       const result = await generateReply(ctx, provider);
       expect(result.engine).toBe("ai_generated");

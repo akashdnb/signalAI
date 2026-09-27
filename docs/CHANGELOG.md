@@ -4,6 +4,44 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-09-22 — Phase 2B: Billing & Monetisation
+
+**Full Phase 2B feature set shipped** (migrations `1758240000034`–`1758240000037`), except the
+WhatsApp Cost Line sub-item (still explicitly Phase 3-gated). Full detail in
+`claude_fixes/2026-09-22-phase-2b-billing.md`.
+- LLM provider interface change first: `generateReply` now returns `{ text, usage? }` instead of a
+  plain string, so real token counts feed the new Per-Tenant Usage Ledger (`token_usage`, unique
+  on `lead_event_id` for retry-safe idempotency) rather than an estimate. Propagated through
+  `replyEngine.ts`, `milestoneEngine.ts`, and every mock provider across 5 test files.
+- Free Trial Period (`tenants.plan_tier`/`trial_started_at`/`trial_ends_at`) with a real Trial
+  Token Allowance enforced in `leadEventReplyHandler.ts` (fail-closed to rule-based, composed onto
+  the existing per-account spend guard) and a Trial-Abuse Guardrail (`instagram_trial_history`)
+  wired into the Instagram OAuth callback — an account that already had a trial under one tenant
+  can't grant a second tenant a fresh one.
+- Plan Tiers (trial/starter/growth — hardcoded in `lib/planTiers.ts`, no admin surface at pilot
+  scale) extending Phase 1's single flat Stripe plan: checkout now accepts a tier, stamped as
+  Checkout session metadata so the webhook can set `plan_tier` without a second Stripe round-trip.
+- Daily Usage Rollup → Stripe Metered Billing: a daily cron job (`services/usageRollupService.ts`)
+  aggregates `token_usage` and best-effort-syncs it to Stripe's Billing Meter Events API — a
+  tenant with nothing to report is resolved immediately, a real Stripe failure is left for the
+  next run to retry, never silently dropped.
+- Usage Visibility Dashboard (`GET /tenants/:id/usage` + `BillingPanel.tsx`): tokens/DMs used vs.
+  tier allowance, soft-cap warnings, and a locally-estimated overage cost (explicitly framed as an
+  estimate — Stripe's own tiered pricing is authoritative once usage lands there).
+- Found and fixed a real bug via testing: the daily rollup's date-range query compared a
+  `timestamptz` against a bare date literal, correct only if the Postgres session's timezone
+  happens to be UTC — this dev machine runs `Asia/Kolkata`, and the test caught it immediately (0
+  rows instead of 2). Fixed by converting to UTC wall-clock time explicitly before comparing.
+- Verified beyond typecheck/tests: full suite (431/431, ~78 new tests) passing, all 4 migrations
+  re-tested against a DB with pre-existing rows, and the trial/tier/usage UI driven end-to-end
+  through a real browser — signup, trial countdown, tier upgrade buttons, and a graceful-failure
+  path against a deliberately invalid Stripe key, zero unexpected console errors throughout.
+- **Deliberately not enforced, flagged rather than silently dropped:** the `connectedAccounts`
+  tier quota is informational only (the system supports exactly one connected Instagram account
+  per tenant today, regardless of tier), and `campaigns`/`connectedAccounts` quotas have no hard
+  block at creation time — only usage (DMs/tokens) gets soft-cap warnings and a real trial
+  allowance block, matching the roadmap's own "warn, don't hard-block" framing.
+
 ## 2026-09-21 — Phase 2A: Lead Capture & CRM
 
 **Full Phase 2A feature set shipped** (migrations `1758240000029`–`1758240000033`)

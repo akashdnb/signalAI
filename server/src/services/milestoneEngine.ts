@@ -1,4 +1,4 @@
-import type { LLMProvider } from "../llm/provider.js";
+import type { GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
 import type { Milestone } from "../db/milestones.js";
 import { classifyInput, validateOutput } from "../lib/guardrails.js";
 import { appendCtaLink } from "../lib/messageComposer.js";
@@ -20,6 +20,8 @@ export interface MilestoneCheckResult {
   fellBackReason?: string;
   /** B10: set specifically when the fallback was caused by the per-account daily AI call cap. */
   capExceeded?: boolean;
+  /** Phase 2B Per-Tenant Usage Ledger — see replyEngine.ts's PreparedReply.usage for the same contract. */
+  usage?: GenerateReplyUsage;
 }
 
 interface StructuredModelOutput {
@@ -189,23 +191,29 @@ export async function runMilestoneCheck(
   }
 
   let raw: string;
+  let usage: GenerateReplyUsage | undefined;
   try {
-    raw = await provider.generateReply({
+    const result = await provider.generateReply({
       systemPrompt: buildSystemPrompt(ctx),
       userMessage: ctx.sourceText,
       responseFormat: "json_object", // R3-07: use the provider's native JSON mode, not just prose + regex recovery
     });
+    raw = result.text;
+    usage = result.usage;
   } catch (err) {
     // R7-02: refund — this call never completed/was never billed. Same
-    // reasoning as replyEngine.ts.
+    // reasoning as replyEngine.ts. No usage: nothing was billed.
     await spendGuard.release();
     const message = err instanceof Error ? err.message : String(err);
     return fallbackResult(`provider error: ${message}`);
   }
 
+  // Everything below this point followed a completed, billed provider
+  // call — usage is threaded through every remaining return, including
+  // the fallback ones, unlike the transport-failure catch above.
   const structured = parseStructuredOutput(raw);
   if (!structured) {
-    return fallbackResult("model did not return parseable structured output");
+    return { ...fallbackResult("model did not return parseable structured output"), usage };
   }
 
   // Compose (append the CTA) BEFORE validating (R2-01 fix) — same ordering
@@ -214,7 +222,7 @@ export async function runMilestoneCheck(
   const text = appendCtaLink(structured.reply, ctx.ctaLink);
   const outputCheck = validateOutput(text, ctx.tier, ctx.ctaLink);
   if (!outputCheck.allowed) {
-    return fallbackResult(outputCheck.reason!);
+    return { ...fallbackResult(outputCheck.reason!), usage };
   }
 
   // R3-04/R3-05 fix: a milestone with a captureField must not advance
@@ -224,10 +232,10 @@ export async function runMilestoneCheck(
   if (ctx.milestone.captureField) {
     const capturedValue = structured.captured_value;
     if (!capturedValue || !isValidCapturedValue(ctx.milestone.captureField, capturedValue)) {
-      return { reply: text, satisfied: false };
+      return { reply: text, satisfied: false, usage };
     }
-    return { reply: text, satisfied: structured.milestone_satisfied, capturedValue };
+    return { reply: text, satisfied: structured.milestone_satisfied, capturedValue, usage };
   }
 
-  return { reply: text, satisfied: structured.milestone_satisfied };
+  return { reply: text, satisfied: structured.milestone_satisfied, usage };
 }

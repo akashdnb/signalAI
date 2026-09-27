@@ -5,6 +5,10 @@ import { getPool, closePool } from "../../db/pool.js";
 import { createTenant, getTenant } from "../../db/tenants.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
+import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
+import { insertEventIdempotent } from "../../db/events.js";
+import { recordTokenUsage } from "../../db/tokenUsage.js";
+import { tryReserveSend } from "../../db/accountSends.js";
 
 const SESSION_SECRET = "test-session-secret";
 
@@ -28,6 +32,10 @@ describe("billing routes (B11)", () => {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
     }
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+    // Phase 2B: resolvePriceIdForTier('starter') needs a real price id to
+    // resolve against — isBillingConfigured is mocked above, but tier
+    // resolution reads config directly, not through that mock.
+    process.env.STRIPE_PRICE_ID = "price_test_starter";
   });
 
   beforeEach(async () => {
@@ -87,7 +95,43 @@ describe("billing routes (B11)", () => {
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     const app = createApp();
     const res = await request(app).get(`/tenants/${tenant.id}/billing`).set(authHeader);
-    expect(res.body).toEqual({ billingStatus: "none", billingConfigured: true });
+    expect(res.body).toMatchObject({ billingStatus: "none", billingConfigured: true, planTier: "trial" });
+  });
+
+  // Phase 2B Plan Tiers.
+  it("GET billing status reports the trial tier's quotas and trial end date for a brand-new tenant", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+    const res = await request(app).get(`/tenants/${tenant.id}/billing`).set(authHeader);
+
+    expect(res.body.planTier).toBe("trial");
+    expect(res.body.quotas).toEqual({ dmsPerMonth: 200, connectedAccounts: 1, campaigns: 3, tokenAllowance: 200_000 });
+    expect(res.body.trialEndsAt).toBeTruthy();
+    expect(res.body.availableTiers).toEqual([
+      { tier: "starter", label: "Starter", dmsPerMonth: 1000, connectedAccounts: 1, campaigns: 10, tokenAllowance: 1_000_000 },
+    ]); // 'growth' omitted — STRIPE_GROWTH_PRICE_ID isn't set in this test env
+  });
+
+  it("POST checkout defaults to the 'starter' tier (the original flat-plan behavior) when no tier is specified", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    mockCreate.mockResolvedValue({ url: "https://checkout.stripe.com/session/abc" });
+    const app = createApp();
+
+    await request(app).post(`/tenants/${tenant.id}/billing/checkout`).set(authHeader);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ line_items: [{ price: "price_test_starter", quantity: 1 }], metadata: { planTier: "starter" } }),
+    );
+  });
+
+  it("POST checkout 503s for a tier that isn't configured on this server", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const res = await request(app).post(`/tenants/${tenant.id}/billing/checkout`).set(authHeader).send({ tier: "growth" });
+    expect(res.status).toBe(503);
   });
 
   // R10-01 regression: the checkout/status routes are exactly what starts
@@ -124,7 +168,7 @@ describe("billing routes (B11)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("checkout.session.completed activates billing for the referenced tenant", async () => {
+  it("checkout.session.completed activates billing for the referenced tenant and sets its plan tier from Checkout metadata", async () => {
     const tenant = await createTenant(getPool(), "creator-a");
     mockConstructEvent.mockReturnValue({
       id: "evt_1",
@@ -134,6 +178,7 @@ describe("billing routes (B11)", () => {
           client_reference_id: tenant.id,
           customer: "cus_123",
           subscription: "sub_123",
+          metadata: { planTier: "growth" },
         },
       },
     });
@@ -147,7 +192,23 @@ describe("billing routes (B11)", () => {
       billingStatus: "active",
       stripeCustomerId: "cus_123",
       stripeSubscriptionId: "sub_123",
+      planTier: "growth",
     });
+  });
+
+  it("checkout.session.completed falls back to the 'starter' tier when the session has no planTier metadata (an old client, or a pre-Phase-2B session)", async () => {
+    const tenant = await createTenant(getPool(), "creator-a");
+    mockConstructEvent.mockReturnValue({
+      id: "evt_1",
+      type: "checkout.session.completed",
+      data: { object: { client_reference_id: tenant.id, customer: "cus_123", subscription: "sub_123" } },
+    });
+
+    const app = createApp();
+    await request(app).post("/billing/webhook").set("stripe-signature", "any").send({});
+
+    const updated = await getTenant(getPool(), tenant.id);
+    expect(updated!.planTier).toBe("starter");
   });
 
   it("customer.subscription.deleted cancels billing for the matching tenant", async () => {
@@ -242,5 +303,89 @@ describe("billing routes (B11)", () => {
     const app = createApp();
     const res = await request(app).post("/billing/webhook").set("stripe-signature", "any").send({});
     expect(res.status).toBe(200);
+  });
+});
+
+describe("GET /tenants/:tenantId/usage (Phase 2B Usage Visibility Dashboard)", () => {
+  beforeAll(() => {
+    process.env.SESSION_SECRET = SESSION_SECRET;
+  });
+
+  beforeEach(async () => {
+    await resetDb(getPool());
+  });
+
+  afterAll(async () => {
+    await closePool();
+  });
+
+  it("reports zero usage against the trial tier's quotas for a brand-new tenant", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const res = await request(app).get(`/tenants/${tenant.id}/usage`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      planTier: "trial",
+      isTrialExpired: false,
+      isEntitled: true,
+      tokens: { used: 0, allowance: 200_000, overage: 0, estimatedOverageCostUsd: 0, nearingLimit: false },
+      dms: { sent: 0, allowance: 200, nearingLimit: false },
+    });
+  });
+
+  it("reflects real token usage and DM sends, and flags nearingLimit once past 80% of the tier's allowance", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const event = await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-1",
+      eventType: "comment",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
+    // Trial allowance is 200,000 tokens — 170,000 used is 85%, over the 80% warning threshold.
+    await recordTokenUsage(pool, { tenantId: tenant.id, leadEventId: event!.id, promptTokens: 150_000, completionTokens: 20_000 });
+    await tryReserveSend(pool, tenant.id, "acct-1", 750);
+
+    const app = createApp();
+    const res = await request(app).get(`/tenants/${tenant.id}/usage`).set(authHeader);
+
+    expect(res.body.tokens.used).toBe(170_000);
+    expect(res.body.tokens.nearingLimit).toBe(true);
+    expect(res.body.dms.sent).toBe(1);
+  });
+
+  it("computes an overage estimate once usage exceeds the tier allowance", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const event = await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-1",
+      eventType: "comment",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
+    // 200,000 (allowance) + 50,000 overage.
+    await recordTokenUsage(pool, { tenantId: tenant.id, leadEventId: event!.id, promptTokens: 200_000, completionTokens: 50_000 });
+
+    const app = createApp();
+    const res = await request(app).get(`/tenants/${tenant.id}/usage`).set(authHeader);
+
+    expect(res.body.tokens.overage).toBe(50_000);
+    expect(res.body.tokens.estimatedOverageCostUsd).toBeGreaterThan(0);
+  });
+
+  it("rejects a request with no session", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+    const res = await request(app).get(`/tenants/${tenant.id}/usage`);
+    expect(res.status).toBe(401);
   });
 });

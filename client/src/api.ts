@@ -257,6 +257,41 @@ export interface PreviewResult {
   aiGenerated: { text: string; fellBackReason?: string };
 }
 
+export type PlanTier = "trial" | "starter" | "growth";
+
+export interface PlanQuotas {
+  dmsPerMonth: number;
+  connectedAccounts: number;
+  campaigns: number;
+  tokenAllowance: number;
+}
+
+export interface AvailableTier extends PlanQuotas {
+  tier: PlanTier;
+  label: string;
+}
+
+export interface BillingSummary {
+  billingStatus: "none" | "active" | "canceled";
+  billingConfigured: boolean;
+  planTier: PlanTier;
+  planTierLabel: string;
+  quotas: PlanQuotas;
+  trialEndsAt: string | null;
+  availableTiers: AvailableTier[];
+}
+
+export interface UsageSummary {
+  planTier: PlanTier;
+  planTierLabel: string;
+  cycleStart: string;
+  trialEndsAt: string | null;
+  isTrialExpired: boolean;
+  isEntitled: boolean;
+  tokens: { used: number; allowance: number; overage: number; estimatedOverageCostUsd: number; nearingLimit: boolean };
+  dms: { sent: number; allowance: number; nearingLimit: boolean };
+}
+
 export const api = {
   getTenant: (tenantId: string) => request<TenantSummary>(`/tenants/${tenantId}`),
   // Identity Refactor U4/U6: connecting Instagram is authenticated (the
@@ -378,10 +413,11 @@ export const api = {
       body: JSON.stringify({ milestones }),
     }),
 
-  getBilling: (tenantId: string) =>
-    request<{ billingStatus: "none" | "active" | "canceled"; billingConfigured: boolean }>(
-      `/tenants/${tenantId}/billing`,
-    ),
-  startCheckout: (tenantId: string) =>
-    request<{ url: string }>(`/tenants/${tenantId}/billing/checkout`, { method: "POST" }),
+  getBilling: (tenantId: string) => request<BillingSummary>(`/tenants/${tenantId}/billing`),
+  startCheckout: (tenantId: string, tier: PlanTier = "starter") =>
+    request<{ url: string }>(`/tenants/${tenantId}/billing/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
+  getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
 };

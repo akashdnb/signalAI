@@ -20,7 +20,18 @@ export interface GenerateReplyInput {
   responseFormat?: "json_object";
 }
 
+/** Phase 2B Per-Tenant Usage Ledger: token counts, when the provider reports them, so a real (not estimated) figure can be billed. Absent for a provider/response that doesn't report usage — callers must treat this as best-effort, not guaranteed. */
+export interface GenerateReplyUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface GenerateReplyResult {
+  text: string;
+  usage?: GenerateReplyUsage;
+}
+
 export interface LLMProvider {
   readonly name: string;
-  generateReply(input: GenerateReplyInput): Promise<string>;
+  generateReply(input: GenerateReplyInput): Promise<GenerateReplyResult>;
 }

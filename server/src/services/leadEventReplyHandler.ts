@@ -1,12 +1,13 @@
 import type { Pool } from "pg";
 import type { PgBoss } from "pg-boss";
-import type { LLMProvider } from "../llm/provider.js";
+import type { LLMProvider, GenerateReplyUsage } from "../llm/provider.js";
 import type { LeadEventJob } from "../queue/leadEventsQueue.js";
 import type { LeadEventHandlerResult } from "../queue/worker.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { getEventForReply } from "../db/events.js";
 import { getCampaign } from "../db/campaigns.js";
 import { getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
+import { getTenant } from "../db/tenants.js";
 import {
   getFirstMilestone,
   getMilestone,
@@ -17,11 +18,13 @@ import {
 import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
+import { getTokenUsageSince, recordTokenUsage } from "../db/tokenUsage.js";
+import { getPlanTier } from "../lib/planTiers.js";
 import { sendInstagramCommentReply, sendInstagramMessage } from "../lib/instagramSend.js";
 import { Sentry } from "../lib/sentry.js";
 import { generateReply } from "./replyEngine.js";
 import { runMilestoneCheck } from "./milestoneEngine.js";
-import { createAccountSpendGuard } from "./aiSpendGuard.js";
+import { createAccountSpendGuard, type AiSpendGuard } from "./aiSpendGuard.js";
 
 // Meta's published ceiling for private-reply/DM sends per Instagram account.
 const HOURLY_SEND_LIMIT = 750;
@@ -83,6 +86,9 @@ export function createLeadEventReplyHandler(
 
     const lead = await getLead(pool, job.tenantId, job.leadId);
     if (!lead || !lead.instagramUserId) return { advance: true };
+
+    const tenant = await getTenant(pool, job.tenantId);
+    if (!tenant) return { advance: true }; // shouldn't happen — the whole pipeline is tenant-scoped from ingestion
 
     // Phase 2A Human Handoff: a human has claimed this conversation
     // (handoffStatus 'human') — the worker stops generating/sending
@@ -147,8 +153,32 @@ export function createLeadEventReplyHandler(
     // never count against the cap.
     const spendGuard = createAccountSpendGuard(pool, job.tenantId, account.instagramAccountId, aiDailyCallCap);
 
+    // Phase 2B Trial Token Allowance: a cumulative cap for the WHOLE
+    // trial, composed onto the existing per-account daily-call guard
+    // rather than a second independent check — both share the same
+    // reserve-before-call/release-on-failure shape, and generateReply/
+    // runMilestoneCheck already only take one guard. Only trial tenants
+    // pay the extra getTokenUsageSince query; every paid tier skips this
+    // wrapper entirely.
+    const effectiveSpendGuard: AiSpendGuard =
+      tenant.planTier === "trial" && tenant.trialStartedAt
+        ? {
+            async tryConsume() {
+              if (!(await spendGuard.tryConsume())) return false;
+              const usage = await getTokenUsageSince(pool, job.tenantId, tenant.trialStartedAt!);
+              if (usage.totalTokens >= getPlanTier("trial").tokenAllowance) {
+                await spendGuard.release(); // undo the reservation just taken above
+                return false;
+              }
+              return true;
+            },
+            release: () => spendGuard.release(),
+          }
+        : spendGuard;
+
     let replyText: string;
     let capExceeded = false;
+    let usage: GenerateReplyUsage | undefined;
     // R6-01: milestone advancement is computed here but only committed
     // after a confirmed send, below.
     let commitMilestoneAdvancement: (() => Promise<void>) | null = null;
@@ -166,10 +196,11 @@ export function createLeadEventReplyHandler(
           ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,
-        spendGuard,
+        effectiveSpendGuard,
       );
       replyText = reply.text;
       capExceeded = reply.capExceeded ?? false;
+      usage = reply.usage;
     } else {
       const activeMilestone = lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
@@ -196,7 +227,7 @@ export function createLeadEventReplyHandler(
           ctaLink: campaign.ctaLink ?? undefined,
         },
         provider,
-        spendGuard,
+        effectiveSpendGuard,
       );
 
       if (result.satisfied) {
@@ -217,6 +248,22 @@ export function createLeadEventReplyHandler(
 
       replyText = result.reply;
       capExceeded = result.capExceeded ?? false;
+      usage = result.usage;
+    }
+
+    // Phase 2B Per-Tenant Usage Ledger: recorded as soon as usage is known
+    // — a completed, billed provider call — not gated on the Instagram
+    // send below succeeding. The tokens were spent regardless of whether
+    // delivery later fails; that's a separate (DM failure) concern from
+    // what the provider actually billed. Idempotent on lead_event_id, so
+    // a job retry after a downstream failure can't double-record it.
+    if (usage) {
+      await recordTokenUsage(pool, {
+        tenantId: job.tenantId,
+        leadEventId: job.leadEventId,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+      });
     }
 
     if (capExceeded) {

@@ -1,5 +1,7 @@
 import type { Pool } from "pg";
 import { addTenantMember } from "./tenantMembers.js";
+import { config } from "../config.js";
+import type { PlanTier } from "../lib/planTiers.js";
 
 export type BillingStatus = "none" | "active" | "canceled";
 
@@ -10,6 +12,9 @@ export interface Tenant {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   billingStatus: BillingStatus;
+  planTier: PlanTier;
+  trialStartedAt: Date | null;
+  trialEndsAt: Date | null;
   createdAt: Date;
 }
 
@@ -20,6 +25,9 @@ interface TenantRow {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   billing_status: BillingStatus;
+  plan_tier: PlanTier;
+  trial_started_at: Date | null;
+  trial_ends_at: Date | null;
   created_at: Date;
 }
 
@@ -31,6 +39,9 @@ function toTenant(row: TenantRow): Tenant {
     stripeCustomerId: row.stripe_customer_id,
     stripeSubscriptionId: row.stripe_subscription_id,
     billingStatus: row.billing_status,
+    planTier: row.plan_tier,
+    trialStartedAt: row.trial_started_at,
+    trialEndsAt: row.trial_ends_at,
     createdAt: row.created_at,
   };
 }
@@ -57,9 +68,16 @@ export async function createTenantForUser(pool: Pool, name: string, ownerUserId:
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Phase 2B Free Trial Period: starts at tenant creation, not at
+    // Instagram connect — a tenant should be able to explore the product
+    // (create campaigns, see the dashboard) before connecting anything.
+    // trialDays lives in config, not a SQL default, so the trial length is
+    // a code-level product decision, not a migration.
+    const trialEndsAt = new Date(Date.now() + config.trialDays * 24 * 60 * 60 * 1000);
     const result = await client.query<TenantRow>(
-      `insert into tenants (name, owner_user_id) values ($1, $2) returning *`,
-      [name, ownerUserId],
+      `insert into tenants (name, owner_user_id, trial_started_at, trial_ends_at)
+       values ($1, $2, now(), $3) returning *`,
+      [name, ownerUserId, trialEndsAt],
     );
     const tenant = toTenant(result.rows[0]!);
     await addTenantMember(client, tenant.id, ownerUserId, "owner");
@@ -102,4 +120,23 @@ export async function setBillingStatus(
     `update tenants set billing_status = $2, stripe_subscription_id = coalesce($3, stripe_subscription_id) where id = $1`,
     [tenantId, billingStatus, stripeSubscriptionId ?? null],
   );
+}
+
+/** Phase 2B Plan Tiers: set from the Stripe webhook once checkout.session.completed resolves which tier was purchased (via Checkout session metadata — see routes/billing.ts). */
+export async function setPlanTier(pool: Pool, tenantId: string, planTier: PlanTier): Promise<void> {
+  await pool.query(`update tenants set plan_tier = $2 where id = $1`, [tenantId, planTier]);
+}
+
+/**
+ * Phase 2B Trial-Abuse Guardrail: called when an Instagram account that
+ * already has a trial elsewhere connects to a NEW tenant — that tenant's
+ * trial ends immediately (trial_ends_at = now()) rather than running the
+ * full trialDays window a second time on the same underlying account.
+ * plan_tier itself isn't touched here: a tenant past trial_ends_at is
+ * gated by the trial-expiry check wherever quotas are enforced, the same
+ * way an ordinary trial's natural expiry is — this just moves that
+ * boundary to "now" instead of leaving it dangling on abuse.
+ */
+export async function endTrialImmediately(pool: Pool, tenantId: string): Promise<void> {
+  await pool.query(`update tenants set trial_ends_at = now() where id = $1 and plan_tier = 'trial'`, [tenantId]);
 }

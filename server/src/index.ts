@@ -15,6 +15,7 @@ import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "./db/emailOtpCodes.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
+import { ensureUsageRollupQueue, startUsageRollupWorker } from "./queue/usageRollupQueue.js";
 import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
 import { ensureUsernameResolutionQueue, startUsernameResolutionWorker } from "./queue/usernameResolutionQueue.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
@@ -59,6 +60,8 @@ async function main() {
   await ensureDataDeletionQueue(boss);
   await ensureMaintenanceQueue(boss);
   await startMaintenanceWorker(boss, pool);
+  await ensureUsageRollupQueue(boss);
+  await startUsageRollupWorker(boss, pool);
   await ensureAlertsQueue(boss);
   await startAlertsWorker(boss, pool);
   await ensureUsernameResolutionQueue(boss);

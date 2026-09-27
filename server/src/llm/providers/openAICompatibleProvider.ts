@@ -25,7 +25,7 @@ const MAX_ERROR_BODY_CHARS = 200;
 export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): LLMProvider {
   return {
     name: config.name,
-    async generateReply({ systemPrompt, userMessage, responseFormat }: GenerateReplyInput): Promise<string> {
+    async generateReply({ systemPrompt, userMessage, responseFormat }: GenerateReplyInput) {
       const res = await fetch(`${config.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -60,12 +60,20 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
 
       const body = (await res.json()) as {
         choices: Array<{ message: { content: string } }>;
+        // Every OpenAI-compatible chat-completions endpoint returns this,
+        // but it's still optional here — a provider that omits or
+        // malforms it must degrade to "no usage recorded", not throw.
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       const content = body.choices[0]?.message.content;
       if (!content) {
         throw new Error(`${config.name} returned no completion content`);
       }
-      return content;
+      const usage =
+        typeof body.usage?.prompt_tokens === "number" && typeof body.usage?.completion_tokens === "number"
+          ? { promptTokens: body.usage.prompt_tokens, completionTokens: body.usage.completion_tokens }
+          : undefined;
+      return { text: content, usage };
     },
   };
 }

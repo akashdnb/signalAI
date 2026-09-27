@@ -204,6 +204,12 @@ None of them change whether a pilot creator can run a campaign and get paid for 
 
 > Extends the single flat plan shipped in [[#Phase 1 — MVP: Instagram Comment Automation|Phase 1]] into a real pricing system.
 
+> **Shipped 2026-09-22**, everything below except the WhatsApp Cost Line sub-item (explicitly Phase 3-gated — no WhatsApp integration or WABA decision exists yet, so it stays exactly as originally scoped). Full writeup in `claude_fixes/2026-09-22-phase-2b-billing.md`. Verified beyond typecheck/tests: full suite (431/431) passing, all 4 new migrations re-tested against a DB with pre-existing rows, and the trial/tier/usage-dashboard UI driven end-to-end through a real browser (Playwright against the live dev server + Postgres) — signup, trial countdown, tier upgrade buttons, and a graceful-failure path against a deliberately invalid Stripe key, all with zero unexpected console errors.
+>
+> **Two things worth flagging, not silently glossed over:**
+> - **`connectedAccounts` in the tier table is informational only, not enforced.** The system only supports one connected Instagram account per tenant today, full stop (`getSoleConnectedAccount` — no multi-account UI or backend exists), regardless of tier. Growth's "3 connected accounts" is a stated future entitlement, not something a Growth tenant can actually use yet — building real multi-account support is its own project, out of this phase's scope.
+> - **`campaigns`/`connectedAccounts` quotas have no hard block at creation time.** Only DM/token usage gets soft-cap warnings (Usage Visibility Dashboard) and the trial token allowance gets a real fail-closed block — matching "warn as a tenant approaches their tier limit; don't hard-block mid-campaign." Nothing currently stops a trial tenant from creating a 4th campaign past their stated 3-campaign quota. Add if real pilot usage shows this matters; it didn't seem worth a hard block nobody asked for yet.
+
 - Free Trial Period (time-boxed, full or near-full feature access; converts to a paid tier or downgrades to a locked/read-only state on expiry — decide which before launch)
 - Trial Token Allowance — the trial includes a capped token budget, separate from its time window, so a trial account can't run unbounded AI cost
 - Trial-Abuse Guardrail — tie trial eligibility to the connected Instagram account / verified identity, not just an email/signup, so one client can't cycle endless free trials

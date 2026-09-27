@@ -12,6 +12,15 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour — Meta's binding ceilin
 // against each other rather than causing incorrect behavior.
 const ADVISORY_LOCK_NAMESPACE = 771_001;
 
+/** Phase 2B Usage Visibility Dashboard: DMs sent this billing cycle, tenant-scoped (not per-account — a tenant's quota is tenant-wide even if they connect more than one account under Growth). */
+export async function countSendsSince(pool: Pool, tenantId: string, since: Date): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `select count(*)::int as count from account_sends where tenant_id = $1 and sent_at >= $2`,
+    [tenantId, since],
+  );
+  return Number(result.rows[0]!.count);
+}
+
 export async function countRecentSends(pool: Pool, instagramAccountId: string): Promise<number> {
   const result = await pool.query<{ count: string }>(
     `select count(*)::int as count from account_sends

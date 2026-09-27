@@ -55,6 +55,41 @@ export const config = {
   get stripeWebhookSecret() {
     return process.env.STRIPE_WEBHOOK_SECRET ?? "";
   },
+  // Phase 2B Plan Tiers: two paid tiers above the Phase 1 flat plan
+  // (stripePriceId above stays the 'starter' tier's price for anyone
+  // still on the original single-plan Checkout link). Both genuinely
+  // optional — a tier whose price id is unset simply can't be checked out
+  // into yet, same graceful-degradation shape as billing overall.
+  get stripeStarterPriceId() {
+    return process.env.STRIPE_STARTER_PRICE_ID || process.env.STRIPE_PRICE_ID || "";
+  },
+  get stripeGrowthPriceId() {
+    return process.env.STRIPE_GROWTH_PRICE_ID ?? "";
+  },
+  // Phase 2B Daily Usage Rollup -> Stripe Metered Billing: the Billing
+  // Meter's event_name, configured on the Stripe dashboard side. Unset
+  // means the rollup job still aggregates internally (that's the real
+  // ledger) but skips the Stripe sync call, logging instead — same
+  // "internal source of truth stays correct even if the external sync
+  // can't run" shape as every other optional integration here.
+  get stripeMeterEventName() {
+    return process.env.STRIPE_METER_EVENT_NAME ?? "";
+  },
+  // Phase 2B Free Trial Period. Deliberately a plain number of days, not
+  // a token-budget-shaped setting — see trialTokenAllowance below for that
+  // half.
+  get trialDays() {
+    return Number(process.env.TRIAL_DAYS ?? 14);
+  },
+  // Phase 2B Trial Token Allowance: a cumulative cap for the WHOLE trial,
+  // separate from aiDailyCallCap above (a rolling 24h CALL-count ceiling
+  // that applies to every tenant regardless of tier). This one is
+  // TOKEN-based and trial-only — a trial account can't outrun it by
+  // spreading calls across many days the way a daily call cap alone would
+  // allow.
+  get trialTokenAllowance() {
+    return Number(process.env.TRIAL_TOKEN_ALLOWANCE ?? 200_000);
+  },
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },

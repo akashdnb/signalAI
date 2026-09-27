@@ -1,5 +1,5 @@
 import type { Campaign } from "../db/campaigns.js";
-import type { LLMProvider } from "../llm/provider.js";
+import type { GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
 import { classifyInput, validateOutput } from "../lib/guardrails.js";
 import { appendCtaLink, renderTemplate } from "../lib/messageComposer.js";
 import { ALLOW_ALL_SPEND_GUARD, type AiSpendGuard } from "./aiSpendGuard.js";
@@ -22,6 +22,8 @@ export interface PreparedReply {
   fellBackReason?: string;
   /** B10: set specifically when the fallback was caused by the per-account daily AI call cap, not any other failure mode — the one case the worker should alert an operator about. */
   capExceeded?: boolean;
+  /** Phase 2B Per-Tenant Usage Ledger: only set for a completed, billed ai_generated call — absent for rule_based (never calls the provider) and for any fallback path, since none of those were actually billed. */
+  usage?: GenerateReplyUsage;
 }
 
 /**
@@ -99,11 +101,14 @@ export async function generateReply(
   }
 
   let generated: string;
+  let usage: GenerateReplyUsage | undefined;
   try {
-    generated = await provider.generateReply({
+    const result = await provider.generateReply({
       systemPrompt: buildSystemPrompt(ctx),
       userMessage: ctx.sourceText,
     });
+    generated = result.text;
+    usage = result.usage;
   } catch (err) {
     // R7-02: this call never completed, so it was never actually billed —
     // refund the reservation rather than letting a provider outage burn
@@ -123,8 +128,8 @@ export async function generateReply(
   if (!outputCheck.allowed) {
     // The call itself completed (and was billed) — only a transport
     // failure above is refunded, not a rejected-but-real generation.
-    return { ...ruleBasedReply(ctx), fellBackReason: outputCheck.reason };
+    return { ...ruleBasedReply(ctx), fellBackReason: outputCheck.reason, usage };
   }
 
-  return { text, engine: "ai_generated" };
+  return { text, engine: "ai_generated", usage };
 }

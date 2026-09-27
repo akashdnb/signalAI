@@ -2,7 +2,9 @@ import { randomBytes } from "node:crypto";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PgBoss } from "pg-boss";
 import { getPool, closePool } from "../../db/pool.js";
-import { createTenant } from "../../db/tenants.js";
+import { createTenant, createTenantForUser } from "../../db/tenants.js";
+import { findOrCreateUserByEmail } from "../../db/users.js";
+import { recordTokenUsage } from "../../db/tokenUsage.js";
 import { createCampaign } from "../../db/campaigns.js";
 import { setCampaignMilestones } from "../../db/milestones.js";
 import { findOrCreateLeadByInstagramUserId, getLead, updateHandoffStatus, updateMessagingWindow } from "../../db/leads.js";
@@ -34,7 +36,7 @@ function mockProvider(replies: string[]): LLMProvider {
   let call = 0;
   return {
     name: "mock",
-    generateReply: vi.fn(async () => replies[Math.min(call++, replies.length - 1)]!),
+    generateReply: vi.fn(async () => ({ text: replies[Math.min(call++, replies.length - 1)]! })),
   };
 }
 
@@ -574,6 +576,59 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
       expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("requested");
+    });
+  });
+
+  describe("Trial Token Allowance (Phase 2B)", () => {
+    const originalAllowance = process.env.TRIAL_TOKEN_ALLOWANCE;
+
+    afterEach(() => {
+      process.env.TRIAL_TOKEN_ALLOWANCE = originalAllowance;
+    });
+
+    it("falls back to rule-based once a trial tenant's cumulative token usage reaches the allowance, even with call-count budget left", async () => {
+      process.env.TRIAL_TOKEN_ALLOWANCE = "1000"; // small, deterministic allowance for this test
+      const pool = getPool();
+      const owner = await findOrCreateUserByEmail(pool, "owner@example.com");
+      const tenant = await createTenantForUser(pool, "creator-a", owner.id); // real trial_started_at, plan_tier 'trial'
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
+
+      // A generously high call-count cap — this test isolates the TOKEN
+      // allowance, not the daily call cap (already covered above).
+      const provider = mockProvider(["Sure, here you go!"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, 1000);
+
+      // Seed prior usage that already exceeds the 1000-token trial allowance.
+      const priorEvent = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "an earlier message");
+      await recordTokenUsage(pool, { tenantId: tenant.id, leadEventId: priorEvent.event.id, promptTokens: 900, completionTokens: 200 });
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "please send the LINK");
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(provider.generateReply).not.toHaveBeenCalled(); // never reached the provider — the trial guard denied it first
+      expect(sendInstagramMessage).toHaveBeenCalledWith("token-1", "ig-user-1", expect.any(String)); // still sends the rule-based fallback
+    });
+
+    it("does not gate a paid-tier tenant's usage against the trial allowance at all", async () => {
+      process.env.TRIAL_TOKEN_ALLOWANCE = "1000";
+      const pool = getPool();
+      const owner = await findOrCreateUserByEmail(pool, "owner@example.com");
+      const tenant = await createTenantForUser(pool, "creator-a", owner.id);
+      await pool.query("update tenants set plan_tier = 'starter' where id = $1", [tenant.id]);
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
+
+      const provider = mockProvider([JSON.stringify("unused")]);
+      provider.generateReply = vi.fn().mockResolvedValue({ text: "Sure, here you go!" });
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, 1000);
+
+      const priorEvent = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "an earlier message");
+      await recordTokenUsage(pool, { tenantId: tenant.id, leadEventId: priorEvent.event.id, promptTokens: 900, completionTokens: 200 });
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "please send the LINK");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(provider.generateReply).toHaveBeenCalled(); // a paid tier has no trial allowance to hit
     });
   });
 });
