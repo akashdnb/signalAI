@@ -1,11 +1,11 @@
 import type { Pool } from "pg";
 import type { PgBoss } from "pg-boss";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
-import { findOrCreateLeadByInstagramUserId, nextSequence, updateMessagingWindow } from "../db/leads.js";
+import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
 import { listActiveCampaignKeywords, type TriggerSource } from "../db/campaigns.js";
-import { findMatchingCampaign } from "../lib/keywordMatch.js";
+import { findMatchingCampaign, CONTINUATION_KEYWORD } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
 import { enqueueUsernameResolution } from "../queue/usernameResolutionQueue.js";
@@ -105,6 +105,35 @@ async function ingestOneEvent(
       if (match) {
         attributes.matchedCampaignId = match.campaignId;
         attributes.matchedKeyword = match.keyword;
+        // DM Conversation Continuation: remember which campaign this lead's
+        // DM conversation belongs to, so a later message that doesn't
+        // independently match any keyword can still fall back to it (below,
+        // and on this lead's NEXT event). Comments never set/read this —
+        // a public comment thread isn't a private ongoing conversation the
+        // same way.
+        if (event.eventType === "message") {
+          await setActiveDmCampaignId(client, tenantId, lead.id, match.campaignId);
+        }
+      } else if (event.eventType === "message" && lead.activeDmCampaignId) {
+        // DM Conversation Continuation fallback: this message didn't match
+        // any keyword on its own, but this lead already has an ongoing DM
+        // conversation — checked against `lead`'s PRE-update windowOpenUntil
+        // (the window's state as of the PRIOR interaction, before this
+        // function's own updateMessagingWindow call below extends it using
+        // THIS message's timestamp) so a customer who's gone quiet 24h+ and
+        // messages again out of the blue needs to mention a keyword again,
+        // same as Instagram's own DM policy window governs elsewhere here.
+        const stillOpen = !!lead.windowOpenUntil && lead.windowOpenUntil.getTime() >= event.occurredAt.getTime();
+        // `campaigns` already only contains tenant_id-scoped, enabled=true
+        // campaigns (listActiveCampaignKeywords) — a since-disabled
+        // campaign naturally isn't found here, no extra check needed.
+        const continuedCampaign = campaigns.find((c) => c.id === lead.activeDmCampaignId);
+        const dmEligible =
+          continuedCampaign && (continuedCampaign.triggerSource === "message" || continuedCampaign.triggerSource === "both");
+        if (stillOpen && dmEligible) {
+          attributes.matchedCampaignId = lead.activeDmCampaignId;
+          attributes.matchedKeyword = CONTINUATION_KEYWORD;
+        }
       }
     }
 

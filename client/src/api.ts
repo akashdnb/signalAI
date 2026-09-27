@@ -258,7 +258,8 @@ export interface Deal {
 
 export type TimelineEntry =
   | { kind: "event"; occurredAt: string; eventType: string; text: string | null; username: string | null; matchedKeyword: string | null }
-  | { kind: "activity"; occurredAt: string; type: string; summary: string; actorUserId: string | null };
+  | { kind: "activity"; occurredAt: string; type: string; summary: string; actorUserId: string | null }
+  | { kind: "reply"; occurredAt: string; channel: "dm" | "comment"; engine: "rule_based" | "ai_generated"; text: string };
 
 export interface TopPost {
   mediaId: string;

@@ -384,6 +384,12 @@ export function LeadDetailPage() {
                         {entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}
                         <div>{entry.text ?? "—"}</div>
                       </>
+                    ) : entry.kind === "reply" ? (
+                      <>
+                        <strong>Bot reply ({entry.channel === "comment" ? "comment" : "DM"})</strong>
+                        <span className="pill">{entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}</span>
+                        <div>{entry.text}</div>
+                      </>
                     ) : (
                       <div>{entry.summary}</div>
                     )}

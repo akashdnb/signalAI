@@ -4,6 +4,16 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-09-28 — DM Conversation Continuation + Timeline Shows Bot Replies
+
+Two fixes surfaced by a real live conversation (migrations `1758240000040`–`1758240000041`):
+
+- **DM Conversation Continuation.** Keyword matching (`lib/keywordMatch.ts`) was entirely stateless per-message — it never looked at whether a lead already had an ongoing conversation. A customer replying in their own words without repeating an exact configured keyword mid-conversation got silently dropped (no reply, no trace beyond a bare timeline row). Fixed via a new `leads.active_dm_campaign_id`, set on every real keyword match for a DM event and read as a fallback when a later message in the same still-open 24h messaging window doesn't independently match anything — surfaced in the timeline via a `(ongoing conversation)` sentinel keyword so it's visibly distinguishable from a genuine silent non-match. Comments are deliberately excluded (not a private ongoing conversation the same way); a since-disabled or comment-only-switched campaign correctly stops continuing.
+- **Timeline now shows the bot's own replies.** Nothing anywhere previously persisted what the bot actually sent back — `leadEventReplyHandler.ts` called Meta's API directly and the dashboard timeline only ever showed the customer's half of the conversation. New `sent_replies` table, one row per actual channel send (a `'both'`-channel campaign produces two rows for one triggering event, matching the two real API calls made), merged into `getLeadTimeline` alongside `lead_events`/`lead_activity` and rendered in `LeadDetailPage.tsx`.
+- Verified: 528/528 passing (25 new tests), migrations re-tested up/down, client build/lint clean.
+
+---
+
 ## 2026-09-27 — Phase 2C Slice 1: Conversational AI Engine (RAG core)
 
 **RAG-engine slice of Phase 2C shipped** (migrations `1758240000038`–`1758240000039`) — Per-Tenant

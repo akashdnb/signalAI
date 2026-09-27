@@ -10,6 +10,7 @@ import { getCampaign } from "../db/campaigns.js";
 import { getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
 import { getTenant } from "../db/tenants.js";
 import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
+import { recordSentReply, type SentReplyEngine } from "../db/sentReplies.js";
 import type { RagDependencies } from "./replyEngine.js";
 import {
   getFirstMilestone,
@@ -192,6 +193,7 @@ export function createLeadEventReplyHandler(
         : spendGuard;
 
     let replyText: string;
+    let engine: SentReplyEngine;
     let capExceeded = false;
     let requiresHumanHandoff = false;
     let fellBackReason: string | undefined;
@@ -217,6 +219,7 @@ export function createLeadEventReplyHandler(
         rag,
       );
       replyText = reply.text;
+      engine = reply.engine;
       capExceeded = reply.capExceeded ?? false;
       requiresHumanHandoff = reply.requiresHumanHandoff ?? false;
       fellBackReason = reply.fellBackReason;
@@ -268,6 +271,11 @@ export function createLeadEventReplyHandler(
       }
 
       replyText = result.reply;
+      // The milestone branch only runs when campaign.replyMode is
+      // 'ai_generated' (the outer if/else split above) — its only non-AI
+      // output is the fail-closed generic fallback (fellBackReason set),
+      // never a rule-based TEMPLATE the way the flat-reply branch has one.
+      engine = result.fellBackReason ? "rule_based" : "ai_generated";
       capExceeded = result.capExceeded ?? false;
       requiresHumanHandoff = result.requiresHumanHandoff ?? false;
       fellBackReason = result.fellBackReason;
@@ -343,10 +351,32 @@ export function createLeadEventReplyHandler(
     if (dmReady) {
       await sendInstagramMessage(token, lead.instagramUserId, replyText);
       delivered = true;
+      // Recorded per actual channel send, not per event — a 'both'-channel
+      // campaign makes two real Instagram API calls below and now produces
+      // two rows, matching what actually went out. Previously nothing
+      // anywhere persisted what the bot sent back at all; the dashboard
+      // timeline (leadTimeline.ts) showed only the customer's half of the
+      // conversation.
+      await recordSentReply(pool, {
+        tenantId: job.tenantId,
+        leadId: job.leadId,
+        leadEventId: job.leadEventId,
+        channel: "dm",
+        engine,
+        text: replyText,
+      });
     }
     if (commentReady) {
       await sendInstagramCommentReply(token, event.commentId!, replyText);
       delivered = true;
+      await recordSentReply(pool, {
+        tenantId: job.tenantId,
+        leadId: job.leadId,
+        leadEventId: job.leadEventId,
+        channel: "comment",
+        engine,
+        text: replyText,
+      });
     }
 
     // R6-01: only commit milestone advancement once at least one channel

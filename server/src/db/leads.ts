@@ -11,6 +11,8 @@ export interface Lead {
   customerId: string | null;
   instagramUserId: string | null;
   activeMilestoneId: string | null;
+  /** DM Conversation Continuation: which campaign this lead's DM conversation currently belongs to — set on every real keyword match for a DM event, read as a fallback when a later message in the same still-open messaging window doesn't match any keyword on its own. Never set/read for comment events. */
+  activeDmCampaignId: string | null;
   lastInboundAt: Date | null;
   windowOpenUntil: Date | null;
   lastAppliedSequence: number;
@@ -28,6 +30,7 @@ interface LeadRow {
   customer_id: string | null;
   instagram_user_id: string | null;
   active_milestone_id: string | null;
+  active_dm_campaign_id: string | null;
   last_inbound_at: Date | null;
   window_open_until: Date | null;
   last_applied_sequence: string; // bigint comes back as string from pg
@@ -45,6 +48,7 @@ function toLead(row: LeadRow): Lead {
     customerId: row.customer_id,
     instagramUserId: row.instagram_user_id,
     activeMilestoneId: row.active_milestone_id,
+    activeDmCampaignId: row.active_dm_campaign_id,
     lastInboundAt: row.last_inbound_at,
     windowOpenUntil: row.window_open_until,
     lastAppliedSequence: Number(row.last_applied_sequence),
@@ -244,6 +248,20 @@ export async function setActiveMilestone(
     leadId,
     tenantId,
     milestoneId,
+  ]);
+}
+
+/** DM Conversation Continuation: called on every real keyword match for a DM event (webhookIngestService.ts), always overwriting to the latest match — explicitly invoking a different campaign's keyword correctly switches which conversation a lead is "in." */
+export async function setActiveDmCampaignId(
+  pool: Queryable,
+  tenantId: string,
+  leadId: string,
+  campaignId: string,
+): Promise<void> {
+  await pool.query(`update leads set active_dm_campaign_id = $3 where id = $1 and tenant_id = $2`, [
+    leadId,
+    tenantId,
+    campaignId,
   ]);
 }
 

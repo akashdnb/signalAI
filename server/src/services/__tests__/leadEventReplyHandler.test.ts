@@ -17,6 +17,7 @@ import type { LLMProvider } from "../../llm/provider.js";
 import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
 import { createProcessingDocument, insertChunks, markDocumentReady } from "../../db/knowledgeBase.js";
 import { upsertGuardrailsConfig } from "../../db/guardrailsConfig.js";
+import { listSentRepliesForLead } from "../../db/sentReplies.js";
 import { sendInstagramCommentReply, sendInstagramMessage } from "../../lib/instagramSend.js";
 import { enqueueLeadEvent } from "../../queue/leadEventsQueue.js";
 import { createLeadEventReplyHandler } from "../leadEventReplyHandler.js";
@@ -438,6 +439,59 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       "select count(*)::int as count from account_sends where instagram_account_id = 'acct-1'",
     );
     expect(rows.rows[0].count).toBe(1);
+  });
+
+  describe("sent replies (bot-reply timeline visibility)", () => {
+    it("records one sent_replies row for a single-channel send, with the right engine", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+      const provider = mockProvider(["Here's the info!"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      const replies = await listSentRepliesForLead(pool, tenant.id, lead.id);
+      expect(replies).toHaveLength(1);
+      expect(replies[0]).toMatchObject({ channel: "dm", engine: "ai_generated", text: expect.stringContaining("Here's the info!") });
+    });
+
+    it("records two sent_replies rows for a 'both'-channel send from one triggering event", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyChannel: "both" });
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {
+        commentId: "comment-1",
+      });
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      const replies = await listSentRepliesForLead(pool, tenant.id, lead.id);
+      expect(replies).toHaveLength(2);
+      expect(replies.map((r) => r.channel).sort()).toEqual(["comment", "dm"]);
+    });
+
+    it("records engine 'rule_based' for a milestone conversation's fail-closed fallback reply", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
+      await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "capture email" }]);
+
+      const provider: LLMProvider = { name: "mock", generateReply: vi.fn().mockResolvedValue({ text: "not json at all" }) };
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "hello");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      const replies = await listSentRepliesForLead(pool, tenant.id, lead.id);
+      expect(replies).toHaveLength(1);
+      expect(replies[0]!.engine).toBe("rule_based");
+    });
   });
 
   describe("reply channel", () => {
