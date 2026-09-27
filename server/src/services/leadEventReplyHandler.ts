@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { PgBoss } from "pg-boss";
 import type { LLMProvider, GenerateReplyUsage } from "../llm/provider.js";
+import type { EmbeddingProvider } from "../llm/embeddingProvider.js";
 import type { LeadEventJob } from "../queue/leadEventsQueue.js";
 import type { LeadEventHandlerResult } from "../queue/worker.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
@@ -8,6 +9,8 @@ import { getEventForReply } from "../db/events.js";
 import { getCampaign } from "../db/campaigns.js";
 import { getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
 import { getTenant } from "../db/tenants.js";
+import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
+import type { RagDependencies } from "./replyEngine.js";
 import {
   getFirstMilestone,
   getMilestone,
@@ -66,6 +69,10 @@ export function createLeadEventReplyHandler(
   provider: LLMProvider,
   keyring: Map<string, Buffer>,
   aiDailyCallCap: number,
+  // Phase 2C: null when embeddings aren't configured on this server —
+  // generateReply/runMilestoneCheck already treat that exactly like "this
+  // tenant has no knowledge base," so no special-casing is needed here.
+  embeddingProvider: EmbeddingProvider | null = null,
 ) {
   return async function handleLeadEvent(job: LeadEventJob): Promise<LeadEventHandlerResult> {
     const event = await getEventForReply(pool, job.tenantId, job.leadEventId);
@@ -89,6 +96,14 @@ export function createLeadEventReplyHandler(
 
     const tenant = await getTenant(pool, job.tenantId);
     if (!tenant) return { advance: true }; // shouldn't happen — the whole pipeline is tenant-scoped from ingestion
+
+    // Phase 2C Client Guardrails + RAG: fetched once per event, alongside
+    // the other per-event context above, and threaded into whichever
+    // engine below actually runs. null (no row yet) is a valid, common
+    // state — generateReply/runMilestoneCheck treat an absent config
+    // identically to an empty one, never as "guardrails disabled."
+    const tenantGuardrailsConfig = await getGuardrailsConfig(pool, job.tenantId);
+    const rag: RagDependencies = { pool, embeddingProvider, tenantGuardrailsConfig };
 
     // Phase 2A Human Handoff: a human has claimed this conversation
     // (handoffStatus 'human') — the worker stops generating/sending
@@ -178,6 +193,7 @@ export function createLeadEventReplyHandler(
 
     let replyText: string;
     let capExceeded = false;
+    let requiresHumanHandoff = false;
     let usage: GenerateReplyUsage | undefined;
     // R6-01: milestone advancement is computed here but only committed
     // after a confirmed send, below.
@@ -197,9 +213,11 @@ export function createLeadEventReplyHandler(
         },
         provider,
         effectiveSpendGuard,
+        rag,
       );
       replyText = reply.text;
       capExceeded = reply.capExceeded ?? false;
+      requiresHumanHandoff = reply.requiresHumanHandoff ?? false;
       usage = reply.usage;
     } else {
       const activeMilestone = lead.activeMilestoneId
@@ -228,6 +246,7 @@ export function createLeadEventReplyHandler(
         },
         provider,
         effectiveSpendGuard,
+        rag,
       );
 
       if (result.satisfied) {
@@ -248,6 +267,7 @@ export function createLeadEventReplyHandler(
 
       replyText = result.reply;
       capExceeded = result.capExceeded ?? false;
+      requiresHumanHandoff = result.requiresHumanHandoff ?? false;
       usage = result.usage;
     }
 
@@ -283,6 +303,18 @@ export function createLeadEventReplyHandler(
       if (lead.handoffStatus === "ai") {
         await updateHandoffStatus(pool, { tenantId: job.tenantId, leadId: job.leadId, status: "requested" });
       }
+    }
+
+    // Phase 2C Escalation Triggers / Grounded-Answer-Only Fallback: unlike
+    // capExceeded above, this actually PAUSES automation (status 'human',
+    // not 'requested') — a tenant-configured escalation phrase or an
+    // ungrounded question against a real knowledge base means a human
+    // should take over this conversation, not just be flagged for
+    // attention while the bot keeps replying. No "already human" guard
+    // needed here — this function already returned early, above, for any
+    // lead whose handoffStatus was already 'human'.
+    if (requiresHumanHandoff) {
+      await updateHandoffStatus(pool, { tenantId: job.tenantId, leadId: job.leadId, status: "human" });
     }
 
     const token = await getDecryptedToken(pool, keyring, job.tenantId, account.instagramAccountId);

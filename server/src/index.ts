@@ -8,7 +8,7 @@ import { ensureQueues, LEAD_EVENTS_DLQ } from "./queue/leadEventsQueue.js";
 import { ensureTokenRefreshQueue, startTokenRefreshWorker } from "./queue/tokenRefreshQueue.js";
 import { ensureDataDeletionQueue, startDataDeletionWorker } from "./queue/dataDeletionQueue.js";
 import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs } from "./queue/worker.js";
-import { createLLMProviderFromEnv } from "./llm/factory.js";
+import { createLLMProviderFromEnv, createEmbeddingProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
@@ -54,6 +54,12 @@ async function main() {
   const pool = getPool();
   const boss = await getBoss();
   const llmProvider = loadLLMProviderOrFallback();
+  // Phase 2C Knowledge Base: null when EMBEDDING_* isn't configured — every
+  // consumer (leadEventReplyHandler.ts, the KB upload route) already
+  // treats that as "no knowledge base," the same graceful degradation
+  // shape as an unconfigured LLM provider above, just without needing a
+  // stub object (callers accept `EmbeddingProvider | null` directly).
+  const embeddingProvider = createEmbeddingProviderFromEnv();
 
   await ensureQueues(boss);
   await ensureTokenRefreshQueue(boss);
@@ -70,7 +76,7 @@ async function main() {
   await startLeadEventsWorker(
     boss,
     pool,
-    createLeadEventReplyHandler(pool, boss, llmProvider, config.tokenKeyring, config.aiDailyCallCap),
+    createLeadEventReplyHandler(pool, boss, llmProvider, config.tokenKeyring, config.aiDailyCallCap, embeddingProvider),
   );
   await startDataDeletionWorker(boss, pool);
 
@@ -141,7 +147,7 @@ async function main() {
     }
   });
 
-  const app = createApp({ llmProvider });
+  const app = createApp({ llmProvider, embeddingProvider });
   app.listen(config.port, () => {
     // eslint-disable-next-line no-console
     console.log(`signalAI server listening on :${config.port} (${config.nodeEnv})`);

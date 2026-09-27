@@ -14,6 +14,9 @@ import { getCapturedFacts } from "../../db/capturedFacts.js";
 import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import type { LLMProvider } from "../../llm/provider.js";
+import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
+import { createProcessingDocument, insertChunks, markDocumentReady } from "../../db/knowledgeBase.js";
+import { upsertGuardrailsConfig } from "../../db/guardrailsConfig.js";
 import { sendInstagramCommentReply, sendInstagramMessage } from "../../lib/instagramSend.js";
 import { enqueueLeadEvent } from "../../queue/leadEventsQueue.js";
 import { createLeadEventReplyHandler } from "../leadEventReplyHandler.js";
@@ -38,6 +41,18 @@ function mockProvider(replies: string[]): LLMProvider {
     name: "mock",
     generateReply: vi.fn(async () => ({ text: replies[Math.min(call++, replies.length - 1)]! })),
   };
+}
+
+// One-hot vectors: perfectly orthogonal (cosine similarity 0) for different
+// indices, identical (similarity 1) for the same index — deterministic and
+// unambiguous for threshold tests, unlike two sine-based vectors which can
+// remain highly correlated across 768 dimensions despite a phase shift.
+function vec(index: number): number[] {
+  return Array.from({ length: 768 }, (_, i) => (i === index ? 1 : 0));
+}
+
+function fakeEmbeddingProvider(queryVector: number[]): EmbeddingProvider {
+  return { name: "fake", embed: vi.fn(async () => ({ vectors: [queryVector] })) };
 }
 
 async function seedMatchedEvent(
@@ -629,6 +644,137 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
       expect(provider.generateReply).toHaveBeenCalled(); // a paid tier has no trial allowance to hit
+    });
+  });
+
+  describe("Phase 2C RAG + Client Guardrails integration", () => {
+    it("proceeds normally when the tenant has no knowledge base and no guardrails config at all", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+      const provider = mockProvider(["Sure, here's the info!"]);
+      const embeddingProvider = fakeEmbeddingProvider(vec(0));
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP, embeddingProvider);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "what's the price?");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(provider.generateReply).toHaveBeenCalled();
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("ai");
+    });
+
+    it("grounds the reply with retrieved knowledge base content when it matches well", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+      const doc = await createProcessingDocument(pool, {
+        tenantId: tenant.id,
+        filename: "faq.txt",
+        contentType: "text/plain",
+        storageKey: "k1",
+      });
+      await markDocumentReady(pool, { tenantId: tenant.id, documentId: doc.id });
+      await insertChunks(pool, {
+        tenantId: tenant.id,
+        documentId: doc.id,
+        chunks: [{ chunkIndex: 0, content: "Our refund window is 30 days after purchase.", embedding: vec(0) }],
+      });
+
+      const provider = mockProvider(["Our refund window is 30 days."]);
+      const embeddingProvider = fakeEmbeddingProvider(vec(0)); // same vector — a strong match
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP, embeddingProvider);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "what's your refund policy?");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      const call = vi.mocked(provider.generateReply).mock.calls[0]![0];
+      expect(call.systemPrompt).toContain("Our refund window is 30 days after purchase.");
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("ai");
+    });
+
+    it("pauses automation (handoffStatus 'human') when the tenant has a knowledge base but nothing matches the question", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+      const doc = await createProcessingDocument(pool, {
+        tenantId: tenant.id,
+        filename: "faq.txt",
+        contentType: "text/plain",
+        storageKey: "k1",
+      });
+      await markDocumentReady(pool, { tenantId: tenant.id, documentId: doc.id });
+      await insertChunks(pool, {
+        tenantId: tenant.id,
+        documentId: doc.id,
+        chunks: [{ chunkIndex: 0, content: "unrelated content about shipping", embedding: vec(100) }],
+      });
+
+      const provider = mockProvider(["should never be used"]);
+      const embeddingProvider = fakeEmbeddingProvider(vec(0)); // far from the seeded chunk's vector
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP, embeddingProvider);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "some off-topic question");
+      const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(result).toEqual({ advance: true });
+      expect(provider.generateReply).not.toHaveBeenCalled();
+      expect(sendInstagramMessage).toHaveBeenCalledTimes(1); // the rule-based fallback still goes out this turn
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("human");
+    });
+
+    it("pauses automation on a tenant-configured escalation trigger, before any provider call", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+      await upsertGuardrailsConfig(pool, {
+        tenantId: tenant.id,
+        brandVoice: null,
+        forbiddenTopics: [],
+        escalationTriggers: ["talk to a lawyer"],
+      });
+
+      const provider = mockProvider(["should never be used"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(
+        pool,
+        tenant.id,
+        campaign.id,
+        "LINK",
+        "I'm going to talk to a lawyer about this",
+      );
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(provider.generateReply).not.toHaveBeenCalled();
+      expect(sendInstagramMessage).toHaveBeenCalledTimes(1); // the rule-based fallback still goes out this turn
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("human");
+    });
+
+    it("rejects a reply matching a tenant-configured forbidden topic even when nothing else fails", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+      await upsertGuardrailsConfig(pool, {
+        tenantId: tenant.id,
+        brandVoice: null,
+        forbiddenTopics: ["competitor"],
+        escalationTriggers: [],
+      });
+
+      const provider = mockProvider(["Ask our competitor, they're worse!"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "who else offers this?");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      // Provider was called and rejected on output, not on escalation — the
+      // rule-based fallback goes out and no human handoff was forced.
+      const [, , text] = vi.mocked(sendInstagramMessage).mock.calls[0]!;
+      expect(text).not.toContain("competitor");
+      expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("ai");
     });
   });
 });

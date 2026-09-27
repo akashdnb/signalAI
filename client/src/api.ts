@@ -85,6 +85,40 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * Phase 2C Knowledge Base upload: the only multipart/form-data call in
+ * this client — `request()` above always sets Content-Type: application/
+ * json and always JSON.stringifies its body, neither of which a file
+ * upload can use. A browser sets its own multipart boundary header
+ * automatically when the body is a FormData, so this must NOT set
+ * Content-Type itself (setting it manually loses the boundary parameter).
+ * Shares the same session/error-handling contract as request() otherwise.
+ */
+async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const session = loadSession();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: session ? { Authorization: `Bearer ${session.token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      message = body.error ?? message;
+    } catch {
+      // body wasn't JSON — keep statusText
+    }
+    if (res.status === 401 || res.status === 403) {
+      clearSession();
+    }
+    throw new ApiError(res.status, message);
+  }
+
+  return res.json() as Promise<T>;
+}
+
 /** Unauthenticated — there's no session yet at login time. Always resolves the same way regardless of outcome (server-side enumeration resistance); the caller just shows "check your inbox". */
 export async function requestOtp(email: string): Promise<void> {
   await request("/auth/email/request", { method: "POST", body: JSON.stringify({ email }) });
@@ -292,6 +326,27 @@ export interface UsageSummary {
   dms: { sent: number; allowance: number; nearingLimit: boolean };
 }
 
+export type KnowledgeBaseDocumentStatus = "processing" | "ready" | "failed";
+
+export interface KnowledgeBaseDocument {
+  id: string;
+  tenantId: string;
+  filename: string;
+  contentType: string;
+  version: number;
+  status: KnowledgeBaseDocumentStatus;
+  errorReason: string | null;
+  supersededAt: string | null;
+  createdAt: string;
+}
+
+export interface GuardrailsConfig {
+  tenantId: string;
+  brandVoice: string | null;
+  forbiddenTopics: string[];
+  escalationTriggers: string[];
+}
+
 export const api = {
   getTenant: (tenantId: string) => request<TenantSummary>(`/tenants/${tenantId}`),
   // Identity Refactor U4/U6: connecting Instagram is authenticated (the
@@ -420,4 +475,27 @@ export const api = {
       body: JSON.stringify({ tier }),
     }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
+
+  listKnowledgeBaseDocuments: (tenantId: string) =>
+    request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
+  uploadKnowledgeBaseDocument: (tenantId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return requestMultipart<{ document: KnowledgeBaseDocument }>(`/tenants/${tenantId}/knowledge-base`, formData).then(
+      (r) => r.document,
+    );
+  },
+  deleteKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<void>(`/tenants/${tenantId}/knowledge-base/${documentId}`, { method: "DELETE" }),
+
+  getGuardrailsConfig: (tenantId: string) =>
+    request<{ config: GuardrailsConfig }>(`/tenants/${tenantId}/guardrails-config`).then((r) => r.config),
+  updateGuardrailsConfig: (
+    tenantId: string,
+    updates: { brandVoice: string | null; forbiddenTopics: string[]; escalationTriggers: string[] },
+  ) =>
+    request<{ config: GuardrailsConfig }>(`/tenants/${tenantId}/guardrails-config`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    }).then((r) => r.config),
 };

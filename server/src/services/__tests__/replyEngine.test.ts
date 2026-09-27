@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../../db/campaigns.js";
 import type { LLMProvider } from "../../llm/provider.js";
+import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
 import type { AiSpendGuard } from "../aiSpendGuard.js";
-import { generateReply, type ReplyContext } from "../replyEngine.js";
+import { generateReply, type RagDependencies, type ReplyContext } from "../replyEngine.js";
+
+const mockQueryRelevantChunks = vi.fn();
+vi.mock("../../db/knowledgeBase.js", () => ({
+  queryRelevantChunks: (...args: unknown[]) => mockQueryRelevantChunks(...args),
+}));
 
 function spendGuard(allow: boolean): AiSpendGuard {
   return { tryConsume: vi.fn(async () => allow), release: vi.fn(async () => {}) };
@@ -228,6 +234,106 @@ describe("generateReply", () => {
       }
 
       expect(seen).toEqual(new Set(["Variation A for LINK", "Variation B for LINK"]));
+    });
+  });
+
+  describe("Phase 2C RAG integration", () => {
+    function fakeEmbeddingProvider(): EmbeddingProvider {
+      return { name: "fake", embed: vi.fn(async () => ({ vectors: [[1, 0]] })) };
+    }
+
+    function ragDeps(overrides: Partial<RagDependencies> = {}): RagDependencies {
+      return { pool: {} as RagDependencies["pool"], embeddingProvider: fakeEmbeddingProvider(), ...overrides };
+    }
+
+    it("behaves exactly as before Phase 2C when no rag dependencies are passed — no DB access at all", async () => {
+      const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Sure!" }));
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider);
+
+      expect(result.engine).toBe("ai_generated");
+      expect(mockQueryRelevantChunks).not.toHaveBeenCalled();
+    });
+
+    it("proceeds normally (no fallback) when the tenant has no knowledge base at all", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([]); // tenant has zero chunks — RAG inactive for them
+      const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Sure!" }));
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider, undefined, ragDeps());
+
+      expect(result.engine).toBe("ai_generated");
+      expect(result.requiresHumanHandoff).toBeUndefined();
+    });
+
+    it("injects retrieved chunks into the system prompt and answers normally when retrieval is above threshold", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "Our refund window is 30 days.", document_id: "doc-1", similarity: 0.95 },
+      ]);
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "Our refund window is 30 days." });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider, undefined, ragDeps());
+
+      expect(result.engine).toBe("ai_generated");
+      const call = generateReplyMock.mock.calls[0]![0];
+      expect(call.systemPrompt).toContain("Our refund window is 30 days.");
+    });
+
+    it("falls back and requires human handoff when the tenant has a knowledge base but nothing matches well enough", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "totally unrelated content", document_id: "doc-1", similarity: 0.1 },
+      ]);
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "should never be used" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider, undefined, ragDeps());
+
+      expect(result.engine).toBe("rule_based");
+      expect(result.requiresHumanHandoff).toBe(true);
+      expect(result.fellBackReason).toMatch(/grounded knowledge/);
+      expect(generateReplyMock).not.toHaveBeenCalled(); // never reaches the model — no spend either
+    });
+
+    describe("Client Guardrails (tenantGuardrailsConfig)", () => {
+      it("triggers human handoff on an escalation-trigger match, before any provider call", async () => {
+        const generateReplyMock = vi.fn().mockResolvedValue({ text: "should never be used" });
+        const provider = mockProvider(generateReplyMock);
+        const ctx = makeContext({
+          campaign: makeCampaign({ replyMode: "ai_generated" }),
+          sourceText: "I want to talk to a lawyer about this",
+        });
+
+        const result = await generateReply(
+          ctx,
+          provider,
+          undefined,
+          ragDeps({ tenantGuardrailsConfig: { forbiddenTopics: [], escalationTriggers: ["talk to a lawyer"] } }),
+        );
+
+        expect(result.engine).toBe("rule_based");
+        expect(result.requiresHumanHandoff).toBe(true);
+        expect(generateReplyMock).not.toHaveBeenCalled();
+      });
+
+      it("rejects a reply matching a tenant-configured forbidden topic even though the global guardrails allow it", async () => {
+        mockQueryRelevantChunks.mockResolvedValue([]);
+        const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Ask our competitor, they're worse!" }));
+        const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+        const result = await generateReply(
+          ctx,
+          provider,
+          undefined,
+          ragDeps({ tenantGuardrailsConfig: { forbiddenTopics: ["competitor"], escalationTriggers: [] } }),
+        );
+
+        expect(result.engine).toBe("rule_based");
+        expect(result.fellBackReason).toMatch(/forbidden topic/);
+      });
     });
   });
 });

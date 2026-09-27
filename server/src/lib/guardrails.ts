@@ -57,9 +57,50 @@ function pathIsAllowed(urlPath: string, allowedPath: string): boolean {
   return urlPath.startsWith(base);
 }
 
+/**
+ * Phase 2C Client Guardrails: per-tenant configuration (lib/guardrailsConfig
+ * naming aside, this shape lives in db/guardrailsConfig.ts) that can only
+ * NARROW the checks above, never override or bypass them — neither field
+ * here is ever consulted by classifyInput/the FORBIDDEN_OUTPUT_PATTERNS
+ * check, only additively in the functions below. `brandVoice` isn't
+ * enforced here at all: a "voice" isn't something a denylist can validate
+ * mechanically, so it's steering (folded into the system prompt by the
+ * caller), not enforcement.
+ */
+export interface TenantGuardrailsInput {
+  forbiddenTopics: string[];
+  escalationTriggers: string[];
+  /** Optional — only read by buildSystemPrompt (replyEngine.ts/milestoneEngine.ts) for prompt steering, never by the functions in this file, which only ever narrow (never loosen) the checks above. */
+  brandVoice?: string | null;
+}
+
 export interface InputClassification {
   blocked: boolean;
   reason?: string;
+}
+
+/**
+ * Phase 2C Escalation Triggers: checked on the INBOUND message, before any
+ * reply is generated — a match means this conversation should go to a
+ * human, not that the AI should try to reply and hope guardrails catch it
+ * afterward. Deliberately a separate function from classifyInput: that one
+ * detects prompt-injection attempts (a security concern, same fallback for
+ * everyone); this one is tenant-configured business logic (a customer
+ * asking for something this specific business wants a human to handle),
+ * with no bearing on whether the text is a security risk.
+ */
+export function checkEscalationTriggers(
+  tenantConfig: TenantGuardrailsInput | null | undefined,
+  text: string,
+): { triggered: boolean; reason?: string } {
+  if (!tenantConfig) return { triggered: false };
+  const lowerText = text.toLowerCase();
+  for (const trigger of tenantConfig.escalationTriggers) {
+    if (trigger && lowerText.includes(trigger.toLowerCase())) {
+      return { triggered: true, reason: `input matched tenant-configured escalation trigger: "${trigger}"` };
+    }
+  }
+  return { triggered: false };
 }
 
 /**
@@ -92,10 +133,28 @@ export interface OutputValidation {
  * under the client's brand is the one injection outcome that actually
  * matters commercially.
  */
-export function validateOutput(text: string, tier: "comment" | "dm", allowedLink?: string): OutputValidation {
+export function validateOutput(
+  text: string,
+  tier: "comment" | "dm",
+  allowedLink?: string,
+  tenantConfig?: TenantGuardrailsInput | null,
+): OutputValidation {
   for (const pattern of FORBIDDEN_OUTPUT_PATTERNS) {
     if (pattern.test(text)) {
       return { allowed: false, reason: `output matched forbidden pattern: ${pattern}` };
+    }
+  }
+
+  // Phase 2C Client Guardrails: additive only — this can reject a reply
+  // the global checks above would have allowed, but it can never un-reject
+  // one of those (tenantConfig is consulted only here, after every global
+  // check has already run and passed).
+  if (tenantConfig) {
+    const lowerText = text.toLowerCase();
+    for (const topic of tenantConfig.forbiddenTopics) {
+      if (topic && lowerText.includes(topic.toLowerCase())) {
+        return { allowed: false, reason: `output matched tenant-configured forbidden topic: "${topic}"` };
+      }
     }
   }
 

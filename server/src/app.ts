@@ -10,7 +10,10 @@ import { campaignsRouter } from "./routes/campaigns.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
+import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
+import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
 import type { LLMProvider } from "./llm/provider.js";
+import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -21,7 +24,7 @@ declare global {
   }
 }
 
-export function createApp(options?: { llmProvider?: LLMProvider }) {
+export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvider?: EmbeddingProvider | null }) {
   const app = express();
 
   // Render terminates TLS and proxies to this process — without this,
@@ -76,6 +79,8 @@ export function createApp(options?: { llmProvider?: LLMProvider }) {
   app.use(billingRouter);
   app.use(dashboardRouter(options?.llmProvider));
   app.use(leadsRouter);
+  app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
+  app.use(guardrailsConfigRouter);
 
   return app;
 }

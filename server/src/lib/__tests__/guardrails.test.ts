@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyInput, validateOutput } from "../guardrails.js";
+import { checkEscalationTriggers, classifyInput, validateOutput } from "../guardrails.js";
 
 describe("classifyInput", () => {
   it("blocks a classic prompt-injection attempt", () => {
@@ -125,5 +125,72 @@ describe("validateOutput", () => {
   it("allows an exact path match with no trailing segment", () => {
     const result = validateOutput("Here: https://example.com/promo", "dm", "https://example.com/promo");
     expect(result.allowed).toBe(true);
+  });
+
+  // Phase 2C Client Guardrails: tenantConfig narrows, it never overrides.
+  it("allows an ordinary reply when no tenant config is passed", () => {
+    expect(validateOutput("Sure, happy to help!", "dm").allowed).toBe(true);
+  });
+
+  it("rejects a reply matching a tenant-configured forbidden topic", () => {
+    const result = validateOutput("Our competitor charges way more than us", "dm", undefined, {
+      forbiddenTopics: ["competitor"],
+      escalationTriggers: [],
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/tenant-configured forbidden topic/);
+  });
+
+  it("is case-insensitive when matching a tenant-configured forbidden topic", () => {
+    const result = validateOutput("Ask our COMPETITOR about that", "dm", undefined, {
+      forbiddenTopics: ["competitor"],
+      escalationTriggers: [],
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("allows a reply that doesn't match any tenant-configured forbidden topic", () => {
+    const result = validateOutput("Happy to help with sizing!", "dm", undefined, {
+      forbiddenTopics: ["competitor"],
+      escalationTriggers: [],
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("still enforces the global guardrails even when a tenant config is passed", () => {
+    const result = validateOutput("this offers guaranteed returns", "dm", undefined, {
+      forbiddenTopics: [], // tenant config narrows nothing here — global check must still fire
+      escalationTriggers: [],
+    });
+    expect(result.allowed).toBe(false);
+  });
+});
+
+describe("checkEscalationTriggers", () => {
+  it("does not trigger when no tenant config is passed", () => {
+    expect(checkEscalationTriggers(undefined, "I want a refund now").triggered).toBe(false);
+    expect(checkEscalationTriggers(null, "I want a refund now").triggered).toBe(false);
+  });
+
+  it("does not trigger when the tenant has no escalation triggers configured", () => {
+    const result = checkEscalationTriggers({ forbiddenTopics: [], escalationTriggers: [] }, "I want a refund now");
+    expect(result.triggered).toBe(false);
+  });
+
+  it("triggers on a configured phrase, case-insensitively", () => {
+    const result = checkEscalationTriggers(
+      { forbiddenTopics: [], escalationTriggers: ["talk to a lawyer"] },
+      "I'm going to TALK TO A LAWYER about this",
+    );
+    expect(result.triggered).toBe(true);
+    expect(result.reason).toMatch(/escalation trigger/);
+  });
+
+  it("does not trigger on unrelated text", () => {
+    const result = checkEscalationTriggers(
+      { forbiddenTopics: [], escalationTriggers: ["talk to a lawyer"] },
+      "does this come in blue?",
+    );
+    expect(result.triggered).toBe(false);
   });
 });

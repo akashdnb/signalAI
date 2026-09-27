@@ -15,6 +15,8 @@ import {
 } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
 import { BillingPanel } from "../components/BillingPanel";
+import { KnowledgeBasePanel } from "../components/KnowledgeBasePanel";
+import { GuardrailsConfigPanel } from "../components/GuardrailsConfigPanel";
 
 const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
   { value: "new", label: "New" },
@@ -321,6 +323,8 @@ export function DashboardPage() {
         )}
       </section>
 
+      <KnowledgeBasePanel tenantId={tenantId} />
+      <GuardrailsConfigPanel tenantId={tenantId} />
       <BillingPanel tenantId={tenantId} />
     </div>
   );

@@ -4,6 +4,45 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-09-27 — Phase 2C Slice 1: Conversational AI Engine (RAG core)
+
+**RAG-engine slice of Phase 2C shipped** (migrations `1758240000038`–`1758240000039`) — Per-Tenant
+Knowledge Base, Tenant-Isolated Retrieval, Client Guardrails, Grounded-Answer-Only Fallback, wired
+into the existing Reply Engine and Milestone Engine. **Lead Scoring is a separate fast-follow, not
+part of this slice.** Built ahead of the roadmap's own Phase 2C gate (a usage metric this codebase
+doesn't instrument anywhere) at explicit direction, same as Phase 2A was. Full detail in
+`claude_fixes/2026-09-27-phase-2c-slice1-rag-engine.md`.
+- `pgvector` (first use in this repo) for tenant-isolated retrieval; Neon's S3-compatible storage
+  for uploaded source documents; a dedicated `EmbeddingProvider` abstraction fully decoupled from
+  the existing chat `LLMProvider` — not every chat host also serves embeddings, so these were never
+  assumed to be the same provider.
+- Knowledge base documents are versioned by `(tenant_id, filename)`: re-uploading a filename
+  supersedes the prior version only once the new one is actually `ready`, never dropping retrieval
+  coverage mid-processing; a failed re-embed leaves the prior ready version serving retrieval
+  untouched.
+- The load-bearing distinction in `knowledgeRetrieval.ts`: a tenant with **no knowledge base at
+  all** gets zero change in behavior (RAG is simply inactive for them — every pre-Phase-2C reply
+  path is untouched), versus one with a knowledge base but **nothing grounded enough to answer
+  from**, which is the actual Grounded-Answer-Only Fallback trigger (pauses automation via
+  `handoffStatus: 'human'`). Conflating these two would have been a severe regression for every
+  existing tenant, not a safety improvement.
+- Client Guardrails (`forbidden_topics`, `escalation_triggers`, `brand_voice`) layer onto Phase 1's
+  Global Guardrails as narrowing-only — the global checks are never passed a tenant config that
+  could loosen or bypass them. `brand_voice` is prompt steering, wrapped in the same
+  tenant-authored-data delimiters `milestoneEngine.ts` already uses for `goalDescription` (R3-03) —
+  identical threat model.
+- Verified beyond typecheck/tests: 504/504 passing (78 new), every safety-critical path (tenant
+  isolation, superseded-version exclusion, fail-closed ingestion, escalation/grounded-fallback
+  handoff) checked against a real Postgres with a locally-built pgvector 0.8.0, not mocked; `npm
+  audit` clean (excluded `unpdf`'s optional `canvas` dependency, which pulled in a critical
+  `node-tar` CVE via a feature — PDF-to-image rendering — this slice never calls); and a real
+  Playwright browser run driving actual sign-up, both new dashboard panels, a real multipart
+  upload reaching the real ingestion pipeline, and a full guardrails-config save/reload/persist
+  round trip.
+- **Deliberately not built, flagged rather than silently dropped:** Lead Scoring (fast-follow),
+  DOCX/other document formats, a pgvector ANN index (unindexed scan is fine at pilot scale), and
+  bulk re-embedding on an embedding-model change.
+
 ## 2026-09-22 — Phase 2B: Billing & Monetisation
 
 **Full Phase 2B feature set shipped** (migrations `1758240000034`–`1758240000037`), except the

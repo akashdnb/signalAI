@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LLMProvider } from "../../llm/provider.js";
 import type { Milestone } from "../../db/milestones.js";
+import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
 import type { AiSpendGuard } from "../aiSpendGuard.js";
+import type { RagDependencies } from "../replyEngine.js";
 import { runMilestoneCheck } from "../milestoneEngine.js";
+
+const mockQueryRelevantChunks = vi.fn();
+vi.mock("../../db/knowledgeBase.js", () => ({
+  queryRelevantChunks: (...args: unknown[]) => mockQueryRelevantChunks(...args),
+}));
 
 function spendGuard(allow: boolean): AiSpendGuard {
   return { tryConsume: vi.fn(async () => allow), release: vi.fn(async () => {}) };
@@ -352,6 +359,82 @@ describe("runMilestoneCheck", () => {
 
       expect(result.satisfied).toBe(true);
       expect(result.capExceeded).toBeUndefined();
+    });
+  });
+
+  describe("Phase 2C RAG integration", () => {
+    function fakeEmbeddingProvider(): EmbeddingProvider {
+      return { name: "fake", embed: vi.fn(async () => ({ vectors: [[1, 0]] })) };
+    }
+
+    function ragDeps(overrides: Partial<RagDependencies> = {}): RagDependencies {
+      return { pool: {} as RagDependencies["pool"], embeddingProvider: fakeEmbeddingProvider(), ...overrides };
+    }
+
+    it("behaves exactly as before Phase 2C when no rag dependencies are passed", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) }),
+      );
+
+      await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
+        provider,
+      );
+
+      expect(mockQueryRelevantChunks).not.toHaveBeenCalled();
+    });
+
+    it("injects retrieved chunks into the system prompt when retrieval is above threshold", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "Our refund window is 30 days.", document_id: "doc-1", similarity: 0.95 },
+      ]);
+      const generateReplyMock = vi
+        .fn()
+        .mockResolvedValue({ text: JSON.stringify({ reply: "It's 30 days.", milestone_satisfied: false }) });
+      const provider = mockProvider(generateReplyMock);
+
+      await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "what's your refund policy?", tier: "comment" },
+        provider,
+        undefined,
+        ragDeps(),
+      );
+
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).toContain("Our refund window is 30 days.");
+    });
+
+    it("falls back and requires human handoff when the tenant has a knowledge base but nothing matches well enough", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "unrelated content", document_id: "doc-1", similarity: 0.1 },
+      ]);
+      const generateReplyMock = vi.fn();
+      const provider = mockProvider(generateReplyMock);
+
+      const result = await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "some off-topic question", tier: "comment" },
+        provider,
+        undefined,
+        ragDeps(),
+      );
+
+      expect(result.satisfied).toBe(false);
+      expect(result.requiresHumanHandoff).toBe(true);
+      expect(generateReplyMock).not.toHaveBeenCalled();
+    });
+
+    it("triggers human handoff on an escalation-trigger match, before any provider call", async () => {
+      const generateReplyMock = vi.fn();
+      const provider = mockProvider(generateReplyMock);
+
+      const result = await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "get me a lawyer now", tier: "comment" },
+        provider,
+        undefined,
+        ragDeps({ tenantGuardrailsConfig: { forbiddenTopics: [], escalationTriggers: ["get me a lawyer"] } }),
+      );
+
+      expect(result.requiresHumanHandoff).toBe(true);
+      expect(generateReplyMock).not.toHaveBeenCalled();
     });
   });
 });

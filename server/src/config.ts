@@ -90,6 +90,28 @@ export const config = {
   get trialTokenAllowance() {
     return Number(process.env.TRIAL_TOKEN_ALLOWANCE ?? 200_000);
   },
+  // Phase 2C Knowledge Base: a dedicated embeddings endpoint, independent
+  // of whatever LLM_BASE_URL is configured for chat — not every chat host
+  // (Groq, DeepSeek) also serves embeddings, so this is never assumed to
+  // be the same provider. Genuinely optional: unset means KB upload
+  // degrades to a clear 503, same shape as Stripe/Resend below.
+  get embeddingBaseUrl() {
+    return process.env.EMBEDDING_BASE_URL ?? "";
+  },
+  get embeddingApiKey() {
+    return process.env.EMBEDDING_API_KEY ?? "";
+  },
+  get embeddingModel() {
+    return process.env.EMBEDDING_MODEL ?? "";
+  },
+  // Phase 2C Knowledge Base: the S3-compatible bucket for uploaded source
+  // documents. Endpoint/region/credentials are read by the AWS SDK itself
+  // from its own standard env vars (AWS_ENDPOINT_URL_S3, AWS_REGION,
+  // AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) — only the bucket name isn't
+  // one of those, so it's the one setting routed through config here.
+  get kbS3Bucket() {
+    return process.env.KB_S3_BUCKET ?? "";
+  },
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },
