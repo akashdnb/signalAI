@@ -92,6 +92,8 @@ Two paths exist and they are not interchangeable. **Instagram API with Instagram
 - Duplicate Event Protection
 - Comment Event Processing
 
+> **DM Conversation Continuation, shipped 2026-09-28.** Matching here was originally entirely stateless per-message — a real live conversation surfaced that a customer replying in their own words mid-conversation, without repeating an exact configured keyword, got silently dropped (no reply, no trace). Fixed via `leads.active_dm_campaign_id` (set on every real keyword match for a DM event, read as a fallback for a later message in the same still-open 24h messaging window that doesn't independently match anything) — surfaced in the timeline via a `(ongoing conversation)` sentinel keyword so it reads as distinct from a genuine silent non-match. Comments are deliberately excluded — a public comment thread isn't a private ongoing conversation the same way. Full detail in `claude_fixes/2026-09-28-dm-continuation-and-timeline-replies.md`.
+
 ### Milestone Engine — the core differentiator
 > This is the thing competitors don't have, and it is what makes an AI reply a *sales* reply rather than a chatbot reply. Legacy platforms make creators draw flowcharts that break on any off-path question; pure LLM bots wander off-topic. The Milestone Engine is the hybrid: the creator writes an ordered list of goals, and the AI is free-form on language but constrained on direction.
 
@@ -157,7 +159,7 @@ None of them change whether a pilot creator can run a campaign and get paid for 
 ### Lead Management
 - Lead Creation
 - Lead Profiles
-- Lead Timeline
+- Lead Timeline — **extended 2026-09-28**: previously only merged `lead_events` (inbound) and `lead_activity` (CRM actions) — nothing anywhere persisted what the bot actually sent back, so this only ever showed half of every conversation. New `sent_replies` table (one row per actual channel send) now merges in too. Full detail in `claude_fixes/2026-09-28-dm-continuation-and-timeline-replies.md`.
 - Lead Activity History
 - Lead Search
 - Lead Filters
