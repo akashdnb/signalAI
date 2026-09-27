@@ -334,6 +334,45 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     expect(text).toBe(campaign.defaultReplyTemplate.replace("{{username}}", "real_handle").replace("{{keyword}}", "LINK"));
   });
 
+  // Previously a provider error/timeout, an output-validation rejection, or
+  // a classifyInput block had NO log line anywhere — only capExceeded did.
+  // "the live reply fell back to rule-based" is now diagnosable from logs.
+  it("logs a warning when the AI reply falls back for a reason other than the spend cap or a human handoff", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+    const provider: LLMProvider = { name: "mock", generateReply: vi.fn().mockRejectedValue(new Error("provider timed out")) };
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+    await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "AI reply fell back to rule-based",
+      expect.objectContaining({ fellBackReason: expect.stringContaining("provider timed out") }),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("does not double-log the generic fallback warning when the fallback was actually the spend cap", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+    const provider = mockProvider(["should never be called"]);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, 0); // cap of 0 — always exceeded
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+    await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    expect(warnSpy).toHaveBeenCalledWith("AI spend cap exceeded — degraded to rule-based reply", expect.anything());
+    expect(warnSpy).not.toHaveBeenCalledWith("AI reply fell back to rule-based", expect.anything());
+    warnSpy.mockRestore();
+  });
+
   // R6-01 regression: milestone advancement used to commit before the send
   // — a failed send still left the lead's active_milestone_id pointing at
   // the NEXT milestone, so a retry would answer milestone 2 without the

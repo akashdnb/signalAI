@@ -194,6 +194,7 @@ export function createLeadEventReplyHandler(
     let replyText: string;
     let capExceeded = false;
     let requiresHumanHandoff = false;
+    let fellBackReason: string | undefined;
     let usage: GenerateReplyUsage | undefined;
     // R6-01: milestone advancement is computed here but only committed
     // after a confirmed send, below.
@@ -218,6 +219,7 @@ export function createLeadEventReplyHandler(
       replyText = reply.text;
       capExceeded = reply.capExceeded ?? false;
       requiresHumanHandoff = reply.requiresHumanHandoff ?? false;
+      fellBackReason = reply.fellBackReason;
       usage = reply.usage;
     } else {
       const activeMilestone = lead.activeMilestoneId
@@ -268,6 +270,7 @@ export function createLeadEventReplyHandler(
       replyText = result.reply;
       capExceeded = result.capExceeded ?? false;
       requiresHumanHandoff = result.requiresHumanHandoff ?? false;
+      fellBackReason = result.fellBackReason;
       usage = result.usage;
     }
 
@@ -315,6 +318,22 @@ export function createLeadEventReplyHandler(
     // lead whose handoffStatus was already 'human'.
     if (requiresHumanHandoff) {
       await updateHandoffStatus(pool, { tenantId: job.tenantId, leadId: job.leadId, status: "human" });
+    }
+
+    // Every OTHER fallback reason (a classifyInput block, a provider
+    // error/timeout, or an output-validation rejection) previously had NO
+    // log line anywhere — capExceeded and requiresHumanHandoff each get
+    // their own specific alert above; this is the catch-all for everything
+    // else, so "the live reply fell back to rule-based" is diagnosable
+    // from logs instead of only reproducible by re-triggering it live.
+    if (fellBackReason && !capExceeded && !requiresHumanHandoff) {
+      const message = "AI reply fell back to rule-based";
+      // eslint-disable-next-line no-console
+      console.warn(message, { tenantId: job.tenantId, campaignId: campaign.id, fellBackReason });
+      Sentry.captureMessage(message, {
+        level: "warning",
+        extra: { tenantId: job.tenantId, campaignId: campaign.id, fellBackReason },
+      });
     }
 
     const token = await getDecryptedToken(pool, keyring, job.tenantId, account.instagramAccountId);
