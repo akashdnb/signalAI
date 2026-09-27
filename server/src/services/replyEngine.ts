@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { config } from "../config.js";
 import type { Campaign } from "../db/campaigns.js";
 import type { GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
 import type { EmbeddingProvider } from "../llm/embeddingProvider.js";
@@ -149,7 +150,7 @@ export async function generateReply(
   if (retrieval.hasKnowledgeBase && retrieval.belowThreshold) {
     return {
       ...ruleBasedReply(ctx),
-      fellBackReason: "no grounded knowledge above confidence threshold",
+      fellBackReason: `no grounded knowledge above confidence threshold (best match: ${retrieval.bestSimilarity?.toFixed(2)}, threshold: ${config.ragMinSimilarityThreshold})`,
       requiresHumanHandoff: true,
     };
   }

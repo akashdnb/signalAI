@@ -80,6 +80,14 @@ services:
       # this set to "768". Leave unset for a model that's already 768-wide.
       - key: EMBEDDING_DIMENSIONS
         sync: false
+      # Phase 2C Grounded-Answer-Only Fallback: cosine similarity below
+      # which a retrieval is treated as "not actually grounded" (real
+      # customer-facing replies then route to human handoff instead of a
+      # freelanced answer). 0.6 is the code default if unset — a starting
+      # point, not a measured value; tune based on real fellBackReason
+      # log lines, which now include the actual best-match similarity.
+      - key: RAG_MIN_SIMILARITY_THRESHOLD
+        sync: false
       # Phase 2C Knowledge Base: Neon's S3-compatible object storage for
       # uploaded source documents. AWS_ENDPOINT_URL_S3/AWS_REGION/
       # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are the AWS SDK's own

@@ -122,6 +122,16 @@ export const config = {
   get kbS3Bucket() {
     return process.env.KB_S3_BUCKET ?? "";
   },
+  // Phase 2C Grounded-Answer-Only Fallback: cosine similarity below which
+  // the best retrieval match is treated as "not actually grounded." 0.6 is
+  // a starting point, not a measured value — real embedding models (and
+  // Matryoshka-truncated ones especially, see EMBEDDING_DIMENSIONS) can
+  // have different similarity distributions, so this is exposed as a
+  // tunable rather than hardcoded.
+  get ragMinSimilarityThreshold() {
+    const raw = process.env.RAG_MIN_SIMILARITY_THRESHOLD;
+    return raw ? Number(raw) : 0.6;
+  },
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },

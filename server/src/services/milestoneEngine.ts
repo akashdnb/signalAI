@@ -1,3 +1,4 @@
+import { config } from "../config.js";
 import type { GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
 import type { Milestone } from "../db/milestones.js";
 import { checkEscalationTriggers, classifyInput, validateOutput } from "../lib/guardrails.js";
@@ -224,7 +225,12 @@ export async function runMilestoneCheck(
     ? await retrieveContext(rag.pool, rag.embeddingProvider, ctx.milestone.tenantId, ctx.sourceText)
     : { hasKnowledgeBase: false, chunks: [] as RetrievedChunk[], belowThreshold: false };
   if (retrieval.hasKnowledgeBase && retrieval.belowThreshold) {
-    return { ...fallbackResult("no grounded knowledge above confidence threshold"), requiresHumanHandoff: true };
+    return {
+      ...fallbackResult(
+        `no grounded knowledge above confidence threshold (best match: ${retrieval.bestSimilarity?.toFixed(2)}, threshold: ${config.ragMinSimilarityThreshold})`,
+      ),
+      requiresHumanHandoff: true,
+    };
   }
 
   // B10: same placement/rationale as replyEngine.ts — checked immediately
