@@ -63,6 +63,16 @@ services:
         sync: false
       - key: LLM_MODEL
         sync: false
+      # Optional overrides for a reasoning model (confirmed live: needed for
+      # gpt-oss:20b on Ollama Cloud) — its internal "thinking" tokens count
+      # against max_tokens (500 default can be consumed entirely before any
+      # user-facing content, surfacing as "returned no completion content"),
+      # and it's inherently slower per response (surfacing as a timeout).
+      # Leave both unset for a short-reply, cost-conscious chat model.
+      - key: LLM_TIMEOUT_MS
+        sync: false
+      - key: LLM_MAX_TOKENS
+        sync: false
       # Phase 2C Knowledge Base: a SEPARATE OpenAI-compatible embeddings
       # endpoint, independent of the chat provider above — not every chat
       # host also serves embeddings. Optional: unset means Knowledge Base

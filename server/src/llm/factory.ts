@@ -21,11 +21,23 @@ export function createLLMProviderFromEnv(env: NodeJS.ProcessEnv = process.env): 
     );
   }
 
+  // Genuinely optional — omitted, createOpenAICompatibleProvider keeps its
+  // own hardcoded defaults (8s timeout, 500 max_tokens), tuned for a
+  // short-reply, cost-conscious chat model. A REASONING model (e.g.
+  // gpt-oss:20b on Ollama Cloud, confirmed live) needs both raised: its
+  // internal "thinking" tokens count against max_tokens — 500 can be
+  // consumed entirely by reasoning before any user-facing content is
+  // emitted (surfaces as "returned no completion content", not a token-
+  // limit error) — and it's inherently slower per response, especially
+  // cloud-hosted (surfaces as "The operation was aborted due to timeout").
+  const timeoutMs = env.LLM_TIMEOUT_MS ? Number(env.LLM_TIMEOUT_MS) : undefined;
+  const maxTokens = env.LLM_MAX_TOKENS ? Number(env.LLM_MAX_TOKENS) : undefined;
+
   // Every provider on the shortlist (Groq, Together AI, DeepSeek, Gemini's
   // compat layer) speaks the OpenAI chat-completions shape, so one client
   // covers all of them today — a provider that doesn't would get its own
   // file here without touching this factory's callers.
-  return createOpenAICompatibleProvider({ name: providerName, baseUrl, apiKey, model });
+  return createOpenAICompatibleProvider({ name: providerName, baseUrl, apiKey, model, timeoutMs, maxTokens });
 }
 
 /**
