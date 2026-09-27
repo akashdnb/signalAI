@@ -42,8 +42,10 @@ export function createEmbeddingProviderFromEnv(env: NodeJS.ProcessEnv = process.
   const baseUrl = env.EMBEDDING_BASE_URL ?? "";
   const apiKey = env.EMBEDDING_API_KEY ?? "";
   const model = env.EMBEDDING_MODEL ?? "";
+  const dimensionsRaw = env.EMBEDDING_DIMENSIONS;
+  const dimensions = dimensionsRaw ? Number(dimensionsRaw) : undefined;
 
   if (!baseUrl || !apiKey || !model) return null;
 
-  return createOpenAICompatibleEmbeddingProvider({ name: "embedding", baseUrl, apiKey, model });
+  return createOpenAICompatibleEmbeddingProvider({ name: "embedding", baseUrl, apiKey, model, dimensions });
 }

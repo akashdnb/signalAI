@@ -113,4 +113,65 @@ describe("openAICompatibleEmbeddingProvider", () => {
 
     await expect(provider.embed(["a", "b"])).rejects.toThrow(/returned 1 embedding\(s\) for 2 input\(s\)/);
   });
+
+  // Matryoshka-style truncation, confirmed live against Gemini's real API:
+  // gemini-embedding-001 defaults to 3072 dims but honors a `dimensions`
+  // request field, needed to match knowledge_base_chunks' fixed vector(768).
+  describe("dimensions (Matryoshka-style truncation)", () => {
+    it("includes dimensions in the request body when configured", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ index: 0, embedding: Array(768).fill(0.1) }] }),
+      });
+
+      const provider = createOpenAICompatibleEmbeddingProvider({
+        name: "gemini",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        apiKey: "key",
+        model: "gemini-embedding-001",
+        dimensions: 768,
+      });
+      await provider.embed(["test"]);
+
+      const [, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      const body = JSON.parse(options.body);
+      expect(body.dimensions).toBe(768);
+    });
+
+    it("omits dimensions entirely when not configured", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ index: 0, embedding: [0.1, 0.2] }] }),
+      });
+
+      const provider = createOpenAICompatibleEmbeddingProvider({
+        name: "openai",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "key",
+        model: "text-embedding-3-small",
+      });
+      await provider.embed(["test"]);
+
+      const [, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      const body = JSON.parse(options.body);
+      expect(body.dimensions).toBeUndefined();
+    });
+
+    it("throws when the returned embedding doesn't match the requested dimensions — the model silently ignored the request", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ index: 0, embedding: Array(3072).fill(0.1) }] }),
+      });
+
+      const provider = createOpenAICompatibleEmbeddingProvider({
+        name: "gemini",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        apiKey: "key",
+        model: "gemini-embedding-001",
+        dimensions: 768,
+      });
+
+      await expect(provider.embed(["test"])).rejects.toThrow(/returned a 3072-dimension embedding, expected 768/);
+    });
+  });
 });

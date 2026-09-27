@@ -73,6 +73,13 @@ services:
         sync: false
       - key: EMBEDDING_MODEL
         sync: false
+      # Matryoshka-style truncation for models whose natural output width
+      # doesn't match knowledge_base_chunks.embedding's fixed vector(768)
+      # column — gemini-embedding-001 (this project's confirmed working
+      # model/base URL combination) natively returns 3072 dims and needs
+      # this set to "768". Leave unset for a model that's already 768-wide.
+      - key: EMBEDDING_DIMENSIONS
+        sync: false
       # Phase 2C Knowledge Base: Neon's S3-compatible object storage for
       # uploaded source documents. AWS_ENDPOINT_URL_S3/AWS_REGION/
       # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are the AWS SDK's own

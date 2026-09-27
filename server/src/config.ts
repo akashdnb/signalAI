@@ -104,6 +104,16 @@ export const config = {
   get embeddingModel() {
     return process.env.EMBEDDING_MODEL ?? "";
   },
+  // Matryoshka-style truncation request (see embeddingProvider.ts) —
+  // genuinely optional, unlike the three above: a model whose natural
+  // output width already matches knowledge_base_chunks.embedding's fixed
+  // vector(768) column (e.g. OpenAI's text-embedding-3-small) needs this
+  // unset. gemini-embedding-001 (this project's actual configured model,
+  // confirmed live) natively returns 3072 dims and needs it set to 768.
+  get embeddingDimensions() {
+    const raw = process.env.EMBEDDING_DIMENSIONS;
+    return raw ? Number(raw) : undefined;
+  },
   // Phase 2C Knowledge Base: the S3-compatible bucket for uploaded source
   // documents. Endpoint/region/credentials are read by the AWS SDK itself
   // from its own standard env vars (AWS_ENDPOINT_URL_S3, AWS_REGION,
