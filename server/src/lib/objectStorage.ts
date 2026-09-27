@@ -13,7 +13,16 @@ import { config } from "../config.js";
  */
 let client: S3Client | undefined;
 function getClient(): S3Client {
-  if (!client) client = new S3Client({});
+  if (!client) {
+    // forcePathStyle: without it, the SDK defaults to virtual-hosted-style
+    // addressing (`${bucket}.${endpoint}`) — confirmed live against Neon's
+    // S3-compatible endpoint: its TLS cert only covers one wildcard level
+    // (`*.storage.c-7.us-east-2.aws.neon.tech`), so prepending the bucket
+    // name as an extra subdomain produces a hostname the cert doesn't
+    // cover at all, failing every request with a TLS altnames mismatch.
+    // Path-style (`${endpoint}/${bucket}/...`) doesn't touch the hostname.
+    client = new S3Client({ forcePathStyle: true });
+  }
   return client;
 }
 
