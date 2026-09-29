@@ -7,11 +7,16 @@
 const GRAPH_BASE_URL = "https://graph.instagram.com";
 const SEND_TIMEOUT_MS = 8000;
 
+export interface SendInstagramMessageResult {
+  /** Meta's own id for this send (Send API response's `message_id` — same value Meta's echo webhook later reports as the message's `mid`) — VERIFY the field name against a real payload, same caveat as instagramWebhookParser.ts. Used to correlate our own echo back to this send, so it isn't mistaken for a human reply (see webhookIngestService.ts). Null if the response didn't include one. */
+  metaMessageId: string | null;
+}
+
 export async function sendInstagramMessage(
   accessToken: string,
   recipientInstagramUserId: string,
   text: string,
-): Promise<void> {
+): Promise<SendInstagramMessageResult> {
   // R6-04 fix: the token used to travel as an `access_token` URL query
   // param — request URLs are the most-logged string in any stack (process
   // logs, proxies, APM traces, error messages that echo the request line),
@@ -37,6 +42,9 @@ export async function sendInstagramMessage(
     const bodyText = await res.text();
     throw new Error(`Instagram send failed: ${res.status} ${bodyText.slice(0, 200)}`);
   }
+
+  const body = (await res.json()) as { message_id?: string };
+  return { metaMessageId: typeof body.message_id === "string" ? body.message_id : null };
 }
 
 /**

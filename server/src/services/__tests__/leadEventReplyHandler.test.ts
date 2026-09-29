@@ -23,7 +23,7 @@ import { enqueueLeadEvent } from "../../queue/leadEventsQueue.js";
 import { createLeadEventReplyHandler } from "../leadEventReplyHandler.js";
 
 vi.mock("../../lib/instagramSend.js", () => ({
-  sendInstagramMessage: vi.fn(async () => {}),
+  sendInstagramMessage: vi.fn(async () => ({ metaMessageId: null })),
   sendInstagramCommentReply: vi.fn(async () => {}),
 }));
 
@@ -129,7 +129,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
   });
 
   afterEach(() => {
-    vi.mocked(sendInstagramMessage).mockResolvedValue(undefined);
+    vi.mocked(sendInstagramMessage).mockResolvedValue({ metaMessageId: null });
     vi.mocked(sendInstagramCommentReply).mockResolvedValue(undefined);
   });
 
@@ -596,6 +596,47 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       expect(result).toEqual({ advance: false });
       expect(sendInstagramMessage).not.toHaveBeenCalled();
       expect(sendInstagramCommentReply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("conversation memory (DM history)", () => {
+    it("passes prior DM turns (customer + bot) into the provider call for the next reply in the same conversation", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["PRICE"], {
+        replyMode: "ai_generated",
+        triggerSource: "message",
+      });
+
+      const provider = mockProvider(["Nice to meet you, Akash!", "You said your name is Akash."]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const first = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "PRICE", "my name is akash, what's the PRICE?");
+      await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: first.event.id, sequence: 1 });
+
+      const second = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "PRICE", "what is my name?");
+      await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: second.event.id, sequence: 2 });
+
+      const secondCall = vi.mocked(provider.generateReply).mock.calls[1]![0];
+      expect(secondCall.userMessage).toBe("what is my name?");
+      expect(secondCall.history).toEqual([
+        { role: "user", content: "my name is akash, what's the PRICE?" },
+        { role: "assistant", content: "Nice to meet you, Akash!" },
+      ]);
+    });
+
+    it("does not fetch or pass history for a rule_based campaign", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"]); // rule_based
+
+      const provider = mockProvider(["unused"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(provider.generateReply).not.toHaveBeenCalled();
     });
   });
 

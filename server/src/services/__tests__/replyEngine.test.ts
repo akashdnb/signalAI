@@ -87,6 +87,27 @@ describe("generateReply", () => {
     expect(call.systemPrompt).not.toContain("what's the price?");
   });
 
+  it("passes ctx.history through to the provider so prior turns reach the prompt", async () => {
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: "You said your name is Akash." });
+    const provider = mockProvider(generateReplyMock);
+    const ctx = makeContext({
+      campaign: makeCampaign({ replyMode: "ai_generated" }),
+      sourceText: "what is my name?",
+      history: [
+        { role: "user", content: "my name is akash" },
+        { role: "assistant", content: "Nice to meet you, Akash!" },
+      ],
+    });
+
+    await generateReply(ctx, provider);
+
+    const call = generateReplyMock.mock.calls[0]![0];
+    expect(call.history).toEqual([
+      { role: "user", content: "my name is akash" },
+      { role: "assistant", content: "Nice to meet you, Akash!" },
+    ]);
+  });
+
   it("falls back to the rule-based reply, unaltered, when the input looks like a prompt injection attempt", async () => {
     const generateReplyMock = vi.fn().mockResolvedValue({ text: "should never be used" });
     const provider = mockProvider(generateReplyMock);

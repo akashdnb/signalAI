@@ -189,8 +189,50 @@ describe("leads routes (Phase 2A)", () => {
 
     const res = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}/timeline`).set(authHeader);
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0]).toMatchObject({ kind: "activity", type: "note_added" });
+    expect(res.body.entries).toHaveLength(1);
+    expect(res.body.entries[0]).toMatchObject({ kind: "activity", type: "note_added" });
+    expect(res.body.hasMore).toBe(false);
+    expect(res.body.nextCursor).toBeNull();
+  });
+
+  it("GET timeline paginates with `limit` and `before`, oldest-first within each page", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const app = createApp();
+
+    for (let i = 0; i < 3; i++) {
+      await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/notes`).set(authHeader).send({ body: `note ${i}` });
+    }
+
+    // Page 1 (no cursor): the 2 MOST RECENT notes, oldest-first within the
+    // page — "note 2" was created last, so the default (most recent) page
+    // is ["note 1", "note 2"], not the oldest two.
+    const first = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}/timeline?limit=2`).set(authHeader);
+    expect(first.status).toBe(200);
+    expect(first.body.entries).toHaveLength(2);
+    expect(first.body.entries.map((e: { summary: string }) => e.summary)).toEqual(["note 1", "note 2"]);
+    expect(first.body.hasMore).toBe(true);
+    expect(first.body.nextCursor).toBeTruthy();
+
+    // Page 2: everything strictly older than page 1's oldest entry.
+    const second = await request(app)
+      .get(`/tenants/${tenant.id}/leads/${lead.id}/timeline?limit=2&before=${encodeURIComponent(first.body.nextCursor)}`)
+      .set(authHeader);
+    expect(second.status).toBe(200);
+    expect(second.body.entries).toHaveLength(1);
+    expect(second.body.entries[0]).toMatchObject({ summary: "note 0" });
+    expect(second.body.hasMore).toBe(false);
+  });
+
+  it("GET timeline rejects an invalid `before` value", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const app = createApp();
+
+    const res = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}/timeline?before=not-a-date`).set(authHeader);
+    expect(res.status).toBe(400);
   });
 
   it("GET /members lists the tenant's members for the assignment dropdown", async () => {

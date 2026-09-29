@@ -186,6 +186,14 @@ export const config = {
   get aiDailyCallCap() {
     return Number(process.env.AI_DAILY_CALL_CAP ?? 300);
   },
+  // Conversation memory: how many prior turns (customer + bot, combined) are
+  // fed back into the prompt alongside the current message. Raw turns, not a
+  // summary or embedding retrieval — recall failures like "what's my name?"
+  // right after "my name is akash" need recency, not semantic similarity,
+  // and a value this small never meaningfully touches LLM_MAX_TOKENS.
+  get chatHistoryMaxTurns() {
+    return Number(process.env.CHAT_HISTORY_MAX_TURNS ?? 10);
+  },
   // Token vault keyring (see lib/tokenVault.ts) — re-parsed on every access
   // rather than cached, matching the live-read pattern above.
   get tokenKeyring() {

@@ -8,7 +8,7 @@ import {
   type PipelineStage,
   type HandoffStatus,
 } from "../db/leads.js";
-import { getLeadTimeline } from "../db/leadTimeline.js";
+import { getLeadTimelinePage } from "../db/leadTimeline.js";
 import { addLeadNote, listLeadNotes } from "../db/leadNotes.js";
 import { findOrCreateTag, listTagsForTenant, listTagsForLead, addTagToLead, removeTagFromLead } from "../db/tags.js";
 import { createDeal, listDealsForLead, updateDealStage, type DealStage } from "../db/deals.js";
@@ -29,13 +29,30 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId", async (req, res) => {
   return res.status(200).json(lead);
 });
 
-// Phase 2A Lead Timeline / Lead Activity History.
+const TIMELINE_DEFAULT_PAGE_SIZE = 50;
+const TIMELINE_MAX_PAGE_SIZE = 200;
+
+// Phase 2A Lead Timeline / Lead Activity History. Cursor-paginated
+// (`before`, an ISO timestamp) rather than returning the whole
+// conversation: a long-running lead's full history was slow to fetch and
+// render on every load. Omit `before` for the most recent page.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/timeline", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
-  const timeline = await getLeadTimeline(getPool(), tenantId, leadId);
-  return res.status(200).json(timeline);
+
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, TIMELINE_MAX_PAGE_SIZE) : TIMELINE_DEFAULT_PAGE_SIZE;
+
+  let before: Date | undefined;
+  if (typeof req.query.before === "string") {
+    const parsed = new Date(req.query.before);
+    if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: "before must be a valid ISO timestamp" });
+    before = parsed;
+  }
+
+  const page = await getLeadTimelinePage(getPool(), tenantId, leadId, limit, before);
+  return res.status(200).json(page);
 });
 
 const VALID_PIPELINE_STAGES: PipelineStage[] = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"];

@@ -72,3 +72,21 @@ export async function listLeadActivity(pool: Queryable, tenantId: string, leadId
   );
   return result.rows.map(toLeadActivity);
 }
+
+/** Bounded, cursor-paginated companion to listLeadActivity — see listEventsForLeadPage in db/events.ts for the pagination contract this and leadTimeline.ts's getLeadTimelinePage share. */
+export async function listLeadActivityPage(
+  pool: Queryable,
+  tenantId: string,
+  leadId: string,
+  limit: number,
+  before?: Date,
+): Promise<LeadActivity[]> {
+  const result = await pool.query<LeadActivityRow>(
+    `select * from lead_activity
+     where tenant_id = $1 and lead_id = $2 and ($4::timestamptz is null or created_at < $4)
+     order by created_at desc
+     limit $3`,
+    [tenantId, leadId, limit, before ?? null],
+  );
+  return result.rows.map(toLeadActivity);
+}

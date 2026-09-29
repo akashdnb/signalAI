@@ -259,7 +259,15 @@ export interface Deal {
 export type TimelineEntry =
   | { kind: "event"; occurredAt: string; eventType: string; text: string | null; username: string | null; matchedKeyword: string | null }
   | { kind: "activity"; occurredAt: string; type: string; summary: string; actorUserId: string | null }
-  | { kind: "reply"; occurredAt: string; channel: "dm" | "comment"; engine: "rule_based" | "ai_generated"; text: string };
+  | { kind: "reply"; occurredAt: string; channel: "dm" | "comment"; engine: "rule_based" | "ai_generated" | "human"; text: string };
+
+export interface TimelinePage {
+  /** Oldest-first, same as the old unpaginated shape. */
+  entries: TimelineEntry[];
+  hasMore: boolean;
+  /** Pass as `before` on the next call to load the next (older) page. */
+  nextCursor: string | null;
+}
 
 export interface TopPost {
   mediaId: string;
@@ -368,8 +376,12 @@ export const api = {
     return request<LeadListItem[]>(`/tenants/${tenantId}/leads${qs ? `?${qs}` : ""}`);
   },
   getLead: (tenantId: string, leadId: string) => request<LeadDetail>(`/tenants/${tenantId}/leads/${leadId}`),
-  getLeadTimeline: (tenantId: string, leadId: string) =>
-    request<TimelineEntry[]>(`/tenants/${tenantId}/leads/${leadId}/timeline`),
+  getLeadTimeline: (tenantId: string, leadId: string, opts?: { before?: string }) => {
+    const params = new URLSearchParams();
+    if (opts?.before) params.set("before", opts.before);
+    const qs = params.toString();
+    return request<TimelinePage>(`/tenants/${tenantId}/leads/${leadId}/timeline${qs ? `?${qs}` : ""}`);
+  },
   updateLead: (tenantId: string, leadId: string, updates: { pipelineStage?: PipelineStage; ownerUserId?: string | null }) =>
     request<LeadDetail>(`/tenants/${tenantId}/leads/${leadId}`, { method: "PATCH", body: JSON.stringify(updates) }),
   handoffAction: (tenantId: string, leadId: string, action: "request" | "takeover" | "release") =>

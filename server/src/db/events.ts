@@ -130,6 +130,87 @@ export async function listEventsForLead(pool: Queryable, tenantId: string, leadI
   }));
 }
 
+export interface LeadEventForHistory {
+  occurredAt: Date;
+  commentText: string | null;
+  dmText: string | null;
+}
+
+/**
+ * Bounded companion to listEventsForLead, for building LLM conversation
+ * history rather than the full dashboard timeline: caps rows fetched to the
+ * `limit` most-recent, so the query stays cheap regardless of how long the
+ * lead's total history is. Excludes `excludeEventId` — the event currently
+ * being replied to, whose text is already the LLM's userMessage, not history.
+ */
+export async function listRecentEventsForLead(
+  pool: Queryable,
+  tenantId: string,
+  leadId: string,
+  limit: number,
+  excludeEventId: string,
+): Promise<LeadEventForHistory[]> {
+  const result = await pool.query<{ occurred_at: Date; comment_text: string | null; dm_text: string | null }>(
+    `select e.occurred_at, p.comment_text, p.dm_text
+     from lead_events e
+     left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
+     where e.tenant_id = $1 and e.lead_id = $2 and e.id != $3
+     order by e.occurred_at desc
+     limit $4`,
+    [tenantId, leadId, excludeEventId, limit],
+  );
+  return result.rows.map((row) => ({
+    occurredAt: row.occurred_at,
+    commentText: row.comment_text,
+    dmText: row.dm_text,
+  }));
+}
+
+/**
+ * Bounded, cursor-paginated companion to listEventsForLead — for the Lead
+ * Timeline UI (leadTimeline.ts's getLeadTimelinePage), which previously
+ * fetched a lead's entire history on every load/reload, unbounded, and was
+ * slow for a long-running conversation. `before` (exclusive) pages
+ * backwards from the most recent event; omitted, starts from the newest.
+ * Capped to `limit + 1` — see getLeadTimelinePage for why one extra row is
+ * fetched per source (it's what lets `hasMore` be computed correctly after
+ * merging three differently-sourced result sets).
+ */
+export async function listEventsForLeadPage(
+  pool: Queryable,
+  tenantId: string,
+  leadId: string,
+  limit: number,
+  before?: Date,
+): Promise<LeadEventForTimeline[]> {
+  const result = await pool.query<{
+    id: string;
+    event_type: string;
+    occurred_at: Date;
+    attributes: { matchedKeyword?: string };
+    comment_text: string | null;
+    dm_text: string | null;
+    username: string | null;
+  }>(
+    `select e.id, e.event_type, e.occurred_at, e.attributes, p.comment_text, p.dm_text, p.username
+     from lead_events e
+     left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
+     where e.tenant_id = $1 and e.lead_id = $2 and ($4::timestamptz is null or e.occurred_at < $4)
+     order by e.occurred_at desc
+     limit $3`,
+    [tenantId, leadId, limit, before ?? null],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    eventType: row.event_type,
+    occurredAt: row.occurred_at,
+    commentText: row.comment_text,
+    dmText: row.dm_text,
+    username: row.username,
+    matchedKeyword: row.attributes.matchedKeyword ?? null,
+  }));
+}
+
 export async function insertEventIdempotent(
   pool: Queryable,
   params: {

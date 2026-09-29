@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { config } from "../config.js";
 import type { Campaign } from "../db/campaigns.js";
-import type { GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
+import type { ConversationTurn, GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
 import type { EmbeddingProvider } from "../llm/embeddingProvider.js";
 import { checkEscalationTriggers, classifyInput, validateOutput, type TenantGuardrailsInput } from "../lib/guardrails.js";
 import { appendCtaLink, renderTemplate } from "../lib/messageComposer.js";
@@ -31,6 +31,8 @@ export interface ReplyContext {
   username?: string;
   tier: ReplyTier;
   ctaLink?: string;
+  /** Prior turns in this conversation (customer + bot), oldest first — see services/conversationHistory.ts. */
+  history?: ConversationTurn[];
 }
 
 export interface PreparedReply {
@@ -173,6 +175,7 @@ export async function generateReply(
     const result = await provider.generateReply({
       systemPrompt: buildSystemPrompt(ctx, retrieval.chunks, rag?.tenantGuardrailsConfig?.brandVoice),
       userMessage: ctx.sourceText,
+      history: ctx.history,
     });
     generated = result.text;
     usage = result.usage;

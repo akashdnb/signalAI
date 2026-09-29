@@ -40,6 +40,9 @@ export function LeadDetailPage() {
 
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
+  const [timelineHasMore, setTimelineHasMore] = useState(false);
+  const [timelineCursor, setTimelineCursor] = useState<string | null>(null);
+  const [loadingMoreTimeline, setLoadingMoreTimeline] = useState(false);
   const [notes, setNotes] = useState<LeadNote[] | null>(null);
   const [tags, setTags] = useState<LeadTag[] | null>(null);
   const [deals, setDeals] = useState<Deal[] | null>(null);
@@ -65,11 +68,29 @@ export function LeadDetailPage() {
       api.listMembers(tenantId),
     ]);
     setLead(l);
-    setTimeline(t);
+    setTimeline(t.entries);
+    setTimelineHasMore(t.hasMore);
+    setTimelineCursor(t.nextCursor);
     setNotes(n);
     setTags(tg);
     setDeals(d);
     setMembers(m);
+  }
+
+  async function handleLoadOlderTimeline() {
+    if (!tenantId || !leadId || !timelineCursor) return;
+    setLoadingMoreTimeline(true);
+    setError(null);
+    try {
+      const page = await api.getLeadTimeline(tenantId, leadId, { before: timelineCursor });
+      setTimeline((prev) => [...page.entries, ...(prev ?? [])]);
+      setTimelineHasMore(page.hasMore);
+      setTimelineCursor(page.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load older messages");
+    } finally {
+      setLoadingMoreTimeline(false);
+    }
   }
 
   useEffect(() => {
@@ -146,7 +167,10 @@ export function LeadDetailPage() {
       await api.addLeadNote(tenantId, leadId, noteBody.trim());
       setNoteBody("");
       setNotes(await api.listLeadNotes(tenantId, leadId));
-      setTimeline(await api.getLeadTimeline(tenantId, leadId));
+      const page = await api.getLeadTimeline(tenantId, leadId);
+      setTimeline(page.entries);
+      setTimelineHasMore(page.hasMore);
+      setTimelineCursor(page.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add note");
     } finally {
@@ -376,6 +400,11 @@ export function LeadDetailPage() {
               <p className="muted">Nothing has happened on this lead yet.</p>
             ) : (
               <div>
+                {timelineHasMore && (
+                  <button className="btn-secondary btn-small" disabled={loadingMoreTimeline} onClick={handleLoadOlderTimeline}>
+                    {loadingMoreTimeline ? "Loading…" : "Load older messages"}
+                  </button>
+                )}
                 {timeline.map((entry, i) => (
                   <div className="timeline-entry" key={i}>
                     {entry.kind === "event" ? (
@@ -386,8 +415,12 @@ export function LeadDetailPage() {
                       </>
                     ) : entry.kind === "reply" ? (
                       <>
-                        <strong>Bot reply ({entry.channel === "comment" ? "comment" : "DM"})</strong>
-                        <span className="pill">{entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}</span>
+                        <strong>
+                          {entry.engine === "human" ? "Team reply" : "Bot reply"} ({entry.channel === "comment" ? "comment" : "DM"})
+                        </strong>
+                        <span className="pill">
+                          {entry.engine === "human" ? "Sent by a teammate" : entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}
+                        </span>
                         <div>{entry.text}</div>
                       </>
                     ) : (

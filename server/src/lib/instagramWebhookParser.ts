@@ -13,7 +13,7 @@
 
 export interface ParsedWebhookEvent {
   instagramAccountId: string; // the creator's connected professional account
-  instagramUserId: string; // the commenter/sender — becomes the lead
+  instagramUserId: string; // the commenter/sender for an inbound event — for an echo (isEcho: true), the RECIPIENT instead, since that's the actual lead
   metaEventId: string; // idempotency key
   eventType: "comment" | "message";
   occurredAt: Date;
@@ -22,6 +22,10 @@ export interface ParsedWebhookEvent {
   username?: string;
   mediaId?: string; // the post/Reel the comment was left on — absent for message events
   commentId?: string; // Meta's own comment id — needed to post a public reply to this exact comment
+  /** Only set (true) for eventType 'message': Meta's echo of an outbound DM sent from the connected account — by the bot, or by a human agent replying directly in Instagram. Routed to webhookIngestService.ts's separate echo-ingestion path, never through keyword matching/campaign triggers. */
+  isEcho?: boolean;
+  /** Only set alongside isEcho: the mid this echo reports — the same id Meta's Send API returned when the message was actually sent, used to correlate an echo back to a send this system already recorded (see db/sentReplies.ts's sentReplyExistsForMetaMessageId). */
+  metaMessageId?: string;
 }
 
 export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEvent[] {
@@ -69,32 +73,50 @@ export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEve
         const sender = isRecord(item.sender) ? item.sender : {};
         const message = isRecord(item.message) ? item.message : {};
 
-        const instagramUserId = typeof sender.id === "string" ? sender.id : undefined;
+        const senderId = typeof sender.id === "string" ? sender.id : undefined;
         const messageId = typeof message.mid === "string" ? message.mid : undefined;
-        if (!instagramUserId || !messageId) continue;
-
-        // Meta echoes the business's OWN outbound DMs back as messaging
-        // events. Ingested naively they create a "lead" whose
-        // instagram_user_id is the business account itself, open a 24h
-        // messaging window against ourselves, and inflate Unique Leads
-        // Generated — observed live: sending one reply produced a second
-        // lead for account 17841408728501893.
-        //
-        // Two checks on purpose: `is_echo` is the documented flag, and
-        // sender-is-the-account is a structural backstop that holds even if
-        // the flag is absent, since a message *from* the connected account
-        // is by definition outbound.
-        if (message.is_echo === true || instagramUserId === instagramAccountId) continue;
+        if (!senderId || !messageId) continue;
 
         const timestamp = typeof item.timestamp === "number" ? new Date(item.timestamp) : entryTime;
+        const dmText = typeof message.text === "string" ? message.text : describeAttachments(message);
+
+        // Meta echoes the business's OWN outbound DMs back as messaging
+        // events, sender-is-the-account (a message *from* the connected
+        // account is by definition outbound) as the structural backstop
+        // for is_echo, which is the documented flag but not guaranteed
+        // present. Naively treating `senderId` as the lead here — as this
+        // parser used to for every messaging event, echoes included —
+        // creates a "lead" whose instagram_user_id is the business account
+        // itself and opens a 24h messaging window against ourselves:
+        // observed live, sending one reply produced a second lead for
+        // account 17841408728501893. An echo instead uses the RECIPIENT as
+        // the lead (the actual customer this was sent to), which is also
+        // who the send was addressed to in the first place.
+        if (message.is_echo === true || senderId === instagramAccountId) {
+          const recipient = isRecord(item.recipient) ? item.recipient : {};
+          const recipientId = typeof recipient.id === "string" ? recipient.id : undefined;
+          if (!recipientId) continue; // can't attribute this echo to any lead
+
+          events.push({
+            instagramAccountId,
+            instagramUserId: recipientId,
+            metaEventId: `message:${messageId}`,
+            eventType: "message",
+            occurredAt: timestamp,
+            dmText,
+            isEcho: true,
+            metaMessageId: messageId,
+          });
+          continue;
+        }
 
         events.push({
           instagramAccountId,
-          instagramUserId,
+          instagramUserId: senderId,
           metaEventId: `message:${messageId}`,
           eventType: "message",
           occurredAt: timestamp,
-          dmText: typeof message.text === "string" ? message.text : undefined,
+          dmText,
         });
       }
     }
@@ -105,4 +127,40 @@ export function parseInstagramWebhookPayload(payload: unknown): ParsedWebhookEve
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/**
+ * A shared Reel/post, photo, video, voice clip, or story mention arrives
+ * with no `message.text` at all — only `message.attachments` — so without
+ * this, dmText stayed undefined and the message rendered as a blank DM in
+ * the timeline (lead_pii.dm_text null, "—" is LeadDetailPage.tsx's fallback
+ * for missing text). A short, readable label plus the content's own URL
+ * (when Meta includes one) beats a blank row; VERIFY the exact attachment
+ * `type`/`payload` shape against a real payload, same caveat as this file's
+ * top-level docstring — unrecognized types fall back to a generic label
+ * rather than staying blank.
+ */
+function describeAttachments(message: Record<string, unknown>): string | undefined {
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const first = attachments[0];
+  if (!isRecord(first)) return undefined;
+
+  const type = typeof first.type === "string" ? first.type : undefined;
+  const payload = isRecord(first.payload) ? first.payload : {};
+  const url = typeof payload.url === "string" ? payload.url : undefined;
+
+  const label =
+    type === "share" || type === "media_share" || type === "reel"
+      ? "Shared a reel/post"
+      : type === "story_mention"
+        ? "Mentioned you in their story"
+        : type === "image"
+          ? "Sent a photo"
+          : type === "video"
+            ? "Sent a video"
+            : type === "audio"
+              ? "Sent a voice clip"
+              : "Shared content";
+
+  return url ? `${label}: ${url}` : label;
 }

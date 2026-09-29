@@ -6,9 +6,22 @@
  * untrusted-input isolation (roadmap Security Foundations); classifyInput/
  * validateOutput in lib/guardrails.ts are the other half.
  */
+/** One prior turn of the conversation, oldest-first. Raw messages, not a summary — see services/conversationHistory.ts for why. */
+export interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface GenerateReplyInput {
   systemPrompt: string;
   userMessage: string;
+  /**
+   * Prior turns in this conversation (customer + bot), oldest first. Every
+   * provider implementation must place these between systemPrompt and
+   * userMessage, preserving role, so the model sees them as real prior
+   * turns rather than folding them into the untrusted userMessage content.
+   */
+  history?: ConversationTurn[];
   /**
    * R3-07 fix: the Milestone Engine was requesting structured output in
    * prose and recovering it with a regex, leaving the provider's native

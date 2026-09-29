@@ -6,6 +6,8 @@ import type { LeadEventJob } from "../queue/leadEventsQueue.js";
 import type { LeadEventHandlerResult } from "../queue/worker.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { getEventForReply } from "../db/events.js";
+import { config } from "../config.js";
+import { getRecentConversationHistory } from "./conversationHistory.js";
 import { getCampaign } from "../db/campaigns.js";
 import { getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
 import { getTenant } from "../db/tenants.js";
@@ -157,6 +159,15 @@ export function createLeadEventReplyHandler(
 
     const milestones = await listMilestones(pool, job.tenantId, campaign.id);
     const sourceText = (isCommentTrigger ? event.commentText : event.dmText) ?? "";
+    // Conversation memory: prior turns for this lead, fed into the LLM
+    // alongside sourceText so "what's my name?" right after "my name is
+    // akash" can actually be answered — see conversationHistory.ts. Skipped
+    // entirely for a rule_based campaign, which never calls the provider
+    // and so never reads ctx.history.
+    const history =
+      campaign.replyMode === "rule_based"
+        ? []
+        : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns);
     // Governs prompt length/strictness (guardrails.ts), not delivery — a
     // message-triggered event is inherently private-origin, so it gets the
     // fuller "dm" prompt even if the campaign's reply_channel also tries a
@@ -213,6 +224,7 @@ export function createLeadEventReplyHandler(
           username: event.username ?? undefined,
           tier,
           ctaLink: campaign.ctaLink ?? undefined,
+          history,
         },
         provider,
         effectiveSpendGuard,
@@ -248,6 +260,7 @@ export function createLeadEventReplyHandler(
           username: event.username ?? undefined,
           tier,
           ctaLink: campaign.ctaLink ?? undefined,
+          history,
         },
         provider,
         effectiveSpendGuard,
@@ -349,7 +362,7 @@ export function createLeadEventReplyHandler(
 
     let delivered = false;
     if (dmReady) {
-      await sendInstagramMessage(token, lead.instagramUserId, replyText);
+      const sendResult = await sendInstagramMessage(token, lead.instagramUserId, replyText);
       delivered = true;
       // Recorded per actual channel send, not per event — a 'both'-channel
       // campaign makes two real Instagram API calls below and now produces
@@ -357,6 +370,11 @@ export function createLeadEventReplyHandler(
       // anywhere persisted what the bot sent back at all; the dashboard
       // timeline (leadTimeline.ts) showed only the customer's half of the
       // conversation.
+      //
+      // metaMessageId (when Meta's response includes one) is what lets
+      // webhookIngestService.ts's echo-ingestion recognize Meta's later
+      // echo of THIS send as already-recorded, instead of mistaking it for
+      // a human agent's own reply.
       await recordSentReply(pool, {
         tenantId: job.tenantId,
         leadId: job.leadId,
@@ -364,6 +382,7 @@ export function createLeadEventReplyHandler(
         channel: "dm",
         engine,
         text: replyText,
+        metaMessageId: sendResult?.metaMessageId ?? null,
       });
     }
     if (commentReady) {

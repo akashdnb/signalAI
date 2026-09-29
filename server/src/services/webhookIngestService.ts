@@ -9,6 +9,7 @@ import { findMatchingCampaign, CONTINUATION_KEYWORD } from "../lib/keywordMatch.
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
 import { enqueueUsernameResolution } from "../queue/usernameResolutionQueue.js";
+import { recordSentReply, sentReplyExistsForMetaMessageId } from "../db/sentReplies.js";
 import type { ParsedWebhookEvent } from "../lib/instagramWebhookParser.js";
 
 const MESSAGING_WINDOW_HOURS = 24;
@@ -45,8 +46,45 @@ export async function ingestWebhookEvents(
       campaignsByTenant.set(tenantId, campaigns);
     }
 
+    if (event.isEcho) {
+      await ingestOneEchoEvent(pool, tenantId, event);
+      continue;
+    }
+
     await ingestOneEvent(pool, boss, tenantId, campaigns, event);
   }
+}
+
+/**
+ * Conversation memory (human replies): an echo is Meta reporting a DM the
+ * connected account itself sent — the bot, via leadEventReplyHandler.ts, OR
+ * a human agent replying directly in Instagram, outside this system
+ * entirely. There is no lead_event to run this through (it isn't an inbound
+ * trigger candidate — no keyword matching, no messaging-window update, no
+ * queue job), just a fact to record once, deduped against our own sends by
+ * Meta's message id (see db/sentReplies.ts's sentReplyExistsForMetaMessageId):
+ * a match means this is just Meta confirming a send this system already
+ * recorded; a miss means it's new — a human's reply, recorded as engine
+ * 'human' so it reaches the dashboard timeline and the LLM's conversation
+ * history exactly like a bot reply does.
+ */
+async function ingestOneEchoEvent(pool: Pool, tenantId: string, event: ParsedWebhookEvent): Promise<void> {
+  if (!event.metaMessageId || !event.dmText) return; // nothing to correlate or record
+
+  const alreadyRecorded = await sentReplyExistsForMetaMessageId(pool, tenantId, event.metaMessageId);
+  if (alreadyRecorded) return;
+
+  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, event.instagramUserId);
+  await recordSentReply(pool, {
+    tenantId,
+    leadId: lead.id,
+    leadEventId: null,
+    channel: "dm",
+    engine: "human",
+    text: event.dmText,
+    metaMessageId: event.metaMessageId,
+    sentAt: event.occurredAt,
+  });
 }
 
 /**

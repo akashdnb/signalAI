@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import type { GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
+import type { ConversationTurn, GenerateReplyUsage, LLMProvider } from "../llm/provider.js";
 import type { Milestone } from "../db/milestones.js";
 import { checkEscalationTriggers, classifyInput, validateOutput } from "../lib/guardrails.js";
 import { appendCtaLink } from "../lib/messageComposer.js";
@@ -14,6 +14,8 @@ export interface MilestoneCheckContext {
   username?: string;
   tier: "comment" | "dm";
   ctaLink?: string;
+  /** Prior turns in this conversation (customer + bot), oldest first — see services/conversationHistory.ts. */
+  history?: ConversationTurn[];
 }
 
 export interface MilestoneCheckResult {
@@ -245,6 +247,7 @@ export async function runMilestoneCheck(
     const result = await provider.generateReply({
       systemPrompt: buildSystemPrompt(ctx, retrieval.chunks, rag?.tenantGuardrailsConfig?.brandVoice),
       userMessage: ctx.sourceText,
+      history: ctx.history,
       responseFormat: "json_object", // R3-07: use the provider's native JSON mode, not just prose + regex recovery
     });
     raw = result.text;
