@@ -138,7 +138,9 @@ function AuthCard({ children }: { children: React.ReactNode }) {
         <div className="mb-8 md:hidden">
           <Logo size="md" />
         </div>
-        {children}
+        <div className="rounded-2xl border border-line bg-card p-8 shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
+          {children}
+        </div>
       </div>
     </div>
   );
