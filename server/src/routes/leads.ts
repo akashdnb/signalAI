@@ -5,6 +5,7 @@ import {
   updatePipelineStage,
   assignLeadOwner,
   updateHandoffStatus,
+  markLeadRead,
   type PipelineStage,
   type HandoffStatus,
 } from "../db/leads.js";
@@ -15,6 +16,12 @@ import { createDeal, listDealsForLead, updateDealStage, type DealStage } from ".
 import { listTenantMembers } from "../db/tenantMembers.js";
 import { getTopPosts, getTopKeywords } from "../db/analytics.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
+import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
+import { tryReserveSend } from "../db/accountSends.js";
+import { sendInstagramMessage } from "../lib/instagramSend.js";
+import { recordSentReply } from "../db/sentReplies.js";
+import { HOURLY_SEND_LIMIT } from "../lib/sendLimits.js";
+import { config } from "../config.js";
 
 export const leadsRouter = Router();
 
@@ -124,6 +131,68 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) =>
   });
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   return res.status(200).json(lead);
+});
+
+// Inbox "Unread": marks a conversation read. Called when a human opens it
+// (Inbox row click, LeadDetailPage mount) — no body, idempotent.
+leadsRouter.post("/tenants/:tenantId/leads/:leadId/read", async (req, res) => {
+  const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+
+  await markLeadRead(getPool(), tenantId, leadId);
+  return res.status(204).send();
+});
+
+// Inbox compose box: a human sending their own DM reply, distinct from the
+// automated Reply Engine (leadEventReplyHandler.ts) — the only other caller
+// of sendInstagramMessage. Gated on handoffStatus === 'human' (Live Agent
+// Takeover) so a human reply can never race the bot for the same lead; DM
+// only, matching the messaging-window / Meta Send API constraints the
+// automated path already respects (comment replies stay automation-only —
+// there's no single "current comment" a conversation-thread UI reply
+// targets).
+leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
+  const { tenantId, leadId } = req.params;
+  const { text } = req.body ?? {};
+  if (typeof text !== "string" || !text.trim()) {
+    return res.status(400).json({ error: "text is required" });
+  }
+
+  const pool = getPool();
+  const lead = await getLead(pool, tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+  if (lead.handoffStatus !== "human") {
+    return res.status(400).json({ error: "take over the conversation before replying (POST .../handoff with action: 'takeover')" });
+  }
+  if (!lead.instagramUserId) {
+    return res.status(400).json({ error: "this lead has no Instagram identity to message" });
+  }
+  if (!lead.windowOpenUntil || lead.windowOpenUntil.getTime() <= Date.now()) {
+    return res.status(409).json({ error: "the messaging window for this lead is closed — it needs a fresh inbound message before you can reply" });
+  }
+
+  const account = await getSoleConnectedAccount(pool, tenantId);
+  if (!account) return res.status(409).json({ error: "no Instagram account connected for this tenant" });
+
+  const token = await getDecryptedToken(pool, config.tokenKeyring, tenantId, account.instagramAccountId);
+  if (!token) return res.status(409).json({ error: "Instagram connection is not currently valid — reconnect and try again" });
+
+  const reserved = await tryReserveSend(pool, tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT);
+  if (!reserved) return res.status(429).json({ error: "hourly send limit reached for this Instagram account — try again shortly" });
+
+  const sendResult = await sendInstagramMessage(token, lead.instagramUserId, text.trim());
+  await recordSentReply(pool, {
+    tenantId,
+    leadId,
+    leadEventId: null,
+    channel: "dm",
+    engine: "human",
+    text: text.trim(),
+    metaMessageId: sendResult.metaMessageId,
+  });
+
+  return res.status(201).json({ ok: true });
 });
 
 // Phase 2A Lead Notes / Internal Comments.

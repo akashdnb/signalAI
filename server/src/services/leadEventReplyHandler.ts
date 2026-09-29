@@ -32,9 +32,8 @@ import { Sentry } from "../lib/sentry.js";
 import { generateReply } from "./replyEngine.js";
 import { runMilestoneCheck } from "./milestoneEngine.js";
 import { createAccountSpendGuard, type AiSpendGuard } from "./aiSpendGuard.js";
+import { HOURLY_SEND_LIMIT } from "../lib/sendLimits.js";
 
-// Meta's published ceiling for private-reply/DM sends per Instagram account.
-const HOURLY_SEND_LIMIT = 750;
 // Not derived from the limit window (that would mean a ~5s average
 // spacing) — this is just how long a deferred job waits before the worker
 // rechecks the counter, so a burst that fills the hourly cap early doesn't

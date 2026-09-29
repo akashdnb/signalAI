@@ -213,6 +213,10 @@ export interface LeadListItem {
   username: string | null;
   /** The most recent event's type for this lead — 'comment' means their last contact was a public comment, 'message' means a DM (including a shared post/Reel, which arrives as a message event). */
   lastEventType: "comment" | "message" | string | null;
+  /** Inbox: that same event's comment/DM text, for a conversation-list preview. */
+  lastMessagePreview: string | null;
+  /** Inbox "Unread": true when there's an inbound message the lead's owner hasn't opened this conversation since. */
+  unread: boolean;
   activeMilestoneId: string | null;
   lastInboundAt: string | null;
   windowOpenUntil: string | null;
@@ -380,12 +384,17 @@ export const api = {
   startInstagramConnect: (tenantId: string) =>
     request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, { method: "POST" }),
   getAccountHealth: (tenantId: string) => request<AccountHealth>(`/tenants/${tenantId}/account`),
-  getLeads: (tenantId: string, filters?: { stage?: PipelineStage; ownerUserId?: string; q?: string; tagId?: string }) => {
+  getLeads: (
+    tenantId: string,
+    filters?: { stage?: PipelineStage; ownerUserId?: string; q?: string; tagId?: string; handoffStatus?: HandoffStatus; unreadOnly?: boolean },
+  ) => {
     const params = new URLSearchParams();
     if (filters?.stage) params.set("stage", filters.stage);
     if (filters?.ownerUserId) params.set("ownerUserId", filters.ownerUserId);
     if (filters?.q) params.set("q", filters.q);
     if (filters?.tagId) params.set("tagId", filters.tagId);
+    if (filters?.handoffStatus) params.set("handoffStatus", filters.handoffStatus);
+    if (filters?.unreadOnly) params.set("unread", "true");
     const qs = params.toString();
     return request<LeadListItem[]>(`/tenants/${tenantId}/leads${qs ? `?${qs}` : ""}`);
   },
@@ -402,6 +411,13 @@ export const api = {
     request<LeadDetail>(`/tenants/${tenantId}/leads/${leadId}/handoff`, {
       method: "POST",
       body: JSON.stringify({ action }),
+    }),
+  markLeadRead: (tenantId: string, leadId: string) =>
+    request<void>(`/tenants/${tenantId}/leads/${leadId}/read`, { method: "POST" }),
+  sendLeadReply: (tenantId: string, leadId: string, text: string) =>
+    request<{ ok: true }>(`/tenants/${tenantId}/leads/${leadId}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
     }),
 
   listMembers: (tenantId: string) => request<TenantMember[]>(`/tenants/${tenantId}/members`),

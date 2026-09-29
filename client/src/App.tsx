@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell";
 import { ComingSoonPage } from "./components/ComingSoonPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { InboxPage } from "./pages/InboxPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -23,7 +24,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
-        <Route path="inbox" element={<ComingSoonPage title="Inbox" />} />
+        <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<ComingSoonPage title="Leads" />} />
         <Route path="automation" element={<ComingSoonPage title="Automation" />} />
         <Route path="content" element={<ComingSoonPage title="Content" />} />

@@ -133,6 +133,68 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(res.body[0]).toMatchObject({ id: lead.id, username: null, lastEventType: "message" });
   });
 
+  it("GET /tenants/:id/leads reports lastMessagePreview from the most recent event's PII, and unread=true with no last_read_at yet", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const event = await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-1",
+      eventType: "message",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
+    await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, dmText: "What's the price?" });
+    await pool.query(`update leads set last_inbound_at = now() where id = $1`, [lead.id]);
+
+    const res = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: lead.id, lastMessagePreview: "What's the price?", unread: true });
+  });
+
+  it("GET /tenants/:id/leads: unread flips false after POST .../read, and unread=true filters it back out", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    await pool.query(`update leads set last_inbound_at = now() where id = $1`, [lead.id]);
+
+    const before = await request(app).get(`/tenants/${tenant.id}/leads?unread=true`).set(authHeader);
+    expect(before.body).toHaveLength(1);
+
+    const markRead = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/read`).set(authHeader);
+    expect(markRead.status).toBe(204);
+
+    const all = await request(app).get(`/tenants/${tenant.id}/leads`).set(authHeader);
+    expect(all.body[0]).toMatchObject({ unread: false });
+
+    const after = await request(app).get(`/tenants/${tenant.id}/leads?unread=true`).set(authHeader);
+    expect(after.body).toHaveLength(0);
+  });
+
+  it("GET /tenants/:id/leads filters by handoffStatus, and rejects an invalid one", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-a");
+    const leadB = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-b");
+    await request(app).post(`/tenants/${tenant.id}/leads/${leadB.id}/handoff`).set(authHeader).send({ action: "takeover" });
+
+    const aiOnly = await request(app).get(`/tenants/${tenant.id}/leads?handoffStatus=ai`).set(authHeader);
+    expect(aiOnly.body.map((l: { id: string }) => l.id)).toEqual([leadA.id]);
+
+    const humanOnly = await request(app).get(`/tenants/${tenant.id}/leads?handoffStatus=human`).set(authHeader);
+    expect(humanOnly.body.map((l: { id: string }) => l.id)).toEqual([leadB.id]);
+
+    const invalid = await request(app).get(`/tenants/${tenant.id}/leads?handoffStatus=bogus`).set(authHeader);
+    expect(invalid.status).toBe(400);
+  });
+
   it("GET /tenants/:id/analytics reports the four numbers sourced from their durable tables", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

@@ -1,47 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ApiError,
-  api,
-  type Deal,
-  type HandoffStatus,
-  type LeadDetail,
-  type LeadNote,
-  type LeadTag,
-  type PipelineStage,
-  type TenantMember,
-  type TimelineEntry,
-} from "../api";
-
-const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "qualified", label: "Qualified" },
-  { value: "meeting_scheduled", label: "Meeting Scheduled" },
-  { value: "won", label: "Won" },
-  { value: "lost", label: "Lost" },
-];
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
-}
-
-function handoffLabel(status: HandoffStatus): { text: string; className: string } {
-  if (status === "human") return { text: "Human is replying", className: "pill pill-ok" };
-  if (status === "requested") return { text: "Escalated — needs attention", className: "pill pill-error" };
-  return { text: "AI is replying", className: "pill" };
-}
+import { ApiError, api, type Deal, type LeadDetail, type LeadNote, type LeadTag, type PipelineStage, type TenantMember } from "../api";
+import { ThreadPanel } from "../components/ThreadPanel";
+import { PIPELINE_STAGES, formatDate, handoffLabel } from "../lib/leadFormatting";
 
 export function LeadDetailPage() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
   const navigate = useNavigate();
 
   const [lead, setLead] = useState<LeadDetail | null>(null);
-  const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
-  const [timelineHasMore, setTimelineHasMore] = useState(false);
-  const [timelineCursor, setTimelineCursor] = useState<string | null>(null);
-  const [loadingMoreTimeline, setLoadingMoreTimeline] = useState(false);
+  const [timelineRefreshToken, setTimelineRefreshToken] = useState(0);
   const [notes, setNotes] = useState<LeadNote[] | null>(null);
   const [tags, setTags] = useState<LeadTag[] | null>(null);
   const [deals, setDeals] = useState<Deal[] | null>(null);
@@ -58,38 +26,18 @@ export function LeadDetailPage() {
 
   async function loadAll() {
     if (!tenantId || !leadId) return;
-    const [l, t, n, tg, d, m] = await Promise.all([
+    const [l, n, tg, d, m] = await Promise.all([
       api.getLead(tenantId, leadId),
-      api.getLeadTimeline(tenantId, leadId),
       api.listLeadNotes(tenantId, leadId),
       api.listLeadTags(tenantId, leadId),
       api.listLeadDeals(tenantId, leadId),
       api.listMembers(tenantId),
     ]);
     setLead(l);
-    setTimeline(t.entries);
-    setTimelineHasMore(t.hasMore);
-    setTimelineCursor(t.nextCursor);
     setNotes(n);
     setTags(tg);
     setDeals(d);
     setMembers(m);
-  }
-
-  async function handleLoadOlderTimeline() {
-    if (!tenantId || !leadId || !timelineCursor) return;
-    setLoadingMoreTimeline(true);
-    setError(null);
-    try {
-      const page = await api.getLeadTimeline(tenantId, leadId, { before: timelineCursor });
-      setTimeline((prev) => [...page.entries, ...(prev ?? [])]);
-      setTimelineHasMore(page.hasMore);
-      setTimelineCursor(page.nextCursor);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load older messages");
-    } finally {
-      setLoadingMoreTimeline(false);
-    }
   }
 
   useEffect(() => {
@@ -105,6 +53,10 @@ export function LeadDetailPage() {
       }
       setError(err instanceof Error ? err.message : "Failed to load lead");
     });
+    api.markLeadRead(tenantId, leadId).catch(() => {
+      // Best-effort — an unread badge staying on somewhere else isn't worth
+      // surfacing an error banner over.
+    });
     return () => {
       cancelled = true;
     };
@@ -119,6 +71,7 @@ export function LeadDetailPage() {
       const updated = await api.updateLead(tenantId, leadId, { pipelineStage: stage });
       setLead(updated);
       await loadAll();
+      setTimelineRefreshToken((t) => t + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update stage");
     } finally {
@@ -134,6 +87,7 @@ export function LeadDetailPage() {
       const updated = await api.updateLead(tenantId, leadId, { ownerUserId: ownerUserId || null });
       setLead(updated);
       await loadAll();
+      setTimelineRefreshToken((t) => t + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to assign owner");
     } finally {
@@ -149,6 +103,7 @@ export function LeadDetailPage() {
       const updated = await api.handoffAction(tenantId, leadId, action);
       setLead(updated);
       await loadAll();
+      setTimelineRefreshToken((t) => t + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update handoff status");
     } finally {
@@ -164,10 +119,7 @@ export function LeadDetailPage() {
       await api.addLeadNote(tenantId, leadId, noteBody.trim());
       setNoteBody("");
       setNotes(await api.listLeadNotes(tenantId, leadId));
-      const page = await api.getLeadTimeline(tenantId, leadId);
-      setTimeline(page.entries);
-      setTimelineHasMore(page.hasMore);
-      setTimelineCursor(page.nextCursor);
+      setTimelineRefreshToken((t) => t + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add note");
     } finally {
@@ -385,43 +337,7 @@ export function LeadDetailPage() {
 
           <section className="card">
             <h2>Timeline</h2>
-            {timeline === null ? (
-              <p className="muted">Loading…</p>
-            ) : timeline.length === 0 ? (
-              <p className="muted">Nothing has happened on this lead yet.</p>
-            ) : (
-              <div>
-                {timelineHasMore && (
-                  <button className="btn-secondary btn-small" disabled={loadingMoreTimeline} onClick={handleLoadOlderTimeline}>
-                    {loadingMoreTimeline ? "Loading…" : "Load older messages"}
-                  </button>
-                )}
-                {timeline.map((entry, i) => (
-                  <div className="timeline-entry" key={i}>
-                    {entry.kind === "event" ? (
-                      <>
-                        <strong>{entry.eventType === "comment" ? "Comment" : "DM"}</strong>
-                        {entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}
-                        <div>{entry.text ?? "—"}</div>
-                      </>
-                    ) : entry.kind === "reply" ? (
-                      <>
-                        <strong>
-                          {entry.engine === "human" ? "Team reply" : "Bot reply"} ({entry.channel === "comment" ? "comment" : "DM"})
-                        </strong>
-                        <span className="pill">
-                          {entry.engine === "human" ? "Sent by a teammate" : entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}
-                        </span>
-                        <div>{entry.text}</div>
-                      </>
-                    ) : (
-                      <div>{entry.summary}</div>
-                    )}
-                    <div className="timeline-meta">{formatDate(entry.occurredAt)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} onError={setError} />
           </section>
         </>
       )}

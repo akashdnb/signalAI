@@ -336,6 +336,10 @@ export interface LeadListItem {
   username: string | null;
   /** The most recent lead_event's type for this lead ('comment' | 'message') — lets the dashboard show whether the last contact was a public comment or a DM. Null only for a lead with no events at all, which shouldn't happen outside a test. */
   lastEventType: string | null;
+  /** Inbox: the same most-recent event's comment/DM text, for a conversation-list preview — null if that event carried no text (e.g. a media share) or the lead has no events yet. */
+  lastMessagePreview: string | null;
+  /** Inbox "Unread": true when there's an inbound message the lead's owner hasn't opened this conversation since. Always false for a lead with no inbound message yet. */
+  unread: boolean;
   activeMilestoneId: string | null;
   lastInboundAt: Date | null;
   windowOpenUntil: Date | null;
@@ -352,6 +356,10 @@ export interface LeadFilters {
   /** Matches against username (case-insensitive substring) — the only searchable text a lead list can show without touching content PII beyond what's already surfaced. */
   q?: string;
   tagId?: string;
+  /** Inbox filter tabs: AI Handling / Needs Attention. */
+  handoffStatus?: HandoffStatus;
+  /** Inbox "Unread" tab — see LeadListItem.unread for the definition. */
+  unreadOnly?: boolean;
 }
 
 /**
@@ -391,6 +399,13 @@ export async function listLeadsForTenant(
       `exists (select 1 from lead_pii p2 where p2.lead_id = l.id and p2.deleted_at is null and p2.username ilike $${params.length})`,
     );
   }
+  if (filters.handoffStatus) {
+    params.push(filters.handoffStatus);
+    conditions.push(`l.handoff_status = $${params.length}`);
+  }
+  if (filters.unreadOnly) {
+    conditions.push(`l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)`);
+  }
 
   params.push(limit);
 
@@ -399,6 +414,8 @@ export async function listLeadsForTenant(
     instagram_user_id: string | null;
     username: string | null;
     last_event_type: string | null;
+    last_message_preview: string | null;
+    unread: boolean;
     active_milestone_id: string | null;
     last_inbound_at: Date | null;
     window_open_until: Date | null;
@@ -409,7 +426,9 @@ export async function listLeadsForTenant(
   }>(
     `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, l.created_at,
             l.pipeline_stage, l.owner_user_id, l.handoff_status,
-            p.username, e.event_type as last_event_type
+            p.username, e.event_type as last_event_type,
+            coalesce(pii.comment_text, pii.dm_text) as last_message_preview,
+            (l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)) as unread
      from leads l
      left join lateral (
        select username from lead_pii
@@ -417,10 +436,14 @@ export async function listLeadsForTenant(
        order by created_at desc limit 1
      ) p on true
      left join lateral (
-       select event_type from lead_events
+       select id, event_type from lead_events
        where lead_id = l.id
        order by occurred_at desc limit 1
      ) e on true
+     left join lateral (
+       select comment_text, dm_text from lead_pii
+       where lead_event_id = e.id and deleted_at is null
+     ) pii on true
      where ${conditions.join(" and ")}
      order by coalesce(l.last_inbound_at, l.created_at) desc
      limit $${params.length}`,
@@ -431,6 +454,8 @@ export async function listLeadsForTenant(
     instagramUserId: row.instagram_user_id,
     username: row.username,
     lastEventType: row.last_event_type,
+    lastMessagePreview: row.last_message_preview,
+    unread: row.unread,
     activeMilestoneId: row.active_milestone_id,
     lastInboundAt: row.last_inbound_at,
     windowOpenUntil: row.window_open_until,
@@ -439,6 +464,11 @@ export async function listLeadsForTenant(
     ownerUserId: row.owner_user_id,
     handoffStatus: row.handoff_status,
   }));
+}
+
+/** Inbox "mark as read" — called when a human opens a conversation (Inbox row click, LeadDetailPage mount). */
+export async function markLeadRead(pool: Queryable, tenantId: string, leadId: string): Promise<void> {
+  await pool.query(`update leads set last_read_at = now() where id = $1 and tenant_id = $2`, [leadId, tenantId]);
 }
 
 export async function advanceSequence(

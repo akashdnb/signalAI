@@ -12,26 +12,7 @@ import {
 } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
 import { useTenant } from "../context/TenantContext";
-
-const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "contacted", label: "Contacted" },
-  { value: "qualified", label: "Qualified" },
-  { value: "meeting_scheduled", label: "Meeting Scheduled" },
-  { value: "won", label: "Won" },
-  { value: "lost", label: "Lost" },
-];
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
-}
-
-function formatLastContactVia(lastEventType: string | null): string {
-  if (lastEventType === "comment") return "Comment";
-  if (lastEventType === "message") return "DM";
-  return "—";
-}
+import { PIPELINE_STAGES, formatDate, formatLastContactVia } from "../lib/leadFormatting";
 
 export function DashboardPage() {
   const { tenantId } = useParams<{ tenantId: string }>();

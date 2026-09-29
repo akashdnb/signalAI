@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
-import { listLeadsForTenant, type PipelineStage } from "../db/leads.js";
+import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
 import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
 import { getCampaign, updateCampaignReplyConfig, type ReplyChannel, type ReplyMode, type TriggerSource } from "../db/campaigns.js";
 import { generateReply, type RagDependencies } from "../services/replyEngine.js";
@@ -48,18 +48,25 @@ export function dashboardRouter(
   });
 
   const VALID_PIPELINE_STAGES: PipelineStage[] = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"];
+  const VALID_HANDOFF_STATUSES: HandoffStatus[] = ["ai", "requested", "human"];
 
-  // Phase 2A Lead Filters/Lead Search: all optional, all AND'd together.
+  // Phase 2A Lead Filters/Lead Search, extended for the Inbox's filter tabs
+  // (handoffStatus, unread): all optional, all AND'd together.
   router.get("/tenants/:tenantId/leads", async (req, res) => {
-    const { stage, ownerUserId, q, tagId } = req.query;
+    const { stage, ownerUserId, q, tagId, handoffStatus, unread } = req.query;
     if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) {
       return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
+    }
+    if (handoffStatus !== undefined && !VALID_HANDOFF_STATUSES.includes(handoffStatus as HandoffStatus)) {
+      return res.status(400).json({ error: `handoffStatus must be one of ${VALID_HANDOFF_STATUSES.join(", ")}` });
     }
     const leads = await listLeadsForTenant(getPool(), req.params.tenantId, 100, {
       stage: stage as PipelineStage | undefined,
       ownerUserId: typeof ownerUserId === "string" ? ownerUserId : undefined,
       q: typeof q === "string" ? q : undefined,
       tagId: typeof tagId === "string" ? tagId : undefined,
+      handoffStatus: handoffStatus as HandoffStatus | undefined,
+      unreadOnly: unread === "true",
     });
     return res.status(200).json(leads);
   });

@@ -1,16 +1,27 @@
+import { randomBytes } from "node:crypto";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
+import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 
 const SESSION_SECRET = "test-session-secret";
+// Same rationale as routes/__tests__/campaigns.test.ts: generated per run
+// (not a fixed literal) and must decode via config.tokenKeyring, since
+// routes/leads.ts's /reply endpoint decrypts through that, not a keyring
+// passed in directly.
+const TOKEN_KEY = randomBytes(32);
+const keyring = new Map<string, Buffer>([["v1", TOKEN_KEY]]);
 
 describe("leads routes (Phase 2A)", () => {
+  const originalFetch = global.fetch;
+
   beforeAll(() => {
     process.env.SESSION_SECRET = SESSION_SECRET;
+    process.env.TOKEN_ENCRYPTION_KEYS = `v1:${TOKEN_KEY.toString("base64")}`;
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
     }
@@ -18,6 +29,11 @@ describe("leads routes (Phase 2A)", () => {
 
   beforeEach(async () => {
     await resetDb(getPool());
+    global.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   afterAll(async () => {
@@ -110,6 +126,82 @@ describe("leads routes (Phase 2A)", () => {
 
     const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "bogus" });
     expect(res.status).toBe(400);
+  });
+
+  it("POST /reply sends a DM and records it as a human sent_reply, once taken over with the messaging window open", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    await pool.query(`update leads set window_open_until = now() + interval '1 hour' where id = $1`, [lead.id]);
+    const app = createApp();
+
+    await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message_id: "mid-1" }),
+    } as Response);
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "Sure, here's the pricing." });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ ok: true });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const replies = await pool.query(`select channel, engine, text, meta_message_id from sent_replies where lead_id = $1`, [lead.id]);
+    expect(replies.rows).toEqual([
+      { channel: "dm", engine: "human", text: "Sure, here's the pricing.", meta_message_id: "mid-1" },
+    ]);
+  });
+
+  it("POST /reply 400s when the conversation hasn't been taken over", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    await pool.query(`update leads set window_open_until = now() + interval '1 hour' where id = $1`, [lead.id]);
+    const app = createApp();
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "Hi" });
+    expect(res.status).toBe(400);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("POST /reply 409s when the messaging window is closed", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const app = createApp();
+
+    await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "Hi" });
+    expect(res.status).toBe(409);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("POST /reply rejects an empty text", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const app = createApp();
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "   " });
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /read marks a conversation read, 404s for an unknown lead", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const app = createApp();
+
+    const ok = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/read`).set(authHeader);
+    expect(ok.status).toBe(204);
+
+    const missing = await request(app).post(`/tenants/${tenant.id}/leads/00000000-0000-0000-0000-000000000000/read`).set(authHeader);
+    expect(missing.status).toBe(404);
   });
 
   it("POST and GET notes", async () => {
