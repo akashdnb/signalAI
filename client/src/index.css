@@ -86,6 +86,9 @@ button {
   --funnel-4: #282cec;
   --funnel-5: #575af0;
   --funnel-6: #8183f4;
+  /* Login page background — a full diagonal wash, not a flat fill, so the
+     page reads as designed rather than a plain gray screen behind the card. */
+  --auth-gradient: linear-gradient(135deg, #e7defb 0%, #eef1fc 45%, #dcf0fb 100%);
   color-scheme: light;
 }
 
@@ -120,6 +123,7 @@ button {
     --funnel-5: #afb1f8;
     --funnel-6: #cccdfa;
     --sidebar-bg: #111827;
+    --auth-gradient: linear-gradient(135deg, #201a3d 0%, #171d34 45%, #0d1f30 100%);
     color-scheme: dark;
   }
 }
@@ -144,6 +148,7 @@ button {
   --funnel-5: #afb1f8;
   --funnel-6: #cccdfa;
   --sidebar-bg: #111827;
+  --auth-gradient: linear-gradient(135deg, #201a3d 0%, #171d34 45%, #0d1f30 100%);
   color-scheme: dark;
 }
 

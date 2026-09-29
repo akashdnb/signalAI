@@ -80,27 +80,43 @@ function SsoButton({
 }
 
 /**
- * Illustrative only — a generic gradient panel standing in for a property
- * photo, with two floating chat bubbles sketching the comment-to-DM flow.
- * No real photo asset, no real account: "@thepropertyco" is the same kind
- * of placeholder the marketing mocks use, not a claim about an actual
- * customer.
+ * Illustrative only — a flat vector house (not a photo asset, and not a
+ * plain color swatch either) with two floating chat bubbles sketching the
+ * comment-to-DM flow. "@thepropertyco" is the same kind of placeholder the
+ * marketing mocks use, not a claim about an actual customer.
  */
 function CommentToDmIllustration() {
   return (
-    <div
-      className="relative hidden aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl lg:block"
-      style={{ background: "linear-gradient(160deg, var(--accent-soft) 0%, var(--accent-cyan) 100%)", opacity: 0.85 }}
-    >
-      <div className="absolute left-4 top-6 flex max-w-[70%] items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
+    <div className="relative hidden aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl shadow-lg lg:block">
+      <svg viewBox="0 0 400 300" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="var(--accent-cyan)" />
+            <stop offset="1" stopColor="var(--accent)" />
+          </linearGradient>
+        </defs>
+        <rect width="400" height="300" fill="url(#sky)" />
+        <rect y="215" width="400" height="85" fill="#000" opacity="0.08" />
+        {/* tree */}
+        <rect x="55" y="190" width="8" height="35" fill="#0F172A" opacity="0.35" />
+        <circle cx="59" cy="180" r="22" fill="#0F172A" opacity="0.35" />
+        {/* house */}
+        <rect x="150" y="160" width="150" height="65" fill="#0F172A" opacity="0.85" />
+        <polygon points="140,160 225,110 310,160" fill="#0F172A" opacity="0.9" />
+        <rect x="212" y="120" width="14" height="20" fill="#0F172A" opacity="0.9" />
+        <rect x="168" y="180" width="22" height="22" fill="#F8FAFC" opacity="0.9" />
+        <rect x="260" y="180" width="22" height="22" fill="#F8FAFC" opacity="0.9" />
+        <rect x="212" y="188" width="26" height="37" fill="#F8FAFC" opacity="0.9" />
+      </svg>
+      <div className="absolute left-4 top-5 flex max-w-[75%] items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
         <span className="h-7 w-7 shrink-0 rounded-full bg-chip" />
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-ink">@thepropertyco</div>
           <div className="truncate text-xs text-subtle">This looks amazing! Price?</div>
         </div>
       </div>
-      <div className="absolute bottom-6 right-4 max-w-[70%] rounded-xl bg-accent px-3 py-2 text-xs font-medium text-white shadow-lg">
-        We'll send you details in DM!
+      <div className="absolute bottom-5 right-4 max-w-[70%] rounded-xl bg-card px-3 py-2 text-xs font-medium text-ink shadow-lg">
+        We'll send you details in DM! <span aria-hidden>👋</span>
       </div>
     </div>
   );
@@ -142,15 +158,12 @@ function MarketingColumn() {
  */
 function LoginLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-canvas">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(55% 45% at 15% 10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent), radial-gradient(45% 40% at 90% 80%, color-mix(in srgb, var(--accent-cyan) 18%, transparent), transparent)",
-        }}
-      />
-      <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center gap-12 px-6 py-16 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+    <div className="relative min-h-screen" style={{ background: "var(--auth-gradient)" }}>
+      {/* justify-center + a fixed gap (not justify-between inside a wide
+          max-width) keeps the two columns adjacent at any viewport width —
+          the outer margin grows on wide screens instead of the gap between
+          them stretching into dead space. */}
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-14 px-6 py-16 lg:flex-row lg:items-center">
         <MarketingColumn />
         <div className="w-full max-w-sm shrink-0">
           <div className="rounded-2xl border border-line bg-card p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.25)]">
