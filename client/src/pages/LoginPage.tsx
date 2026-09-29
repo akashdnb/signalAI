@@ -79,49 +79,6 @@ function SsoButton({
   );
 }
 
-/**
- * Illustrative only — a flat vector house (not a photo asset, and not a
- * plain color swatch either) with two floating chat bubbles sketching the
- * comment-to-DM flow. "@thepropertyco" is the same kind of placeholder the
- * marketing mocks use, not a claim about an actual customer.
- */
-function CommentToDmIllustration() {
-  return (
-    <div className="relative hidden aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl shadow-lg lg:block">
-      <svg viewBox="0 0 400 300" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="var(--accent-cyan)" />
-            <stop offset="1" stopColor="var(--accent)" />
-          </linearGradient>
-        </defs>
-        <rect width="400" height="300" fill="url(#sky)" />
-        <rect y="215" width="400" height="85" fill="#000" opacity="0.08" />
-        {/* tree */}
-        <rect x="55" y="190" width="8" height="35" fill="#0F172A" opacity="0.35" />
-        <circle cx="59" cy="180" r="22" fill="#0F172A" opacity="0.35" />
-        {/* house */}
-        <rect x="150" y="160" width="150" height="65" fill="#0F172A" opacity="0.85" />
-        <polygon points="140,160 225,110 310,160" fill="#0F172A" opacity="0.9" />
-        <rect x="212" y="120" width="14" height="20" fill="#0F172A" opacity="0.9" />
-        <rect x="168" y="180" width="22" height="22" fill="#F8FAFC" opacity="0.9" />
-        <rect x="260" y="180" width="22" height="22" fill="#F8FAFC" opacity="0.9" />
-        <rect x="212" y="188" width="26" height="37" fill="#F8FAFC" opacity="0.9" />
-      </svg>
-      <div className="absolute left-4 top-5 flex max-w-[75%] items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
-        <span className="h-7 w-7 shrink-0 rounded-full bg-chip" />
-        <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-ink">@thepropertyco</div>
-          <div className="truncate text-xs text-subtle">This looks amazing! Price?</div>
-        </div>
-      </div>
-      <div className="absolute bottom-5 right-4 max-w-[70%] rounded-xl bg-card px-3 py-2 text-xs font-medium text-ink shadow-lg">
-        We'll send you details in DM! <span aria-hidden>👋</span>
-      </div>
-    </div>
-  );
-}
-
 function MarketingColumn() {
   return (
     <div className="max-w-lg">
@@ -143,9 +100,6 @@ function MarketingColumn() {
           </li>
         ))}
       </ul>
-      <div className="mt-10">
-        <CommentToDmIllustration />
-      </div>
     </div>
   );
 }
