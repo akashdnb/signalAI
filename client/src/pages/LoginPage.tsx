@@ -79,67 +79,83 @@ function SsoButton({
   );
 }
 
-function BrandPanel() {
+/**
+ * Illustrative only — a generic gradient panel standing in for a property
+ * photo, with two floating chat bubbles sketching the comment-to-DM flow.
+ * No real photo asset, no real account: "@thepropertyco" is the same kind
+ * of placeholder the marketing mocks use, not a claim about an actual
+ * customer.
+ */
+function CommentToDmIllustration() {
   return (
-    <div className="relative hidden w-[46%] shrink-0 flex-col justify-between overflow-hidden bg-[#0F172A] px-12 py-12 text-white md:flex">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{ background: "radial-gradient(60% 50% at 20% 15%, rgba(124,58,237,0.5), transparent), radial-gradient(50% 40% at 90% 85%, rgba(34,211,238,0.35), transparent)" }}
-      />
-      <div className="relative">
-        <span className="inline-flex items-center gap-2 text-lg font-bold">
-          <svg width={28} height={28} viewBox="0 0 512 512" aria-hidden="true" className="shrink-0">
-            <defs>
-              <linearGradient id="login-logo-gradient" x1="80" y1="430" x2="430" y2="70" gradientUnits="userSpaceOnUse">
-                <stop offset="0" stopColor="#22D3EE" />
-                <stop offset=".45" stopColor="#2563EB" />
-                <stop offset="1" stopColor="#7C3AED" />
-              </linearGradient>
-            </defs>
-            <path
-              fill="url(#login-logo-gradient)"
-              d="M320 62c-70 5-134 38-168 86-30 42-22 79 23 102l83 42c18 9 19 22 2 37-25 22-67 34-113 32l-45 66c88 9 174-18 220-70 40-46 38-90-15-118l-82-43c-19-10-18-23 3-39 24-19 61-29 104-28l42-67z"
-            />
-            <path fill="#22D3EE" d="M402 57l9 24 24 9-24 9-9 24-9-24-24-9 24-9z" />
-          </svg>
-          signal<span className="text-[#22D3EE]">AI</span>
-        </span>
+    <div
+      className="relative hidden aspect-[4/3] w-full max-w-md overflow-hidden rounded-2xl lg:block"
+      style={{ background: "linear-gradient(160deg, var(--accent-soft) 0%, var(--accent-cyan) 100%)", opacity: 0.85 }}
+    >
+      <div className="absolute left-4 top-6 flex max-w-[70%] items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-lg">
+        <span className="h-7 w-7 shrink-0 rounded-full bg-chip" />
+        <div className="min-w-0">
+          <div className="truncate text-xs font-semibold text-ink">@thepropertyco</div>
+          <div className="truncate text-xs text-subtle">This looks amazing! Price?</div>
+        </div>
       </div>
-
-      <div className="relative">
-        <h1 className="m-0 text-4xl font-extrabold leading-tight">
-          Turn Instagram enquiries into <span className="text-[#22D3EE]">qualified customers</span>
-        </h1>
-        <p className="mt-4 max-w-sm text-sm text-white/70">
-          AI-powered Instagram automation: reply to comments and DMs, qualify leads, and hand over high-intent
-          customers to your team.
-        </p>
-        <ul className="mt-8 list-none space-y-3 p-0">
-          {CHECKLIST.map((item) => (
-            <li key={item} className="flex items-center gap-3 text-sm text-white/90">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#22D3EE]/20 text-[#22D3EE]">
-                ✓
-              </span>
-              {item}
-            </li>
-          ))}
-        </ul>
+      <div className="absolute bottom-6 right-4 max-w-[70%] rounded-xl bg-accent px-3 py-2 text-xs font-medium text-white shadow-lg">
+        We'll send you details in DM!
       </div>
-
-      <p className="relative text-xs text-white/40">© {new Date().getFullYear()} signalAI</p>
     </div>
   );
 }
 
-function AuthCard({ children }: { children: React.ReactNode }) {
+function MarketingColumn() {
   return (
-    <div className="flex min-h-screen flex-1 items-center justify-center bg-canvas px-6 py-12">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 md:hidden">
-          <Logo size="md" />
-        </div>
-        <div className="rounded-2xl border border-line bg-card p-8 shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
-          {children}
+    <div className="max-w-lg">
+      <Logo size="md" />
+      <h1 className="mt-8 text-4xl font-extrabold leading-tight text-ink">
+        Turn Instagram enquiries into <span className="text-accent">qualified customers</span>
+      </h1>
+      <p className="mt-4 text-sm text-subtle">
+        AI-powered Instagram automation: reply to comments and DMs, qualify leads, and hand over high-intent customers
+        to your team.
+      </p>
+      <ul className="mt-8 list-none space-y-3 p-0">
+        {CHECKLIST.map((item) => (
+          <li key={item} className="flex items-center gap-3 text-sm text-ink">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-chip text-accent">
+              ✓
+            </span>
+            {item}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-10">
+        <CommentToDmIllustration />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One shared, full-bleed background (no separate dark/light halves) with
+ * the marketing content sitting directly on it and a compact floating card
+ * for the auth step — matching the mock, which is a single page with an
+ * elevated card, not a split screen.
+ */
+function LoginLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-canvas">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(55% 45% at 15% 10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent), radial-gradient(45% 40% at 90% 80%, color-mix(in srgb, var(--accent-cyan) 18%, transparent), transparent)",
+        }}
+      />
+      <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center gap-12 px-6 py-16 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+        <MarketingColumn />
+        <div className="w-full max-w-sm shrink-0">
+          <div className="rounded-2xl border border-line bg-card p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.25)]">
+            {children}
+          </div>
         </div>
       </div>
     </div>
@@ -207,152 +223,139 @@ export function LoginPage() {
 
   if (step === "method") {
     return (
-      <div className="flex min-h-screen">
-        <BrandPanel />
-        <AuthCard>
-          <h1 className="m-0 text-2xl font-bold text-ink">Welcome back</h1>
-          <p className="mt-1 text-sm text-subtle">Sign in to your account</p>
+      <LoginLayout>
+        <h1 className="m-0 text-center text-2xl font-bold text-ink">Welcome back</h1>
+        <p className="mt-1 text-center text-sm text-subtle">Sign in to your account</p>
 
-          <div className="mt-6 space-y-3">
-            <SsoButton
-              provider="google"
-              icon={<GoogleIcon />}
-              label="Continue with Google"
-              unavailable={unavailableProvider === "google"}
-              onClick={() => handleSsoClick("google")}
-            />
-            <SsoButton
-              provider="meta"
-              icon={<MetaIcon />}
-              label="Continue with Meta"
-              unavailable={unavailableProvider === "meta"}
-              onClick={() => handleSsoClick("meta")}
-            />
-            <button
-              type="button"
-              onClick={() => setStep("email")}
-              className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink transition-colors hover:bg-chip"
-            >
-              <InboxIcon className="h-4 w-4" />
-              Continue with Email
-            </button>
-          </div>
+        <div className="mt-6 space-y-3">
+          <SsoButton
+            provider="google"
+            icon={<GoogleIcon />}
+            label="Continue with Google"
+            unavailable={unavailableProvider === "google"}
+            onClick={() => handleSsoClick("google")}
+          />
+          <SsoButton
+            provider="meta"
+            icon={<MetaIcon />}
+            label="Continue with Meta"
+            unavailable={unavailableProvider === "meta"}
+            onClick={() => handleSsoClick("meta")}
+          />
+          <button
+            type="button"
+            onClick={() => setStep("email")}
+            className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink transition-colors hover:bg-chip"
+          >
+            <InboxIcon className="h-4 w-4" />
+            Continue with Email
+          </button>
+        </div>
 
-          <p className="mt-6 text-center text-xs text-subtle">By continuing, you agree to our Terms &amp; Privacy Policy.</p>
+        <p className="mt-6 text-center text-xs text-subtle">
+          By continuing, you agree to our <span className="text-accent">Terms &amp; Privacy Policy</span>.
+        </p>
 
-          <p className="mt-4 text-center text-sm text-subtle">
-            New here?{" "}
-            <button type="button" className="link-button font-medium text-ink" onClick={() => setStep("email")}>
-              Create an account
-            </button>
-          </p>
-        </AuthCard>
-      </div>
+        <p className="mt-4 text-center text-sm text-subtle">
+          New here?{" "}
+          <button type="button" className="link-button font-medium text-accent" onClick={() => setStep("email")}>
+            Create an account
+          </button>
+        </p>
+      </LoginLayout>
     );
   }
 
   if (step === "code") {
     return (
-      <div className="flex min-h-screen">
-        <BrandPanel />
-        <AuthCard>
-          <h1 className="m-0 text-2xl font-bold text-ink">Enter your code</h1>
-          <p className="mt-2 text-sm text-subtle">
-            We sent a 6-digit code to <strong className="text-ink">{email.trim()}</strong>. It expires in 10 minutes.
-          </p>
-
-          {error && <div className="banner banner-error mt-4">{error}</div>}
-
-          <form onSubmit={handleVerifyCode} className="mt-6 space-y-4">
-            <div>
-              <label htmlFor="code" className="text-sm font-medium text-ink">
-                Sign-in code
-              </label>
-              <input
-                id="code"
-                type="text"
-                inputMode="numeric"
-                pattern="\d{6}"
-                maxLength={6}
-                autoFocus
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="123456"
-                required
-                className="text-center text-lg tracking-[0.5em]"
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn-primary w-full"
-              disabled={code.trim().length !== 6 || submitting}
-            >
-              {submitting ? "Verifying…" : "Sign in"}
-            </button>
-          </form>
-
-          <p className="mt-6 text-sm text-subtle">
-            Didn't get it?{" "}
-            <button type="button" className="link-button font-medium text-ink" onClick={handleResend} disabled={submitting}>
-              Send a new code
-            </button>{" "}
-            or{" "}
-            <button
-              type="button"
-              className="link-button font-medium text-ink"
-              onClick={() => {
-                setStep("email");
-                setCode("");
-                setError(null);
-              }}
-            >
-              use a different email
-            </button>
-            .
-          </p>
-        </AuthCard>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen">
-      <BrandPanel />
-      <AuthCard>
-        <button
-          type="button"
-          onClick={() => setStep("method")}
-          className="link-button mb-4 text-sm font-medium text-subtle hover:text-ink"
-        >
-          ← Back
-        </button>
-        <h1 className="m-0 text-2xl font-bold text-ink">Sign in with email</h1>
+      <LoginLayout>
+        <h1 className="m-0 text-2xl font-bold text-ink">Enter your code</h1>
         <p className="mt-2 text-sm text-subtle">
-          Enter your email to get a 6-digit sign-in code — no password to remember.
+          We sent a 6-digit code to <strong className="text-ink">{email.trim()}</strong>. It expires in 10 minutes.
         </p>
 
         {error && <div className="banner banner-error mt-4">{error}</div>}
 
-        <form onSubmit={handleRequestCode} className="mt-6 space-y-4">
+        <form onSubmit={handleVerifyCode} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="email" className="text-sm font-medium text-ink">
-              Email
+            <label htmlFor="code" className="text-sm font-medium text-ink">
+              Sign-in code
             </label>
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              required
+              id="code"
+              type="text"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
               autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="123456"
+              required
+              className="text-center text-lg tracking-[0.5em]"
             />
           </div>
-          <button type="submit" className="btn-primary w-full" disabled={!email.trim() || submitting}>
-            {submitting ? "Sending…" : "Send sign-in code"}
+          <button type="submit" className="btn-primary w-full" disabled={code.trim().length !== 6 || submitting}>
+            {submitting ? "Verifying…" : "Sign in"}
           </button>
         </form>
-      </AuthCard>
-    </div>
+
+        <p className="mt-6 text-sm text-subtle">
+          Didn't get it?{" "}
+          <button type="button" className="link-button font-medium text-ink" onClick={handleResend} disabled={submitting}>
+            Send a new code
+          </button>{" "}
+          or{" "}
+          <button
+            type="button"
+            className="link-button font-medium text-ink"
+            onClick={() => {
+              setStep("email");
+              setCode("");
+              setError(null);
+            }}
+          >
+            use a different email
+          </button>
+          .
+        </p>
+      </LoginLayout>
+    );
+  }
+
+  return (
+    <LoginLayout>
+      <button
+        type="button"
+        onClick={() => setStep("method")}
+        className="link-button mb-4 text-sm font-medium text-subtle hover:text-ink"
+      >
+        ← Back
+      </button>
+      <h1 className="m-0 text-2xl font-bold text-ink">Sign in with email</h1>
+      <p className="mt-2 text-sm text-subtle">Enter your email to get a 6-digit sign-in code — no password to remember.</p>
+
+      {error && <div className="banner banner-error mt-4">{error}</div>}
+
+      <form onSubmit={handleRequestCode} className="mt-6 space-y-4">
+        <div>
+          <label htmlFor="email" className="text-sm font-medium text-ink">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            required
+            autoFocus
+          />
+        </div>
+        <button type="submit" className="btn-primary w-full" disabled={!email.trim() || submitting}>
+          {submitting ? "Sending…" : "Send sign-in code"}
+        </button>
+      </form>
+    </LoginLayout>
   );
 }
