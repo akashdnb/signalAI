@@ -12,6 +12,24 @@
  */
 
 /*
+ * ...except a bare <button> specifically: without Preflight, the browser's
+ * native chrome (a beveled border + background, most visible on plain
+ * icon-only buttons like ThemeToggle that add no border/background classes
+ * of their own) shows through and looks broken, especially with a dark
+ * icon on a light native background regardless of theme. `.btn-primary`/
+ * `.btn-secondary`/`.link-button` below already set their own border and
+ * background explicitly, so this lower-specificity element reset never
+ * overrides them — it only fixes the buttons that were relying on nothing.
+ */
+button {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+
+/*
  * Bridges our own hand-rolled CSS-variable tokens (below) into Tailwind's
  * theme so utilities like `bg-canvas`/`text-ink`/`border-line` are
  * available to new components (AppShell, etc.) while every existing
