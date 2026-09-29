@@ -203,6 +203,61 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     expect(facts).toEqual({});
   });
 
+  // Regression: a lead mid-funnel on one campaign's milestones whose next
+  // message independently matches a DIFFERENT campaign's keyword used to
+  // carry over the stale active_milestone_id from the FIRST campaign —
+  // active_milestone_id is only unique globally, not scoped to whichever
+  // campaign the event actually matched, so the reply handler would run the
+  // second campaign's context (CTA link, etc.) against the first campaign's
+  // leftover funnel position. A campaign mismatch must reset to the new
+  // campaign's own first milestone instead, exactly like a brand-new lead.
+  it("resets to the new campaign's first milestone when a later event matches a different campaign", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaignA = await createCampaign(pool, tenant.id, "Giveaway A", ["LINKA"], { replyMode: "ai_generated" });
+    const campaignB = await createCampaign(pool, tenant.id, "Giveaway B", ["LINKB"], { replyMode: "ai_generated" });
+    await setCampaignMilestones(pool, tenant.id, campaignA.id, [
+      { goalDescription: "capture email for A", captureFields: ["email"] },
+      { goalDescription: "A step two" },
+    ]);
+    const [firstMilestoneB] = await setCampaignMilestones(pool, tenant.id, campaignB.id, [
+      { goalDescription: "capture phone for B", captureFields: ["phone"] },
+    ]);
+
+    const provider = mockProvider([
+      // Captures email but doesn't advance (milestone_satisfied: false) —
+      // keeps the lead mid-funnel on A's first milestone, exercising
+      // partial-capture persistence alongside the campaign switch below.
+      JSON.stringify({ reply: "Thanks! Anything else?", milestone_satisfied: false, captured_values: { email: "a@b.com" } }),
+      JSON.stringify({ reply: "What's your phone number?", milestone_satisfied: false }),
+    ]);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+    // First event matches campaign A — lead lands on A's first milestone.
+    const first = await seedMatchedEvent(pool, tenant.id, campaignA.id, "LINKA", "my email is a@b.com");
+    await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: first.event.id, sequence: 1 });
+
+    let lead = await getLead(pool, tenant.id, first.lead.id);
+    const milestonesA = await pool.query(
+      "select id from campaign_milestones where campaign_id = $1 order by ordinal asc",
+      [campaignA.id],
+    );
+    expect(lead!.activeMilestoneId).toBe(milestonesA.rows[0].id); // A's first milestone
+
+    // Second event, same lead, independently matches campaign B's own keyword.
+    const second = await seedMatchedEvent(pool, tenant.id, campaignB.id, "LINKB", "tell me about LINKB");
+    await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: second.event.id, sequence: 2 });
+
+    lead = await getLead(pool, tenant.id, first.lead.id);
+    // Must land on B's own first milestone, never a stale id from A's funnel.
+    expect(lead!.activeMilestoneId).toBe(firstMilestoneB!.id);
+
+    // Captured facts are lead-level CRM data, deliberately NOT reset by a
+    // campaign switch — the email captured under A survives.
+    const facts = await getCapturedFacts(pool, tenant.id, first.lead.id);
+    expect(facts).toEqual({ email: "a@b.com" });
+  });
+
   it("falls back to a plain B7 reply (no milestone tracking) for a campaign with no milestones configured", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");

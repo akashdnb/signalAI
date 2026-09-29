@@ -238,15 +238,35 @@ export function createLeadEventReplyHandler(
       fellBackReason = reply.fellBackReason;
       usage = reply.usage;
     } else {
-      const activeMilestone = lead.activeMilestoneId
+      let activeMilestone = lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
-        : await getFirstMilestone(pool, job.tenantId, campaign.id);
+        : null;
+
+      // Campaign-switch guard: webhookIngestService's DM Conversation
+      // Continuation can overwrite active_dm_campaign_id to a DIFFERENT
+      // campaign than the one this lead was mid-funnel on — but
+      // active_milestone_id is only unique globally, not scoped to
+      // whichever campaign is actually in play for this event. Reusing a
+      // stale milestone from the PREVIOUS campaign here would run this
+      // reply against another campaign's funnel position: wrong ordinal
+      // (getNextMilestone below is scoped to campaign.id, so a stale
+      // ordinal from a different campaign's sequence can skip milestones
+      // or end the funnel early), wrong CTA link, wrong steering goal.
+      // Treat a mismatch exactly like a brand-new lead on this campaign —
+      // captured facts (email, phone, etc.) are lead-level CRM data and
+      // deliberately NOT reset here, only the funnel position is.
+      if (activeMilestone && activeMilestone.campaignId !== campaign.id) {
+        activeMilestone = null;
+      }
+      if (!activeMilestone) {
+        activeMilestone = await getFirstMilestone(pool, job.tenantId, campaign.id);
+      }
 
       if (!activeMilestone) return { advance: true }; // campaign has milestones but somehow none resolved
 
-      if (!lead.activeMilestoneId) {
+      if (lead.activeMilestoneId !== activeMilestone.id) {
         // Idempotent regardless of send outcome — always resolves to the
-        // same first milestone id on a retry, so this is safe to commit
+        // same milestone id on a retry, so this is safe to commit
         // immediately rather than deferring it too.
         await setActiveMilestone(pool, job.tenantId, job.leadId, activeMilestone.id);
       }
