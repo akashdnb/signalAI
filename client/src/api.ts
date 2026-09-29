@@ -12,6 +12,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 export interface Session {
   tenantId: string;
   token: string;
+  /** Set client-side after OTP verify, for display only (e.g. the sidebar account block) — the server doesn't return it as part of the session. */
+  email?: string;
 }
 
 const SESSION_KEY = "signalai.session";

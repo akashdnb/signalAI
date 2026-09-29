@@ -3,17 +3,15 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ApiError,
   api,
-  clearSession,
-  loadSession,
   type AccountHealth,
   type Analytics,
   type LeadListItem,
   type PipelineStage,
-  type TenantSummary,
   type TopKeyword,
   type TopPost,
 } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
+import { useTenant } from "../context/TenantContext";
 
 const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
   { value: "new", label: "New" },
@@ -39,8 +37,8 @@ export function DashboardPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { tenant } = useTenant();
 
-  const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [leads, setLeads] = useState<LeadListItem[] | null>(null);
@@ -68,28 +66,21 @@ export function DashboardPage() {
   }, [stageFilter, search]);
 
   useEffect(() => {
-    const session = loadSession();
-    // Identity Refactor U6: an expired/revoked session (401/403 from the API
-    // calls below) also clears storage — see api.ts's `request` — and lands
-    // back here on the next render with no session, so this guard handles
-    // both "never logged in" and "session just died" the same way.
-    if (!tenantId || !session || session.tenantId !== tenantId) {
-      navigate("/login", { replace: true });
-      return;
-    }
+    // AppShell already guards the session before this page ever mounts —
+    // this effect only needs to load the page's own data. A 401/403 mid-
+    // session (expired/revoked token) is still handled below per call.
+    if (!tenantId) return;
 
     let cancelled = false;
     async function load() {
       try {
-        const [t, a, an, posts, keywords] = await Promise.all([
-          api.getTenant(tenantId!),
+        const [a, an, posts, keywords] = await Promise.all([
           api.getAccountHealth(tenantId!),
           api.getAnalytics(tenantId!),
           api.getTopPosts(tenantId!),
           api.getTopKeywords(tenantId!),
         ]);
         if (cancelled) return;
-        setTenant(t);
         setAccount(a);
         setAnalytics(an);
         setTopPosts(posts);
@@ -109,11 +100,6 @@ export function DashboardPage() {
     };
   }, [tenantId, navigate]);
 
-  function handleLogout() {
-    clearSession();
-    navigate("/login", { replace: true });
-  }
-
   async function handleConnectInstagram() {
     if (!tenantId) return;
     setConnecting(true);
@@ -131,18 +117,7 @@ export function DashboardPage() {
 
   return (
     <div className="page">
-      <header className="dashboard-header">
-        <div>
-          <h1>{tenant?.name ?? "Your dashboard"}</h1>
-          <p className="muted small">Tenant ID: {tenantId}</p>
-        </div>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <Link to={`/dashboard/${tenantId}/settings`}>Settings</Link>
-          <button className="btn-secondary" onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
+      <h1>{tenant?.name ?? "Your dashboard"}</h1>
 
       {error && <div className="banner banner-error">{error}</div>}
       {justConnected && (

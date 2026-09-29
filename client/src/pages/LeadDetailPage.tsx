@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
   api,
-  loadSession,
   type Deal,
   type HandoffStatus,
   type LeadDetail,
@@ -94,11 +93,9 @@ export function LeadDetailPage() {
   }
 
   useEffect(() => {
-    const session = loadSession();
-    if (!tenantId || !leadId || !session || session.tenantId !== tenantId) {
-      navigate("/login", { replace: true });
-      return;
-    }
+    // AppShell already guards the session before this page ever mounts —
+    // this effect only needs to load the lead's own data.
+    if (!tenantId || !leadId) return;
     let cancelled = false;
     loadAll().catch((err) => {
       if (cancelled) return;
@@ -233,18 +230,12 @@ export function LeadDetailPage() {
 
   return (
     <div className="page">
-      <header className="dashboard-header">
-        <div>
-          <Link to={`/dashboard/${tenantId}`} className="link-button">
-            ← Back to dashboard
-          </Link>
-          <h1>{lead?.username ?? "Lead"}</h1>
-          <p className="muted small">Lead ID: {leadId}</p>
-        </div>
+      <h1>
+        {lead?.username ?? "Lead"}
         {lead && (
           <span className={handoffLabel(lead.handoffStatus).className}>{handoffLabel(lead.handoffStatus).text}</span>
         )}
-      </header>
+      </h1>
 
       {error && <div className="banner banner-error">{error}</div>}
 

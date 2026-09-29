@@ -1,17 +1,78 @@
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/*
+ * Preflight (Tailwind's CSS reset) is deliberately NOT imported here. The
+ * hand-written element selectors below (input/button/textarea/etc., used by
+ * every existing page) predate Tailwind and would be silently restyled by
+ * it. New components (AppShell and later) use utility classes without
+ * depending on preflight's reset.
+ */
+
+/*
+ * Bridges our own hand-rolled CSS-variable tokens (below) into Tailwind's
+ * theme so utilities like `bg-canvas`/`text-ink`/`border-line` are
+ * available to new components (AppShell, etc.) while every existing
+ * `.card`/`.btn-primary`/`.pill`/... rule keeps reading the same variables
+ * directly. `inline` keeps these as live `var(...)` references instead of
+ * baking in the light-mode value at build time, so both the new utilities
+ * and the old classes repaint together when the dark-mode media query
+ * below flips.
+ */
+@theme inline {
+  --color-canvas: var(--bg);
+  --color-card: var(--card-bg);
+  --color-ink: var(--text);
+  --color-subtle: var(--text-muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok-bg);
+  --color-ok-ink: var(--ok-text);
+  --color-err: var(--error-bg);
+  --color-err-ink: var(--error-text);
+  --color-chip: var(--pill-bg);
+  --color-sidebar: var(--sidebar-bg);
+}
+
 :root {
-  --bg: #f7f7fb;
+  --bg: #f5f3ff;
   --card-bg: #ffffff;
-  --text: #1a1a2e;
-  --text-muted: #6b6b80;
-  --border: #e2e2ec;
-  --accent: #5b4bff;
-  --accent-hover: #4638e0;
-  --ok-bg: #e3f9ec;
-  --ok-text: #1a7a4c;
-  --error-bg: #fdecec;
-  --error-text: #b3261e;
-  --pill-bg: #eeeef5;
+  --text: #1e1b4b;
+  --text-muted: #475569;
+  --border: #e0e7ff;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-soft: #818cf8;
+  --ok-bg: #ecfdf5;
+  --ok-text: #059669;
+  --error-bg: #fef2f2;
+  --error-text: #dc2626;
+  --pill-bg: #eef0ff;
+  --sidebar-bg: #fbfaff;
+  --font-sans-stack: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a;
+    --card-bg: #192134;
+    --text: #ffffff;
+    --text-muted: #94a3b8;
+    --border: rgba(255, 255, 255, 0.08);
+    --accent-hover: #818cf8;
+    --ok-bg: rgba(5, 150, 105, 0.16);
+    --ok-text: #34d399;
+    --error-bg: rgba(220, 38, 38, 0.16);
+    --error-text: #f87171;
+    --pill-bg: #1f2a44;
+    --sidebar-bg: #111827;
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -22,7 +83,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans-stack);
   line-height: 1.5;
 }
 

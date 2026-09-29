@@ -38,7 +38,7 @@ export function LoginPage() {
     setError(null);
     try {
       const session = await verifyOtp(email.trim(), code.trim());
-      saveSession(session);
+      saveSession({ ...session, email: email.trim() });
       navigate(`/dashboard/${session.tenantId}`, { replace: true });
     } catch (err) {
       const message = err instanceof ApiError ? (VERIFY_ERROR_MESSAGES[err.message] ?? err.message) : "Something went wrong. Please try again.";
