@@ -5,6 +5,7 @@ import { ConnectPage } from "./pages/ConnectPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { InboxPage } from "./pages/InboxPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
+import { LeadsPage } from "./pages/LeadsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { loadSession } from "./api";
@@ -25,7 +26,7 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
         <Route path="inbox" element={<InboxPage />} />
-        <Route path="leads" element={<ComingSoonPage title="Leads" />} />
+        <Route path="leads" element={<LeadsPage />} />
         <Route path="automation" element={<ComingSoonPage title="Automation" />} />
         <Route path="content" element={<ComingSoonPage title="Content" />} />
         <Route path="analytics" element={<ComingSoonPage title="Analytics" />} />

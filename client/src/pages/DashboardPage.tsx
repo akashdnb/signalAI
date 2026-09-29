@@ -1,15 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  ApiError,
-  api,
-  type AccountHealth,
-  type Analytics,
-  type LeadListItem,
-  type PipelineStage,
-  type TopKeyword,
-  type TopPost,
-} from "../api";
+import { ApiError, api, type AccountHealth, type Analytics, type LeadListItem, type TopKeyword, type TopPost } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
 import { useTenant } from "../context/TenantContext";
 import { PIPELINE_STAGES, formatDate, formatLastContactVia } from "../lib/leadFormatting";
@@ -22,29 +13,12 @@ export function DashboardPage() {
 
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [leads, setLeads] = useState<LeadListItem[] | null>(null);
+  const [recentLeads, setRecentLeads] = useState<LeadListItem[] | null>(null);
   const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
   const [topKeywords, setTopKeywords] = useState<TopKeyword[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
-  const [search, setSearch] = useState("");
   const justConnected = searchParams.get("connected") === "1";
-
-  async function reloadLeads() {
-    if (!tenantId) return;
-    try {
-      const l = await api.getLeads(tenantId, { stage: stageFilter || undefined, q: search.trim() || undefined });
-      setLeads(l);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load leads");
-    }
-  }
-
-  useEffect(() => {
-    reloadLeads();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageFilter, search]);
 
   useEffect(() => {
     // AppShell already guards the session before this page ever mounts —
@@ -55,17 +29,19 @@ export function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [a, an, posts, keywords] = await Promise.all([
+        const [a, an, posts, keywords, leads] = await Promise.all([
           api.getAccountHealth(tenantId!),
           api.getAnalytics(tenantId!),
           api.getTopPosts(tenantId!),
           api.getTopKeywords(tenantId!),
+          api.getLeads(tenantId!),
         ]);
         if (cancelled) return;
         setAccount(a);
         setAnalytics(an);
         setTopPosts(posts);
         setTopKeywords(keywords);
+        setRecentLeads(leads.slice(0, 5));
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -222,27 +198,14 @@ export function DashboardPage() {
       </section>
 
       <section className="card">
-        <h2>Leads</h2>
-        <div className="filter-row">
-          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
-            <option value="">All stages</option>
-            {PIPELINE_STAGES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Search by username…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="dashboard-header" style={{ marginBottom: "1rem" }}>
+          <h2 style={{ marginBottom: 0 }}>Recent Leads</h2>
+          <Link to={`/dashboard/${tenantId}/leads`}>View all leads →</Link>
         </div>
-        {leads === null ? (
+        {recentLeads === null ? (
           <p className="muted">Loading…</p>
-        ) : leads.length === 0 ? (
-          <p className="muted">No leads match this view yet.</p>
+        ) : recentLeads.length === 0 ? (
+          <p className="muted">No leads yet.</p>
         ) : (
           <table className="table">
             <thead>
@@ -251,12 +214,10 @@ export function DashboardPage() {
                 <th>Stage</th>
                 <th>Last contact</th>
                 <th>Via</th>
-                <th>Messaging window</th>
-                <th>First seen</th>
               </tr>
             </thead>
             <tbody>
-              {leads.map((lead) => (
+              {recentLeads.map((lead) => (
                 <tr key={lead.id}>
                   <td>
                     <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>{lead.username ?? "(unknown)"}</Link>
@@ -264,14 +225,6 @@ export function DashboardPage() {
                   <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
                   <td>{formatDate(lead.lastInboundAt)}</td>
                   <td>{formatLastContactVia(lead.lastEventType)}</td>
-                  <td>
-                    {lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? (
-                      <span className="pill pill-ok">open</span>
-                    ) : (
-                      <span className="pill">closed</span>
-                    )}
-                  </td>
-                  <td>{formatDate(lead.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
