@@ -178,6 +178,20 @@ describe("generateReply", () => {
     expect(result.text).toBe("Here's what you asked for. https://example.com/offer");
   });
 
+  // Regression: a live tenant's bot reciprocated flirtatious messages and
+  // answered plain general-knowledge questions ("what is 2+2") — nothing in
+  // the prompt ever said the bot's scope was limited to the business.
+  it("includes the global scope instruction (no off-topic/personal engagement) in every system prompt", async () => {
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
+    const provider = mockProvider(generateReplyMock);
+    const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+    await generateReply(ctx, provider);
+    const call = generateReplyMock.mock.calls[0]![0];
+    expect(call.systemPrompt).toContain("Never engage in romantic, flirtatious, or other personal conversation");
+    expect(call.systemPrompt).toContain("Do not answer general-knowledge, trivia, math");
+  });
+
   it("keeps the comment-tier brevity instruction out of the DM tier's system prompt", async () => {
     const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
     const provider = mockProvider(generateReplyMock);

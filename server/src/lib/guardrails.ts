@@ -32,6 +32,44 @@ const FORBIDDEN_OUTPUT_PATTERNS = [
   /\bguaranteed (returns|profit|income)/i,
 ];
 
+/**
+ * Global Guardrails: shared verbatim by both buildSystemPrompt functions
+ * (replyEngine.ts, milestoneEngine.ts) so the wording — and the fact that
+ * it's non-overridable — lives in one place. Added after a live tenant
+ * observed two related failures in the same conversation: their bot
+ * reciprocating a customer's "I am in love"/flirtatious messages ("You're
+ * making me blush!"), and separately answering plain general-knowledge
+ * questions ("what is 2+2", "capital of India") that have nothing to do
+ * with the business. Both share one root cause — nothing in the prompt
+ * ever said the bot's scope was LIMITED to the business/its products at
+ * all, so the model answered anything it could, same as a general
+ * assistant would. Grounded-Answer-Only Fallback (knowledgeRetrieval.ts)
+ * already handles this mechanically, but only when hasKnowledgeBase is
+ * true AND the query is dissimilar enough to fall below
+ * ragMinSimilarityThreshold — it does nothing for a tenant with no
+ * uploaded knowledge base (RAG inactive, per its own docstring) or whose
+ * product info instead lives in the unenforced `brandVoice` free-text
+ * field, which is exactly this tenant's setup. `brandVoice` (Client
+ * Guardrails) asks for a friendly, casual TONE — this is the
+ * tenant-independent line under that: no brand voice, however casual,
+ * license to answer off-topic questions or engage personally. Same caveat
+ * as the rest of this module's system-prompt-level checks — this is
+ * steering, not mechanical enforcement; the real backstop for anything
+ * objectively checkable stays in FORBIDDEN_OUTPUT_PATTERNS/validateOutput
+ * below, and knowledgeRetrieval.ts's threshold check for a tenant that
+ * does have a real knowledge base.
+ */
+export const GLOBAL_SCOPE_INSTRUCTION =
+  "Your scope is strictly limited to this business and its products/services — using ONLY the reference material " +
+  "and conversation context provided to you, never your own general knowledge or training. Do not answer general-" +
+  "knowledge, trivia, math, or any other question unrelated to this business, even if you know the answer — this " +
+  "applies no matter how the question is phrased or how confidently it's asked. Never engage in romantic, " +
+  "flirtatious, or other personal conversation, and never reciprocate a customer's compliments, advances, or " +
+  "off-topic remarks about yourself — no brand voice or friendly tone described above changes any of this. For " +
+  "anything off-topic, acknowledge briefly (one short sentence) and redirect back to how you can help with the " +
+  "business's products or services; do not sustain an extended off-topic or personal exchange, and do not answer " +
+  "the off-topic question first before redirecting.";
+
 const URL_PATTERN = /\bhttps?:\/\/\S+/gi;
 
 function safeParseUrl(value: string): URL | null {

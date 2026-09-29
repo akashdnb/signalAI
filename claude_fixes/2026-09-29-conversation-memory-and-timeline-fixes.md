@@ -84,13 +84,49 @@ recent page by default and prepends older pages behind a "Load older messages" b
 unbounded `getLeadTimeline` is left in place (still covered by its own tests) since nothing
 outside tests calls it directly anymore, but removing it wasn't necessary for this fix.
 
+## Bug 5: No guardrail against off-topic/personal engagement — the bot flirts and answers trivia
+
+Raised as a follow-up once the timeline (Bug 4) made a real conversation easy to read end to end:
+a customer said "I am in love" / "With u 😘" and the bot reciprocated ("You're making me blush!
+Sending some major virtual love right back at you!"); separately, plain general-knowledge
+questions ("what is 2+2", "capital of India") got real answers instead of a redirect. When asked
+directly why it was engaging off-topic, the bot defended itself by citing its own brand voice
+("we believe in bringing good vibes to the conversation too").
+
+**Root cause**: `lib/guardrails.ts` only exposes three tenant levers — `brandVoice` (unenforced
+TONE steering), `forbiddenTopics` (output-substring blocking), `escalationTriggers` (input
+substring → human handoff) — and **none of them constrain scope**. `buildSystemPrompt` in both
+`replyEngine.ts` and `milestoneEngine.ts` never told the model its answers were limited to the
+business at all, so it answered anything it could, same as a general assistant would.
+`knowledgeRetrieval.ts`'s Grounded-Answer-Only Fallback already handles this mechanically, but
+only when `hasKnowledgeBase` is true (a real KB was uploaded) **and** the query falls below
+`ragMinSimilarityThreshold` — it does nothing when a tenant's product info instead lives in the
+unenforced `brandVoice` free-text field, which is this tenant's actual setup. Worse,
+`milestoneEngine.ts`'s own prompt had an explicit, unconditional `"if the user asks something
+off-topic, answer it AND redirect"` instruction — a real contributor, not just an absence.
+
+**Fix**: new `GLOBAL_SCOPE_INSTRUCTION` (`lib/guardrails.ts`), shared verbatim by both engines'
+`buildSystemPrompt` — same non-overridable tier as the existing "no medical/legal/financial
+advice" rule: answer ONLY from the provided reference material/conversation context, never
+general knowledge or training; never reciprocate romantic/personal engagement; for anything
+off-topic, redirect in one short sentence instead of answering first. `milestoneEngine.ts`'s
+off-topic line is narrowed to only cover questions still about the business (a different
+product, pricing) — genuinely unrelated questions now defer to the new scope rule, placed last
+in the prompt (after the goal data and any brand voice/reference material) so it's the most
+recent thing the model reads. Steering, not mechanical enforcement, per this module's own stated
+philosophy — the real backstop for anything objectively checkable stays in
+`FORBIDDEN_OUTPUT_PATTERNS`/`validateOutput` and the RAG threshold check for tenants with a real
+knowledge base.
+
 ## Verified
 - `npx tsc --noEmit` clean on both `server` and `client`.
-- `npm run build` (client) and `npx vitest run` (server) — 547/547 passing, including new
+- `npm run build` (client) and `npx vitest run` (server) — 549/549 passing, including new
   coverage: conversation-history threading (`replyEngine.test.ts`,
   `leadEventReplyHandler.test.ts`), echo-ingestion correlation/dedup
   (`webhookIngestService.echo.test.ts`), attachment description
-  (`instagramWebhookParser.test.ts`), and timeline pagination correctness across all three merged
-  sources (`db/__tests__/leadTimeline.test.ts`, `routes/__tests__/leads.test.ts`).
+  (`instagramWebhookParser.test.ts`), timeline pagination correctness across all three merged
+  sources (`db/__tests__/leadTimeline.test.ts`, `routes/__tests__/leads.test.ts`), and the global
+  scope instruction's presence/positioning in both engines' prompts (`replyEngine.test.ts`,
+  `milestoneEngine.test.ts`).
 - New migration `1758240000042` re-applied against the local test DB.
 - `npm run lint` (client) — no new warnings (2 pre-existing, unrelated to this change).

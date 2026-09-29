@@ -186,6 +186,28 @@ describe("runMilestoneCheck", () => {
     expect(call.systemPrompt).not.toContain("what times work?");
   });
 
+  // Regression: the old "answer it AND redirect" wording for off-topic
+  // messages had the milestone flow answering plain general-knowledge
+  // questions before steering back to the goal — narrowed to only apply to
+  // still-on-business questions, with GLOBAL_SCOPE_INSTRUCTION covering
+  // anything genuinely unrelated (and appearing last, after the goal data).
+  it("includes the global scope instruction, after the goal data, in the milestone system prompt", async () => {
+    const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
+    const provider = mockProvider(generateReplyMock);
+
+    await runMilestoneCheck(
+      { milestone: makeMilestone({ goalDescription: "capture email" }), capturedFactsSoFar: {}, sourceText: "what is 2+2?", tier: "dm" },
+      provider,
+    );
+
+    const prompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+    expect(prompt).toContain("Do not answer general-knowledge, trivia, math");
+    expect(prompt).toContain("Never engage in romantic, flirtatious, or other personal conversation");
+    const goalIndex = prompt.indexOf("<<<GOAL_DATA>>>capture email<<<END_GOAL_DATA>>>");
+    const scopeIndex = prompt.indexOf("Your scope is strictly limited");
+    expect(scopeIndex).toBeGreaterThan(goalIndex);
+  });
+
   it("requests native JSON mode from the provider (R3-07)", async () => {
     const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
     const provider = mockProvider(generateReplyMock);
