@@ -71,8 +71,17 @@
   color-scheme: light;
 }
 
+/*
+ * Dark tokens apply in two cases: the OS/browser prefers dark AND the user
+ * hasn't explicitly forced light (the `:not([data-theme="light"])` guard),
+ * or the user has explicitly forced dark via the ThemeToggle regardless of
+ * OS preference (the plain `[data-theme="dark"]` rule below). Plain CSS
+ * has no way to share a custom-property block between a media query and a
+ * standalone selector, so the two rules are kept in sync by hand — small
+ * and stable enough that this is cheaper than reaching for a preprocessor.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f172a;
     --card-bg: #1f2937;
     --text: #f8fafc;
@@ -95,6 +104,29 @@
     --sidebar-bg: #111827;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f172a;
+  --card-bg: #1f2937;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --border: #374151;
+  --accent-hover: #8b5cf6;
+  --accent-soft: #c4b5fd;
+  --ok-bg: rgba(5, 150, 105, 0.16);
+  --ok-text: #34d399;
+  --error-bg: rgba(220, 38, 38, 0.16);
+  --error-text: #f87171;
+  --pill-bg: #2e2247;
+  --funnel-1: #282cec;
+  --funnel-2: #4d51ef;
+  --funnel-3: #7375f2;
+  --funnel-4: #9395f5;
+  --funnel-5: #afb1f8;
+  --funnel-6: #cccdfa;
+  --sidebar-bg: #111827;
+  color-scheme: dark;
 }
 
 * {

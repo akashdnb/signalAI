@@ -4,6 +4,7 @@ import { ApiError, api, clearSession, loadSession, type TenantSummary } from "..
 import { TenantContext } from "../context/TenantContext";
 import { Logo } from "./Logo";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { ThemeToggle } from "./ThemeToggle";
 import {
   AnalyticsIcon,
   AutomationIcon,
@@ -142,14 +143,17 @@ export function AppShell() {
       >
         <div className="flex items-center justify-between px-5 py-5">
           <Logo size="md" />
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="text-subtle md:hidden"
-            onClick={() => setMobileNavOpen(false)}
-          >
-            <CloseIcon className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="text-subtle md:hidden"
+              onClick={() => setMobileNavOpen(false)}
+            >
+              <CloseIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3">
@@ -177,7 +181,8 @@ export function AppShell() {
           <button type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}>
             <MenuIcon className="h-6 w-6" />
           </button>
-          <Logo size="sm" />
+          <Logo size="sm" className="flex-1" />
+          <ThemeToggle />
         </header>
 
         <main className="flex-1 overflow-y-auto">

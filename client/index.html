@@ -2,6 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Applied before any CSS renders, so an explicit theme choice (see
+      // src/lib/theme.ts) never flashes the wrong palette on load. No
+      // stored value means "follow the OS" — index.css's media query
+      // alone handles that case, so this script does nothing.
+      (function () {
+        try {
+          var theme = localStorage.getItem("signalai.theme");
+          if (theme === "light" || theme === "dark") {
+            document.documentElement.setAttribute("data-theme", theme);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>signalAI</title>
