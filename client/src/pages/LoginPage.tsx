@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, requestOtp, saveSession, verifyOtp } from "../api";
+import { InboxIcon } from "../components/icons";
 import { Logo } from "../components/Logo";
 
 const VERIFY_ERROR_MESSAGES: Record<string, string> = {
@@ -26,30 +27,54 @@ function GoogleIcon() {
   );
 }
 
-/** Google OAuth isn't wired up server-side yet — shown so the UI matches the mocks, but disabled with an inline explanation rather than silently doing nothing on click. */
-function GoogleButton() {
+function MetaIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" aria-hidden="true" className="shrink-0">
+      <rect width={18} height={18} rx={4} fill="#0866FF" />
+      <path
+        fill="#fff"
+        d="M5.1 12.4c0-2.7 1.2-5.2 2.85-5.2 1 0 1.65.85 2.28 2.15.6-1.35 1.24-2.15 2.18-2.15 1.63 0 2.79 2.36 2.79 5.05 0 1.02-.2 1.65-.62 1.65-.5 0-.7-.5-1.36-2.06-.5-1.18-1.02-2.32-1.4-2.32-.34 0-.62.5-1.05 1.55.55 1.1.94 1.98.94 2.5 0 .48-.24.83-.7.83-.6 0-.98-.6-1.6-2.1-.6 1.5-.98 2.1-1.58 2.1-.46 0-.7-.36-.7-.86 0-.5.36-1.3.9-2.4-.42-1.03-.7-1.6-1.04-1.6-.4 0-.9 1.16-1.4 2.4-.6 1.48-.86 2.02-1.36 2.02-.42 0-.67-.5-.67-1.56z"
+      />
+    </svg>
+  );
+}
+
+type SsoProvider = "google" | "meta";
+
+/**
+ * Google/Meta OAuth aren't wired up server-side yet. Kept fully enabled
+ * (no `disabled` attribute/dimming) so they read as real options rather
+ * than dead UI — clicking one reveals an inline "not yet" note instead of
+ * graying the button out upfront.
+ */
+function SsoButton({
+  provider,
+  icon,
+  label,
+  unavailable,
+  onClick,
+}: {
+  provider: SsoProvider;
+  icon: React.ReactNode;
+  label: string;
+  unavailable: boolean;
+  onClick: () => void;
+}) {
   return (
     <div>
       <button
         type="button"
-        disabled
-        className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink opacity-60"
-        style={{ cursor: "not-allowed" }}
+        onClick={onClick}
+        className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink transition-colors hover:bg-chip"
       >
-        <GoogleIcon />
-        Continue with Google
+        {icon}
+        {label}
       </button>
-      <p className="mt-1.5 text-center text-xs text-subtle">Temporarily unavailable — please use email</p>
-    </div>
-  );
-}
-
-function OrDivider() {
-  return (
-    <div className="my-5 flex items-center gap-3 text-xs text-subtle">
-      <div className="h-px flex-1 bg-line" />
-      or
-      <div className="h-px flex-1 bg-line" />
+      {unavailable && (
+        <p className="mt-1.5 text-center text-xs text-subtle" data-provider={provider}>
+          Temporarily unavailable — please use email
+        </p>
+      )}
     </div>
   );
 }
@@ -122,7 +147,8 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 /** Login is the app's entry point — Instagram connects from inside the dashboard afterward, not the other way around. A 6-digit email code, entered on this same page: no redirect, no leaving the tab. */
 export function LoginPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [step, setStep] = useState<"method" | "email" | "code">("method");
+  const [unavailableProvider, setUnavailableProvider] = useState<SsoProvider | null>(null);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +197,56 @@ export function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleSsoClick(provider: SsoProvider) {
+    setUnavailableProvider(provider);
+  }
+
+  if (step === "method") {
+    return (
+      <div className="flex min-h-screen">
+        <BrandPanel />
+        <AuthCard>
+          <h1 className="m-0 text-2xl font-bold text-ink">Welcome back</h1>
+          <p className="mt-1 text-sm text-subtle">Sign in to your account</p>
+
+          <div className="mt-6 space-y-3">
+            <SsoButton
+              provider="google"
+              icon={<GoogleIcon />}
+              label="Continue with Google"
+              unavailable={unavailableProvider === "google"}
+              onClick={() => handleSsoClick("google")}
+            />
+            <SsoButton
+              provider="meta"
+              icon={<MetaIcon />}
+              label="Continue with Meta"
+              unavailable={unavailableProvider === "meta"}
+              onClick={() => handleSsoClick("meta")}
+            />
+            <button
+              type="button"
+              onClick={() => setStep("email")}
+              className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink transition-colors hover:bg-chip"
+            >
+              <InboxIcon className="h-4 w-4" />
+              Continue with Email
+            </button>
+          </div>
+
+          <p className="mt-6 text-center text-xs text-subtle">By continuing, you agree to our Terms &amp; Privacy Policy.</p>
+
+          <p className="mt-4 text-center text-sm text-subtle">
+            New here?{" "}
+            <button type="button" className="link-button font-medium text-ink" onClick={() => setStep("email")}>
+              Create an account
+            </button>
+          </p>
+        </AuthCard>
+      </div>
+    );
   }
 
   if (step === "code") {
@@ -241,19 +317,21 @@ export function LoginPage() {
     <div className="flex min-h-screen">
       <BrandPanel />
       <AuthCard>
-        <h1 className="m-0 text-2xl font-bold text-ink">Welcome back</h1>
+        <button
+          type="button"
+          onClick={() => setStep("method")}
+          className="link-button mb-4 text-sm font-medium text-subtle hover:text-ink"
+        >
+          ← Back
+        </button>
+        <h1 className="m-0 text-2xl font-bold text-ink">Sign in with email</h1>
         <p className="mt-2 text-sm text-subtle">
           Enter your email to get a 6-digit sign-in code — no password to remember.
         </p>
 
         {error && <div className="banner banner-error mt-4">{error}</div>}
 
-        <div className="mt-6">
-          <GoogleButton />
-        </div>
-        <OrDivider />
-
-        <form onSubmit={handleRequestCode} className="space-y-4">
+        <form onSubmit={handleRequestCode} className="mt-6 space-y-4">
           <div>
             <label htmlFor="email" className="text-sm font-medium text-ink">
               Email
