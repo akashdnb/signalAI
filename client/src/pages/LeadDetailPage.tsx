@@ -1,6 +1,16 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api, type Deal, type LeadDetail, type LeadNote, type LeadTag, type PipelineStage, type TenantMember } from "../api";
+import {
+  ApiError,
+  api,
+  type Deal,
+  type FieldDefinition,
+  type LeadDetail,
+  type LeadNote,
+  type LeadTag,
+  type PipelineStage,
+  type TenantMember,
+} from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
 import { PIPELINE_STAGES, formatDate, handoffLabel } from "../lib/leadFormatting";
 
@@ -14,7 +24,10 @@ export function LeadDetailPage() {
   const [tags, setTags] = useState<LeadTag[] | null>(null);
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [members, setMembers] = useState<TenantMember[] | null>(null);
+  const [capturedFacts, setCapturedFacts] = useState<Record<string, string> | null>(null);
+  const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "conversation" | "activities" | "notes">("overview");
 
   const [noteBody, setNoteBody] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -26,18 +39,22 @@ export function LeadDetailPage() {
 
   async function loadAll() {
     if (!tenantId || !leadId) return;
-    const [l, n, tg, d, m] = await Promise.all([
+    const [l, n, tg, d, m, cf, fd] = await Promise.all([
       api.getLead(tenantId, leadId),
       api.listLeadNotes(tenantId, leadId),
       api.listLeadTags(tenantId, leadId),
       api.listLeadDeals(tenantId, leadId),
       api.listMembers(tenantId),
+      api.getCapturedFacts(tenantId, leadId),
+      api.listFieldDefinitions(tenantId),
     ]);
     setLead(l);
     setNotes(n);
     setTags(tg);
     setDeals(d);
     setMembers(m);
+    setCapturedFacts(cf);
+    setFieldDefinitions(fd);
   }
 
   useEffect(() => {
@@ -180,6 +197,15 @@ export function LeadDetailPage() {
 
   if (!tenantId || !leadId) return null;
 
+  const fieldLabel = (key: string) => fieldDefinitions?.find((f) => f.fieldKey === key)?.label ?? key;
+
+  const TABS: { value: typeof activeTab; label: string }[] = [
+    { value: "overview", label: "Overview" },
+    { value: "conversation", label: "Conversation" },
+    { value: "activities", label: "Activities" },
+    { value: "notes", label: "Notes" },
+  ];
+
   return (
     <div className="page">
       <h1>
@@ -195,6 +221,21 @@ export function LeadDetailPage() {
         <p className="muted">Loading…</p>
       ) : (
         <>
+          <div className="button-row">
+            {TABS.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                className={activeTab === t.value ? "btn-primary btn-small" : "btn-secondary btn-small"}
+                onClick={() => setActiveTab(t.value)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "overview" && (
+            <>
           <section className="card">
             <h2>Overview</h2>
             <div className="field-group">
@@ -264,6 +305,24 @@ export function LeadDetailPage() {
           </section>
 
           <section className="card">
+            <h2>Captured Facts</h2>
+            {capturedFacts === null ? (
+              <p className="muted">Loading…</p>
+            ) : Object.keys(capturedFacts).length === 0 ? (
+              <p className="muted">Nothing captured yet — the AI hasn't learned any details about this lead so far.</p>
+            ) : (
+              <dl className="kv">
+                {Object.entries(capturedFacts).map(([key, value]) => (
+                  <Fragment key={key}>
+                    <dt>{fieldLabel(key)}</dt>
+                    <dd>{value}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+            )}
+          </section>
+
+          <section className="card">
             <h2>Deals</h2>
             {deals === null ? (
               <p className="muted">Loading…</p>
@@ -305,40 +364,65 @@ export function LeadDetailPage() {
               </button>
             </div>
           </section>
+            </>
+          )}
 
-          <section className="card">
-            <h2>Notes</h2>
-            {notes === null ? (
-              <p className="muted">Loading…</p>
-            ) : notes.length === 0 ? (
-              <p className="muted">No notes yet.</p>
-            ) : (
-              <ul className="list">
-                {notes.map((n) => (
-                  <li className="list-item" key={n.id} style={{ display: "block" }}>
-                    <div>{n.body}</div>
-                    <div className="timeline-meta">{formatDate(n.createdAt)}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="inline-form">
-              <textarea
-                placeholder="Add an internal note…"
-                value={noteBody}
-                onChange={(e) => setNoteBody(e.target.value)}
-                rows={2}
+          {activeTab === "conversation" && (
+            <section className="card">
+              <h2>Conversation</h2>
+              <ThreadPanel
+                tenantId={tenantId}
+                leadId={leadId}
+                refreshToken={timelineRefreshToken}
+                kindFilter={["event", "reply"]}
+                onError={setError}
               />
-              <button className="btn-secondary btn-small" disabled={savingNote || !noteBody.trim()} onClick={handleAddNote}>
-                Add note
-              </button>
-            </div>
-          </section>
+            </section>
+          )}
 
-          <section className="card">
-            <h2>Timeline</h2>
-            <ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} onError={setError} />
-          </section>
+          {activeTab === "activities" && (
+            <section className="card">
+              <h2>Activities</h2>
+              <ThreadPanel
+                tenantId={tenantId}
+                leadId={leadId}
+                refreshToken={timelineRefreshToken}
+                kindFilter={["activity"]}
+                onError={setError}
+              />
+            </section>
+          )}
+
+          {activeTab === "notes" && (
+            <section className="card">
+              <h2>Notes</h2>
+              {notes === null ? (
+                <p className="muted">Loading…</p>
+              ) : notes.length === 0 ? (
+                <p className="muted">No notes yet.</p>
+              ) : (
+                <ul className="list">
+                  {notes.map((n) => (
+                    <li className="list-item" key={n.id} style={{ display: "block" }}>
+                      <div>{n.body}</div>
+                      <div className="timeline-meta">{formatDate(n.createdAt)}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="inline-form">
+                <textarea
+                  placeholder="Add an internal note…"
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  rows={2}
+                />
+                <button className="btn-secondary btn-small" disabled={savingNote || !noteBody.trim()} onClick={handleAddNote}>
+                  Add note
+                </button>
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>

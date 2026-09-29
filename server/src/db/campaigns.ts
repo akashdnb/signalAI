@@ -9,6 +9,11 @@ export type ReplyChannel = "dm" | "comment" | "both";
 /** What kind of inbound event a campaign's keywords match against — a comment, a DM, or either. Distinct from ReplyChannel (where the reply goes, not what triggers it). Default 'comment' preserves every existing campaign's current behaviour, since DM-triggered matching didn't exist before this field. */
 export type TriggerSource = "comment" | "message" | "both";
 
+/** AI Behaviour panel (UI revamp R3): a coarse tone knob alongside the tenant-wide free-text brandVoice — both get interpolated into the same prompt. */
+export type CampaignTone = "professional" | "friendly" | "casual" | "professional_and_friendly";
+/** 'auto' (default) leaves reply language unspecified, identical to every pre-R3 campaign's behavior. */
+export type CampaignLanguage = "auto" | "en" | "hi";
+
 export interface Campaign {
   id: string;
   tenantId: string;
@@ -23,6 +28,10 @@ export interface Campaign {
   targetMediaIds: string[];
   replyChannel: ReplyChannel;
   triggerSource: TriggerSource;
+  tone: CampaignTone;
+  language: CampaignLanguage;
+  /** Per-campaign override of the tenant's always-on-whenever-documents-exist RAG — default true preserves every existing campaign's current behavior. */
+  useKnowledgeBase: boolean;
   createdAt: Date;
 }
 
@@ -39,6 +48,9 @@ interface CampaignRow {
   target_media_ids: string[];
   reply_channel: ReplyChannel;
   trigger_source: TriggerSource;
+  tone: CampaignTone;
+  language: CampaignLanguage;
+  use_knowledge_base: boolean;
   created_at: Date;
 }
 
@@ -56,6 +68,9 @@ function toCampaign(row: CampaignRow): Campaign {
     targetMediaIds: row.target_media_ids,
     replyChannel: row.reply_channel,
     triggerSource: row.trigger_source,
+    tone: row.tone,
+    language: row.language,
+    useKnowledgeBase: row.use_knowledge_base,
     createdAt: row.created_at,
   };
 }
@@ -101,6 +116,11 @@ export async function createCampaign(
   );
   return toCampaign(result.rows[0]!);
 }
+
+// tone/language/useKnowledgeBase are deliberately left off createCampaign's
+// options — every campaign is created with the schema defaults
+// ('professional_and_friendly' / 'auto' / true) and configured afterward
+// via updateCampaignReplyConfig, same as replyMode/replyChannel already are.
 
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(
@@ -206,6 +226,9 @@ export async function updateCampaignReplyConfig(
     defaultReplyTemplate?: string;
     replyChannel?: ReplyChannel;
     triggerSource?: TriggerSource;
+    tone?: CampaignTone;
+    language?: CampaignLanguage;
+    useKnowledgeBase?: boolean;
   },
 ): Promise<Campaign | null> {
   const result = await pool.query<CampaignRow>(
@@ -215,6 +238,9 @@ export async function updateCampaignReplyConfig(
        default_reply_template = coalesce($6, default_reply_template),
        reply_channel = coalesce($7, reply_channel),
        trigger_source = coalesce($8, trigger_source),
+       tone = coalesce($9, tone),
+       language = coalesce($10, language),
+       use_knowledge_base = case when $11::boolean then $12 else use_knowledge_base end,
        updated_at = now()
      where id = $1 and tenant_id = $2
      returning *`,
@@ -227,6 +253,10 @@ export async function updateCampaignReplyConfig(
       updates.defaultReplyTemplate ?? null,
       updates.replyChannel ?? null,
       updates.triggerSource ?? null,
+      updates.tone ?? null,
+      updates.language ?? null,
+      updates.useKnowledgeBase !== undefined, // same "was it sent at all" trick as ctaLink — useKnowledgeBase: false must not coalesce away
+      updates.useKnowledgeBase ?? null,
     ],
   );
   return result.rows[0] ? toCampaign(result.rows[0]) : null;

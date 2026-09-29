@@ -521,6 +521,30 @@ describe("runMilestoneCheck", () => {
       expect(generateReplyMock.mock.calls[0]![0].systemPrompt).toContain("Our refund window is 30 days.");
     });
 
+    it("does not retrieve from the knowledge base when the campaign's useKnowledgeBase is false, even with rag deps present", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "Our refund window is 30 days.", document_id: "doc-1", similarity: 0.95 },
+      ]);
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) }),
+      );
+
+      await runMilestoneCheck(
+        {
+          milestone: makeMilestone(),
+          capturedFactsSoFar: {},
+          sourceText: "what's your refund policy?",
+          tier: "comment",
+          campaignSettings: { tone: "professional_and_friendly", language: "auto", useKnowledgeBase: false },
+        },
+        provider,
+        undefined,
+        ragDeps(),
+      );
+
+      expect(mockQueryRelevantChunks).not.toHaveBeenCalled();
+    });
+
     it("falls back and requires human handoff when the tenant has a knowledge base but nothing matches well enough", async () => {
       mockQueryRelevantChunks.mockResolvedValue([
         { content: "unrelated content", document_id: "doc-1", similarity: 0.1 },
@@ -553,6 +577,54 @@ describe("runMilestoneCheck", () => {
 
       expect(result.requiresHumanHandoff).toBe(true);
       expect(generateReplyMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("AI Behaviour panel (tone/language)", () => {
+    it("includes a tone instruction matching the campaign's configured tone", async () => {
+      const generateReplyMock = vi
+        .fn()
+        .mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
+      const provider = mockProvider(generateReplyMock);
+
+      await runMilestoneCheck(
+        {
+          milestone: makeMilestone(),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          campaignSettings: { tone: "casual", language: "auto", useKnowledgeBase: true },
+        },
+        provider,
+      );
+
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).toContain("relaxed, casual, conversational tone");
+    });
+
+    it("adds a language instruction when language is not 'auto', and omits it when 'auto'", async () => {
+      const generateReplyMock = vi
+        .fn()
+        .mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
+      const provider = mockProvider(generateReplyMock);
+
+      await runMilestoneCheck(
+        {
+          milestone: makeMilestone(),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          campaignSettings: { tone: "professional_and_friendly", language: "hi", useKnowledgeBase: true },
+        },
+        provider,
+      );
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).toContain("Always reply in Hindi");
+
+      generateReplyMock.mockClear();
+      await runMilestoneCheck(
+        { milestone: makeMilestone(), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
+        provider,
+      );
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).not.toContain("Always reply in");
     });
   });
 

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   api,
+  LANGUAGE_LABEL,
+  TONE_LABEL,
   type Campaign,
+  type CampaignLanguage,
+  type CampaignTone,
   type Dropoff,
   type FieldDefinition,
   type FieldDefinitionValueType,
@@ -42,6 +46,11 @@ export function CampaignEditor({
   const [triggerSource, setTriggerSource] = useState<TriggerSource>(campaign.triggerSource);
   const [savingConfig, setSavingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+
+  // AI Behaviour panel
+  const [tone, setTone] = useState<CampaignTone>(campaign.tone);
+  const [language, setLanguage] = useState<CampaignLanguage>(campaign.language);
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(campaign.useKnowledgeBase);
 
   const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
   const [savingMilestones, setSavingMilestones] = useState(false);
@@ -85,6 +94,9 @@ export function CampaignEditor({
     setTriggerSource(campaign.triggerSource);
     setTargetMediaIds(campaign.targetMediaIds);
     setReplyTemplates(campaign.replyTemplates);
+    setTone(campaign.tone);
+    setLanguage(campaign.language);
+    setUseKnowledgeBase(campaign.useKnowledgeBase);
   }, [campaign]);
 
   useEffect(() => {
@@ -126,6 +138,9 @@ export function CampaignEditor({
         defaultReplyTemplate,
         replyChannel,
         triggerSource,
+        tone,
+        language,
+        useKnowledgeBase,
       });
       onChanged();
     } catch (err) {
@@ -372,6 +387,38 @@ export function CampaignEditor({
           <input type="text" value={ctaLink} onChange={(e) => setCtaLink(e.target.value)} placeholder="https://…" />
         </label>
 
+        <h4>AI Behaviour</h4>
+        <div className="flex flex-wrap gap-4" style={{ marginBottom: "0.75rem" }}>
+          <label style={{ flex: "1 1 160px" }}>
+            Tone
+            <select value={tone} onChange={(e) => setTone(e.target.value as CampaignTone)}>
+              {(Object.keys(TONE_LABEL) as CampaignTone[]).map((t) => (
+                <option key={t} value={t}>
+                  {TONE_LABEL[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ flex: "1 1 160px" }}>
+            Language
+            <select value={language} onChange={(e) => setLanguage(e.target.value as CampaignLanguage)}>
+              {(Object.keys(LANGUAGE_LABEL) as CampaignLanguage[]).map((l) => (
+                <option key={l} value={l}>
+                  {LANGUAGE_LABEL[l]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="radio-row" style={{ flex: "1 1 200px", alignSelf: "flex-end" }}>
+            <input type="checkbox" checked={useKnowledgeBase} onChange={(e) => setUseKnowledgeBase(e.target.checked)} />
+            Use Knowledge Base
+          </label>
+        </div>
+        <p className="muted small">
+          Knowledge Base grounds AI replies in your uploaded documents (Settings → Knowledge Base). Turn this off to
+          have this campaign reply without referencing them, even if your tenant has documents uploaded.
+        </p>
+
         {configError && <div className="banner banner-error">{configError}</div>}
         <button className="btn-primary" onClick={saveReplyConfig} disabled={savingConfig}>
           {savingConfig ? "Saving…" : "Save reply settings"}
@@ -444,9 +491,14 @@ export function CampaignEditor({
 
       <div className="field-group">
         <h4>Milestones (conversation goals, in order)</h4>
-        {milestones.map((m, i) => (
-          <div key={i} style={{ marginBottom: "0.75rem" }}>
+        {milestones.map((m, i) => {
+          const availableFields = fieldDefinitions.filter((fd) => !m.captureFields.includes(fd.fieldKey));
+          return (
+          <div key={i} className="card" style={{ marginBottom: "0.75rem" }}>
             <div className="milestone-row">
+              <span className="pill pill-ok" style={{ marginLeft: 0, flexShrink: 0 }}>
+                Step {i + 1}
+              </span>
               <input
                 type="text"
                 placeholder={`Goal ${i + 1}, e.g. "capture their email"`}
@@ -457,24 +509,6 @@ export function CampaignEditor({
                   setMilestones(next);
                 }}
               />
-              <select
-                multiple
-                value={m.captureFields}
-                size={Math.min(4, Math.max(2, fieldDefinitions.length))}
-                style={{ flex: 1 }}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                  const next = [...milestones];
-                  next[i] = { ...next[i]!, captureFields: selected };
-                  setMilestones(next);
-                }}
-              >
-                {fieldDefinitions.map((fd) => (
-                  <option key={fd.fieldKey} value={fd.fieldKey}>
-                    {fd.label}
-                  </option>
-                ))}
-              </select>
               <button
                 type="button"
                 className="btn-secondary btn-small"
@@ -491,6 +525,47 @@ export function CampaignEditor({
                 Remove
               </button>
             </div>
+
+            <div style={{ margin: "0.5rem 0" }}>
+              {m.captureFields.length === 0 ? (
+                <span className="muted small">No fields captured by this goal yet.</span>
+              ) : (
+                m.captureFields.map((fieldKey) => (
+                  <span className="tag-chip" key={fieldKey}>
+                    {fieldDefinitions.find((fd) => fd.fieldKey === fieldKey)?.label ?? fieldKey}
+                    <button
+                      type="button"
+                      aria-label={`Remove field ${fieldKey}`}
+                      onClick={() => {
+                        const next = [...milestones];
+                        next[i] = { ...next[i]!, captureFields: next[i]!.captureFields.filter((k) => k !== fieldKey) };
+                        setMilestones(next);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+            {availableFields.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const next = [...milestones];
+                  next[i] = { ...next[i]!, captureFields: [...next[i]!.captureFields, e.target.value] };
+                  setMilestones(next);
+                }}
+              >
+                <option value="">+ Add field to capture…</option>
+                {availableFields.map((fd) => (
+                  <option key={fd.fieldKey} value={fd.fieldKey}>
+                    {fd.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {newFieldRow === i && (
               <form onSubmit={(e) => createFieldForRow(i, e)} className="inline-form">
                 <input
@@ -523,7 +598,8 @@ export function CampaignEditor({
             )}
             {newFieldRow === i && newFieldError && <div className="banner banner-error">{newFieldError}</div>}
           </div>
-        ))}
+          );
+        })}
         <button
           type="button"
           className="btn-secondary btn-small"

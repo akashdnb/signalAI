@@ -9,6 +9,8 @@ export interface ThreadPanelProps {
   refreshToken?: number;
   /** Rendered after the fetched timeline, for a send that hasn't round-tripped yet — the caller owns this list (add on submit, clear once refreshToken's refetch has picked it up for real). */
   pendingEntries?: TimelineEntry[];
+  /** Restricts which entries render (e.g. LeadDetailPage's Conversation vs Activities tabs) — fetch/pagination still cover the full merged history regardless, this only filters what's shown. */
+  kindFilter?: TimelineEntry["kind"][];
   onError?: (message: string) => void;
 }
 
@@ -18,7 +20,7 @@ export interface ThreadPanelProps {
  * InboxPage's thread view renders conversations identically rather than
  * re-implementing the same merge/pagination/rendering a second time.
  */
-export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, onError }: ThreadPanelProps) {
+export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, kindFilter, onError }: ThreadPanelProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -64,8 +66,9 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, on
 
   if (timeline === null) return <p className="muted">Loading…</p>;
 
-  const allEntries = pendingEntries?.length ? [...timeline, ...pendingEntries] : timeline;
-  if (allEntries.length === 0) return <p className="muted">Nothing has happened on this lead yet.</p>;
+  const merged = pendingEntries?.length ? [...timeline, ...pendingEntries] : timeline;
+  const allEntries = kindFilter ? merged.filter((e) => kindFilter.includes(e.kind)) : merged;
+  if (allEntries.length === 0) return <p className="muted">Nothing here yet.</p>;
 
   return (
     <div>

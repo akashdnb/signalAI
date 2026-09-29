@@ -320,6 +320,89 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(both.body.triggerSource).toBe("both");
   });
 
+  it("new campaigns default to tone=professional_and_friendly, language=auto, useKnowledgeBase=true", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    expect(campaign).toMatchObject({ tone: "professional_and_friendly", language: "auto", useKnowledgeBase: true });
+  });
+
+  it("PATCH reply-config updates tone and rejects an invalid one", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    const app = createApp();
+
+    const invalid = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ tone: "sarcastic" });
+    expect(invalid.status).toBe(400);
+
+    const valid = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ tone: "casual" });
+    expect(valid.status).toBe(200);
+    expect(valid.body.tone).toBe("casual");
+  });
+
+  it("PATCH reply-config updates language and rejects an invalid one", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    const app = createApp();
+
+    const invalid = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ language: "fr" });
+    expect(invalid.status).toBe(400);
+
+    const valid = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ language: "hi" });
+    expect(valid.status).toBe(200);
+    expect(valid.body.language).toBe("hi");
+  });
+
+  it("PATCH reply-config updates useKnowledgeBase, including explicitly setting it back to false", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    const app = createApp();
+
+    const invalid = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ useKnowledgeBase: "yes" });
+    expect(invalid.status).toBe(400);
+
+    const off = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ useKnowledgeBase: false });
+    expect(off.status).toBe(200);
+    expect(off.body.useKnowledgeBase).toBe(false);
+
+    // The "was it sent at all" boolean-flag trick: a PATCH that omits
+    // useKnowledgeBase entirely must leave the false value alone, not
+    // coalesce it back to some default.
+    const untouched = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ replyMode: "ai_generated" });
+    expect(untouched.body.useKnowledgeBase).toBe(false);
+
+    const on = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaign.id}/reply-config`)
+      .set(authHeader)
+      .send({ useKnowledgeBase: true });
+    expect(on.status).toBe(200);
+    expect(on.body.useKnowledgeBase).toBe(true);
+  });
+
   it("POST preview returns both a rule-based and an AI-generated sample reply, regardless of the campaign's current mode", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

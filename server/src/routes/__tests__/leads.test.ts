@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
+import { mergeCapturedFacts } from "../../db/capturedFacts.js";
 import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
@@ -189,6 +190,34 @@ describe("leads routes (Phase 2A)", () => {
 
     const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "   " });
     expect(res.status).toBe(400);
+  });
+
+  it("GET /captured-facts returns what the Milestone Engine has learned about the lead", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const app = createApp();
+
+    const empty = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}/captured-facts`).set(authHeader);
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual({ facts: {} });
+
+    await mergeCapturedFacts(pool, tenant.id, lead.id, { budget: "1.5Cr", location: "Whitefield" });
+
+    const res = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}/captured-facts`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ facts: { budget: "1.5Cr", location: "Whitefield" } });
+  });
+
+  it("GET /captured-facts 404s for a lead in a different tenant", async () => {
+    const pool = getPool();
+    const { tenant: tenantA } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { authHeader: authB } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "ig-user-1");
+    const app = createApp();
+
+    const res = await request(app).get(`/tenants/${tenantA.id}/leads/${leadA.id}/captured-facts`).set(authB);
+    expect(res.status).toBe(403);
   });
 
   it("POST /read marks a conversation read, 404s for an unknown lead", async () => {

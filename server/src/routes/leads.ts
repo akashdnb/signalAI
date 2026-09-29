@@ -10,6 +10,7 @@ import {
   type HandoffStatus,
 } from "../db/leads.js";
 import { getLeadTimelinePage } from "../db/leadTimeline.js";
+import { getCapturedFacts } from "../db/capturedFacts.js";
 import { addLeadNote, listLeadNotes } from "../db/leadNotes.js";
 import { findOrCreateTag, listTagsForTenant, listTagsForLead, addTagToLead, removeTagFromLead } from "../db/tags.js";
 import { createDeal, listDealsForLead, updateDealStage, type DealStage } from "../db/deals.js";
@@ -131,6 +132,19 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) =>
   });
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   return res.status(200).json(lead);
+});
+
+// Captured Facts panel (UI revamp R3): what the Milestone Engine has
+// learned about this lead so far (budget, location, etc., keyed by
+// tenant-registered field keys) — previously server-internal only, no
+// route exposed lead_captured_facts to the client at all.
+leadsRouter.get("/tenants/:tenantId/leads/:leadId/captured-facts", async (req, res) => {
+  const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+
+  const facts = await getCapturedFacts(getPool(), tenantId, leadId);
+  return res.status(200).json({ facts });
 });
 
 // Inbox "Unread": marks a conversation read. Called when a human opens it

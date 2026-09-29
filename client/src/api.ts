@@ -155,6 +155,23 @@ export interface AccountHealth {
 export type ReplyChannel = "dm" | "comment" | "both";
 /** What kind of inbound event a campaign's keywords match against — distinct from ReplyChannel, which is where the reply goes once triggered. */
 export type TriggerSource = "comment" | "message" | "both";
+/** AI Behaviour panel: a coarse tone knob alongside the tenant-wide free-text brand voice. */
+export type CampaignTone = "professional" | "friendly" | "casual" | "professional_and_friendly";
+/** 'auto' leaves reply language unspecified (today's default behavior). */
+export type CampaignLanguage = "auto" | "en" | "hi";
+
+export const TONE_LABEL: Record<CampaignTone, string> = {
+  professional: "Professional",
+  friendly: "Friendly",
+  casual: "Casual",
+  professional_and_friendly: "Professional & Friendly",
+};
+
+export const LANGUAGE_LABEL: Record<CampaignLanguage, string> = {
+  auto: "Auto-detect",
+  en: "English",
+  hi: "Hindi",
+};
 
 export interface Campaign {
   id: string;
@@ -169,6 +186,9 @@ export interface Campaign {
   targetMediaIds: string[];
   replyChannel: ReplyChannel;
   triggerSource: TriggerSource;
+  tone: CampaignTone;
+  language: CampaignLanguage;
+  useKnowledgeBase: boolean;
   createdAt: string;
 }
 
@@ -419,6 +439,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text }),
     }),
+  getCapturedFacts: (tenantId: string, leadId: string) =>
+    request<{ facts: Record<string, string> }>(`/tenants/${tenantId}/leads/${leadId}/captured-facts`).then((r) => r.facts),
 
   listMembers: (tenantId: string) => request<TenantMember[]>(`/tenants/${tenantId}/members`),
 
@@ -468,6 +490,9 @@ export const api = {
       defaultReplyTemplate?: string;
       replyChannel?: ReplyChannel;
       triggerSource?: TriggerSource;
+      tone?: CampaignTone;
+      language?: CampaignLanguage;
+      useKnowledgeBase?: boolean;
     },
   ) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, {

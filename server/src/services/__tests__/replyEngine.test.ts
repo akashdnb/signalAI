@@ -28,6 +28,9 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     targetMediaIds: [],
     replyChannel: "dm",
     triggerSource: "comment",
+    tone: "professional_and_friendly",
+    language: "auto",
+    useKnowledgeBase: true,
     createdAt: new Date(),
     ...overrides,
   };
@@ -317,6 +320,18 @@ describe("generateReply", () => {
       expect(call.systemPrompt).toContain("Our refund window is 30 days.");
     });
 
+    it("does not retrieve from the knowledge base when the campaign's useKnowledgeBase is false, even with rag deps present", async () => {
+      mockQueryRelevantChunks.mockResolvedValue([
+        { content: "Our refund window is 30 days.", document_id: "doc-1", similarity: 0.95 },
+      ]);
+      const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Sure!" }));
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated", useKnowledgeBase: false }) });
+
+      await generateReply(ctx, provider, undefined, ragDeps());
+
+      expect(mockQueryRelevantChunks).not.toHaveBeenCalled();
+    });
+
     it("falls back and requires human handoff when the tenant has a knowledge base but nothing matches well enough", async () => {
       mockQueryRelevantChunks.mockResolvedValue([
         { content: "totally unrelated content", document_id: "doc-1", similarity: 0.1 },
@@ -369,6 +384,30 @@ describe("generateReply", () => {
         expect(result.engine).toBe("rule_based");
         expect(result.fellBackReason).toMatch(/forbidden topic/);
       });
+    });
+  });
+
+  describe("AI Behaviour panel (tone/language)", () => {
+    it("includes a tone instruction matching the campaign's configured tone", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "Sure!" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated", tone: "casual" }) });
+
+      await generateReply(ctx, provider);
+
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).toContain("relaxed, casual, conversational tone");
+    });
+
+    it("adds a language instruction when language is not 'auto', and omits it when 'auto'", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "Sure!" });
+      const provider = mockProvider(generateReplyMock);
+
+      await generateReply(makeContext({ campaign: makeCampaign({ replyMode: "ai_generated", language: "hi" }) }), provider);
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).toContain("Always reply in Hindi");
+
+      generateReplyMock.mockClear();
+      await generateReply(makeContext({ campaign: makeCampaign({ replyMode: "ai_generated", language: "auto" }) }), provider);
+      expect(generateReplyMock.mock.calls[0]![0].systemPrompt).not.toContain("Always reply in");
     });
   });
 });

@@ -4,7 +4,15 @@ import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
 import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
-import { getCampaign, updateCampaignReplyConfig, type ReplyChannel, type ReplyMode, type TriggerSource } from "../db/campaigns.js";
+import {
+  getCampaign,
+  updateCampaignReplyConfig,
+  type CampaignLanguage,
+  type CampaignTone,
+  type ReplyChannel,
+  type ReplyMode,
+  type TriggerSource,
+} from "../db/campaigns.js";
 import { generateReply, type RagDependencies } from "../services/replyEngine.js";
 import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
 import type { LLMProvider } from "../llm/provider.js";
@@ -85,10 +93,12 @@ export function dashboardRouter(
   const VALID_REPLY_MODES: ReplyMode[] = ["rule_based", "ai_generated"];
   const VALID_REPLY_CHANNELS: ReplyChannel[] = ["dm", "comment", "both"];
   const VALID_TRIGGER_SOURCES: TriggerSource[] = ["comment", "message", "both"];
+  const VALID_TONES: CampaignTone[] = ["professional", "friendly", "casual", "professional_and_friendly"];
+  const VALID_LANGUAGES: CampaignLanguage[] = ["auto", "en", "hi"];
 
   router.patch("/tenants/:tenantId/campaigns/:campaignId/reply-config", async (req, res) => {
     const { tenantId, campaignId } = req.params;
-    const { replyMode, ctaLink, defaultReplyTemplate, replyChannel, triggerSource } = req.body ?? {};
+    const { replyMode, ctaLink, defaultReplyTemplate, replyChannel, triggerSource, tone, language, useKnowledgeBase } = req.body ?? {};
 
     if (replyMode !== undefined && !VALID_REPLY_MODES.includes(replyMode)) {
       return res.status(400).json({ error: `replyMode must be one of ${VALID_REPLY_MODES.join(", ")}` });
@@ -105,6 +115,15 @@ export function dashboardRouter(
     if (triggerSource !== undefined && !VALID_TRIGGER_SOURCES.includes(triggerSource)) {
       return res.status(400).json({ error: `triggerSource must be one of ${VALID_TRIGGER_SOURCES.join(", ")}` });
     }
+    if (tone !== undefined && !VALID_TONES.includes(tone)) {
+      return res.status(400).json({ error: `tone must be one of ${VALID_TONES.join(", ")}` });
+    }
+    if (language !== undefined && !VALID_LANGUAGES.includes(language)) {
+      return res.status(400).json({ error: `language must be one of ${VALID_LANGUAGES.join(", ")}` });
+    }
+    if (useKnowledgeBase !== undefined && typeof useKnowledgeBase !== "boolean") {
+      return res.status(400).json({ error: "useKnowledgeBase must be a boolean" });
+    }
 
     const updated = await updateCampaignReplyConfig(getPool(), tenantId, campaignId, {
       replyMode,
@@ -112,6 +131,9 @@ export function dashboardRouter(
       defaultReplyTemplate,
       replyChannel,
       triggerSource,
+      tone,
+      language,
+      useKnowledgeBase,
     });
     if (!updated) return res.status(404).json({ error: "campaign not found for this tenant" });
     return res.status(200).json(updated);

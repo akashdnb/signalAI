@@ -283,6 +283,7 @@ export function createLeadEventReplyHandler(
           ctaLink: campaign.ctaLink ?? undefined,
           history,
           fieldDefinitions,
+          campaignSettings: { tone: campaign.tone, language: campaign.language, useKnowledgeBase: campaign.useKnowledgeBase },
         },
         provider,
         effectiveSpendGuard,
