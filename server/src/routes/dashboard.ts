@@ -3,7 +3,7 @@ import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
-import { getMilestoneDropoff, getTenantAnalytics } from "../db/analytics.js";
+import { getMilestoneDropoff, getPipelineFunnel, getRevenueSummary, getTenantAnalytics } from "../db/analytics.js";
 import {
   getCampaign,
   updateCampaignReplyConfig,
@@ -82,6 +82,19 @@ export function dashboardRouter(
   router.get("/tenants/:tenantId/analytics", async (req, res) => {
     const analytics = await getTenantAnalytics(getPool(), req.params.tenantId);
     return res.status(200).json(analytics);
+  });
+
+  // R4 Analytics page: the tenant-wide conversion funnel (built from each
+  // lead's current pipeline_stage, not a transition history) and a
+  // won-deals revenue rollup, grouped by currency.
+  router.get("/tenants/:tenantId/analytics/funnel", async (req, res) => {
+    const funnel = await getPipelineFunnel(getPool(), req.params.tenantId);
+    return res.status(200).json(funnel);
+  });
+
+  router.get("/tenants/:tenantId/analytics/revenue", async (req, res) => {
+    const revenue = await getRevenueSummary(getPool(), req.params.tenantId);
+    return res.status(200).json(revenue);
   });
 
   router.get("/tenants/:tenantId/campaigns/:campaignId/dropoff", async (req, res) => {

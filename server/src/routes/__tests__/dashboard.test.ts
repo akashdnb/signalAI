@@ -222,6 +222,38 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(res.body).toEqual({ commentsReceived: 1, dmsSent: 1, dmFailures: 1, uniqueLeads: 1 });
   });
 
+  it("GET /tenants/:id/analytics/funnel reports stage-cumulative counts and open-with-no-outcome", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-a");
+    const leadB = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-b");
+    await request(app).patch(`/tenants/${tenant.id}/leads/${leadA.id}`).set(authHeader).send({ pipelineStage: "won" });
+    await request(app).patch(`/tenants/${tenant.id}/leads/${leadB.id}`).set(authHeader).send({ pipelineStage: "qualified" });
+
+    const res = await request(app).get(`/tenants/${tenant.id}/analytics/funnel`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.stages.find((s: { key: string }) => s.key === "leads")).toMatchObject({ count: 2 });
+    expect(res.body.stages.find((s: { key: string }) => s.key === "qualified")).toMatchObject({ count: 2 });
+    expect(res.body.stages.find((s: { key: string }) => s.key === "won")).toMatchObject({ count: 1 });
+    expect(res.body.openWithNoOutcome).toBe(1); // leadB (qualified) — leadA is won
+  });
+
+  it("GET /tenants/:id/analytics/revenue sums won deal value by currency", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const deal = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/deals`).set(authHeader).send({ value: 50000, currency: "INR" });
+    await request(app).patch(`/tenants/${tenant.id}/deals/${deal.body.id}`).set(authHeader).send({ stage: "won" });
+
+    const res = await request(app).get(`/tenants/${tenant.id}/analytics/revenue`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([{ currency: "INR", total: 50000 }]);
+  });
+
   it("GET /tenants/:id/campaigns/:id/dropoff reports per-milestone advancement counts in order", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

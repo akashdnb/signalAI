@@ -326,6 +326,22 @@ export interface Analytics {
   uniqueLeads: number;
 }
 
+export interface FunnelStage {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface Funnel {
+  stages: FunnelStage[];
+  openWithNoOutcome: number;
+}
+
+export interface RevenueByCurrency {
+  currency: string;
+  total: number;
+}
+
 export interface Dropoff {
   milestoneId: string;
   ordinal: number;
@@ -467,6 +483,8 @@ export const api = {
   getTopPosts: (tenantId: string) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts`),
   getTopKeywords: (tenantId: string) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
+  getFunnel: (tenantId: string) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel`),
+  getRevenue: (tenantId: string) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
 

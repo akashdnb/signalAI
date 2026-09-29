@@ -54,6 +54,13 @@
   --pill-bg: #eef0ff;
   --sidebar-bg: #fbfaff;
   --font-sans-stack: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* R4 Analytics funnel — ordinal ramp (one hue, monotone lightness), validated via the dataviz skill's six-checks script for this light surface. */
+  --funnel-1: #080954;
+  --funnel-2: #0d0f8c;
+  --funnel-3: #1215c5;
+  --funnel-4: #282cec;
+  --funnel-5: #575af0;
+  --funnel-6: #8183f4;
   color-scheme: light;
 }
 
@@ -70,6 +77,13 @@
     --error-bg: rgba(220, 38, 38, 0.16);
     --error-text: #f87171;
     --pill-bg: #1f2a44;
+    /* R4 Analytics funnel — dark mode gets its own validated steps, not an automatic flip of the light ones. */
+    --funnel-1: #282cec;
+    --funnel-2: #4d51ef;
+    --funnel-3: #7375f2;
+    --funnel-4: #9395f5;
+    --funnel-5: #afb1f8;
+    --funnel-6: #cccdfa;
     --sidebar-bg: #111827;
     color-scheme: dark;
   }

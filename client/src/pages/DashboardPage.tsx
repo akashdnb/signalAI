@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ApiError, api, type AccountHealth, type Analytics, type LeadListItem, type TopKeyword, type TopPost } from "../api";
+import { ApiError, api, type AccountHealth, type Analytics, type LeadListItem } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
 import { useTenant } from "../context/TenantContext";
 import { PIPELINE_STAGES, formatDate, formatLastContactVia } from "../lib/leadFormatting";
@@ -14,8 +14,6 @@ export function DashboardPage() {
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [recentLeads, setRecentLeads] = useState<LeadListItem[] | null>(null);
-  const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
-  const [topKeywords, setTopKeywords] = useState<TopKeyword[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const justConnected = searchParams.get("connected") === "1";
@@ -29,18 +27,14 @@ export function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [a, an, posts, keywords, leads] = await Promise.all([
+        const [a, an, leads] = await Promise.all([
           api.getAccountHealth(tenantId!),
           api.getAnalytics(tenantId!),
-          api.getTopPosts(tenantId!),
-          api.getTopKeywords(tenantId!),
           api.getLeads(tenantId!),
         ]);
         if (cancelled) return;
         setAccount(a);
         setAnalytics(an);
-        setTopPosts(posts);
-        setTopKeywords(keywords);
         setRecentLeads(leads.slice(0, 5));
       } catch (err) {
         if (cancelled) return;
@@ -124,7 +118,10 @@ export function DashboardPage() {
       </section>
 
       <section className="card">
-        <h2>Analytics</h2>
+        <div className="dashboard-header" style={{ marginBottom: "1rem" }}>
+          <h2 style={{ marginBottom: 0 }}>Analytics</h2>
+          <Link to={`/dashboard/${tenantId}/analytics`}>View full analytics →</Link>
+        </div>
         {analytics === null ? (
           <p className="muted">Loading…</p>
         ) : (
@@ -150,52 +147,6 @@ export function DashboardPage() {
       </section>
 
       <CampaignsPanel tenantId={tenantId} />
-
-      <section className="card">
-        <h2>Top Performing Posts</h2>
-        {topPosts === null ? (
-          <p className="muted">Loading…</p>
-        ) : topPosts.length === 0 ? (
-          <p className="muted">No comments yet.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Post</th>
-                <th>Comments</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topPosts.map((p) => (
-                <tr key={p.mediaId}>
-                  <td>
-                    {p.permalink ? (
-                      <a href={p.permalink} target="_blank" rel="noreferrer">
-                        {p.caption ?? p.mediaId}
-                      </a>
-                    ) : (
-                      p.caption ?? p.mediaId
-                    )}
-                  </td>
-                  <td>{p.commentCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {topKeywords && topKeywords.length > 0 && (
-          <>
-            <h3 style={{ marginTop: "1.25rem" }}>Top Trigger Keywords</h3>
-            <div>
-              {topKeywords.map((k) => (
-                <span className="tag-chip" key={k.keyword}>
-                  {k.keyword} ({k.matchCount})
-                </span>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
 
       <section className="card">
         <div className="dashboard-header" style={{ marginBottom: "1rem" }}>

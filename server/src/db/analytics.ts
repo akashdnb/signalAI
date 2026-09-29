@@ -109,6 +109,75 @@ export async function getTopKeywords(pool: Pool, tenantId: string, limit = 10): 
   return result.rows.map((row) => ({ keyword: row.keyword, matchCount: Number(row.match_count) }));
 }
 
+export interface FunnelStage {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface Funnel {
+  stages: FunnelStage[];
+  /** Leads still open — neither won nor lost — the roadmap's "leads without outcomes" gap made real, scoped to what's actually computable (no attribution/identity-matching concept exists yet for the rest of that gap). */
+  openWithNoOutcome: number;
+}
+
+/**
+ * R4 Analytics: built from each lead's CURRENT pipeline_stage (a live
+ * snapshot, not a transition history — nothing else in this app tracks
+ * leads any differently, see Dashboard/Leads pages) so "Qualified" etc.
+ * below are cumulative "reached this stage or later" counts, and a lead
+ * marked 'lost' after reaching Qualified no longer counts there — same
+ * simplification the rest of the app already lives with. 'Reach' isn't
+ * included: no impression/reach data exists anywhere to back it.
+ */
+export async function getPipelineFunnel(pool: Pool, tenantId: string): Promise<Funnel> {
+  const [comments, dmsSent, uniqueLeads, stageRows] = await Promise.all([
+    pool.query<{ count: string }>(
+      `select count(*)::int as count from lead_events where tenant_id = $1 and event_type = 'comment'`,
+      [tenantId],
+    ),
+    pool.query<{ count: string }>(`select count(*)::int as count from account_sends where tenant_id = $1`, [tenantId]),
+    pool.query<{ count: string }>(`select count(*)::int as count from leads where tenant_id = $1`, [tenantId]),
+    pool.query<{ pipeline_stage: string; count: string }>(
+      `select pipeline_stage, count(*)::int as count from leads where tenant_id = $1 group by pipeline_stage`,
+      [tenantId],
+    ),
+  ]);
+
+  const byStage = new Map(stageRows.rows.map((r) => [r.pipeline_stage, Number(r.count)]));
+  const countAtLeast = (stages: string[]) => stages.reduce((sum, s) => sum + (byStage.get(s) ?? 0), 0);
+
+  return {
+    stages: [
+      { key: "comments", label: "Comments", count: Number(comments.rows[0]!.count) },
+      { key: "dms", label: "DMs", count: Number(dmsSent.rows[0]!.count) },
+      { key: "leads", label: "Leads", count: Number(uniqueLeads.rows[0]!.count) },
+      { key: "qualified", label: "Qualified", count: countAtLeast(["qualified", "meeting_scheduled", "won"]) },
+      { key: "meeting", label: "Meeting Scheduled", count: countAtLeast(["meeting_scheduled", "won"]) },
+      { key: "won", label: "Won", count: countAtLeast(["won"]) },
+    ],
+    openWithNoOutcome: countAtLeast(["new", "contacted", "qualified", "meeting_scheduled"]),
+  };
+}
+
+export interface RevenueByCurrency {
+  currency: string;
+  total: number;
+}
+
+/** Grouped by currency rather than a flat sum — deals.currency is per-deal, not tenant-fixed, so a flat SUM would silently mix currencies. */
+export async function getRevenueSummary(pool: Pool, tenantId: string): Promise<RevenueByCurrency[]> {
+  const result = await pool.query<{ currency: string; total: string }>(
+    `select currency, sum(value)::numeric as total
+     from deals
+     where tenant_id = $1 and stage = 'won' and value is not null
+     group by currency
+     order by total desc`,
+    [tenantId],
+  );
+  return result.rows.map((row) => ({ currency: row.currency, total: Number(row.total) }));
+}
+
 export interface MilestoneDropoff {
   milestoneId: string;
   ordinal: number;
