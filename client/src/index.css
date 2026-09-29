@@ -231,6 +231,24 @@ select:focus {
   border-color: var(--accent);
 }
 
+/*
+ * Chrome/Safari paint their own background (usually a pale yellow/lavender
+ * autocomplete tint) behind an autofilled input, ignoring our `background`
+ * entirely — this is what "the light mode input looks weird" turned out
+ * to be, not a color-token bug. The inset box-shadow trick is the standard
+ * workaround: a shadow large enough to cover the whole field paints over
+ * the browser's autofill layer with our own card-bg, and the huge
+ * transition delay stops the swap from visibly flashing.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--card-bg) inset;
+  box-shadow: 0 0 0 1000px var(--card-bg) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 textarea {
   resize: vertical;
 }
