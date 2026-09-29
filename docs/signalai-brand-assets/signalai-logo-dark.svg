@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360"><rect width="1200" height="360" fill="#0F172A"/>
+<g transform="translate(50 45) scale(.52)">
 <defs><linearGradient id="g" x1="80" y1="430" x2="430" y2="70" gradientUnits="userSpaceOnUse">
 <stop offset="0" stop-color="#22D3EE"/><stop offset=".45" stop-color="#2563EB"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs>
 <path fill="url(#g)" d="M320 62c-70 5-134 38-168 86-30 42-22 79 23 102l83 42c18 9 19 22 2 37-25 22-67 34-113 32l-45 66c88 9 174-18 220-70 40-46 38-90-15-118l-82-43c-19-10-18-23 3-39 24-19 61-29 104-28l42-67z"/>
-<path fill="#7C3AED" d="M402 57l9 24 24 9-24 9-9 24-9-24-24-9 24-9z"/></svg>
+<path fill="#7C3AED" d="M402 57l9 24 24 9-24 9-9 24-9-24-24-9 24-9z"/></g>
+<text x="305" y="224" font-family="Arial,sans-serif" font-size="128" font-weight="700" fill="#FFFFFF">signal<tspan fill="#7C3AED">AI</tspan></text></svg>

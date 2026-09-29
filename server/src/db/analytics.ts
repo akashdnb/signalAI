@@ -178,6 +178,44 @@ export async function getRevenueSummary(pool: Pool, tenantId: string): Promise<R
   return result.rows.map((row) => ({ currency: row.currency, total: Number(row.total) }));
 }
 
+export interface ConversationsTimeseriesPoint {
+  /** UTC calendar date, YYYY-MM-DD. */
+  date: string;
+  comments: number;
+  dms: number;
+}
+
+/**
+ * Dashboard "Conversations over time" chart: daily comment/DM counts for
+ * the trailing 30 days (inclusive of today), zero-filled for days with no
+ * activity via generate_series rather than only returning days that have
+ * rows.
+ */
+export async function getConversationsTimeseries(pool: Pool, tenantId: string): Promise<ConversationsTimeseriesPoint[]> {
+  const result = await pool.query<{ date: string; comments: string; dms: string }>(
+    `select
+       to_char(d::date, 'YYYY-MM-DD') as date,
+       coalesce(c.count, 0) as comments,
+       coalesce(m.count, 0) as dms
+     from generate_series(current_date - interval '29 days', current_date, interval '1 day') as d
+     left join (
+       select date_trunc('day', occurred_at) as day, count(*)::int as count
+       from lead_events
+       where tenant_id = $1 and event_type = 'comment' and occurred_at >= current_date - interval '29 days'
+       group by 1
+     ) c on c.day = d
+     left join (
+       select date_trunc('day', sent_at) as day, count(*)::int as count
+       from account_sends
+       where tenant_id = $1 and sent_at >= current_date - interval '29 days'
+       group by 1
+     ) m on m.day = d
+     order by d`,
+    [tenantId],
+  );
+  return result.rows.map((row) => ({ date: row.date, comments: Number(row.comments), dms: Number(row.dms) }));
+}
+
 export interface MilestoneDropoff {
   milestoneId: string;
   ordinal: number;

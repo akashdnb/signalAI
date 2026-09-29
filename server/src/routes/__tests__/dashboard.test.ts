@@ -254,6 +254,29 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(res.body).toEqual([{ currency: "INR", total: 50000 }]);
   });
 
+  it("GET /tenants/:id/analytics/timeseries zero-fills 30 days and counts today's comment", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-1",
+      eventType: "comment",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
+
+    const res = await request(app).get(`/tenants/${tenant.id}/analytics/timeseries`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(30);
+    const today = res.body.at(-1);
+    expect(today).toMatchObject({ comments: 1, dms: 0 });
+    expect(res.body[0]).toMatchObject({ comments: 0, dms: 0 });
+  });
+
   it("GET /tenants/:id/campaigns/:id/dropoff reports per-milestone advancement counts in order", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

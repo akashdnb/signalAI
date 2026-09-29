@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, clearSession, loadSession, type TenantSummary } from "../api";
 import { TenantContext } from "../context/TenantContext";
+import { Logo } from "./Logo";
 import { OnboardingWizard } from "./OnboardingWizard";
 import {
   AnalyticsIcon,
@@ -51,7 +52,7 @@ function NavList({ items, tenantId, onNavigate }: { items: NavItem[]; tenantId: 
             onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
-                isActive ? "bg-accent text-white" : "text-ink hover:bg-chip"
+                isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"
               }`
             }
           >
@@ -140,7 +141,7 @@ export function AppShell() {
         }`}
       >
         <div className="flex items-center justify-between px-5 py-5">
-          <span className="text-lg font-bold text-accent">signalAI</span>
+          <Logo size="md" />
           <button
             type="button"
             aria-label="Close menu"
@@ -176,7 +177,7 @@ export function AppShell() {
           <button type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}>
             <MenuIcon className="h-6 w-6" />
           </button>
-          <span className="text-base font-semibold text-accent">signalAI</span>
+          <Logo size="sm" />
         </header>
 
         <main className="flex-1 overflow-y-auto">

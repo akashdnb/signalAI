@@ -1,0 +1,13 @@
+signalAI Brand Guide
+Primary Purple: #7C3AED
+Primary Blue: #2563EB
+Accent Cyan: #22D3EE
+Dark: #0F172A
+Surface: #1F2937
+Border: #374151
+Muted Text: #6B7280
+Background: #F1F5F9
+
+Use the light logo on light backgrounds and dark logo on dark backgrounds.
+Use the icon alone for app icons, avatars and compact navigation.
+Maintain clear space around the mark approximately equal to the sparkle height.

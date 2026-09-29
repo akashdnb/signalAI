@@ -39,20 +39,27 @@
 }
 
 :root {
-  --bg: #f5f3ff;
+  /* Brand guide (docs/signalai-brand-assets/BRAND-GUIDE.txt): Primary
+     Purple #7C3AED, Primary Blue #2563EB, Accent Cyan #22D3EE, Dark
+     #0F172A, Background #F1F5F9, Muted Text #6B7280. Surface/Border from
+     the guide (#1F2937/#374151) are the dark-mode pair, applied below. */
+  --bg: #f1f5f9;
   --card-bg: #ffffff;
-  --text: #1e1b4b;
-  --text-muted: #475569;
-  --border: #e0e7ff;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-soft: #818cf8;
+  --text: #0f172a;
+  --text-muted: #6b7280;
+  --border: #e2e8f0;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: #a78bfa;
+  --accent-blue: #2563eb;
+  --accent-cyan: #22d3ee;
+  --brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb, #7c3aed);
   --ok-bg: #ecfdf5;
   --ok-text: #059669;
   --error-bg: #fef2f2;
   --error-text: #dc2626;
-  --pill-bg: #eef0ff;
-  --sidebar-bg: #fbfaff;
+  --pill-bg: #f3e8ff;
+  --sidebar-bg: #ffffff;
   --font-sans-stack: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   /* R4 Analytics funnel — ordinal ramp (one hue, monotone lightness), validated via the dataviz skill's six-checks script for this light surface. */
   --funnel-1: #080954;
@@ -67,16 +74,17 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0f172a;
-    --card-bg: #192134;
-    --text: #ffffff;
+    --card-bg: #1f2937;
+    --text: #f8fafc;
     --text-muted: #94a3b8;
-    --border: rgba(255, 255, 255, 0.08);
-    --accent-hover: #818cf8;
+    --border: #374151;
+    --accent-hover: #8b5cf6;
+    --accent-soft: #c4b5fd;
     --ok-bg: rgba(5, 150, 105, 0.16);
     --ok-text: #34d399;
     --error-bg: rgba(220, 38, 38, 0.16);
     --error-text: #f87171;
-    --pill-bg: #1f2a44;
+    --pill-bg: #2e2247;
     /* R4 Analytics funnel — dark mode gets its own validated steps, not an automatic flip of the light ones. */
     --funnel-1: #282cec;
     --funnel-2: #4d51ef;
@@ -145,9 +153,10 @@ h4 {
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 1.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .dashboard-header {
@@ -172,13 +181,22 @@ select {
   display: block;
   width: 100%;
   margin-top: 0.3rem;
-  padding: 0.55rem 0.7rem;
+  padding: 0.6rem 0.8rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.95rem;
   font-family: inherit;
   background: var(--card-bg);
   color: var(--text);
+  transition: border-color 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 textarea {
@@ -188,11 +206,13 @@ textarea {
 .btn-primary,
 .btn-secondary {
   border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  padding: 0.65rem 1.2rem;
   font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  transition: background-color 0.15s ease;
 }
 
 .btn-primary {

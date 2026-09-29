@@ -356,6 +356,12 @@ export interface RevenueByCurrency {
   total: number;
 }
 
+export interface ConversationsTimeseriesPoint {
+  date: string;
+  comments: number;
+  dms: number;
+}
+
 export interface Dropoff {
   milestoneId: string;
   ordinal: number;
@@ -504,6 +510,8 @@ export const api = {
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
   getFunnel: (tenantId: string) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel`),
   getRevenue: (tenantId: string) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue`),
+  getConversationsTimeseries: (tenantId: string) =>
+    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
 

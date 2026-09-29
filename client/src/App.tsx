@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { ComingSoonPage } from "./components/ComingSoonPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
+import { AutomationPage } from "./pages/AutomationPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { InboxPage } from "./pages/InboxPage";
@@ -28,7 +29,7 @@ export default function App() {
         <Route path="leads/:leadId" element={<LeadDetailPage />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<LeadsPage />} />
-        <Route path="automation" element={<ComingSoonPage title="Automation" />} />
+        <Route path="automation" element={<AutomationPage />} />
         <Route path="content" element={<ComingSoonPage title="Content" />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="team" element={<ComingSoonPage title="Team" />} />

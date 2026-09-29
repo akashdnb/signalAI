@@ -3,7 +3,13 @@ import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
-import { getMilestoneDropoff, getPipelineFunnel, getRevenueSummary, getTenantAnalytics } from "../db/analytics.js";
+import {
+  getConversationsTimeseries,
+  getMilestoneDropoff,
+  getPipelineFunnel,
+  getRevenueSummary,
+  getTenantAnalytics,
+} from "../db/analytics.js";
 import {
   getCampaign,
   updateCampaignReplyConfig,
@@ -95,6 +101,13 @@ export function dashboardRouter(
   router.get("/tenants/:tenantId/analytics/revenue", async (req, res) => {
     const revenue = await getRevenueSummary(getPool(), req.params.tenantId);
     return res.status(200).json(revenue);
+  });
+
+  // Dashboard R6: trailing-30-day comment/DM counts for the "Conversations
+  // over time" chart.
+  router.get("/tenants/:tenantId/analytics/timeseries", async (req, res) => {
+    const timeseries = await getConversationsTimeseries(getPool(), req.params.tenantId);
+    return res.status(200).json(timeseries);
   });
 
   router.get("/tenants/:tenantId/campaigns/:campaignId/dropoff", async (req, res) => {
