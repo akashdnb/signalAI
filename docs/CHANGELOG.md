@@ -4,6 +4,36 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-09-29 — Milestone Multi-Field Capture + Tenant Field-Definitions Registry + Unified Settings
+
+Raised from a real live conversation review (migrations `1758240000043`–`1758240000044`). Full
+detail in `claude_fixes/2026-09-29-milestone-multi-field-capture-and-field-definitions.md`.
+
+- **Multi-field milestone capture.** `campaign_milestones.capture_field` (single nullable string)
+  is now `capture_fields` (`text[]`) — a milestone can request several fields (e.g. email + phone)
+  in one conversational turn instead of forcing one turn per field. The LLM's structured-output
+  contract moved from `captured_value` to `captured_values: Record<string, string>`, and the
+  system prompt only ever asks about whatever's still missing against `capturedFactsSoFar`. Partial
+  answers now persist across turns — a lead who gives only one of two requested fields gets that
+  fact saved immediately, without the model re-asking for it on the next message; the milestone
+  itself only advances once every requested field is known.
+- **Tenant field-definitions registry.** New `tenant_field_definitions` table: a per-tenant
+  registry of reusable typed fields (email/phone/country/number/date/text), reused across
+  campaigns instead of ad-hoc capture-field strings. `isValidCapturedValue` now validates by a
+  field's registered type when one exists (fixing a real gap: an unregistered field like
+  `user_country` previously accepted almost any non-empty string), falling back to the old
+  substring heuristic for anything not yet registered — fully backward-compatible.
+- **Unified Settings page.** Knowledge Base, Client Guardrails, and Billing — previously three
+  panels stacked at the bottom of the dashboard — now live on a new
+  `/dashboard/:tenantId/settings` page alongside the new Field Definitions panel. The milestone
+  editor gained a real multi-select fed by the registry, with an inline "+ New field" to register
+  one without leaving the page.
+- Verified: 572/572 passing (one queue test confirmed pre-existing-flaky under parallel-worker DB
+  contention, unrelated), migrations round-tripped up/down against real data, client build/typecheck
+  clean.
+
+---
+
 ## 2026-09-28 — DM Conversation Continuation + Timeline Shows Bot Replies
 
 Two fixes surfaced by a real live conversation (migrations `1758240000040`–`1758240000041`):
