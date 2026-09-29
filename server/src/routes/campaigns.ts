@@ -73,10 +73,13 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/milestones", async
         m !== null &&
         typeof m.goalDescription === "string" &&
         m.goalDescription.trim().length > 0 &&
-        (m.captureField === undefined || typeof m.captureField === "string"),
+        (m.captureFields === undefined ||
+          (Array.isArray(m.captureFields) && m.captureFields.every((f: unknown) => typeof f === "string"))),
     )
   ) {
-    return res.status(400).json({ error: "milestones must be a non-empty array of { goalDescription, captureField? }" });
+    return res
+      .status(400)
+      .json({ error: "milestones must be a non-empty array of { goalDescription, captureFields?: string[] }" });
   }
 
   const saved = await setCampaignMilestones(getPool(), tenantId, campaignId, milestones);

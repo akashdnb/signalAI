@@ -14,9 +14,6 @@ import {
   type TopPost,
 } from "../api";
 import { CampaignsPanel } from "../components/CampaignsPanel";
-import { BillingPanel } from "../components/BillingPanel";
-import { KnowledgeBasePanel } from "../components/KnowledgeBasePanel";
-import { GuardrailsConfigPanel } from "../components/GuardrailsConfigPanel";
 
 const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
   { value: "new", label: "New" },
@@ -139,9 +136,12 @@ export function DashboardPage() {
           <h1>{tenant?.name ?? "Your dashboard"}</h1>
           <p className="muted small">Tenant ID: {tenantId}</p>
         </div>
-        <button className="btn-secondary" onClick={handleLogout}>
-          Log out
-        </button>
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <Link to={`/dashboard/${tenantId}/settings`}>Settings</Link>
+          <button className="btn-secondary" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </header>
 
       {error && <div className="banner banner-error">{error}</div>}
@@ -323,9 +323,6 @@ export function DashboardPage() {
         )}
       </section>
 
-      <KnowledgeBasePanel tenantId={tenantId} />
-      <GuardrailsConfigPanel tenantId={tenantId} />
-      <BillingPanel tenantId={tenantId} />
     </div>
   );
 }

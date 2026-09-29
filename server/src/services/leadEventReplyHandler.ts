@@ -22,6 +22,7 @@ import {
   recordMilestoneAdvancement,
 } from "../db/milestones.js";
 import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
+import { getFieldDefinitionValueTypes } from "../db/fieldDefinitions.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
 import { getTokenUsageSince, recordTokenUsage } from "../db/tokenUsage.js";
@@ -209,9 +210,9 @@ export function createLeadEventReplyHandler(
     let requiresHumanHandoff = false;
     let fellBackReason: string | undefined;
     let usage: GenerateReplyUsage | undefined;
-    // R6-01: milestone advancement is computed here but only committed
-    // after a confirmed send, below.
-    let commitMilestoneAdvancement: (() => Promise<void>) | null = null;
+    // R6-01: milestone progress (captured facts and/or advancement) is
+    // computed here but only committed after a confirmed send, below.
+    let commitMilestoneProgress: (() => Promise<void>) | null = null;
 
     if (milestones.length === 0 || campaign.replyMode === "rule_based") {
       // No Milestone Engine configured, or the campaign opted out of AI
@@ -251,6 +252,7 @@ export function createLeadEventReplyHandler(
       }
 
       const capturedFactsSoFar = await getCapturedFacts(pool, job.tenantId, job.leadId);
+      const fieldDefinitions = await getFieldDefinitionValueTypes(pool, job.tenantId);
 
       const result = await runMilestoneCheck(
         {
@@ -261,24 +263,33 @@ export function createLeadEventReplyHandler(
           tier,
           ctaLink: campaign.ctaLink ?? undefined,
           history,
+          fieldDefinitions,
         },
         provider,
         effectiveSpendGuard,
         rag,
       );
 
-      if (result.satisfied) {
-        commitMilestoneAdvancement = async () => {
-          if (activeMilestone.captureField && result.capturedValue) {
-            await mergeCapturedFacts(pool, job.tenantId, job.leadId, {
-              [activeMilestone.captureField]: result.capturedValue,
-            });
+      // Multi-field capture, partial-across-turns: a field answered this
+      // turn must be persisted even when the milestone isn't fully
+      // satisfied yet (some other requested field is still missing) — that
+      // durable fact is what lets the NEXT turn's capturedFactsSoFar tell
+      // the model to stop re-asking for it. Only advancing to the next
+      // milestone (recordMilestoneAdvancement + setActiveMilestone) is
+      // gated on full satisfaction.
+      const hasNewCapturedValues = !!result.capturedValues && Object.keys(result.capturedValues).length > 0;
+      if (hasNewCapturedValues || result.satisfied) {
+        commitMilestoneProgress = async () => {
+          if (hasNewCapturedValues) {
+            await mergeCapturedFacts(pool, job.tenantId, job.leadId, result.capturedValues!);
           }
-          await recordMilestoneAdvancement(pool, job.tenantId, job.leadId, campaign.id, activeMilestone.id);
+          if (result.satisfied) {
+            await recordMilestoneAdvancement(pool, job.tenantId, job.leadId, campaign.id, activeMilestone.id);
 
-          const next = await getNextMilestone(pool, job.tenantId, campaign.id, activeMilestone.ordinal);
-          if (next) {
-            await setActiveMilestone(pool, job.tenantId, job.leadId, next.id);
+            const next = await getNextMilestone(pool, job.tenantId, campaign.id, activeMilestone.ordinal);
+            if (next) {
+              await setActiveMilestone(pool, job.tenantId, job.leadId, next.id);
+            }
           }
         };
       }
@@ -402,8 +413,8 @@ export function createLeadEventReplyHandler(
     // actually delivered — a throw above propagates out of this handler
     // and the job retries with nothing committed yet, so the retry redoes
     // the LLM/milestone work cleanly instead of skipping ahead.
-    if (commitMilestoneAdvancement && delivered) {
-      await commitMilestoneAdvancement();
+    if (commitMilestoneProgress && delivered) {
+      await commitMilestoneProgress();
     }
 
     return { advance: true };

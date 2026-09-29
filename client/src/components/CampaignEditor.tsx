@@ -1,10 +1,30 @@
 import { useEffect, useState } from "react";
-import { api, type Campaign, type Dropoff, type Milestone, type ObservedMedia, type PreviewResult, type ReplyChannel, type TriggerSource } from "../api";
+import {
+  api,
+  type Campaign,
+  type Dropoff,
+  type FieldDefinition,
+  type FieldDefinitionValueType,
+  type Milestone,
+  type ObservedMedia,
+  type PreviewResult,
+  type ReplyChannel,
+  type TriggerSource,
+} from "../api";
 
 interface MilestoneDraft {
   goalDescription: string;
-  captureField: string;
+  captureFields: string[];
 }
+
+const VALUE_TYPES: { value: FieldDefinitionValueType; label: string }[] = [
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "country", label: "Country" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "text", label: "Text" },
+];
 
 export function CampaignEditor({
   tenantId,
@@ -26,6 +46,15 @@ export function CampaignEditor({
   const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
   const [savingMilestones, setSavingMilestones] = useState(false);
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
+
+  const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([]);
+  // Which milestone row (by index) currently has its "+ new field" mini-form open, if any.
+  const [newFieldRow, setNewFieldRow] = useState<number | null>(null);
+  const [newFieldKey, setNewFieldKey] = useState("");
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<FieldDefinitionValueType>("text");
+  const [creatingField, setCreatingField] = useState(false);
+  const [newFieldError, setNewFieldError] = useState<string | null>(null);
 
   // Phase 2A "Multiple DM Variations" — an empty list falls back to
   // defaultReplyTemplate above (see server's replyEngine.ts).
@@ -62,21 +91,23 @@ export function CampaignEditor({
     let cancelled = false;
     async function load() {
       try {
-        const [ms, d, media] = await Promise.all([
+        const [ms, d, media, defs] = await Promise.all([
           api.listMilestones(tenantId, campaign.id),
           api.getDropoff(tenantId, campaign.id),
           api.listObservedMedia(tenantId),
+          api.listFieldDefinitions(tenantId),
         ]);
         if (cancelled) return;
         setMilestones(
           ms.length > 0
-            ? ms.map((m: Milestone) => ({ goalDescription: m.goalDescription, captureField: m.captureField ?? "" }))
-            : [{ goalDescription: "", captureField: "" }],
+            ? ms.map((m: Milestone) => ({ goalDescription: m.goalDescription, captureFields: m.captureFields }))
+            : [{ goalDescription: "", captureFields: [] }],
         );
         setDropoff(d);
         setObservedMedia(media);
+        setFieldDefinitions(defs);
       } catch {
-        if (!cancelled) setMilestones([{ goalDescription: "", captureField: "" }]);
+        if (!cancelled) setMilestones([{ goalDescription: "", captureFields: [] }]);
       }
     }
     load();
@@ -164,7 +195,7 @@ export function CampaignEditor({
         .filter((m) => m.goalDescription.trim())
         .map((m) => ({
           goalDescription: m.goalDescription.trim(),
-          ...(m.captureField.trim() ? { captureField: m.captureField.trim() } : {}),
+          ...(m.captureFields.length > 0 ? { captureFields: m.captureFields } : {}),
         }));
       if (payload.length === 0) {
         setMilestoneError("Add at least one milestone goal.");
@@ -177,6 +208,43 @@ export function CampaignEditor({
       setMilestoneError(err instanceof Error ? err.message : "Failed to save milestones");
     } finally {
       setSavingMilestones(false);
+    }
+  }
+
+  function toggleNewFieldRow(i: number) {
+    setNewFieldError(null);
+    setNewFieldKey("");
+    setNewFieldLabel("");
+    setNewFieldType("text");
+    setNewFieldRow((prev) => (prev === i ? null : i));
+  }
+
+  async function createFieldForRow(i: number, e: React.FormEvent) {
+    e.preventDefault();
+    if (!newFieldKey.trim() || !newFieldLabel.trim()) return;
+    setCreatingField(true);
+    setNewFieldError(null);
+    try {
+      const created = await api.createFieldDefinition(tenantId, {
+        fieldKey: newFieldKey.trim(),
+        label: newFieldLabel.trim(),
+        valueType: newFieldType,
+      });
+      setFieldDefinitions((prev) => [...prev, created]);
+      setMilestones((prev) => {
+        const next = [...prev];
+        const row = next[i]!;
+        next[i] = { ...row, captureFields: [...row.captureFields, created.fieldKey] };
+        return next;
+      });
+      setNewFieldRow(null);
+      setNewFieldKey("");
+      setNewFieldLabel("");
+      setNewFieldType("text");
+    } catch (err) {
+      setNewFieldError(err instanceof Error ? err.message : "Failed to create field");
+    } finally {
+      setCreatingField(false);
     }
   }
 
@@ -377,41 +445,89 @@ export function CampaignEditor({
       <div className="field-group">
         <h4>Milestones (conversation goals, in order)</h4>
         {milestones.map((m, i) => (
-          <div key={i} className="milestone-row">
-            <input
-              type="text"
-              placeholder={`Goal ${i + 1}, e.g. "capture their email"`}
-              value={m.goalDescription}
-              onChange={(e) => {
-                const next = [...milestones];
-                next[i] = { ...next[i]!, goalDescription: e.target.value };
-                setMilestones(next);
-              }}
-            />
-            <input
-              type="text"
-              placeholder="capture field (optional, e.g. email)"
-              value={m.captureField}
-              onChange={(e) => {
-                const next = [...milestones];
-                next[i] = { ...next[i]!, captureField: e.target.value };
-                setMilestones(next);
-              }}
-            />
-            <button
-              type="button"
-              className="btn-secondary btn-small"
-              onClick={() => setMilestones(milestones.filter((_, idx) => idx !== i))}
-              disabled={milestones.length === 1}
-            >
-              Remove
-            </button>
+          <div key={i} style={{ marginBottom: "0.75rem" }}>
+            <div className="milestone-row">
+              <input
+                type="text"
+                placeholder={`Goal ${i + 1}, e.g. "capture their email"`}
+                value={m.goalDescription}
+                onChange={(e) => {
+                  const next = [...milestones];
+                  next[i] = { ...next[i]!, goalDescription: e.target.value };
+                  setMilestones(next);
+                }}
+              />
+              <select
+                multiple
+                value={m.captureFields}
+                size={Math.min(4, Math.max(2, fieldDefinitions.length))}
+                style={{ flex: 1 }}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                  const next = [...milestones];
+                  next[i] = { ...next[i]!, captureFields: selected };
+                  setMilestones(next);
+                }}
+              >
+                {fieldDefinitions.map((fd) => (
+                  <option key={fd.fieldKey} value={fd.fieldKey}>
+                    {fd.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-secondary btn-small"
+                onClick={() => toggleNewFieldRow(i)}
+              >
+                {newFieldRow === i ? "Cancel" : "+ New field"}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-small"
+                onClick={() => setMilestones(milestones.filter((_, idx) => idx !== i))}
+                disabled={milestones.length === 1}
+              >
+                Remove
+              </button>
+            </div>
+            {newFieldRow === i && (
+              <form onSubmit={(e) => createFieldForRow(i, e)} className="inline-form">
+                <input
+                  type="text"
+                  placeholder="Key, e.g. email"
+                  value={newFieldKey}
+                  onChange={(e) => setNewFieldKey(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Label, e.g. Email address"
+                  value={newFieldLabel}
+                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                />
+                <select value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDefinitionValueType)}>
+                  {VALUE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="btn-primary btn-small"
+                  disabled={!newFieldKey.trim() || !newFieldLabel.trim() || creatingField}
+                >
+                  {creatingField ? "Adding…" : "Add field"}
+                </button>
+              </form>
+            )}
+            {newFieldRow === i && newFieldError && <div className="banner banner-error">{newFieldError}</div>}
           </div>
         ))}
         <button
           type="button"
           className="btn-secondary btn-small"
-          onClick={() => setMilestones([...milestones, { goalDescription: "", captureField: "" }])}
+          onClick={() => setMilestones([...milestones, { goalDescription: "", captureFields: [] }])}
         >
           Add milestone
         </button>

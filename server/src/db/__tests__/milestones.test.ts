@@ -33,9 +33,9 @@ describe("milestones and captured facts", () => {
     const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
 
     await setCampaignMilestones(pool, tenant.id, campaign.id, [
-      { goalDescription: "capture email", captureField: "email" },
+      { goalDescription: "capture email", captureFields: ["email"] },
       { goalDescription: "send pricing" },
-      { goalDescription: "book a call", captureField: "preferredTime" },
+      { goalDescription: "book a call", captureFields: ["preferredTime"] },
     ]);
 
     const milestones = await listMilestones(pool, tenant.id, campaign.id);
@@ -164,21 +164,45 @@ describe("milestones and captured facts", () => {
 
       await expect(
         setCampaignMilestones(pool, tenant.id, campaign.id, [
-          { goalDescription: "capture email", captureField: "email address; DROP TABLE leads" },
+          { goalDescription: "capture email", captureFields: ["email address; DROP TABLE leads"] },
         ]),
       ).rejects.toThrow();
     });
 
-    it("accepts an ordinary goal description and captureField", async () => {
+    it("rejects a milestone requesting more than the max captureFields", async () => {
       const pool = getPool();
       const tenant = await createTenant(pool, "creator-a");
       const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
 
       await expect(
         setCampaignMilestones(pool, tenant.id, campaign.id, [
-          { goalDescription: "capture email", captureField: "email" },
+          { goalDescription: "capture everything", captureFields: ["a", "b", "c", "d", "e"] },
+        ]),
+      ).rejects.toThrow();
+    });
+
+    it("accepts an ordinary goal description and captureFields", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      await expect(
+        setCampaignMilestones(pool, tenant.id, campaign.id, [
+          { goalDescription: "capture email", captureFields: ["email"] },
         ]),
       ).resolves.toBeTruthy();
+    });
+
+    it("accepts a milestone that captures multiple fields at once", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+
+      const [milestone] = await setCampaignMilestones(pool, tenant.id, campaign.id, [
+        { goalDescription: "capture email and phone", captureFields: ["email", "phone"] },
+      ]);
+
+      expect(milestone!.captureFields).toEqual(["email", "phone"]);
     });
   });
 });

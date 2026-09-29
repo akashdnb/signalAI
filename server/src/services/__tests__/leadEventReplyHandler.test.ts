@@ -142,15 +142,15 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const tenant = await createTenant(pool, "creator-a");
     const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
     await setCampaignMilestones(pool, tenant.id, campaign.id, [
-      { goalDescription: "capture email", captureField: "email" },
+      { goalDescription: "capture email", captureFields: ["email"] },
       { goalDescription: "send pricing" },
-      { goalDescription: "book a call", captureField: "preferredTime" },
+      { goalDescription: "book a call", captureFields: ["preferredTime"] },
     ]);
 
     const provider = mockProvider([
-      JSON.stringify({ reply: "Thanks! Got your email.", milestone_satisfied: true, captured_value: "a@b.com" }),
+      JSON.stringify({ reply: "Thanks! Got your email.", milestone_satisfied: true, captured_values: { email: "a@b.com" } }),
       JSON.stringify({ reply: "Here is our pricing.", milestone_satisfied: true }),
-      JSON.stringify({ reply: "Booked for 3pm!", milestone_satisfied: true, captured_value: "3pm" }),
+      JSON.stringify({ reply: "Booked for 3pm!", milestone_satisfied: true, captured_values: { preferredTime: "3pm" } }),
     ]);
     const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
@@ -186,7 +186,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
-    await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "capture email", captureField: "email" }]);
+    await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "capture email", captureFields: ["email"] }]);
 
     const provider = mockProvider([
       JSON.stringify({ reply: "Could you share your email?", milestone_satisfied: false }),
@@ -383,12 +383,12 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const tenant = await createTenant(pool, "creator-a");
     const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"], { replyMode: "ai_generated" });
     await setCampaignMilestones(pool, tenant.id, campaign.id, [
-      { goalDescription: "capture email", captureField: "email" },
+      { goalDescription: "capture email", captureFields: ["email"] },
       { goalDescription: "send pricing" },
     ]);
 
     const provider = mockProvider([
-      JSON.stringify({ reply: "Thanks! Got your email.", milestone_satisfied: true, captured_value: "a@b.com" }),
+      JSON.stringify({ reply: "Thanks! Got your email.", milestone_satisfied: true, captured_values: { email: "a@b.com" } }),
     ]);
     const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
     vi.mocked(sendInstagramMessage).mockRejectedValueOnce(new Error("Instagram send failed: 500"));

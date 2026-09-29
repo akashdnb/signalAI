@@ -3,6 +3,7 @@ import { ConnectPage } from "./pages/ConnectPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LoginPage } from "./pages/LoginPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { loadSession } from "./api";
 
 function HomeRedirect() {
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/connect" element={<ConnectPage />} />
       <Route path="/dashboard/:tenantId" element={<DashboardPage />} />
+      <Route path="/dashboard/:tenantId/settings" element={<SettingsPage />} />
       <Route path="/dashboard/:tenantId/leads/:leadId" element={<LeadDetailPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

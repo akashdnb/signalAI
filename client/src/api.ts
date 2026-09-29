@@ -187,7 +187,19 @@ export interface Milestone {
   campaignId: string;
   ordinal: number;
   goalDescription: string;
-  captureField: string | null;
+  captureFields: string[];
+}
+
+export type FieldDefinitionValueType = "email" | "phone" | "country" | "number" | "date" | "text";
+
+export interface FieldDefinition {
+  id: string;
+  tenantId: string;
+  fieldKey: string;
+  label: string;
+  valueType: FieldDefinitionValueType;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type PipelineStage = "new" | "contacted" | "qualified" | "meeting_scheduled" | "won" | "lost";
@@ -475,7 +487,7 @@ export const api = {
 
   listMilestones: (tenantId: string, campaignId: string) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`),
-  setMilestones: (tenantId: string, campaignId: string, milestones: Array<{ goalDescription: string; captureField?: string }>) =>
+  setMilestones: (tenantId: string, campaignId: string, milestones: Array<{ goalDescription: string; captureFields?: string[] }>) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`, {
       method: "PUT",
       body: JSON.stringify({ milestones }),
@@ -511,4 +523,21 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(updates),
     }).then((r) => r.config),
+
+  listFieldDefinitions: (tenantId: string) =>
+    request<{ fieldDefinitions: FieldDefinition[] }>(`/tenants/${tenantId}/field-definitions`).then(
+      (r) => r.fieldDefinitions,
+    ),
+  createFieldDefinition: (tenantId: string, input: { fieldKey: string; label: string; valueType: FieldDefinitionValueType }) =>
+    request<{ fieldDefinition: FieldDefinition }>(`/tenants/${tenantId}/field-definitions`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }).then((r) => r.fieldDefinition),
+  updateFieldDefinition: (tenantId: string, id: string, updates: { label?: string; valueType?: FieldDefinitionValueType }) =>
+    request<{ fieldDefinition: FieldDefinition }>(`/tenants/${tenantId}/field-definitions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }).then((r) => r.fieldDefinition),
+  deleteFieldDefinition: (tenantId: string, id: string) =>
+    request<void>(`/tenants/${tenantId}/field-definitions/${id}`, { method: "DELETE" }),
 };

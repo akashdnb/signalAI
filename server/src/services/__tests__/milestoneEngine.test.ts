@@ -22,7 +22,7 @@ function makeMilestone(overrides: Partial<Milestone> = {}): Milestone {
     campaignId: "c1",
     ordinal: 0,
     goalDescription: "capture email",
-    captureField: "email",
+    captureFields: ["email"],
     ...overrides,
   };
 }
@@ -34,8 +34,8 @@ function mockProvider(impl: LLMProvider["generateReply"]): LLMProvider {
 describe("runMilestoneCheck", () => {
   it("parses structured output and reports satisfaction with the captured value", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue({ text: 
-        JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_value: "a@b.com" }),
+      vi.fn().mockResolvedValue({ text:
+        JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_values: { email: "a@b.com" } }),
        }),
     );
 
@@ -44,19 +44,19 @@ describe("runMilestoneCheck", () => {
       provider,
     );
 
-    expect(result).toEqual({ reply: "Great, got it!", satisfied: true, capturedValue: "a@b.com" });
+    expect(result).toEqual({ reply: "Great, got it!", satisfied: true, capturedValues: { email: "a@b.com" } });
   });
 
-  it("does not report a captured value for a milestone with no captureField, even if the model returns one", async () => {
+  it("does not report a captured value for a milestone with no captureFields, even if the model returns one", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue({ text: 
-        JSON.stringify({ reply: "Sounds good", milestone_satisfied: true, captured_value: "should be ignored" }),
+      vi.fn().mockResolvedValue({ text:
+        JSON.stringify({ reply: "Sounds good", milestone_satisfied: true, captured_values: { email: "should be ignored" } }),
        }),
     );
 
     const result = await runMilestoneCheck(
       {
-        milestone: makeMilestone({ captureField: null, goalDescription: "acknowledge pricing" }),
+        milestone: makeMilestone({ captureFields: [], goalDescription: "acknowledge pricing" }),
         capturedFactsSoFar: {},
         sourceText: "ok thanks",
         tier: "comment",
@@ -64,7 +64,103 @@ describe("runMilestoneCheck", () => {
       provider,
     );
 
-    expect(result.capturedValue).toBeUndefined();
+    expect(result.capturedValues).toBeUndefined();
+  });
+
+  it("advances in one turn when the user's message satisfies multiple requested fields at once", async () => {
+    const provider = mockProvider(
+      vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          reply: "Got both, thanks!",
+          milestone_satisfied: true,
+          captured_values: { email: "a@b.com", phone: "+1 555 123 4567" },
+        }),
+      }),
+    );
+
+    const result = await runMilestoneCheck(
+      {
+        milestone: makeMilestone({ goalDescription: "capture email and phone", captureFields: ["email", "phone"] }),
+        capturedFactsSoFar: {},
+        sourceText: "a@b.com, +1 555 123 4567",
+        tier: "comment",
+      },
+      provider,
+    );
+
+    expect(result.satisfied).toBe(true);
+    expect(result.capturedValues).toEqual({ email: "a@b.com", phone: "+1 555 123 4567" });
+  });
+
+  it("does not advance a multi-field milestone when only some requested fields are captured this turn", async () => {
+    const provider = mockProvider(
+      vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          reply: "Thanks! And what's the best phone number to reach you at?",
+          milestone_satisfied: true, // model can claim satisfied; code must still gate on all fields being known
+          captured_values: { email: "a@b.com" },
+        }),
+      }),
+    );
+
+    const result = await runMilestoneCheck(
+      {
+        milestone: makeMilestone({ goalDescription: "capture email and phone", captureFields: ["email", "phone"] }),
+        capturedFactsSoFar: {},
+        sourceText: "a@b.com",
+        tier: "comment",
+      },
+      provider,
+    );
+
+    expect(result.satisfied).toBe(false); // phone still missing
+    expect(result.capturedValues).toEqual({ email: "a@b.com" }); // but what WAS given is still persisted
+  });
+
+  it("advances a multi-field milestone once the remaining field is captured on a later turn", async () => {
+    const provider = mockProvider(
+      vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          reply: "Perfect, got it all!",
+          milestone_satisfied: true,
+          captured_values: { phone: "+1 555 123 4567" },
+        }),
+      }),
+    );
+
+    const result = await runMilestoneCheck(
+      {
+        milestone: makeMilestone({ goalDescription: "capture email and phone", captureFields: ["email", "phone"] }),
+        capturedFactsSoFar: { email: "a@b.com" }, // captured on a prior, already-committed turn
+        sourceText: "+1 555 123 4567",
+        tier: "comment",
+      },
+      provider,
+    );
+
+    expect(result.satisfied).toBe(true);
+    expect(result.capturedValues).toEqual({ phone: "+1 555 123 4567" });
+  });
+
+  it("only asks about still-missing fields in the prompt, never one already captured", async () => {
+    const generateReplyMock = vi
+      .fn()
+      .mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
+    const provider = mockProvider(generateReplyMock);
+
+    await runMilestoneCheck(
+      {
+        milestone: makeMilestone({ goalDescription: "capture email and phone", captureFields: ["email", "phone"] }),
+        capturedFactsSoFar: { email: "a@b.com" },
+        sourceText: "hi",
+        tier: "comment",
+      },
+      provider,
+    );
+
+    const prompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+    expect(prompt).toContain("phone");
+    expect(prompt).not.toMatch(/still-needed fields[^.]*email/);
   });
 
   it("handles the model wrapping JSON in prose despite instructions", async () => {
@@ -229,7 +325,7 @@ describe("runMilestoneCheck", () => {
 
     await runMilestoneCheck(
       {
-        milestone: makeMilestone({ goalDescription: "get budget", captureField: "budget" }),
+        milestone: makeMilestone({ goalDescription: "get budget", captureFields: ["budget"] }),
         capturedFactsSoFar: { email: "a@b.com" },
         sourceText: "hi",
         tier: "comment",
@@ -260,48 +356,48 @@ describe("runMilestoneCheck", () => {
     expect(safetyIndex).toBeGreaterThan(goalIndex);
   });
 
-  // R3-04 regression: a captureField milestone advancing with no captured
+  // R3-04 regression: a captureFields milestone advancing with no captured
   // value at all used to claim a fact it didn't hold.
-  it("does not advance when the model says satisfied but returns no captured_value for a captureField milestone", async () => {
+  it("does not advance when the model says satisfied but returns no captured_values for a captureFields milestone", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true }) }), // no captured_value
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true }) }), // no captured_values
     );
 
     const result = await runMilestoneCheck(
-      { milestone: makeMilestone({ captureField: "email" }), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
+      { milestone: makeMilestone({ captureFields: ["email"] }), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
       provider,
     );
 
     expect(result.satisfied).toBe(false);
-    expect(result.capturedValue).toBeUndefined();
+    expect(result.capturedValues).toBeUndefined();
   });
 
-  // R3-05 regression: captured_value used to be stored as whatever string
-  // the model returned, with no check against the field it claims to be.
-  it("does not advance when captured_value doesn't validate against an email-shaped field", async () => {
+  // R3-05 regression: captured values used to be stored as whatever string
+  // the model returned, with no check against the field they claim to be.
+  it("does not advance when captured_values doesn't validate against an email-shaped field", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue({ text: 
-        JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "I'd rather not say" }),
+      vi.fn().mockResolvedValue({ text:
+        JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { email: "I'd rather not say" } }),
        }),
     );
 
     const result = await runMilestoneCheck(
-      { milestone: makeMilestone({ captureField: "email" }), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
+      { milestone: makeMilestone({ captureFields: ["email"] }), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
       provider,
     );
 
     expect(result.satisfied).toBe(false);
-    expect(result.capturedValue).toBeUndefined();
+    expect(result.capturedValues).toBeUndefined();
   });
 
-  it("does not advance when a non-email/phone field's captured_value is a bare refusal phrase", async () => {
+  it("does not advance when a non-email/phone field's captured value is a bare refusal phrase", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "none" }) }),
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { budget: "none" } }) }),
     );
 
     const result = await runMilestoneCheck(
       {
-        milestone: makeMilestone({ goalDescription: "get budget", captureField: "budget" }),
+        milestone: makeMilestone({ goalDescription: "get budget", captureFields: ["budget"] }),
         capturedFactsSoFar: {},
         sourceText: "hi",
         tier: "comment",
@@ -312,14 +408,14 @@ describe("runMilestoneCheck", () => {
     expect(result.satisfied).toBe(false);
   });
 
-  it("advances when a non-email/phone field's captured_value is a real answer", async () => {
+  it("advances when a non-email/phone field's captured value is a real answer", async () => {
     const provider = mockProvider(
-      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_value: "$500" }) }),
+      vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { budget: "$500" } }) }),
     );
 
     const result = await runMilestoneCheck(
       {
-        milestone: makeMilestone({ goalDescription: "get budget", captureField: "budget" }),
+        milestone: makeMilestone({ goalDescription: "get budget", captureFields: ["budget"] }),
         capturedFactsSoFar: {},
         sourceText: "hi",
         tier: "comment",
@@ -328,7 +424,7 @@ describe("runMilestoneCheck", () => {
     );
 
     expect(result.satisfied).toBe(true);
-    expect(result.capturedValue).toBe("$500");
+    expect(result.capturedValues).toEqual({ budget: "$500" });
   });
 
   // R3-09 regression: the old /\{[\s\S]*\}/ was greedy end-to-end and
@@ -370,7 +466,7 @@ describe("runMilestoneCheck", () => {
 
     it("calls the provider normally when the guard allows it", async () => {
       const provider = mockProvider(
-        vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_value: "a@b.com" }) }),
+        vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "Great, got it!", milestone_satisfied: true, captured_values: { email: "a@b.com" } }) }),
       );
 
       const result = await runMilestoneCheck(
@@ -457,6 +553,148 @@ describe("runMilestoneCheck", () => {
 
       expect(result.requiresHumanHandoff).toBe(true);
       expect(generateReplyMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // Workstream 2 Field Definitions registry: a registered valueType drives
+  // validation instead of the field-name substring guess. The observable
+  // behavior change is clearest for number/date, where the old heuristic
+  // (neither name contains "email"/"phone") fell through to the bare
+  // refusal-phrase check and accepted anything non-refusal.
+  describe("Field Definitions registry (isValidCapturedValue)", () => {
+    it("rejects a non-numeric value for a field registered as 'number', which the old heuristic would have accepted", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { budget: "not a number" } }),
+        }),
+      );
+
+      const result = await runMilestoneCheck(
+        {
+          milestone: makeMilestone({ goalDescription: "get budget", captureFields: ["budget"] }),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          fieldDefinitions: { budget: "number" },
+        },
+        provider,
+      );
+
+      expect(result.satisfied).toBe(false);
+      expect(result.capturedValues).toBeUndefined();
+    });
+
+    it("accepts a numeric value for a field registered as 'number'", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { budget: "42" } }),
+        }),
+      );
+
+      const result = await runMilestoneCheck(
+        {
+          milestone: makeMilestone({ goalDescription: "get budget", captureFields: ["budget"] }),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          fieldDefinitions: { budget: "number" },
+        },
+        provider,
+      );
+
+      expect(result.satisfied).toBe(true);
+      expect(result.capturedValues).toEqual({ budget: "42" });
+    });
+
+    it("rejects an unparseable date for a field registered as 'date'", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { preferredDate: "whenever" } }),
+        }),
+      );
+
+      const result = await runMilestoneCheck(
+        {
+          milestone: makeMilestone({ goalDescription: "book a call", captureFields: ["preferredDate"] }),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          fieldDefinitions: { preferredDate: "date" },
+        },
+        provider,
+      );
+
+      expect(result.satisfied).toBe(false);
+      expect(result.capturedValues).toBeUndefined();
+    });
+
+    it("accepts a parseable date for a field registered as 'date'", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { preferredDate: "2026-10-01" } }),
+        }),
+      );
+
+      const result = await runMilestoneCheck(
+        {
+          milestone: makeMilestone({ goalDescription: "book a call", captureFields: ["preferredDate"] }),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          fieldDefinitions: { preferredDate: "date" },
+        },
+        provider,
+      );
+
+      expect(result.satisfied).toBe(true);
+      expect(result.capturedValues).toEqual({ preferredDate: "2026-10-01" });
+    });
+
+    it("still accepts a plausible value for a registered 'country' field (no strict format check, same as the fallback)", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { user_country: "France" } }),
+        }),
+      );
+
+      const result = await runMilestoneCheck(
+        {
+          milestone: makeMilestone({ goalDescription: "get country", captureFields: ["user_country"] }),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          fieldDefinitions: { user_country: "country" },
+        },
+        provider,
+      );
+
+      expect(result.satisfied).toBe(true);
+      expect(result.capturedValues).toEqual({ user_country: "France" });
+    });
+
+    it("falls back to the pre-registry name-substring heuristic when the field isn't in fieldDefinitions", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "ok", milestone_satisfied: true, captured_values: { budget: "not a number" } }),
+        }),
+      );
+
+      const result = await runMilestoneCheck(
+        {
+          milestone: makeMilestone({ goalDescription: "get budget", captureFields: ["budget"] }),
+          capturedFactsSoFar: {},
+          sourceText: "hi",
+          tier: "comment",
+          fieldDefinitions: { user_country: "country" }, // present, but doesn't cover "budget"
+        },
+        provider,
+      );
+
+      // "budget" contains neither "email" nor "phone", so it falls through
+      // to the bare refusal-phrase check — "not a number" isn't a refusal
+      // phrase, so it's accepted exactly like the no-registry behavior.
+      expect(result.satisfied).toBe(true);
+      expect(result.capturedValues).toEqual({ budget: "not a number" });
     });
   });
 });

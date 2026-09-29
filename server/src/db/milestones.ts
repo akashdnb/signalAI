@@ -3,16 +3,21 @@ import { classifyInput } from "../lib/guardrails.js";
 
 const MAX_GOAL_DESCRIPTION_LENGTH = 200;
 const MAX_CAPTURE_FIELD_LENGTH = 50;
+// A milestone that captures too many fields at once stops being "a short
+// conversational ask" and starts being a form — defeats the whole point of
+// multi-field capture, which is to shorten the conversation, not just move
+// the same amount of asking into one denser message.
+const MAX_CAPTURE_FIELDS_PER_MILESTONE = 4;
 
 /**
- * R3-03 fix, write-time half: goalDescription/captureField are tenant-
+ * R3-03 fix, write-time half: goalDescription/captureFields are tenant-
  * authored and land in the LLM's instruction channel (see
  * milestoneEngine.ts's buildSystemPrompt). Rejecting obviously
  * instruction-shaped text here — reusing classifyInput, since the risk is
  * identical to what it already detects in end-user messages — is cheaper
  * now than after campaigns with bad goal text exist.
  */
-function validateMilestoneInput(goalDescription: string, captureField?: string): void {
+function validateMilestoneInput(goalDescription: string, captureFields?: string[]): void {
   if (!goalDescription.trim()) {
     throw new Error("goalDescription must not be empty");
   }
@@ -26,9 +31,14 @@ function validateMilestoneInput(goalDescription: string, captureField?: string):
     throw new Error("goalDescription looks like an attempt to inject instructions, not a goal description");
   }
 
-  if (captureField !== undefined) {
-    if (!/^[a-zA-Z0-9_]{1,50}$/.test(captureField) || captureField.length > MAX_CAPTURE_FIELD_LENGTH) {
-      throw new Error("captureField must be a short identifier (letters, digits, underscore only)");
+  if (captureFields !== undefined) {
+    if (captureFields.length > MAX_CAPTURE_FIELDS_PER_MILESTONE) {
+      throw new Error(`a milestone may capture at most ${MAX_CAPTURE_FIELDS_PER_MILESTONE} fields`);
+    }
+    for (const field of captureFields) {
+      if (!/^[a-zA-Z0-9_]{1,50}$/.test(field) || field.length > MAX_CAPTURE_FIELD_LENGTH) {
+        throw new Error("each captureField must be a short identifier (letters, digits, underscore only)");
+      }
     }
   }
 }
@@ -39,7 +49,7 @@ export interface Milestone {
   campaignId: string;
   ordinal: number;
   goalDescription: string;
-  captureField: string | null;
+  captureFields: string[];
 }
 
 interface MilestoneRow {
@@ -48,7 +58,7 @@ interface MilestoneRow {
   campaign_id: string;
   ordinal: number;
   goal_description: string;
-  capture_field: string | null;
+  capture_fields: string[];
 }
 
 function toMilestone(row: MilestoneRow): Milestone {
@@ -58,7 +68,7 @@ function toMilestone(row: MilestoneRow): Milestone {
     campaignId: row.campaign_id,
     ordinal: row.ordinal,
     goalDescription: row.goal_description,
-    captureField: row.capture_field,
+    captureFields: row.capture_fields,
   };
 }
 
@@ -72,7 +82,7 @@ export async function setCampaignMilestones(
   pool: Pool,
   tenantId: string,
   campaignId: string,
-  milestones: Array<{ goalDescription: string; captureField?: string }>,
+  milestones: Array<{ goalDescription: string; captureFields?: string[] }>,
 ): Promise<Milestone[]> {
   const client = await pool.connect();
   try {
@@ -85,11 +95,11 @@ export async function setCampaignMilestones(
     const inserted: MilestoneRow[] = [];
     for (let i = 0; i < milestones.length; i++) {
       const m = milestones[i]!;
-      validateMilestoneInput(m.goalDescription, m.captureField);
+      validateMilestoneInput(m.goalDescription, m.captureFields);
       const result = await client.query<MilestoneRow>(
-        `insert into campaign_milestones (tenant_id, campaign_id, ordinal, goal_description, capture_field)
+        `insert into campaign_milestones (tenant_id, campaign_id, ordinal, goal_description, capture_fields)
          values ($1, $2, $3, $4, $5) returning *`,
-        [tenantId, campaignId, i, m.goalDescription, m.captureField ?? null],
+        [tenantId, campaignId, i, m.goalDescription, m.captureFields ?? []],
       );
       inserted.push(result.rows[0]!);
     }
