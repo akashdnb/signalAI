@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
+import { insertEventIdempotent } from "../../db/events.js";
+import { insertPii } from "../../db/pii.js";
 import { mergeCapturedFacts } from "../../db/capturedFacts.js";
 import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
@@ -50,6 +52,32 @@ describe("leads routes (Phase 2A)", () => {
     const res = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}`).set(authHeader);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ id: lead.id, pipelineStage: "new", handoffStatus: "ai", ownerUserId: null });
+  });
+
+  it("GET a lead's detail includes username from lead_pii, and null when the lead has none yet", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const dmOnlyLead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-dm-only");
+    const noUsername = await request(app).get(`/tenants/${tenant.id}/leads/${dmOnlyLead.id}`).set(authHeader);
+    expect(noUsername.status).toBe(200);
+    expect(noUsername.body.username).toBeNull();
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    const event = await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-username",
+      eventType: "comment",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
+    await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, username: "real_handle" });
+
+    const res = await request(app).get(`/tenants/${tenant.id}/leads/${lead.id}`).set(authHeader);
+    expect(res.status).toBe(200);
+    expect(res.body.username).toBe("real_handle");
   });
 
   it("404s a lead detail request for a lead in a different tenant", async () => {

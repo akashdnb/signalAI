@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import {
   getLead,
+  getLatestUsernameForLead,
   updatePipelineStage,
   assignLeadOwner,
   updateHandoffStatus,
@@ -32,9 +33,11 @@ leadsRouter.use("/tenants/:tenantId", requireTenantSession);
 // lead beyond what the list already shows.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId", async (req, res) => {
   const { tenantId, leadId } = req.params;
-  const lead = await getLead(getPool(), tenantId, leadId);
+  const pool = getPool();
+  const lead = await getLead(pool, tenantId, leadId);
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
-  return res.status(200).json(lead);
+  const username = await getLatestUsernameForLead(pool, leadId);
+  return res.status(200).json({ ...lead, username });
 });
 
 const TIMELINE_DEFAULT_PAGE_SIZE = 50;

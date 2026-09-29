@@ -111,6 +111,25 @@ export async function getLead(pool: Queryable, tenantId: string, leadId: string)
   return result.rows[0] ? toLead(result.rows[0]) : null;
 }
 
+/**
+ * `Lead`/`getLead` above carry no username — it lives in `lead_pii`, not
+ * `leads`, and every OTHER caller of `getLead` (pipeline/handoff updates,
+ * webhook ingestion, etc.) is an internal write path that has no use for
+ * it, so it's kept off the shared type rather than joining it on every
+ * call. Only the single-lead GET route needs it (for the Lead Detail
+ * page's title) — same lateral-join shape `listLeadsForTenant` already
+ * uses for the leads list, just scoped to one lead.
+ */
+export async function getLatestUsernameForLead(pool: Queryable, leadId: string): Promise<string | null> {
+  const result = await pool.query<{ username: string | null }>(
+    `select username from lead_pii
+     where lead_id = $1 and deleted_at is null and username is not null
+     order by created_at desc limit 1`,
+    [leadId],
+  );
+  return result.rows[0]?.username ?? null;
+}
+
 const PIPELINE_STAGE_LABEL: Record<PipelineStage, string> = {
   new: "New",
   contacted: "Contacted",
