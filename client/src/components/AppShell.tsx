@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, clearSession, loadSession, type TenantSummary } from "../api";
 import { TenantContext } from "../context/TenantContext";
+import { OnboardingWizard } from "./OnboardingWizard";
 import {
   AnalyticsIcon,
   AutomationIcon,
@@ -75,6 +76,14 @@ export function AppShell() {
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Onboarding wizard (R5): latched open once industry flips from null to
+  // set (step 2 of the wizard), so the user stays on step 3 (knowledge
+  // base) rather than the wizard vanishing the instant tenant.industry
+  // becomes non-null. Only "Finish" (or a page reload, since this is
+  // local-only state) ends it — see AppShell/OnboardingWizard's shared
+  // doc comment in the R5 plan for why a reload mid-wizard is an accepted
+  // simplification rather than a persisted step field.
+  const [wizardLatchedOpen, setWizardLatchedOpen] = useState(false);
   const session = loadSession();
   const sessionValid = Boolean(tenantId && session && session.tenantId === tenantId);
 
@@ -111,6 +120,8 @@ export function AppShell() {
   }
 
   if (!tenantId || !sessionValid) return null;
+
+  const showWizard = Boolean(tenant) && (tenant!.industry === null || wizardLatchedOpen);
 
   return (
     <div className="flex min-h-screen bg-canvas text-ink">
@@ -175,7 +186,18 @@ export function AppShell() {
             </div>
           )}
           <TenantContext.Provider value={{ tenant, error: tenantError, reload: reloadTenant }}>
-            <Outlet />
+            {showWizard ? (
+              <OnboardingWizard
+                tenantId={tenantId}
+                onIndustryApplied={(updated) => {
+                  setTenant(updated);
+                  setWizardLatchedOpen(true);
+                }}
+                onFinish={() => setWizardLatchedOpen(false)}
+              />
+            ) : (
+              <Outlet />
+            )}
           </TenantContext.Provider>
         </main>
       </div>

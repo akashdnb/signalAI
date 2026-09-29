@@ -5,6 +5,9 @@ import type { PlanTier } from "../lib/planTiers.js";
 
 export type BillingStatus = "none" | "active" | "canceled";
 
+/** Onboarding wizard (R5): the vertical a tenant picked. null = hasn't gone through the wizard yet — 'other' is a real, explicit choice, not the same as unset. */
+export type TenantIndustry = "real_estate" | "ecommerce" | "education" | "creator" | "coach" | "agency" | "other";
+
 export interface Tenant {
   id: string;
   name: string;
@@ -15,6 +18,7 @@ export interface Tenant {
   planTier: PlanTier;
   trialStartedAt: Date | null;
   trialEndsAt: Date | null;
+  industry: TenantIndustry | null;
   createdAt: Date;
 }
 
@@ -28,6 +32,7 @@ interface TenantRow {
   plan_tier: PlanTier;
   trial_started_at: Date | null;
   trial_ends_at: Date | null;
+  industry: TenantIndustry | null;
   created_at: Date;
 }
 
@@ -42,6 +47,7 @@ function toTenant(row: TenantRow): Tenant {
     planTier: row.plan_tier,
     trialStartedAt: row.trial_started_at,
     trialEndsAt: row.trial_ends_at,
+    industry: row.industry,
     createdAt: row.created_at,
   };
 }
@@ -139,4 +145,10 @@ export async function setPlanTier(pool: Pool, tenantId: string, planTier: PlanTi
  */
 export async function endTrialImmediately(pool: Pool, tenantId: string): Promise<void> {
   await pool.query(`update tenants set trial_ends_at = now() where id = $1 and plan_tier = 'trial'`, [tenantId]);
+}
+
+/** Onboarding wizard (R5): persists the tenant's chosen vertical — 'other' included, since declining a real industry is still a real, recorded choice (see TenantIndustry's doc comment). */
+export async function setTenantIndustry(pool: Pool, tenantId: string, industry: TenantIndustry): Promise<Tenant | null> {
+  const result = await pool.query<TenantRow>(`update tenants set industry = $2 where id = $1 returning *`, [tenantId, industry]);
+  return result.rows[0] ? toTenant(result.rows[0]) : null;
 }

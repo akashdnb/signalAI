@@ -13,6 +13,7 @@ import { leadsRouter } from "./routes/leads.js";
 import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
 import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
 import { fieldDefinitionsRouter } from "./routes/fieldDefinitions.js";
+import { onboardingRouter } from "./routes/onboarding.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
 
@@ -83,6 +84,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);
   app.use(fieldDefinitionsRouter);
+  app.use(onboardingRouter);
 
   return app;
 }

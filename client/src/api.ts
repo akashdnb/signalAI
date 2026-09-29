@@ -137,10 +137,24 @@ export async function verifyOtp(email: string, code: string): Promise<Session> {
   return request<Session>("/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) });
 }
 
+/** Onboarding wizard (R5): the vertical a tenant picked. null = hasn't gone through the wizard yet — 'other' is a real, explicit choice, not the same as unset. */
+export type TenantIndustry = "real_estate" | "ecommerce" | "education" | "creator" | "coach" | "agency" | "other";
+
+export const INDUSTRY_LABEL: Record<TenantIndustry, string> = {
+  real_estate: "Real Estate",
+  ecommerce: "E-commerce",
+  education: "Education",
+  creator: "Creator",
+  coach: "Coach",
+  agency: "Agency",
+  other: "Other",
+};
+
 export interface TenantSummary {
   id: string;
   name: string;
   billingStatus: "none" | "active" | "canceled";
+  industry: TenantIndustry | null;
 }
 
 export interface AccountHealth {
@@ -412,6 +426,11 @@ export interface GuardrailsConfig {
 
 export const api = {
   getTenant: (tenantId: string) => request<TenantSummary>(`/tenants/${tenantId}`),
+  applyIndustry: (tenantId: string, industry: TenantIndustry) =>
+    request<TenantSummary>(`/tenants/${tenantId}/onboarding/apply-industry`, {
+      method: "POST",
+      body: JSON.stringify({ industry }),
+    }),
   // Identity Refactor U4/U6: connecting Instagram is authenticated (the
   // caller's session must be a member of tenantId) and is reached via a
   // top-level navigation, which can't carry an Authorization header — this

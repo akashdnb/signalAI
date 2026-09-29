@@ -46,7 +46,7 @@ export function dashboardRouter(
   router.get("/tenants/:tenantId", async (req, res) => {
     const tenant = await getTenant(getPool(), req.params.tenantId);
     if (!tenant) return res.status(404).json({ error: "tenant not found" });
-    return res.status(200).json({ id: tenant.id, name: tenant.name, billingStatus: tenant.billingStatus });
+    return res.status(200).json({ id: tenant.id, name: tenant.name, billingStatus: tenant.billingStatus, industry: tenant.industry });
   });
 
   router.get("/tenants/:tenantId/account", async (req, res) => {
