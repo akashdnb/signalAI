@@ -77,17 +77,6 @@ export function AutomationPage() {
     }
   }
 
-  async function handleToggleEnabled(campaign: Campaign) {
-    if (!tenantId) return;
-    try {
-      await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
-      await reload(selectedId ?? undefined);
-      push(campaign.enabled ? `${campaign.name} disabled` : `${campaign.name} enabled`);
-    } catch (err) {
-      push(err instanceof Error ? err.message : "Couldn't update this journey", "error");
-    }
-  }
-
   if (!tenantId) return null;
 
   return (
@@ -137,7 +126,6 @@ export function AutomationPage() {
                 search={search}
                 onSearch={setSearch}
                 onSelect={setSelectedId}
-                onToggleEnabled={handleToggleEnabled}
               />
             </div>
 

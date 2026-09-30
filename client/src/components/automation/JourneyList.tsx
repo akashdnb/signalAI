@@ -1,6 +1,5 @@
-import { useState } from "react";
 import type { Campaign } from "../../api";
-import { DotsVerticalIcon, SearchIcon } from "../icons";
+import { SearchIcon } from "../icons";
 
 /** Prefers the journey's own description; falls back to a summary derived from real trigger config for campaigns created before that field existed. */
 export function summarize(campaign: Campaign): string {
@@ -14,15 +13,11 @@ function JourneyCard({
   campaign,
   selected,
   onSelect,
-  onToggleEnabled,
 }: {
   campaign: Campaign;
   selected: boolean;
   onSelect: () => void;
-  onToggleEnabled: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <div
       role="button"
@@ -31,57 +26,19 @@ function JourneyCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onSelect();
       }}
-      className={`relative cursor-pointer rounded-xl border p-3.5 transition-colors ${
+      className={`cursor-pointer rounded-xl border p-3.5 transition-colors ${
         selected ? "border-accent bg-chip shadow-sm" : "border-line bg-card hover:border-accent-soft"
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-ink">{campaign.name}</div>
-          <div className="mt-0.5 truncate text-xs text-subtle">{summarize(campaign)}</div>
-        </div>
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            aria-label={`More actions for ${campaign.name}`}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-subtle hover:bg-card hover:text-ink"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen((v) => !v);
-            }}
-          >
-            <DotsVerticalIcon className="h-4 w-4" />
-          </button>
-          {menuOpen && (
-            <>
-              <button
-                type="button"
-                aria-label="Close menu"
-                className="fixed inset-0 z-10 cursor-default"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                }}
-              />
-              <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-line bg-card p-1 shadow-lg">
-                <button
-                  type="button"
-                  className="w-full rounded-md px-2.5 py-1.5 text-left text-xs text-ink hover:bg-chip"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(false);
-                    onToggleEnabled();
-                  }}
-                >
-                  {campaign.enabled ? "Disable" : "Enable"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-ink">{campaign.name}</div>
+        <div className="mt-0.5 truncate text-xs text-subtle">{summarize(campaign)}</div>
       </div>
 
-      <span className={`mt-2.5 inline-block ${campaign.enabled ? "pill pill-ok" : "pill"}`} style={{ marginLeft: 0 }}>
+      <span
+        className={`mt-1.5 inline-block text-[11px] ${campaign.enabled ? "pill pill-ok" : "pill"}`}
+        style={{ marginLeft: 0, padding: "0.05rem 0.5rem" }}
+      >
         <span className="mr-1">●</span>
         {campaign.enabled ? "Active" : "Inactive"}
       </span>
@@ -96,7 +53,6 @@ export function JourneyList({
   search,
   onSearch,
   onSelect,
-  onToggleEnabled,
 }: {
   campaigns: Campaign[] | null;
   totalCount: number;
@@ -104,7 +60,6 @@ export function JourneyList({
   search: string;
   onSearch: (value: string) => void;
   onSelect: (id: string) => void;
-  onToggleEnabled: (campaign: Campaign) => void;
 }) {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-line bg-card p-4">
@@ -131,13 +86,7 @@ export function JourneyList({
           <p className="muted small">No journeys match your search.</p>
         ) : (
           campaigns.map((c) => (
-            <JourneyCard
-              key={c.id}
-              campaign={c}
-              selected={c.id === selectedId}
-              onSelect={() => onSelect(c.id)}
-              onToggleEnabled={() => onToggleEnabled(c)}
-            />
+            <JourneyCard key={c.id} campaign={c} selected={c.id === selectedId} onSelect={() => onSelect(c.id)} />
           ))
         )}
       </div>
