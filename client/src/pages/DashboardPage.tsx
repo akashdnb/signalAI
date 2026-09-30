@@ -16,7 +16,7 @@ import { ConversationsChart } from "../components/ConversationsChart";
 import { LeadsByStageDonut } from "../components/LeadsByStageDonut";
 import { InboxIcon, LeadsIcon, CalendarIcon, RevenueIcon } from "../components/icons";
 import { useTenant } from "../context/TenantContext";
-import { PIPELINE_STAGES, formatRelativeTime } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, deriveDisplayName, formatRelativeTime } from "../lib/leadFormatting";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
@@ -27,14 +27,6 @@ function formatMoney(revenue: RevenueByCurrency[]): string {
   const amount = top!.total.toLocaleString();
   const primary = symbol ? `${symbol}${amount}` : `${top!.currency} ${amount}`;
   return rest.length > 0 ? `${primary} +${rest.length} more` : primary;
-}
-
-/** Derived from the account's own email, never invented — "priya.shah@x.com" -> "Priya". Falls back to "there" if no session (shouldn't happen post-AppShell guard). */
-function deriveDisplayName(email?: string): string {
-  const local = email?.split("@")[0];
-  const first = local?.split(/[._+-]/)[0];
-  if (!first) return "there";
-  return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
 function greetingForHour(hour: number): string {

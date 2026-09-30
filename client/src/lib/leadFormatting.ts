@@ -34,6 +34,14 @@ export function formatLastContactVia(lastEventType: string | null): string {
   return "—";
 }
 
+/** Derived from the account's own email, never invented — "priya.shah@x.com" -> "Priya". Falls back to "there" if no session. */
+export function deriveDisplayName(email?: string): string {
+  const local = email?.split("@")[0];
+  const first = local?.split(/[._+-]/)[0];
+  if (!first) return "there";
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
 export function handoffLabel(status: HandoffStatus): { text: string; className: string } {
   if (status === "human") return { text: "Human is replying", className: "pill pill-ok" };
   if (status === "requested") return { text: "Escalated — needs attention", className: "pill pill-error" };

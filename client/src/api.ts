@@ -538,6 +538,7 @@ export const api = {
       tone?: CampaignTone;
       language?: CampaignLanguage;
       useKnowledgeBase?: boolean;
+      keywords?: string[];
     },
   ) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, {

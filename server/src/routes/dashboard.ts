@@ -124,8 +124,15 @@ export function dashboardRouter(
 
   router.patch("/tenants/:tenantId/campaigns/:campaignId/reply-config", async (req, res) => {
     const { tenantId, campaignId } = req.params;
-    const { replyMode, ctaLink, defaultReplyTemplate, replyChannel, triggerSource, tone, language, useKnowledgeBase } = req.body ?? {};
+    const { replyMode, ctaLink, defaultReplyTemplate, replyChannel, triggerSource, tone, language, useKnowledgeBase, keywords } =
+      req.body ?? {};
 
+    if (
+      keywords !== undefined &&
+      (!Array.isArray(keywords) || keywords.length === 0 || !keywords.every((k: unknown) => typeof k === "string"))
+    ) {
+      return res.status(400).json({ error: "keywords must be a non-empty array of strings" });
+    }
     if (replyMode !== undefined && !VALID_REPLY_MODES.includes(replyMode)) {
       return res.status(400).json({ error: `replyMode must be one of ${VALID_REPLY_MODES.join(", ")}` });
     }
@@ -160,6 +167,7 @@ export function dashboardRouter(
       tone,
       language,
       useKnowledgeBase,
+      keywords,
     });
     if (!updated) return res.status(404).json({ error: "campaign not found for this tenant" });
     return res.status(200).json(updated);

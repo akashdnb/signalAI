@@ -268,3 +268,171 @@ export function PlayIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function BellIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 10a6 6 0 1 1 12 0c0 3.2 1 5 1.7 5.9a1 1 0 0 1-.8 1.6H5.1a1 1 0 0 1-.8-1.6C5 15 6 13.2 6 10Z" />
+      <path d="M10 19.5a2 2 0 0 0 4 0" />
+    </Icon>
+  );
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-4.3-4.3" />
+    </Icon>
+  );
+}
+
+export function DotsVerticalIcon(props: IconProps) {
+  return (
+    <Icon {...props} strokeWidth={0} fill="currentColor">
+      <circle cx="12" cy="5.5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="18.5" r="1.6" />
+    </Icon>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 4.5v15M4.5 12h15" />
+    </Icon>
+  );
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 12h15" />
+    </Icon>
+  );
+}
+
+export function MaximizeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8.5 4.5h-3a1 1 0 0 0-1 1v3M15.5 4.5h3a1 1 0 0 1 1 1v3M8.5 19.5h-3a1 1 0 0 1-1-1v-3M15.5 19.5h3a1 1 0 0 0 1-1v-3" />
+    </Icon>
+  );
+}
+
+export function LockIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5.5" y="10.5" width="13" height="9" rx="2" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    </Icon>
+  );
+}
+
+export function EyeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="2.6" />
+    </Icon>
+  );
+}
+
+export function FileTextIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7 3.5Z" />
+      <path d="M14 3.5V8h4.5" />
+      <path d="M9 12.5h6M9 15.5h6" />
+    </Icon>
+  );
+}
+
+export function BotIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4.5" y="8.5" width="15" height="10" rx="3" />
+      <path d="M12 8.5V5M9.5 5h5" />
+      <circle cx="9" cy="13.2" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="13.2" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M9.5 16.3h5" />
+    </Icon>
+  );
+}
+
+export function ListChecksIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m3.5 6.5 1.3 1.3L7.5 5M3.5 13.3l1.3 1.3 2.7-2.7M3.5 19.3l1.3 1.3L7.5 18" />
+      <path d="M11 6.5h9.5M11 13h9.5M11 19.5h9.5" />
+    </Icon>
+  );
+}
+
+export function HandshakeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 11.5 8 7l3.2 2.4a1.4 1.4 0 0 1 0 2.2l-.6.5a1.4 1.4 0 0 1-1.9-.1L7 10.3" />
+      <path d="M20.5 11.5 16 7l-3.2 2.4" />
+      <path d="M8 15.5l2.3 2a1.6 1.6 0 0 0 2.2-.1l4-3.8M11 12l3.3 2.6a1.6 1.6 0 0 0 2.2-.1l.5-.5" />
+      <path d="m3.5 11.5-2 2 4 4.3 2-1.8M20.5 11.5l2 2-4 4.3-2-1.8" />
+    </Icon>
+  );
+}
+
+export function SendIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20 20.5 12 4 4l2.3 7-2.3 1z" />
+      <path d="M6.3 11 12 11" />
+    </Icon>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 7.5h14M9.5 7.5V5.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3V7.5" />
+      <path d="M7 7.5 7.7 19a1.5 1.5 0 0 0 1.5 1.5h5.6A1.5 1.5 0 0 0 16.3 19l.7-11.5" />
+      <path d="M10.3 11v6M13.7 11v6" />
+    </Icon>
+  );
+}
+
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 19V5M6 11l6-6 6 6" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M6 13l6 6 6-6" />
+    </Icon>
+  );
+}
+
+export function DragHandleIcon(props: IconProps) {
+  return (
+    <Icon {...props} strokeWidth={0} fill="currentColor">
+      <circle cx="9" cy="6.5" r="1.3" />
+      <circle cx="15" cy="6.5" r="1.3" />
+      <circle cx="9" cy="12" r="1.3" />
+      <circle cx="15" cy="12" r="1.3" />
+      <circle cx="9" cy="17.5" r="1.3" />
+      <circle cx="15" cy="17.5" r="1.3" />
+    </Icon>
+  );
+}

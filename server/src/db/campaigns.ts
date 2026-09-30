@@ -229,6 +229,7 @@ export async function updateCampaignReplyConfig(
     tone?: CampaignTone;
     language?: CampaignLanguage;
     useKnowledgeBase?: boolean;
+    keywords?: string[];
   },
 ): Promise<Campaign | null> {
   const result = await pool.query<CampaignRow>(
@@ -241,6 +242,7 @@ export async function updateCampaignReplyConfig(
        tone = coalesce($9, tone),
        language = coalesce($10, language),
        use_knowledge_base = case when $11::boolean then $12 else use_knowledge_base end,
+       keywords = coalesce($13, keywords),
        updated_at = now()
      where id = $1 and tenant_id = $2
      returning *`,
@@ -257,6 +259,7 @@ export async function updateCampaignReplyConfig(
       updates.language ?? null,
       updates.useKnowledgeBase !== undefined, // same "was it sent at all" trick as ctaLink — useKnowledgeBase: false must not coalesce away
       updates.useKnowledgeBase ?? null,
+      updates.keywords ?? null,
     ],
   );
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
