@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, type Campaign, type PreviewResult } from "../../api";
-import { Modal } from "../Modal";
+import { BottomSheet } from "../BottomSheet";
 
 export function PreviewDialog({
   tenantId,
@@ -32,7 +32,7 @@ export function PreviewDialog({
   }
 
   return (
-    <Modal title="Preview conversation" onClose={onClose} width={520}>
+    <BottomSheet title="Preview conversation" onClose={onClose} maxWidth={520}>
       <p className="muted small mt-0">
         Simulates an Instagram DM for <strong className="text-ink">{campaign.name}</strong>.
       </p>
@@ -74,6 +74,6 @@ export function PreviewDialog({
           </div>
         </div>
       )}
-    </Modal>
+    </BottomSheet>
   );
 }

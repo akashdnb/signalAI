@@ -570,3 +570,80 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/*
+ * Mobile Automation Details fix (R9): explicit, deliberate mobile sizing —
+ * not `zoom`/`font-size: 80%` on the desktop rules above. Phone breakpoint
+ * matches the app's existing Tailwind `md:` (768px) so this and every
+ * `md:` utility class agree on where "mobile" ends.
+ */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  textarea,
+  select {
+    min-height: 44px;
+    padding: 0.7rem 0.85rem;
+    font-size: 16px; /* iOS Safari zooms the page on focus for any input below 16px */
+  }
+
+  textarea {
+    min-height: 100px;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+  }
+
+  label {
+    font-size: 0.9rem;
+  }
+}
+
+/*
+ * Accordion sections (Automation Details, mobile): plain <details>/
+ * <summary>, so open/close needs zero JS — the browser already toggles
+ * the `open` attribute on a summary click. Desktop forces every section
+ * visible regardless of `open`, since the same markup renders both
+ * layouts (section content/business logic is identical; only whether a
+ * section can be *collapsed* differs by breakpoint).
+ */
+.accordion-card > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.accordion-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion-card .accordion-chevron {
+  transition: transform 150ms ease;
+}
+
+.accordion-card[open] .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accordion-card .accordion-chevron {
+    transition: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .accordion-card > summary {
+    cursor: default;
+    pointer-events: none;
+  }
+  .accordion-card .accordion-chevron {
+    display: none;
+  }
+  .accordion-card:not([open]) {
+    display: block;
+  }
+  .accordion-card:not([open]) > *:not(summary) {
+    display: block !important;
+  }
+}

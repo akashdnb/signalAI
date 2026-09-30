@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal } from "../Modal";
+import { BottomSheet } from "../BottomSheet";
 
 export function NewJourneyDialog({
   onClose,
@@ -33,7 +33,7 @@ export function NewJourneyDialog({
   }
 
   return (
-    <Modal title="New Journey" onClose={onClose}>
+    <BottomSheet title="New Journey" onClose={onClose}>
       <form onSubmit={handleSubmit}>
         <label>
           Journey name
@@ -64,6 +64,6 @@ export function NewJourneyDialog({
           </button>
         </div>
       </form>
-    </Modal>
+    </BottomSheet>
   );
 }

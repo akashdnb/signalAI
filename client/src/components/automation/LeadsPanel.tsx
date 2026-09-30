@@ -105,6 +105,14 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
+  const rows = pageItems.map((lead) => ({
+    lead,
+    milestone: milestones.find((m) => m.id === lead.activeMilestoneId),
+    facts: capturedByLead[lead.id],
+    stage: PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage),
+    handoff: handoffLabel(lead.handoffStatus),
+  }));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="stat-grid">
@@ -144,7 +152,54 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
       {filtered.length === 0 ? (
         <p className="muted">No leads match these filters.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <>
+          {/* Mobile: cards, not a squeezed table (section 52 of the mobile fix). */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {rows.map(({ lead, milestone, facts, stage, handoff }) => (
+              <div key={lead.id} className="card mb-0">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chip text-sm font-semibold text-accent">
+                      {(lead.username ?? "?").charAt(0).toUpperCase()}
+                    </span>
+                    <span className="truncate text-sm font-semibold text-ink">@{lead.username ?? "unknown"}</span>
+                  </span>
+                  <span className="pill m-0 shrink-0">{stage?.label ?? lead.pipelineStage}</span>
+                </div>
+
+                <div className="mt-2.5 text-sm text-ink">{milestone?.goalDescription ?? "—"}</div>
+                {facts && Object.keys(facts).length > 0 && (
+                  <div className="muted small mt-0.5">{Object.values(facts).slice(0, 2).join(" · ")}</div>
+                )}
+                {lead.handoffStatus !== "ai" && <span className={`${handoff.className} mt-2 inline-block`}>{handoff.text}</span>}
+
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
+                  <select
+                    value={lead.ownerUserId ?? ""}
+                    onChange={(e) => handleOwnerChange(lead.id, e.target.value)}
+                    disabled={savingOwnerFor === lead.id}
+                    style={{ marginTop: 0, width: "auto", flex: 1 }}
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.email}
+                      </option>
+                    ))}
+                  </select>
+                  <Link
+                    to={`/dashboard/${tenantId}/leads/${lead.id}`}
+                    className="flex min-h-11 shrink-0 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink no-underline"
+                  >
+                    View
+                  </Link>
+                </div>
+                <div className="muted small mt-2">Last activity {formatRelativeTime(lead.lastInboundAt)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block" style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
               <tr>
@@ -157,11 +212,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
               </tr>
             </thead>
             <tbody>
-              {pageItems.map((lead) => {
-                const milestone = milestones.find((m) => m.id === lead.activeMilestoneId);
-                const facts = capturedByLead[lead.id];
-                const stage = PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage);
-                const handoff = handoffLabel(lead.handoffStatus);
+              {rows.map(({ lead, milestone, facts, stage, handoff }) => {
                 return (
                   <tr key={lead.id}>
                     <td>
@@ -212,7 +263,8 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       {filtered.length > PAGE_SIZE && (

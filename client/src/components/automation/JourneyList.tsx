@@ -3,7 +3,7 @@ import type { Campaign } from "../../api";
 import { DotsVerticalIcon, SearchIcon } from "../icons";
 
 /** Prefers the journey's own description; falls back to a summary derived from real trigger config for campaigns created before that field existed. */
-function summarize(campaign: Campaign): string {
+export function summarize(campaign: Campaign): string {
   if (campaign.description) return campaign.description;
   const count = campaign.keywords.length;
   const kind = campaign.triggerSource === "message" ? "DMs" : campaign.triggerSource === "both" ? "comments & DMs" : "comments";

@@ -5,6 +5,7 @@ import { AutomationHeader } from "../components/automation/AutomationHeader";
 import { AutomationTabs, type AutomationTab } from "../components/automation/AutomationTabs";
 import { JourneyList } from "../components/automation/JourneyList";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
+import { MobileJourneySelector } from "../components/automation/MobileJourneySelector";
 import { NewJourneyDialog } from "../components/automation/NewJourneyDialog";
 import { PreviewDialog } from "../components/automation/PreviewDialog";
 import { ToastStack, useToasts } from "../components/Toast";
@@ -90,7 +91,7 @@ export function AutomationPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="flex flex-col px-6 py-6 md:h-[calc(100vh-76px)] md:overflow-hidden">
+    <div className="flex flex-col px-4 py-4 md:h-[calc(100vh-76px)] md:overflow-hidden md:px-6 md:py-6">
       <AutomationHeader
         onPreview={() => setShowPreview(true)}
         previewDisabled={!selected}
@@ -100,48 +101,65 @@ export function AutomationPage() {
         onNewJourney={() => setShowNewJourney(true)}
       />
 
-      <AutomationTabs active={activeTab} onChange={setActiveTab} />
+      <div className="hidden md:block">
+        <AutomationTabs active={activeTab} onChange={setActiveTab} />
+      </div>
 
       {error && <div className="banner banner-error mt-4">{error}</div>}
 
+      {/* AutomationTabs is desktop-only (see above) — the "journeys" branch is the only one reachable on mobile. */}
       {activeTab !== "journeys" ? (
-        <div className="mt-6 flex flex-1 items-center justify-center rounded-2xl border border-dashed border-line">
+        <div className="mt-6 hidden flex-1 items-center justify-center rounded-2xl border border-dashed border-line md:flex">
           <p className="muted">
             {AUTOMATION_TAB_LABEL[activeTab]} is coming soon — everything here today lives under Journeys.
           </p>
         </div>
       ) : (
-        <div className="mt-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto md:flex-row md:overflow-hidden">
-          <div className="w-full shrink-0 md:w-[270px] md:overflow-y-auto">
-            <JourneyList
+        <>
+          <div className="mt-4 md:hidden">
+            <MobileJourneySelector
               campaigns={filtered}
               totalCount={campaigns?.length ?? 0}
-              selectedId={selectedId}
+              selected={selected}
               search={search}
               onSearch={setSearch}
               onSelect={setSelectedId}
-              onToggleEnabled={handleToggleEnabled}
+              onNewJourney={() => setShowNewJourney(true)}
             />
           </div>
 
-          <div className="min-h-0 flex-1 md:overflow-hidden">
-            {selected ? (
-              <JourneyBuilder key={selected.id} tenantId={tenantId} campaign={selected} onChanged={() => reload(selected.id)} />
-            ) : campaigns === null ? (
-              <div className="flex h-full items-center justify-center rounded-2xl border border-line bg-card">
-                <p className="muted">Loading…</p>
-              </div>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-card text-center">
-                <h2 className="m-0">No journeys yet</h2>
-                <p className="muted m-0">Create your first AI conversation journey.</p>
-                <button type="button" className="btn-primary" onClick={() => setShowNewJourney(true)}>
-                  + New Journey
-                </button>
-              </div>
+          <div className="mt-4 flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto md:mt-5 md:flex-row md:overflow-hidden">
+            <div className="hidden md:block md:w-[270px] md:shrink-0 md:overflow-y-auto">
+              <JourneyList
+                campaigns={filtered}
+                totalCount={campaigns?.length ?? 0}
+                selectedId={selectedId}
+                search={search}
+                onSearch={setSearch}
+                onSelect={setSelectedId}
+                onToggleEnabled={handleToggleEnabled}
+              />
+            </div>
+
+            <div className="min-h-0 min-w-0 flex-1 md:overflow-hidden">
+              {selected ? (
+                <JourneyBuilder key={selected.id} tenantId={tenantId} campaign={selected} onChanged={() => reload(selected.id)} />
+              ) : campaigns === null ? (
+                <div className="flex h-full items-center justify-center rounded-2xl border border-line bg-card">
+                  <p className="muted">Loading…</p>
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-card text-center">
+                  <h2 className="m-0">No journeys yet</h2>
+                  <p className="muted m-0">Create your first AI conversation journey.</p>
+                  <button type="button" className="btn-primary" onClick={() => setShowNewJourney(true)}>
+                    + New Journey
+                  </button>
+                </div>
             )}
           </div>
         </div>
+        </>
       )}
 
       {showNewJourney && <NewJourneyDialog onClose={() => setShowNewJourney(false)} onCreate={handleCreateJourney} />}

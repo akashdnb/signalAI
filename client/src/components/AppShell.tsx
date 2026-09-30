@@ -10,6 +10,7 @@ import {
   type TenantSummary,
   type UsageSummary,
 } from "../api";
+import { BottomSheet } from "./BottomSheet";
 import { TenantContext } from "../context/TenantContext";
 import { deriveDisplayName } from "../lib/leadFormatting";
 import { Logo } from "./Logo";
@@ -82,7 +83,7 @@ function NavList({
         item.disabled ? (
           <li key={item.label}>
             <span
-              className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-subtle opacity-60"
+              className="flex min-h-11 cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-subtle opacity-60"
               title="Coming soon"
             >
               <item.icon className="h-5 w-5 shrink-0" />
@@ -99,7 +100,7 @@ function NavList({
               end={item.end}
               onClick={onNavigate}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
+                `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
                   isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"
                 }`
               }
@@ -139,6 +140,87 @@ function PlanCard({ tenantId, billing }: { tenantId: string; billing: BillingSum
         Upgrade
       </Link>
     </div>
+  );
+}
+
+function MobileAccountSheet({
+  tenant,
+  account,
+  usage,
+  email,
+  onClose,
+  onLogout,
+}: {
+  tenant: TenantSummary | null;
+  account: AccountHealth | null;
+  usage: UsageSummary | null;
+  email?: string;
+  onClose: () => void;
+  onLogout: () => void;
+}) {
+  const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
+
+  return (
+    <BottomSheet title="Account" onClose={onClose}>
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">
+          <InstagramMarkIcon className="h-5.5 w-5.5" />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-base font-semibold text-ink">{tenant?.name ?? "…"}</div>
+          {account?.connected ? (
+            <span className="pill pill-ok m-0 inline-block">
+              <span className="mr-1">●</span>Connected
+            </span>
+          ) : (
+            <span className="text-sm text-subtle">Instagram not connected</span>
+          )}
+        </div>
+      </div>
+
+      {usage && (
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-sm text-subtle">
+            <span>AI Tokens</span>
+            <span>
+              {usage.tokens.used >= 1000 ? `${(usage.tokens.used / 1000).toFixed(1)}K` : usage.tokens.used}
+              {" / "}
+              {usage.tokens.allowance >= 1000 ? `${(usage.tokens.allowance / 1000).toFixed(0)}K` : usage.tokens.allowance}
+            </span>
+          </div>
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-chip">
+            <div
+              className={`h-full rounded-full ${usage.tokens.nearingLimit ? "bg-err-ink" : "bg-accent"}`}
+              style={{ width: `${tokenPct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center gap-3 border-t border-line pt-4">
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-base font-semibold text-white">
+          {(email?.charAt(0) ?? "?").toUpperCase()}
+        </span>
+        <div>
+          <div className="text-base font-medium text-ink">{deriveDisplayName(email)}</div>
+          <div className="text-sm text-subtle">Owner</div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between rounded-xl border border-line px-4 py-3">
+        <span className="text-sm font-medium text-ink">Theme</span>
+        <ThemeToggle />
+      </div>
+
+      <button
+        type="button"
+        onClick={onLogout}
+        className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-left text-sm font-medium text-ink hover:bg-chip"
+      >
+        <LogoutIcon className="h-4.5 w-4.5" />
+        Log out
+      </button>
+    </BottomSheet>
   );
 }
 
@@ -264,6 +346,7 @@ export function AppShell() {
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
   // base) rather than the wizard vanishing the instant tenant.industry
@@ -354,11 +437,10 @@ export function AppShell() {
         <div className="flex items-center justify-between px-5 py-5">
           <Logo size="md" />
           <div className="flex items-center gap-1 md:hidden">
-            <ThemeToggle />
             <button
               type="button"
               aria-label="Close menu"
-              className="text-subtle"
+              className="flex h-11 w-11 items-center justify-center text-subtle"
               onClick={() => setMobileNavOpen(false)}
             >
               <CloseIcon className="h-5 w-5" />
@@ -382,18 +464,41 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-card px-4 py-3 md:hidden">
-          <button type="button" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}>
+          <button
+            type="button"
+            aria-label="Open menu"
+            className="flex h-11 w-11 items-center justify-center"
+            onClick={() => setMobileNavOpen(true)}
+          >
             <MenuIcon className="h-6 w-6" />
           </button>
           <Logo size="sm" className="flex-1" />
-          <ThemeToggle />
+          <button
+            type="button"
+            aria-label="Account"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
+            onClick={() => setMobileAccountOpen(true)}
+          >
+            {(session?.email?.charAt(0) ?? "?").toUpperCase()}
+          </button>
         </header>
 
         <AccountHeader tenant={tenant} account={account} usage={usage} email={session?.email} onLogout={handleLogout} />
 
-        <main className="flex-1 overflow-y-auto">
+        {mobileAccountOpen && (
+          <MobileAccountSheet
+            tenant={tenant}
+            account={account}
+            usage={usage}
+            email={session?.email}
+            onClose={() => setMobileAccountOpen(false)}
+            onLogout={handleLogout}
+          />
+        )}
+
+        <main className="min-w-0 flex-1 overflow-y-auto">
           {tenantError && (
             <div className="page">
               <div className="banner banner-error">{tenantError}</div>

@@ -56,7 +56,7 @@ export function BuilderCanvas({
   const isSelected = (node: SelectedNode) => JSON.stringify(node) === JSON.stringify(selectedNode);
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-auto bg-canvas">
+    <div className="relative min-h-[420px] flex-1 overflow-auto bg-canvas md:min-h-0">
       <div
         className="absolute inset-0"
         style={{

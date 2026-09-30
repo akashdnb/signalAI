@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, type Campaign, type Milestone } from "../../api";
-import { Modal } from "../Modal";
+import { BottomSheet } from "../BottomSheet";
 
 type ChatMessage = { from: "user" | "bot" | "system"; text: string };
 
@@ -73,7 +73,7 @@ export function TestJourneyDialog({
   const finished = started && milestoneIndex >= milestones.length - 1 && milestones.length > 0 && messages.some((m) => m.text.includes("Journey complete"));
 
   return (
-    <Modal title={`Test Journey — ${campaign.name}`} onClose={onClose} width={520}>
+    <BottomSheet title={`Test Journey — ${campaign.name}`} onClose={onClose} maxWidth={520}>
       <p className="muted small mt-0">
         Simulates the full sequence (trigger → reply → milestones). This doesn't affect any real lead.
       </p>
@@ -120,6 +120,6 @@ export function TestJourneyDialog({
           )}
         </>
       )}
-    </Modal>
+    </BottomSheet>
   );
 }
