@@ -67,7 +67,7 @@ export function BuilderCanvas({
       />
 
       <div
-        className="relative flex flex-col items-center gap-0 p-8"
+        className="relative flex flex-col items-center gap-0 px-8 pb-8 pt-4"
         style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
       >
         <BuilderNode

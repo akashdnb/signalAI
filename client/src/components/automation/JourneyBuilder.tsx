@@ -124,7 +124,10 @@ export function JourneyBuilder({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="m-0 text-sm font-semibold text-ink">{campaign.name}</h2>
-              <span className={campaign.enabled ? "pill pill-ok" : "pill"} style={{ marginLeft: 0 }}>
+              <span
+                className={`text-[11px] ${campaign.enabled ? "pill pill-ok" : "pill"}`}
+                style={{ marginLeft: 0, padding: "0.05rem 0.5rem" }}
+              >
                 <span className="mr-1">●</span>
                 {campaign.enabled ? "Active" : "Inactive"}
               </span>
@@ -197,7 +200,7 @@ export function JourneyBuilder({
               onRemoveMilestone={handleRemoveMilestone}
               onReorderMilestone={handleReorderMilestone}
             />
-            <div className="hidden shrink-0 border-t border-line p-4 md:block md:w-[340px] md:overflow-y-auto md:border-l md:border-t-0">
+            <div className="hidden shrink-0 border-t border-line p-4 md:block md:w-[300px] md:overflow-y-auto md:border-l md:border-t-0">
               <Inspector
                 tenantId={tenantId}
                 campaign={campaign}
