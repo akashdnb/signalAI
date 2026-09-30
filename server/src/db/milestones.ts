@@ -87,10 +87,14 @@ export async function setCampaignMilestones(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`delete from campaign_milestones where campaign_id = $1 and tenant_id = $2`, [
-      campaignId,
-      tenantId,
-    ]);
+    // Soft-delete, not delete: milestone_advancements is an append-only
+    // analytics log with a not-null FK to these rows, so a hard delete
+    // fails as soon as any lead has advanced past a milestone.
+    await client.query(
+      `update campaign_milestones set deleted_at = now()
+       where campaign_id = $1 and tenant_id = $2 and deleted_at is null`,
+      [campaignId, tenantId],
+    );
 
     const inserted: MilestoneRow[] = [];
     for (let i = 0; i < milestones.length; i++) {
@@ -116,7 +120,8 @@ export async function setCampaignMilestones(
 
 export async function listMilestones(pool: Pool, tenantId: string, campaignId: string): Promise<Milestone[]> {
   const result = await pool.query<MilestoneRow>(
-    `select * from campaign_milestones where campaign_id = $1 and tenant_id = $2 order by ordinal`,
+    `select * from campaign_milestones
+     where campaign_id = $1 and tenant_id = $2 and deleted_at is null order by ordinal`,
     [campaignId, tenantId],
   );
   return result.rows.map(toMilestone);
@@ -124,7 +129,7 @@ export async function listMilestones(pool: Pool, tenantId: string, campaignId: s
 
 export async function getMilestone(pool: Pool, tenantId: string, milestoneId: string): Promise<Milestone | null> {
   const result = await pool.query<MilestoneRow>(
-    `select * from campaign_milestones where id = $1 and tenant_id = $2`,
+    `select * from campaign_milestones where id = $1 and tenant_id = $2 and deleted_at is null`,
     [milestoneId, tenantId],
   );
   return result.rows[0] ? toMilestone(result.rows[0]) : null;
@@ -137,7 +142,8 @@ export async function getNextMilestone(
   afterOrdinal: number,
 ): Promise<Milestone | null> {
   const result = await pool.query<MilestoneRow>(
-    `select * from campaign_milestones where campaign_id = $1 and tenant_id = $2 and ordinal > $3
+    `select * from campaign_milestones
+     where campaign_id = $1 and tenant_id = $2 and deleted_at is null and ordinal > $3
      order by ordinal limit 1`,
     [campaignId, tenantId, afterOrdinal],
   );
@@ -146,7 +152,8 @@ export async function getNextMilestone(
 
 export async function getFirstMilestone(pool: Pool, tenantId: string, campaignId: string): Promise<Milestone | null> {
   const result = await pool.query<MilestoneRow>(
-    `select * from campaign_milestones where campaign_id = $1 and tenant_id = $2 order by ordinal limit 1`,
+    `select * from campaign_milestones
+     where campaign_id = $1 and tenant_id = $2 and deleted_at is null order by ordinal limit 1`,
     [campaignId, tenantId],
   );
   return result.rows[0] ? toMilestone(result.rows[0]) : null;

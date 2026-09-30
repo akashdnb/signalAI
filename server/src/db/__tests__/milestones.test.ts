@@ -121,6 +121,28 @@ describe("milestones and captured facts", () => {
     expect(rows.rows[0].count).toBe(1);
   });
 
+  it("allows re-saving milestones after a lead has advanced past one, without losing the advancement record", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    const [milestone] = await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "step 1" }]);
+    const lead = await pool.query("insert into leads (tenant_id) values ($1) returning id", [tenant.id]);
+    const leadId = lead.rows[0].id;
+    await recordMilestoneAdvancement(pool, tenant.id, leadId, campaign.id, milestone!.id);
+
+    await expect(
+      setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "revised step 1" }]),
+    ).resolves.toBeTruthy();
+
+    const milestones = await listMilestones(pool, tenant.id, campaign.id);
+    expect(milestones.map((m) => m.goalDescription)).toEqual(["revised step 1"]);
+
+    const rows = await pool.query("select count(*)::int as count from milestone_advancements where lead_id = $1", [
+      leadId,
+    ]);
+    expect(rows.rows[0].count).toBe(1);
+  });
+
   // R3-03 write-time validation: goalDescription/captureField land in the
   // LLM's instruction channel, so obviously injection-shaped tenant text
   // is rejected before it can ever be saved.

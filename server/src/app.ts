@@ -1,5 +1,14 @@
+// Must be the first import: patches Express's router so a rejected
+// promise in an async handler reaches error middleware via next(err)
+// instead of becoming an unhandled rejection that kills the process
+// (Express 4 doesn't do this on its own — every route handler here is
+// async and none of them try/catch, so without this a single failed
+// query takes down the whole server for every tenant, not just a 500
+// for the one request).
+import "express-async-errors";
 import express from "express";
 import { config } from "./config.js";
+import { Sentry } from "./lib/sentry.js";
 import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
 import { dataDeletionRouter } from "./routes/dataDeletion.js";
@@ -85,6 +94,19 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(guardrailsConfigRouter);
   app.use(fieldDefinitionsRouter);
   app.use(onboardingRouter);
+
+  // Last middleware = error handler (Express identifies it by arity, not
+  // position among app.use calls otherwise, but it only catches errors
+  // from routes registered before it). Reports to Sentry and returns a
+  // 500 instead of the alternative here: an unhandled rejection that
+  // crashes the whole process for every tenant, not just this request.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    Sentry.captureException(err);
+    console.error("Unhandled route error:", err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: "internal server error" });
+  });
 
   return app;
 }
