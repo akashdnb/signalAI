@@ -174,7 +174,7 @@ export function JourneyBuilder({
               key={tab.key}
               type="button"
               onClick={() => requestSubTabChange(tab.key)}
-              className={`-mb-px flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 transition-colors ${
+              className={`-mb-px flex max-md:min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 transition-colors ${
                 subTab === tab.key ? "border-accent font-semibold text-accent" : "border-transparent text-subtle hover:text-ink"
               }`}
             >
