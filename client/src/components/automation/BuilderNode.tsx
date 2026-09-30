@@ -73,10 +73,10 @@ export function BuilderNode({
 
 export function NodeConnector() {
   return (
-    <div className="flex flex-col items-center py-0.5" aria-hidden="true">
-      <div className="h-6 w-0.5 rounded-full bg-subtle" />
-      <svg width="12" height="7" viewBox="0 0 12 7" className="-mt-px text-subtle">
-        <path d="M1 0.5 6 6 11 0.5" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <div className="flex flex-col items-center py-1" aria-hidden="true">
+      <div className="h-5 w-0.5 rounded-full bg-accent-soft" />
+      <svg width="14" height="8" viewBox="0 0 14 8" className="-mt-px text-accent-soft">
+        <path d="M0 0 L14 0 L7 8 Z" fill="currentColor" />
       </svg>
     </div>
   );

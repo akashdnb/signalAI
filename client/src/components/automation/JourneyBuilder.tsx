@@ -118,8 +118,9 @@ export function JourneyBuilder({
   }
 
   return (
-    <div className="flex min-w-0 flex-col md:h-full md:overflow-hidden md:rounded-2xl md:border md:border-line md:bg-card">
-      <div className="border-b border-line pb-1.5 md:p-1.5">
+    <>
+    <div className="flex min-w-0 min-h-0 flex-1 flex-col md:h-full md:overflow-hidden md:rounded-2xl md:border md:border-line md:bg-card">
+      <div className="border-b border-line px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -188,31 +189,17 @@ export function JourneyBuilder({
         </div>
       </div>
 
-      <div className="flex-1 md:min-h-0 md:overflow-hidden">
+      <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
         {subTab === "builder" && (
-          <div className="flex flex-col md:h-full md:min-h-0 md:flex-row">
-            <BuilderCanvas
-              campaign={campaign}
-              milestones={milestones}
-              selectedNode={selectedNode}
-              onSelectNode={selectNode}
-              onAddMilestone={handleAddMilestone}
-              onRemoveMilestone={handleRemoveMilestone}
-              onReorderMilestone={handleReorderMilestone}
-            />
-            <div className="hidden shrink-0 border-t border-line p-4 md:block md:w-[300px] md:overflow-y-auto md:border-l md:border-t-0">
-              <Inspector
-                tenantId={tenantId}
-                campaign={campaign}
-                milestones={milestones}
-                fieldDefinitions={fieldDefinitions}
-                selectedNode={selectedNode}
-                onCampaignChanged={onChanged}
-                onSaveMilestone={handleSaveMilestone}
-                onFieldDefinitionsChanged={setFieldDefinitions}
-              />
-            </div>
-          </div>
+          <BuilderCanvas
+            campaign={campaign}
+            milestones={milestones}
+            selectedNode={selectedNode}
+            onSelectNode={selectNode}
+            onAddMilestone={handleAddMilestone}
+            onRemoveMilestone={handleRemoveMilestone}
+            onReorderMilestone={handleReorderMilestone}
+          />
         )}
 
         {subTab === "details" && (
@@ -239,25 +226,42 @@ export function JourneyBuilder({
           </div>
         )}
       </div>
+    </div>
 
-      {mobileInspectorOpen && subTab === "builder" && (
-        <div className="md:hidden">
-          <BottomSheet title="Edit Node" onClose={() => setMobileInspectorOpen(false)}>
-            <Inspector
-              tenantId={tenantId}
-              campaign={campaign}
-              milestones={milestones}
-              fieldDefinitions={fieldDefinitions}
-              selectedNode={selectedNode}
-              onCampaignChanged={onChanged}
-              onSaveMilestone={handleSaveMilestone}
-              onFieldDefinitionsChanged={setFieldDefinitions}
-            />
-          </BottomSheet>
-        </div>
-      )}
+    {/* Sibling column, not nested under the header above — starts at the same top as "All Journeys" and this card (section 3-column parity). */}
+    {subTab === "builder" && (
+      <div className="inspector-compact hidden shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-card p-4 md:flex md:h-full md:w-[300px]">
+        <Inspector
+          tenantId={tenantId}
+          campaign={campaign}
+          milestones={milestones}
+          fieldDefinitions={fieldDefinitions}
+          selectedNode={selectedNode}
+          onCampaignChanged={onChanged}
+          onSaveMilestone={handleSaveMilestone}
+          onFieldDefinitionsChanged={setFieldDefinitions}
+        />
+      </div>
+    )}
 
-      {showTestJourney && (
+    {mobileInspectorOpen && subTab === "builder" && (
+      <div className="inspector-compact md:hidden">
+        <BottomSheet title="Edit Node" onClose={() => setMobileInspectorOpen(false)}>
+          <Inspector
+            tenantId={tenantId}
+            campaign={campaign}
+            milestones={milestones}
+            fieldDefinitions={fieldDefinitions}
+            selectedNode={selectedNode}
+            onCampaignChanged={onChanged}
+            onSaveMilestone={handleSaveMilestone}
+            onFieldDefinitionsChanged={setFieldDefinitions}
+          />
+        </BottomSheet>
+      </div>
+    )}
+
+    {showTestJourney && (
         <TestJourneyDialog tenantId={tenantId} campaign={campaign} milestones={milestones} onClose={() => setShowTestJourney(false)} />
       )}
 
@@ -295,6 +299,6 @@ export function JourneyBuilder({
           </div>
         </BottomSheet>
       )}
-    </div>
+    </>
   );
 }

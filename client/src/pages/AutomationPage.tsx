@@ -129,24 +129,22 @@ export function AutomationPage() {
               />
             </div>
 
-            <div className="min-h-0 min-w-0 flex-1 md:overflow-hidden">
-              {selected ? (
-                <JourneyBuilder key={selected.id} tenantId={tenantId} campaign={selected} onChanged={() => reload(selected.id)} />
-              ) : campaigns === null ? (
-                <div className="flex h-full items-center justify-center rounded-2xl border border-line bg-card">
-                  <p className="muted">Loading…</p>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-card text-center">
-                  <h2 className="m-0">No journeys yet</h2>
-                  <p className="muted m-0">Create your first AI conversation journey.</p>
-                  <button type="button" className="btn-primary" onClick={() => setShowNewJourney(true)}>
-                    + New Journey
-                  </button>
-                </div>
+            {selected ? (
+              <JourneyBuilder key={selected.id} tenantId={tenantId} campaign={selected} onChanged={() => reload(selected.id)} />
+            ) : campaigns === null ? (
+              <div className="min-h-0 min-w-0 flex flex-1 items-center justify-center rounded-2xl border border-line bg-card md:overflow-hidden">
+                <p className="muted">Loading…</p>
+              </div>
+            ) : (
+              <div className="min-h-0 min-w-0 flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-card text-center md:overflow-hidden">
+                <h2 className="m-0">No journeys yet</h2>
+                <p className="muted m-0">Create your first AI conversation journey.</p>
+                <button type="button" className="btn-primary" onClick={() => setShowNewJourney(true)}>
+                  + New Journey
+                </button>
+              </div>
             )}
           </div>
-        </div>
         </>
       )}
 

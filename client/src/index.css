@@ -647,3 +647,21 @@ button:disabled {
     display: block !important;
   }
 }
+
+/*
+ * Builder Inspector ("node edit section"): ~2pt smaller than the app's
+ * default form-control sizing everywhere else, since this panel is dense
+ * by design and the default label/input sizes (set globally above) felt
+ * oversized for it. Scoped to this one panel, not a global change.
+ */
+.inspector-compact label {
+  font-size: 0.8rem;
+}
+.inspector-compact input[type="text"],
+.inspector-compact textarea,
+.inspector-compact select {
+  font-size: 0.85rem;
+}
+.inspector-compact h3 {
+  font-size: 0.95rem;
+}

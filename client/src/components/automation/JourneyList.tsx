@@ -26,7 +26,7 @@ function JourneyCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onSelect();
       }}
-      className={`cursor-pointer rounded-xl border p-3.5 transition-colors ${
+      className={`cursor-pointer rounded-xl border p-2.5 transition-colors ${
         selected ? "border-accent bg-chip shadow-sm" : "border-line bg-card hover:border-accent-soft"
       }`}
     >
