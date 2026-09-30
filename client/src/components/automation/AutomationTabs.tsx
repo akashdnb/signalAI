@@ -11,13 +11,13 @@ const TABS: { key: AutomationTab; label: string }[] = [
 
 export function AutomationTabs({ active, onChange }: { active: AutomationTab; onChange: (tab: AutomationTab) => void }) {
   return (
-    <div className="mt-3 flex gap-6 border-b border-line">
+    <div className="mt-1.5 flex gap-6 border-b border-line">
       {TABS.map((tab) => (
         <button
           key={tab.key}
           type="button"
           onClick={() => onChange(tab.key)}
-          className={`-mb-px border-b-2 px-0.5 pb-2 text-sm transition-colors ${
+          className={`-mb-px border-b-2 px-0.5 pb-1 text-xs transition-colors ${
             active === tab.key
               ? "border-accent font-semibold text-accent"
               : "border-transparent text-subtle hover:text-ink"

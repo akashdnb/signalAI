@@ -21,26 +21,26 @@ export function AutomationHeader({
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 md:gap-4">
-      <div>
-        <h1 className="m-0 text-2xl font-bold leading-tight text-ink md:text-2xl">Automation</h1>
-        <p className="muted m-0 mt-0.5 max-w-xl text-sm leading-snug">
+      <div className="min-w-0">
+        <h1 className="m-0 text-xl font-bold leading-tight text-ink">Automation</h1>
+        <p className="muted m-0 mt-0.5 max-w-2xl truncate text-xs leading-snug md:text-sm">
           Create AI-powered conversations that turn Instagram comments and DMs into qualified leads.
         </p>
       </div>
 
       {/* Desktop: every action visible at once. */}
-      <div className="hidden shrink-0 flex-wrap items-center gap-2.5 md:flex">
+      <div className="hidden shrink-0 flex-wrap items-center gap-2 md:flex">
         <div className="relative">
           <button
             type="button"
-            className="flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-chip"
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-semibold text-ink hover:bg-chip"
             onClick={() => setShowDocsNote((v) => !v)}
           >
-            <FileTextIcon className="h-4.5 w-4.5" />
+            <FileTextIcon className="h-4 w-4" />
             Docs
           </button>
           {showDocsNote && (
-            <div className="absolute right-0 top-11 z-20 w-52 rounded-lg border border-line bg-card p-2.5 text-xs text-subtle shadow-lg">
+            <div className="absolute right-0 top-10 z-20 w-52 rounded-lg border border-line bg-card p-2.5 text-xs text-subtle shadow-lg">
               Documentation is coming soon.
             </div>
           )}
@@ -49,24 +49,24 @@ export function AutomationHeader({
         <button
           type="button"
           disabled={previewDisabled}
-          className="flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-semibold text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50"
           onClick={onPreview}
         >
-          <EyeIcon className="h-4.5 w-4.5" />
+          <EyeIcon className="h-4 w-4" />
           Preview
         </button>
 
         <button
           type="button"
           disabled={publishDisabled || publishing}
-          className="btn-primary flex h-10 items-center gap-2 px-4 disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary flex h-9 items-center gap-1.5 px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           onClick={onPublish}
         >
           {publishing ? "Publishing…" : "Publish"}
         </button>
 
-        <button type="button" className="btn-primary flex h-10 items-center gap-2 px-5" onClick={onNewJourney}>
-          <PlusIcon className="h-4.5 w-4.5" />
+        <button type="button" className="btn-primary flex h-9 items-center gap-1.5 px-4 text-sm" onClick={onNewJourney}>
+          <PlusIcon className="h-4 w-4" />
           New Journey
         </button>
       </div>

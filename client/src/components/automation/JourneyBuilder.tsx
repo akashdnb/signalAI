@@ -119,17 +119,17 @@ export function JourneyBuilder({
 
   return (
     <div className="flex min-w-0 flex-col md:h-full md:overflow-hidden md:rounded-2xl md:border md:border-line md:bg-card">
-      <div className="border-b border-line pb-3 md:p-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="border-b border-line pb-1.5 md:p-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="m-0 text-base font-semibold text-ink">{campaign.name}</h2>
+              <h2 className="m-0 text-sm font-semibold text-ink">{campaign.name}</h2>
               <span className={campaign.enabled ? "pill pill-ok" : "pill"} style={{ marginLeft: 0 }}>
                 <span className="mr-1">●</span>
                 {campaign.enabled ? "Active" : "Inactive"}
               </span>
             </div>
-            <p className="muted small m-0 mt-0.5">
+            <p className="muted small m-0 truncate">
               {describeCampaign(campaign)} · Updated {new Date(campaign.updatedAt).toLocaleDateString()}
             </p>
           </div>
@@ -141,7 +141,7 @@ export function JourneyBuilder({
               <button
                 type="button"
                 aria-label="More actions"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-subtle hover:bg-chip hover:text-ink"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-subtle hover:bg-chip hover:text-ink"
                 onClick={() => setMenuOpen((v) => !v)}
               >
                 <DotsVerticalIcon className="h-4 w-4" />
@@ -154,7 +154,7 @@ export function JourneyBuilder({
                     className="fixed inset-0 z-10 cursor-default"
                     onClick={() => setMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-9 z-20 w-40 rounded-lg border border-line bg-card p-1 shadow-lg">
+                  <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-line bg-card p-1 shadow-lg">
                     <button
                       type="button"
                       className="w-full rounded-md px-2.5 py-1.5 text-left text-xs text-ink hover:bg-chip"
@@ -169,13 +169,13 @@ export function JourneyBuilder({
           </div>
         </div>
 
-        <div className="-mx-4 mt-2 flex min-w-0 gap-5 overflow-x-auto px-4 text-sm md:mx-0 md:px-0">
+        <div className="-mx-4 mt-1 flex min-w-0 gap-5 overflow-x-auto px-4 text-xs md:mx-0 md:px-0">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => requestSubTabChange(tab.key)}
-              className={`-mb-px flex max-md:min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 transition-colors ${
+              className={`-mb-px flex max-md:min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 pb-0.5 transition-colors ${
                 subTab === tab.key ? "border-accent font-semibold text-accent" : "border-transparent text-subtle hover:text-ink"
               }`}
             >
