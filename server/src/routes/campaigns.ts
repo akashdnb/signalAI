@@ -9,6 +9,7 @@ import {
   setCampaignReplyTemplates,
 } from "../db/campaigns.js";
 import { listMilestones, setCampaignMilestones } from "../db/milestones.js";
+import { getBuilderGraph, saveBuilderGraph, type JourneyNode, type JourneyEdge } from "../db/journeyGraph.js";
 import { listKnownMediaForTenant, upsertMediaMetadata } from "../db/mediaMetadata.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { fetchMediaMetadata, findMediaByPermalink } from "../lib/instagramMedia.js";
@@ -90,6 +91,99 @@ campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/milestones", async
   const { tenantId, campaignId } = req.params;
   const milestones = await listMilestones(getPool(), tenantId, campaignId);
   return res.status(200).json(milestones);
+});
+
+function isValidPosition(value: unknown): value is { x: number; y: number } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { x: unknown }).x === "number" &&
+    typeof (value as { y: unknown }).y === "number"
+  );
+}
+
+function isValidNode(value: unknown): value is JourneyNode {
+  if (typeof value !== "object" || value === null) return false;
+  const node = value as Record<string, unknown>;
+  return (
+    typeof node.id === "string" &&
+    node.id.length > 0 &&
+    typeof node.type === "string" &&
+    node.type.length > 0 &&
+    isValidPosition(node.position) &&
+    typeof node.data === "object" &&
+    node.data !== null &&
+    (node.parentGroupId === null || typeof node.parentGroupId === "string") &&
+    typeof node.collapsed === "boolean"
+  );
+}
+
+function isValidEdge(value: unknown): value is JourneyEdge {
+  if (typeof value !== "object" || value === null) return false;
+  const edge = value as Record<string, unknown>;
+  return (
+    typeof edge.id === "string" &&
+    edge.id.length > 0 &&
+    typeof edge.sourceNodeId === "string" &&
+    typeof edge.targetNodeId === "string" &&
+    (edge.label === null || typeof edge.label === "string") &&
+    (edge.condition === null || (typeof edge.condition === "object" && edge.condition !== null))
+  );
+}
+
+/**
+ * Advanced Automation Builder (graph data model): the whole visual journey
+ * — nodes and edges — read and written as one atomic unit. GET synthesizes
+ * a default pipeline graph on the fly for any campaign that hasn't saved a
+ * real one yet (see getBuilderGraph), so every campaign — including ones
+ * created before this endpoint existed — has something to render.
+ */
+campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/builder", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const graph = await getBuilderGraph(getPool(), tenantId, campaignId);
+  if (!graph) return res.status(404).json({ error: "campaign not found for this tenant" });
+  return res.status(200).json(graph);
+});
+
+/**
+ * Atomic save, gated on `expectedVersion` (roadmap "Atomic Save" /
+ * "Version Conflict"): a save based on a stale read is rejected with 409
+ * rather than silently overwriting whatever another editor saved in the
+ * meantime. `campaigns.builder_version` is the source of truth for the
+ * current version; the response's `currentVersion` is what the caller
+ * should re-read from before trying again.
+ */
+campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const { expectedVersion, nodes, edges } = req.body ?? {};
+
+  if (typeof expectedVersion !== "number" || !Number.isInteger(expectedVersion)) {
+    return res.status(400).json({ error: "expectedVersion must be an integer" });
+  }
+  if (!Array.isArray(nodes) || !nodes.every(isValidNode)) {
+    return res
+      .status(400)
+      .json({ error: "nodes must be an array of { id, type, position: {x,y}, data, parentGroupId, collapsed }" });
+  }
+  if (!Array.isArray(edges) || !edges.every(isValidEdge)) {
+    return res
+      .status(400)
+      .json({ error: "edges must be an array of { id, sourceNodeId, targetNodeId, label, condition }" });
+  }
+
+  const result = await saveBuilderGraph(getPool(), tenantId, campaignId, expectedVersion, nodes, edges);
+  if (result.status === "not_found") {
+    return res.status(404).json({ error: "campaign not found for this tenant" });
+  }
+  if (result.status === "conflict") {
+    return res
+      .status(409)
+      .json({ error: "this journey changed elsewhere — reload before saving again", currentVersion: result.currentVersion });
+  }
+  if (result.status === "invalid") {
+    return res.status(400).json({ error: "invalid graph", details: result.errors });
+  }
+  return res.status(200).json(result.graph);
 });
 
 /**
