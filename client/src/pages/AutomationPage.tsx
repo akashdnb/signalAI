@@ -91,7 +91,7 @@ export function AutomationPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="flex flex-col px-4 py-4 md:h-[calc(100vh-76px)] md:overflow-hidden md:px-6 md:py-6">
+    <div className="flex flex-col px-4 py-4 md:h-[calc(100vh-56px)] md:overflow-hidden md:px-6 md:py-4">
       <AutomationHeader
         onPreview={() => setShowPreview(true)}
         previewDisabled={!selected}
@@ -129,7 +129,7 @@ export function AutomationPage() {
           </div>
 
           <div className="mt-4 flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto md:mt-5 md:flex-row md:overflow-hidden">
-            <div className="hidden md:block md:w-[270px] md:shrink-0 md:overflow-y-auto">
+            <div className="hidden md:block md:w-[230px] md:shrink-0 md:overflow-y-auto">
               <JourneyList
                 campaigns={filtered}
                 totalCount={campaigns?.length ?? 0}

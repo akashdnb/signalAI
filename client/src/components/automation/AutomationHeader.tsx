@@ -22,8 +22,8 @@ export function AutomationHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 md:gap-4">
       <div>
-        <h1 className="m-0 text-2xl font-bold leading-tight text-ink md:text-[28px]">Automation</h1>
-        <p className="muted m-0 mt-1 max-w-xl text-sm leading-snug md:text-base">
+        <h1 className="m-0 text-2xl font-bold leading-tight text-ink md:text-2xl">Automation</h1>
+        <p className="muted m-0 mt-0.5 max-w-xl text-sm leading-snug">
           Create AI-powered conversations that turn Instagram comments and DMs into qualified leads.
         </p>
       </div>

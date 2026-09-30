@@ -241,10 +241,10 @@ function AccountHeader({
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
 
   return (
-    <header className="hidden h-[76px] items-center justify-between gap-4 border-b border-line bg-card px-6 md:flex">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">
-          <InstagramMarkIcon className="h-5 w-5" />
+    <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
+          <InstagramMarkIcon className="h-4 w-4" />
         </span>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</div>
@@ -259,9 +259,9 @@ function AccountHeader({
         <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
       </div>
 
-      <div className="flex shrink-0 items-center gap-5">
+      <div className="flex shrink-0 items-center gap-4">
         {usage && (
-          <div className="w-40">
+          <div className="w-36">
             <div className="flex items-center justify-between text-xs text-subtle">
               <span>AI Tokens</span>
               <span>
@@ -284,9 +284,9 @@ function AccountHeader({
         <button
           type="button"
           aria-label="Notifications"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
         >
-          <BellIcon className="h-5 w-5" />
+          <BellIcon className="h-4.5 w-4.5" />
         </button>
 
         <div className="relative">
@@ -295,7 +295,7 @@ function AccountHeader({
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-chip"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
               {(email?.charAt(0) ?? "?").toUpperCase()}
             </span>
             <span className="text-left leading-tight">

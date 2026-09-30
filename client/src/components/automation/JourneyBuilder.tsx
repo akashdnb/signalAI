@@ -119,18 +119,19 @@ export function JourneyBuilder({
 
   return (
     <div className="flex min-w-0 flex-col md:h-full md:overflow-hidden md:rounded-2xl md:border md:border-line md:bg-card">
-      <div className="border-b border-line pb-4 md:p-4">
+      <div className="border-b border-line pb-3 md:p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="m-0 text-lg font-semibold text-ink">{campaign.name}</h2>
+              <h2 className="m-0 text-base font-semibold text-ink">{campaign.name}</h2>
               <span className={campaign.enabled ? "pill pill-ok" : "pill"} style={{ marginLeft: 0 }}>
                 <span className="mr-1">●</span>
                 {campaign.enabled ? "Active" : "Inactive"}
               </span>
             </div>
-            <p className="muted m-0 mt-1 text-sm">{describeCampaign(campaign)}</p>
-            <p className="muted small m-0 mt-0.5">Last updated {new Date(campaign.updatedAt).toLocaleString()}</p>
+            <p className="muted small m-0 mt-0.5">
+              {describeCampaign(campaign)} · Updated {new Date(campaign.updatedAt).toLocaleDateString()}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button type="button" className="btn-secondary btn-small" onClick={() => setShowTestJourney(true)}>
@@ -168,7 +169,7 @@ export function JourneyBuilder({
           </div>
         </div>
 
-        <div className="-mx-4 mt-3 flex min-w-0 gap-5 overflow-x-auto px-4 text-sm md:mx-0 md:px-0">
+        <div className="-mx-4 mt-2 flex min-w-0 gap-5 overflow-x-auto px-4 text-sm md:mx-0 md:px-0">
           {TABS.map((tab) => (
             <button
               key={tab.key}
