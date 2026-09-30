@@ -5,6 +5,7 @@ import { AutomationHeader } from "../components/automation/AutomationHeader";
 import { AutomationTabs, type AutomationTab } from "../components/automation/AutomationTabs";
 import { JourneyList } from "../components/automation/JourneyList";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
+import { DesktopDrawer } from "../components/DesktopDrawer";
 import { MobileJourneySelector } from "../components/automation/MobileJourneySelector";
 import { NewJourneyDialog } from "../components/automation/NewJourneyDialog";
 import { PreviewDialog } from "../components/automation/PreviewDialog";
@@ -21,6 +22,7 @@ export function AutomationPage() {
   const [showNewJourney, setShowNewJourney] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [journeyDrawerOpen, setJourneyDrawerOpen] = useState(false);
   const { toasts, push } = useToasts();
 
   async function reload(selectAfter?: string) {
@@ -117,17 +119,33 @@ export function AutomationPage() {
             />
           </div>
 
-          <div className="mt-4 flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto md:mt-3 md:flex-row md:overflow-hidden">
-            <div className="hidden md:block md:w-[230px] md:shrink-0 md:overflow-y-auto">
+          {/* Sits above the drawer-scoped row below so the toggle is never covered by the drawer it opens. */}
+          <div className="mt-4 hidden md:mt-3 md:block">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-ink hover:bg-chip"
+              onClick={() => setJourneyDrawerOpen((v) => !v)}
+              aria-expanded={journeyDrawerOpen}
+            >
+              {journeyDrawerOpen ? "← Journeys" : "☰ Journeys"}
+            </button>
+          </div>
+
+          <div className="relative mt-3 flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto md:mt-2 md:flex-row md:overflow-hidden">
+            <DesktopDrawer side="left" width={280} open={journeyDrawerOpen} onClose={() => setJourneyDrawerOpen(false)}>
               <JourneyList
                 campaigns={filtered}
                 totalCount={campaigns?.length ?? 0}
                 selectedId={selectedId}
                 search={search}
                 onSearch={setSearch}
-                onSelect={setSelectedId}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                  setJourneyDrawerOpen(false);
+                }}
+                onClose={() => setJourneyDrawerOpen(false)}
               />
-            </div>
+            </DesktopDrawer>
 
             {selected ? (
               <JourneyBuilder key={selected.id} tenantId={tenantId} campaign={selected} onChanged={() => reload(selected.id)} />

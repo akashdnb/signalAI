@@ -1,5 +1,5 @@
 import type { Campaign } from "../../api";
-import { SearchIcon } from "../icons";
+import { CloseIcon, SearchIcon } from "../icons";
 
 /** Prefers the journey's own description; falls back to a summary derived from real trigger config for campaigns created before that field existed. */
 export function summarize(campaign: Campaign): string {
@@ -53,6 +53,7 @@ export function JourneyList({
   search,
   onSearch,
   onSelect,
+  onClose,
 }: {
   campaigns: Campaign[] | null;
   totalCount: number;
@@ -60,10 +61,23 @@ export function JourneyList({
   search: string;
   onSearch: (value: string) => void;
   onSelect: (id: string) => void;
+  onClose?: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-line bg-card p-4">
-      <h2 className="m-0 text-[15px] font-semibold text-ink">All Journeys ({totalCount})</h2>
+    <div className="flex h-full flex-col rounded-2xl border border-line bg-card p-4 shadow-xl">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="m-0 text-[15px] font-semibold text-ink">All Journeys ({totalCount})</h2>
+        {onClose && (
+          <button
+            type="button"
+            aria-label="Close journeys"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+            onClick={onClose}
+          >
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       <div className="relative mt-3">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />

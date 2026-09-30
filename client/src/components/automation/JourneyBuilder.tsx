@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Campaign, type FieldDefinition, type Milestone } from "../../api";
 import { BottomSheet } from "../BottomSheet";
 import { CampaignEditor, type CampaignEditorHandle } from "../CampaignEditor";
-import { DotsVerticalIcon } from "../icons";
+import { DesktopDrawer } from "../DesktopDrawer";
+import { CloseIcon, DotsVerticalIcon } from "../icons";
 import { AnalyticsPanel } from "./AnalyticsPanel";
 import { BuilderCanvas, type SelectedNode } from "./BuilderCanvas";
 import { Inspector } from "./Inspector";
@@ -40,6 +41,7 @@ export function JourneyBuilder({
   const [menuOpen, setMenuOpen] = useState(false);
   const [showTestJourney, setShowTestJourney] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
+  const [desktopInspectorOpen, setDesktopInspectorOpen] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<BuilderTab | null>(null);
   const detailsRef = useRef<CampaignEditorHandle>(null);
@@ -57,12 +59,14 @@ export function JourneyBuilder({
     loadMilestones();
     setSelectedNode({ type: "trigger" });
     setMobileInspectorOpen(false);
+    setDesktopInspectorOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, campaign.id]);
 
   function selectNode(node: SelectedNode) {
     setSelectedNode(node);
     setMobileInspectorOpen(true);
+    setDesktopInspectorOpen(true);
   }
 
   function requestSubTabChange(next: BuilderTab) {
@@ -138,6 +142,18 @@ export function JourneyBuilder({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {subTab === "builder" && (
+              <button
+                type="button"
+                className={`hidden h-7 items-center rounded-lg border px-2.5 text-xs font-semibold md:inline-flex ${
+                  desktopInspectorOpen ? "border-accent text-accent" : "border-line text-ink hover:bg-chip"
+                }`}
+                onClick={() => setDesktopInspectorOpen((v) => !v)}
+                aria-pressed={desktopInspectorOpen}
+              >
+                Inspector
+              </button>
+            )}
             <button type="button" className="btn-secondary btn-small" onClick={() => setShowTestJourney(true)}>
               Test Journey
             </button>
@@ -189,60 +205,75 @@ export function JourneyBuilder({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
-        {subTab === "builder" && (
-          <BuilderCanvas
-            campaign={campaign}
-            milestones={milestones}
-            selectedNode={selectedNode}
-            onSelectNode={selectNode}
-            onAddMilestone={handleAddMilestone}
-            onRemoveMilestone={handleRemoveMilestone}
-            onReorderMilestone={handleReorderMilestone}
-          />
-        )}
-
-        {subTab === "details" && (
-          <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
-            <CampaignEditor
-              ref={detailsRef}
-              tenantId={tenantId}
+      {/* `relative` scopes the Inspector drawer below — it overlays only this content area, never the header above (which holds the Inspector toggle itself). */}
+      <div className="relative flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
+        <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
+          {subTab === "builder" && (
+            <BuilderCanvas
               campaign={campaign}
-              onChanged={onChanged}
-              onDirtyChange={setDetailsDirty}
+              milestones={milestones}
+              selectedNode={selectedNode}
+              onSelectNode={selectNode}
+              onAddMilestone={handleAddMilestone}
+              onRemoveMilestone={handleRemoveMilestone}
+              onReorderMilestone={handleReorderMilestone}
             />
-          </div>
-        )}
+          )}
 
-        {subTab === "analytics" && (
-          <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
-            <AnalyticsPanel tenantId={tenantId} campaign={campaign} />
-          </div>
-        )}
+          {subTab === "details" && (
+            <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
+              <CampaignEditor
+                ref={detailsRef}
+                tenantId={tenantId}
+                campaign={campaign}
+                onChanged={onChanged}
+                onDirtyChange={setDetailsDirty}
+              />
+            </div>
+          )}
 
-        {subTab === "leads" && (
-          <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
-            <LeadsPanel tenantId={tenantId} campaign={campaign} />
-          </div>
+          {subTab === "analytics" && (
+            <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
+              <AnalyticsPanel tenantId={tenantId} campaign={campaign} />
+            </div>
+          )}
+
+          {subTab === "leads" && (
+            <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
+              <LeadsPanel tenantId={tenantId} campaign={campaign} />
+            </div>
+          )}
+        </div>
+
+        {subTab === "builder" && (
+          <DesktopDrawer side="right" width={340} open={desktopInspectorOpen} onClose={() => setDesktopInspectorOpen(false)}>
+            <div className="inspector-compact flex h-full flex-col overflow-y-auto rounded-2xl border border-line bg-card p-4 shadow-xl">
+              <div className="mb-3 flex shrink-0 items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-subtle">Inspector</span>
+                <button
+                  type="button"
+                  aria-label="Close inspector"
+                  onClick={() => setDesktopInspectorOpen(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+                >
+                  <CloseIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <Inspector
+                tenantId={tenantId}
+                campaign={campaign}
+                milestones={milestones}
+                fieldDefinitions={fieldDefinitions}
+                selectedNode={selectedNode}
+                onCampaignChanged={onChanged}
+                onSaveMilestone={handleSaveMilestone}
+                onFieldDefinitionsChanged={setFieldDefinitions}
+              />
+            </div>
+          </DesktopDrawer>
         )}
       </div>
     </div>
-
-    {/* Sibling column, not nested under the header above — starts at the same top as "All Journeys" and this card (section 3-column parity). */}
-    {subTab === "builder" && (
-      <div className="inspector-compact hidden shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-card p-4 md:flex md:h-full md:w-[300px]">
-        <Inspector
-          tenantId={tenantId}
-          campaign={campaign}
-          milestones={milestones}
-          fieldDefinitions={fieldDefinitions}
-          selectedNode={selectedNode}
-          onCampaignChanged={onChanged}
-          onSaveMilestone={handleSaveMilestone}
-          onFieldDefinitionsChanged={setFieldDefinitions}
-        />
-      </div>
-    )}
 
     {mobileInspectorOpen && subTab === "builder" && (
       <div className="inspector-compact md:hidden">
