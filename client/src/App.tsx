@@ -1,15 +1,17 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
-import { ComingSoonPage } from "./components/ComingSoonPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { AutomationPage } from "./pages/AutomationPage";
 import { ConnectPage } from "./pages/ConnectPage";
+import { ContentPage } from "./pages/ContentPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { InboxPage } from "./pages/InboxPage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { TeamPage } from "./pages/TeamPage";
 import { loadSession } from "./api";
 
 function HomeRedirect() {
@@ -30,10 +32,10 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="automation" element={<AutomationPage />} />
-        <Route path="content" element={<ComingSoonPage title="Content" />} />
+        <Route path="content" element={<ContentPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="team" element={<ComingSoonPage title="Team" />} />
-        <Route path="integrations" element={<ComingSoonPage title="Integrations" />} />
+        <Route path="team" element={<TeamPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

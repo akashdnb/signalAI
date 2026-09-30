@@ -218,3 +218,53 @@ export function CloseIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function InstagramMarkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17" cy="7" r="0.9" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+export function WhatsAppMarkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5a8.5 8.5 0 0 0-7.4 12.7L3.5 20.5l4.4-1.1A8.5 8.5 0 1 0 12 3.5Z" />
+      <path
+        d="M8.7 8.8c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4.2.5.6 1.5.7 1.6.1.1.1.3 0 .5-.1.2-.2.3-.3.5-.2.2-.3.3-.1.6.2.3.8 1.2 1.7 2 1.1 1 2 1.4 2.3 1.5.3.1.5.1.6-.1.2-.2.7-.7.9-1 .2-.2.4-.2.6-.1.2.1 1.5.7 1.7.8.2.1.4.2.4.3 0 .2 0 .9-.3 1.3-.4.5-1.3.9-2.2.8-.8-.1-2.5-.6-4.3-1.9-1.8-1.3-3-3-3.4-3.7-.4-.6-.7-1.3-.7-1.9 0-.6.3-1 .5-1.2Z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </Icon>
+  );
+}
+
+export function CrmMarkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5Z" />
+      <path d="M4 7.5 12 12l8-4.5M12 12v9" />
+    </Icon>
+  );
+}
+
+export function UserPlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="9.5" cy="8" r="3" />
+      <path d="M3.5 19c0-3 2.7-5.5 6-5.5s6 2.5 6 5.5" />
+      <path d="M18 8.5v5M15.5 11h5" />
+    </Icon>
+  );
+}
+
+export function PlayIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 5.5v13l11-6.5Z" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
