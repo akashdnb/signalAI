@@ -19,9 +19,13 @@ import {
   AnalyticsIcon,
   AutomationIcon,
   BellIcon,
+  BookIcon,
+  BroadcastIcon,
   ChevronDownIcon,
   CloseIcon,
+  ContactsIcon,
   ContentIcon,
+  CreditCardIcon,
   HomeIcon,
   InboxIcon,
   InstagramMarkIcon,
@@ -38,43 +42,79 @@ interface NavItem {
   label: string;
   icon: ComponentType<{ className?: string }>;
   end?: boolean;
+  /** No real page behind this yet — shown so the product's information architecture stays visible, per explicit product direction, rather than silently disappearing. */
+  disabled?: boolean;
 }
 
 const PRIMARY_NAV: NavItem[] = [
-  { to: "", label: "Home", icon: HomeIcon, end: true },
+  { to: "", label: "Overview", icon: HomeIcon, end: true },
   { to: "inbox", label: "Inbox", icon: InboxIcon },
   { to: "leads", label: "Leads", icon: LeadsIcon },
   { to: "automation", label: "Automation", icon: AutomationIcon },
+  { to: "knowledge", label: "Knowledge", icon: BookIcon },
   { to: "content", label: "Content", icon: ContentIcon },
   { to: "analytics", label: "Analytics", icon: AnalyticsIcon },
-  { to: "team", label: "Team", icon: TeamIcon },
+  { to: "contacts", label: "Contacts", icon: ContactsIcon, disabled: true },
+  { to: "broadcasts", label: "Broadcasts", icon: BroadcastIcon, disabled: true },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
+  { to: "team", label: "Team", icon: TeamIcon },
   { to: "integrations", label: "Integrations", icon: IntegrationsIcon },
+  { to: "billing", label: "Billing", icon: CreditCardIcon },
   { to: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
-function NavList({ items, tenantId, onNavigate }: { items: NavItem[]; tenantId: string; onNavigate: () => void }) {
+function NavList({
+  items,
+  tenantId,
+  onNavigate,
+  badges,
+}: {
+  items: NavItem[];
+  tenantId: string;
+  onNavigate: () => void;
+  badges?: Record<string, number>;
+}) {
   return (
     <ul className="list-none space-y-1 p-0">
-      {items.map((item) => (
-        <li key={item.label}>
-          <NavLink
-            to={`/dashboard/${tenantId}/${item.to}`}
-            end={item.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
-                isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"
-              }`
-            }
-          >
-            <item.icon className="h-5 w-5 shrink-0" />
-            {item.label}
-          </NavLink>
-        </li>
-      ))}
+      {items.map((item) =>
+        item.disabled ? (
+          <li key={item.label}>
+            <span
+              className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-subtle opacity-60"
+              title="Coming soon"
+            >
+              <item.icon className="h-5 w-5 shrink-0" />
+              {item.label}
+              <span className="ml-auto rounded-full bg-chip px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-subtle">
+                Soon
+              </span>
+            </span>
+          </li>
+        ) : (
+          <li key={item.label}>
+            <NavLink
+              to={`/dashboard/${tenantId}/${item.to}`}
+              end={item.end}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
+                  isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"
+                }`
+              }
+            >
+              <item.icon className="h-5 w-5 shrink-0" />
+              {item.label}
+              {Boolean(badges?.[item.to]) && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-err-ink px-1.5 text-[11px] font-semibold text-white">
+                  {badges![item.to]! > 99 ? "99+" : badges![item.to]}
+                </span>
+              )}
+            </NavLink>
+          </li>
+        ),
+      )}
     </ul>
   );
 }
@@ -222,6 +262,7 @@ export function AppShell() {
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
@@ -264,12 +305,18 @@ export function AppShell() {
   useEffect(() => {
     if (!sessionValid || !tenantId) return;
     let cancelled = false;
-    Promise.all([api.getAccountHealth(tenantId), api.getUsage(tenantId), api.getBilling(tenantId)])
-      .then(([a, u, b]) => {
+    Promise.all([
+      api.getAccountHealth(tenantId),
+      api.getUsage(tenantId),
+      api.getBilling(tenantId),
+      api.getLeads(tenantId, { unreadOnly: true }),
+    ])
+      .then(([a, u, b, unread]) => {
         if (cancelled) return;
         setAccount(a);
         setUsage(u);
         setBilling(b);
+        setUnreadCount(unread.length);
       })
       .catch(() => {
         // Header chrome degrades gracefully — a failed fetch just leaves these panels blank, it's not a page-blocking error.
@@ -320,7 +367,12 @@ export function AppShell() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3">
-          <NavList items={PRIMARY_NAV} tenantId={tenantId} onNavigate={() => setMobileNavOpen(false)} />
+          <NavList
+            items={PRIMARY_NAV}
+            tenantId={tenantId}
+            onNavigate={() => setMobileNavOpen(false)}
+            badges={{ inbox: unreadCount }}
+          />
           <div className="my-4 border-t border-line" />
           <NavList items={SECONDARY_NAV} tenantId={tenantId} onNavigate={() => setMobileNavOpen(false)} />
         </nav>

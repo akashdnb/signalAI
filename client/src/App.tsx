@@ -2,11 +2,13 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { AutomationPage } from "./pages/AutomationPage";
+import { BillingPage } from "./pages/BillingPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { ContentPage } from "./pages/ContentPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { InboxPage } from "./pages/InboxPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
+import { KnowledgePage } from "./pages/KnowledgePage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -33,9 +35,11 @@ export default function App() {
         <Route path="leads" element={<LeadsPage />} />
         <Route path="automation" element={<AutomationPage />} />
         <Route path="content" element={<ContentPage />} />
+        <Route path="knowledge" element={<KnowledgePage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="billing" element={<BillingPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

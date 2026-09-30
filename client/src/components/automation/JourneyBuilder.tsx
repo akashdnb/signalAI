@@ -1,20 +1,27 @@
 import { useEffect, useState } from "react";
-import {
-  api,
-  type Campaign,
-  type Dropoff,
-  type FieldDefinition,
-  type LeadListItem,
-  type Milestone,
-} from "../../api";
+import { api, type Campaign, type FieldDefinition, type Milestone } from "../../api";
 import { CampaignEditor } from "../CampaignEditor";
-import { PIPELINE_STAGES } from "../../lib/leadFormatting";
 import { DotsVerticalIcon } from "../icons";
+import { AnalyticsPanel } from "./AnalyticsPanel";
 import { BuilderCanvas, type SelectedNode } from "./BuilderCanvas";
 import { Inspector } from "./Inspector";
+import { LeadsPanel } from "./LeadsPanel";
 import { TestJourneyDialog } from "./TestJourneyDialog";
 
 type BuilderTab = "builder" | "details" | "analytics" | "leads";
+const TABS: { key: BuilderTab; label: string }[] = [
+  { key: "builder", label: "Builder" },
+  { key: "details", label: "Details" },
+  { key: "analytics", label: "Analytics" },
+  { key: "leads", label: "Leads" },
+];
+
+function describeCampaign(campaign: Campaign): string {
+  if (campaign.description) return campaign.description;
+  const count = campaign.keywords.length;
+  const kind = campaign.triggerSource === "message" ? "DMs" : campaign.triggerSource === "both" ? "comments & DMs" : "comments";
+  return `Replies to ${kind} matching ${count} keyword${count === 1 ? "" : "s"}`;
+}
 
 export function JourneyBuilder({
   tenantId,
@@ -29,8 +36,6 @@ export function JourneyBuilder({
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([]);
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
-  const [dropoff, setDropoff] = useState<Dropoff[] | null>(null);
-  const [leads, setLeads] = useState<LeadListItem[] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showTestJourney, setShowTestJourney] = useState(false);
 
@@ -48,22 +53,6 @@ export function JourneyBuilder({
     setSelectedNode({ type: "trigger" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, campaign.id]);
-
-  useEffect(() => {
-    if (subTab === "analytics") {
-      api.getDropoff(tenantId, campaign.id).then(setDropoff).catch(() => setDropoff([]));
-    }
-    if (subTab === "leads" && leads === null) {
-      api
-        .getLeads(tenantId)
-        .then((all) => {
-          const milestoneIds = new Set(milestones.map((m) => m.id));
-          setLeads(all.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId)));
-        })
-        .catch(() => setLeads([]));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subTab, tenantId, campaign.id]);
 
   async function persistMilestones(next: Milestone[]) {
     const saved = await api.setMilestones(
@@ -121,7 +110,8 @@ export function JourneyBuilder({
                 {campaign.enabled ? "Active" : "Inactive"}
               </span>
             </div>
-            <p className="muted m-0 mt-1 text-sm">{campaign.defaultReplyTemplate ? "Qualify Instagram leads and capture key details." : "No reply configured yet."}</p>
+            <p className="muted m-0 mt-1 text-sm">{describeCampaign(campaign)}</p>
+            <p className="muted small m-0 mt-0.5">Last updated {new Date(campaign.updatedAt).toLocaleString()}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button type="button" className="btn-secondary btn-small" onClick={() => setShowTestJourney(true)}>
@@ -160,16 +150,16 @@ export function JourneyBuilder({
         </div>
 
         <div className="mt-3 flex gap-5 text-sm">
-          {(["builder", "details", "analytics", "leads"] as BuilderTab[]).map((tab) => (
+          {TABS.map((tab) => (
             <button
-              key={tab}
+              key={tab.key}
               type="button"
-              onClick={() => setSubTab(tab)}
-              className={`-mb-px border-b-2 pb-1.5 capitalize transition-colors ${
-                subTab === tab ? "border-accent font-semibold text-accent" : "border-transparent text-subtle hover:text-ink"
+              onClick={() => setSubTab(tab.key)}
+              className={`-mb-px border-b-2 pb-1.5 transition-colors ${
+                subTab === tab.key ? "border-accent font-semibold text-accent" : "border-transparent text-subtle hover:text-ink"
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -210,54 +200,13 @@ export function JourneyBuilder({
 
         {subTab === "analytics" && (
           <div className="h-full overflow-y-auto p-4">
-            <h3>Milestone drop-off</h3>
-            {dropoff === null ? (
-              <p className="muted">Loading…</p>
-            ) : dropoff.length === 0 ? (
-              <p className="muted">No milestone activity yet.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {dropoff.map((d) => {
-                  const max = Math.max(...dropoff.map((x) => x.advancedCount), 1);
-                  return (
-                    <div key={d.milestoneId}>
-                      <div className="flex justify-between text-xs text-subtle">
-                        <span>
-                          {d.ordinal + 1}. {d.goalDescription}
-                        </span>
-                        <span>{d.advancedCount}</span>
-                      </div>
-                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-chip">
-                        <div className="h-full rounded-full bg-accent" style={{ width: `${(d.advancedCount / max) * 100}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <AnalyticsPanel tenantId={tenantId} campaign={campaign} />
           </div>
         )}
 
         {subTab === "leads" && (
           <div className="h-full overflow-y-auto p-4">
-            <h3>Leads in this journey</h3>
-            {leads === null ? (
-              <p className="muted">Loading…</p>
-            ) : leads.length === 0 ? (
-              <p className="muted">No leads are currently in this journey.</p>
-            ) : (
-              <ul className="list">
-                {leads.map((lead) => {
-                  const stage = PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage);
-                  return (
-                    <li key={lead.id} className="list-item">
-                      <span>{lead.username ?? "Unknown"}</span>
-                      <span className="pill">{stage?.label ?? lead.pipelineStage}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            <LeadsPanel tenantId={tenantId} campaign={campaign} />
           </div>
         )}
       </div>

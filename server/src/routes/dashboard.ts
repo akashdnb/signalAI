@@ -4,6 +4,7 @@ import { getTenant } from "../db/tenants.js";
 import { getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
 import {
+  getCampaignAnalytics,
   getConversationsTimeseries,
   getMilestoneDropoff,
   getPipelineFunnel,
@@ -116,6 +117,12 @@ export function dashboardRouter(
     return res.status(200).json(dropoff);
   });
 
+  router.get("/tenants/:tenantId/campaigns/:campaignId/analytics", async (req, res) => {
+    const { tenantId, campaignId } = req.params;
+    const analytics = await getCampaignAnalytics(getPool(), tenantId, campaignId);
+    return res.status(200).json(analytics);
+  });
+
   const VALID_REPLY_MODES: ReplyMode[] = ["rule_based", "ai_generated"];
   const VALID_REPLY_CHANNELS: ReplyChannel[] = ["dm", "comment", "both"];
   const VALID_TRIGGER_SOURCES: TriggerSource[] = ["comment", "message", "both"];
@@ -124,14 +131,31 @@ export function dashboardRouter(
 
   router.patch("/tenants/:tenantId/campaigns/:campaignId/reply-config", async (req, res) => {
     const { tenantId, campaignId } = req.params;
-    const { replyMode, ctaLink, defaultReplyTemplate, replyChannel, triggerSource, tone, language, useKnowledgeBase, keywords } =
-      req.body ?? {};
+    const {
+      replyMode,
+      ctaLink,
+      defaultReplyTemplate,
+      replyChannel,
+      triggerSource,
+      tone,
+      language,
+      useKnowledgeBase,
+      keywords,
+      name,
+      description,
+    } = req.body ?? {};
 
     if (
       keywords !== undefined &&
       (!Array.isArray(keywords) || keywords.length === 0 || !keywords.every((k: unknown) => typeof k === "string"))
     ) {
       return res.status(400).json({ error: "keywords must be a non-empty array of strings" });
+    }
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+      return res.status(400).json({ error: "name must be a non-empty string" });
+    }
+    if (description !== undefined && description !== null && typeof description !== "string") {
+      return res.status(400).json({ error: "description must be a string or null" });
     }
     if (replyMode !== undefined && !VALID_REPLY_MODES.includes(replyMode)) {
       return res.status(400).json({ error: `replyMode must be one of ${VALID_REPLY_MODES.join(", ")}` });
@@ -168,6 +192,8 @@ export function dashboardRouter(
       language,
       useKnowledgeBase,
       keywords,
+      name: name?.trim(),
+      description,
     });
     if (!updated) return res.status(404).json({ error: "campaign not found for this tenant" });
     return res.status(200).json(updated);

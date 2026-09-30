@@ -424,6 +424,37 @@ export function ArrowDownIcon(props: IconProps) {
   );
 }
 
+export function ContactsIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+      <circle cx="9.5" cy="10.5" r="2.2" />
+      <path d="M6 16c0-1.8 1.6-3 3.5-3s3.5 1.2 3.5 3" />
+      <path d="M15 9.5h3M15 13h3" />
+    </Icon>
+  );
+}
+
+export function BroadcastIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 11.5 15 6v12L4 12.5Z" />
+      <path d="M4 11.5v4a1.5 1.5 0 0 0 1.5 1.5H7v-5" />
+      <path d="M17.5 9a4 4 0 0 1 0 6M20 6.5a7.5 7.5 0 0 1 0 11" />
+    </Icon>
+  );
+}
+
+export function CreditCardIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="M3 9.5h18" />
+      <path d="M6.5 14.5h4" />
+    </Icon>
+  );
+}
+
 export function DragHandleIcon(props: IconProps) {
   return (
     <Icon {...props} strokeWidth={0} fill="currentColor">

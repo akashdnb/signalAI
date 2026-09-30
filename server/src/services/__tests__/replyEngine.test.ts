@@ -19,6 +19,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     id: "campaign-1",
     tenantId: "tenant-1",
     name: "Giveaway",
+    description: null,
     keywords: ["LINK"],
     enabled: true,
     replyMode: "rule_based",
@@ -32,6 +33,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     language: "auto",
     useKnowledgeBase: true,
     createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   };
 }

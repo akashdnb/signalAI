@@ -191,6 +191,7 @@ export interface Campaign {
   id: string;
   tenantId: string;
   name: string;
+  description: string | null;
   keywords: string[];
   enabled: boolean;
   replyMode: "rule_based" | "ai_generated";
@@ -204,6 +205,7 @@ export interface Campaign {
   language: CampaignLanguage;
   useKnowledgeBase: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ObservedMedia {
@@ -362,6 +364,19 @@ export interface ConversationsTimeseriesPoint {
   dms: number;
 }
 
+export interface CampaignAnalyticsPoint {
+  date: string;
+  comments: number;
+  messages: number;
+}
+
+export interface CampaignAnalytics {
+  commentsMatched: number;
+  messagesMatched: number;
+  conversationsStarted: number;
+  timeseries: CampaignAnalyticsPoint[];
+}
+
 export interface Dropoff {
   milestoneId: string;
   ordinal: number;
@@ -514,6 +529,8 @@ export const api = {
     request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
+  getCampaignAnalytics: (tenantId: string, campaignId: string) =>
+    request<CampaignAnalytics>(`/tenants/${tenantId}/campaigns/${campaignId}/analytics`),
 
   listCampaigns: (tenantId: string) => request<Campaign[]>(`/tenants/${tenantId}/campaigns`),
   createCampaign: (tenantId: string, name: string, keywords: string[]) =>
@@ -539,6 +556,8 @@ export const api = {
       language?: CampaignLanguage;
       useKnowledgeBase?: boolean;
       keywords?: string[];
+      name?: string;
+      description?: string | null;
     },
   ) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, {

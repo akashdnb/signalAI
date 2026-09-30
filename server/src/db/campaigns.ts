@@ -18,6 +18,8 @@ export interface Campaign {
   id: string;
   tenantId: string;
   name: string;
+  /** Free-text summary shown on the journey card / Details page. Null for every campaign created before this field existed. */
+  description: string | null;
   keywords: string[];
   enabled: boolean;
   replyMode: ReplyMode;
@@ -33,12 +35,14 @@ export interface Campaign {
   /** Per-campaign override of the tenant's always-on-whenever-documents-exist RAG — default true preserves every existing campaign's current behavior. */
   useKnowledgeBase: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 interface CampaignRow {
   id: string;
   tenant_id: string;
   name: string;
+  description: string | null;
   keywords: string[];
   enabled: boolean;
   reply_mode: ReplyMode;
@@ -52,6 +56,7 @@ interface CampaignRow {
   language: CampaignLanguage;
   use_knowledge_base: boolean;
   created_at: Date;
+  updated_at: Date;
 }
 
 function toCampaign(row: CampaignRow): Campaign {
@@ -59,6 +64,7 @@ function toCampaign(row: CampaignRow): Campaign {
     id: row.id,
     tenantId: row.tenant_id,
     name: row.name,
+    description: row.description,
     keywords: row.keywords,
     enabled: row.enabled,
     replyMode: row.reply_mode,
@@ -72,6 +78,7 @@ function toCampaign(row: CampaignRow): Campaign {
     language: row.language,
     useKnowledgeBase: row.use_knowledge_base,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -230,6 +237,8 @@ export async function updateCampaignReplyConfig(
     language?: CampaignLanguage;
     useKnowledgeBase?: boolean;
     keywords?: string[];
+    name?: string;
+    description?: string | null;
   },
 ): Promise<Campaign | null> {
   const result = await pool.query<CampaignRow>(
@@ -243,6 +252,8 @@ export async function updateCampaignReplyConfig(
        language = coalesce($10, language),
        use_knowledge_base = case when $11::boolean then $12 else use_knowledge_base end,
        keywords = coalesce($13, keywords),
+       name = coalesce($14, name),
+       description = case when $15::boolean then $16 else description end,
        updated_at = now()
      where id = $1 and tenant_id = $2
      returning *`,
@@ -260,6 +271,9 @@ export async function updateCampaignReplyConfig(
       updates.useKnowledgeBase !== undefined, // same "was it sent at all" trick as ctaLink — useKnowledgeBase: false must not coalesce away
       updates.useKnowledgeBase ?? null,
       updates.keywords ?? null,
+      updates.name ?? null,
+      updates.description !== undefined,
+      updates.description ?? null,
     ],
   );
   return result.rows[0] ? toCampaign(result.rows[0]) : null;

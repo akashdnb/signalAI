@@ -2,8 +2,9 @@ import { useState } from "react";
 import type { Campaign } from "../../api";
 import { DotsVerticalIcon, SearchIcon } from "../icons";
 
-/** Campaigns have no free-text description field — this is a short, honest summary derived from real trigger config, not invented copy. */
+/** Prefers the journey's own description; falls back to a summary derived from real trigger config for campaigns created before that field existed. */
 function summarize(campaign: Campaign): string {
+  if (campaign.description) return campaign.description;
   const count = campaign.keywords.length;
   const kind = campaign.triggerSource === "message" ? "DMs" : campaign.triggerSource === "both" ? "comments & DMs" : "comments";
   return `Replies to ${kind} matching ${count} keyword${count === 1 ? "" : "s"}`;

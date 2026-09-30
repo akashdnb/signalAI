@@ -50,7 +50,7 @@ export function BuilderNode({
           onClick();
         }
       }}
-      className={`w-full max-w-[420px] cursor-pointer rounded-xl border border-l-4 bg-card p-3.5 text-left shadow-sm transition-shadow ${
+      className={`w-full max-w-[420px] min-h-[68px] cursor-pointer rounded-xl border border-l-4 bg-card p-3.5 text-left shadow-sm transition-shadow ${
         ACCENT_BORDER[accent]
       } ${selected ? "border-accent shadow-md ring-1 ring-accent" : "border-line hover:shadow-md"}`}
     >
@@ -73,8 +73,11 @@ export function BuilderNode({
 
 export function NodeConnector() {
   return (
-    <div className="flex justify-center py-1" aria-hidden="true">
-      <div className="h-6 w-px bg-line" />
+    <div className="flex flex-col items-center py-0.5" aria-hidden="true">
+      <div className="h-6 w-0.5 rounded-full bg-line" />
+      <svg width="12" height="7" viewBox="0 0 12 7" className="-mt-px text-line">
+        <path d="M1 0.5 6 6 11 0.5" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </div>
   );
 }

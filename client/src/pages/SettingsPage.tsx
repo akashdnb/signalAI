@@ -1,10 +1,9 @@
 import { useParams } from "react-router-dom";
 import { FieldDefinitionsPanel } from "../components/FieldDefinitionsPanel";
-import { KnowledgeBasePanel } from "../components/KnowledgeBasePanel";
 import { GuardrailsConfigPanel } from "../components/GuardrailsConfigPanel";
-import { BillingPanel } from "../components/BillingPanel";
 import { useTenant } from "../context/TenantContext";
 
+/** Knowledge Base and Billing moved to their own nav destinations (R8) — this page is now tenant-wide config only: captured-fact schema and AI guardrails. */
 export function SettingsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const { tenant } = useTenant();
@@ -16,9 +15,7 @@ export function SettingsPage() {
       <h1>{tenant?.name ?? "Settings"}</h1>
 
       <FieldDefinitionsPanel tenantId={tenantId} />
-      <KnowledgeBasePanel tenantId={tenantId} />
       <GuardrailsConfigPanel tenantId={tenantId} />
-      <BillingPanel tenantId={tenantId} />
     </div>
   );
 }

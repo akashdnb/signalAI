@@ -216,6 +216,82 @@ export async function getConversationsTimeseries(pool: Pool, tenantId: string): 
   return result.rows.map((row) => ({ date: row.date, comments: Number(row.comments), dms: Number(row.dms) }));
 }
 
+export interface CampaignAnalyticsPoint {
+  date: string;
+  comments: number;
+  messages: number;
+}
+
+export interface CampaignAnalytics {
+  commentsMatched: number;
+  messagesMatched: number;
+  /** Distinct leads who ever triggered this campaign — not the same as total matched events, since one lead can match more than once. */
+  conversationsStarted: number;
+  timeseries: CampaignAnalyticsPoint[];
+}
+
+/**
+ * Journey-scoped analytics (Automation Analytics subsection). Unlike
+ * getTenantAnalytics/getPipelineFunnel above, this filters lead_events by
+ * `attributes->>'matchedCampaignId'` — set at ingestion
+ * (webhookIngestService.ts) whenever an event actually matched this
+ * campaign's keywords, so "matched" here means the same thing the reply
+ * engine acted on, not merely "received while this campaign existed".
+ */
+export async function getCampaignAnalytics(pool: Pool, tenantId: string, campaignId: string): Promise<CampaignAnalytics> {
+  const [matchedRows, conversationsRow, timeseriesRows] = await Promise.all([
+    pool.query<{ event_type: string; count: string }>(
+      `select event_type, count(*)::int as count
+       from lead_events
+       where tenant_id = $1 and attributes->>'matchedCampaignId' = $2
+       group by event_type`,
+      [tenantId, campaignId],
+    ),
+    pool.query<{ count: string }>(
+      `select count(distinct lead_id)::int as count
+       from lead_events
+       where tenant_id = $1 and attributes->>'matchedCampaignId' = $2`,
+      [tenantId, campaignId],
+    ),
+    pool.query<{ date: string; comments: string; messages: string }>(
+      `select
+         to_char(d::date, 'YYYY-MM-DD') as date,
+         coalesce(c.count, 0) as comments,
+         coalesce(m.count, 0) as messages
+       from generate_series(current_date - interval '29 days', current_date, interval '1 day') as d
+       left join (
+         select date_trunc('day', occurred_at) as day, count(*)::int as count
+         from lead_events
+         where tenant_id = $1 and event_type = 'comment' and attributes->>'matchedCampaignId' = $2
+           and occurred_at >= current_date - interval '29 days'
+         group by 1
+       ) c on c.day = d
+       left join (
+         select date_trunc('day', occurred_at) as day, count(*)::int as count
+         from lead_events
+         where tenant_id = $1 and event_type = 'message' and attributes->>'matchedCampaignId' = $2
+           and occurred_at >= current_date - interval '29 days'
+         group by 1
+       ) m on m.day = d
+       order by d`,
+      [tenantId, campaignId],
+    ),
+  ]);
+
+  const byEventType = new Map(matchedRows.rows.map((r) => [r.event_type, Number(r.count)]));
+
+  return {
+    commentsMatched: byEventType.get("comment") ?? 0,
+    messagesMatched: byEventType.get("message") ?? 0,
+    conversationsStarted: Number(conversationsRow.rows[0]!.count),
+    timeseries: timeseriesRows.rows.map((row) => ({
+      date: row.date,
+      comments: Number(row.comments),
+      messages: Number(row.messages),
+    })),
+  };
+}
+
 export interface MilestoneDropoff {
   milestoneId: string;
   ordinal: number;
