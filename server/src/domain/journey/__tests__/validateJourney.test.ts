@@ -200,6 +200,151 @@ describe("validateJourneyGraph", () => {
     expect(result.errors.some((e) => e.code === "CYCLE")).toBe(true);
   });
 
+  it("allows a child node to appear before its parent group", () => {
+    const result = validateJourneyGraph(
+      graph({
+        nodes: [
+          {
+            id: "trigger",
+            type: "trigger",
+            position: { x: 0, y: 0 },
+            data: {},
+            parentGroupId: null,
+            collapsed: false,
+          },
+          {
+            id: "message",
+            type: "message",
+            position: { x: 0, y: 100 },
+            data: {},
+            parentGroupId: "group",
+            collapsed: false,
+          },
+          {
+            id: "group",
+            type: "message",
+            position: { x: 0, y: 200 },
+            data: {},
+            parentGroupId: null,
+            collapsed: false,
+          },
+          {
+            id: "handoff",
+            type: "human_handoff",
+            position: { x: 0, y: 300 },
+            data: {},
+            parentGroupId: null,
+            collapsed: false,
+          },
+        ],
+        edges: [
+          {
+            id: "e1",
+            sourceNodeId: "trigger",
+            targetNodeId: "message",
+            label: null,
+            condition: null,
+          },
+          {
+            id: "e2",
+            sourceNodeId: "message",
+            targetNodeId: "handoff",
+            label: null,
+            condition: null,
+          },
+        ],
+      }),
+    );
+
+    expect(
+      result.errors.some((e) => e.code === "INVALID_PARENT_GROUP"),
+    ).toBe(false);
+  });
+
+  it("requires every campaign milestone to have a journey node", () => {
+    const result = validateJourneyGraph(
+      graph(),
+      [
+        {
+          id: "m1",
+          campaignId: "campaign",
+          tenantId: "tenant",
+          ordinal: 0,
+          goalDescription: "Get budget",
+          captureFields: [],
+        },
+      ],
+    );
+
+    expect(
+      result.errors.some((e) => e.code === "MISSING_MILESTONE_NODE"),
+    ).toBe(true);
+  });
+
+  it("rejects duplicate journey nodes for the same milestone", () => {
+    const milestoneNode = {
+      id: "m1-node",
+      type: "milestone_group" as const,
+      position: { x: 0, y: 150 },
+      data: { milestoneId: "m1" },
+      parentGroupId: null,
+      collapsed: false,
+    };
+
+    const duplicateNode = {
+      ...milestoneNode,
+      id: "m2-node",
+    };
+
+    const result = validateJourneyGraph(
+      graph({
+        nodes: [
+          ...graph().nodes,
+          milestoneNode,
+          duplicateNode,
+        ],
+        edges: [
+          ...graph().edges,
+          {
+            id: "e3",
+            sourceNodeId: "message",
+            targetNodeId: "m1-node",
+            label: null,
+            condition: null,
+          },
+          {
+            id: "e4",
+            sourceNodeId: "m1-node",
+            targetNodeId: "m2-node",
+            label: null,
+            condition: null,
+          },
+          {
+            id: "e5",
+            sourceNodeId: "m2-node",
+            targetNodeId: "handoff",
+            label: null,
+            condition: null,
+          },
+        ],
+      }),
+      [
+        {
+          id: "m1",
+          campaignId: "campaign",
+          tenantId: "tenant",
+          ordinal: 0,
+          goalDescription: "Get budget",
+          captureFields: [],
+        },
+      ],
+    );
+
+    expect(
+      result.errors.some((e) => e.code === "DUPLICATE_MILESTONE_NODE"),
+    ).toBe(true);
+  });
+
   it("validates milestone references", () => {
     const result = validateJourneyGraph(
       graph({

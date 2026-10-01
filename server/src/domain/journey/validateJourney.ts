@@ -12,6 +12,8 @@ export type JourneyValidationCode =
   | "UNSUPPORTED_NODE_TYPE"
   | "MISSING_MILESTONE_ID"
   | "UNKNOWN_MILESTONE"
+  | "MISSING_MILESTONE_NODE"
+  | "DUPLICATE_MILESTONE_NODE"
   | "UNREACHABLE_NODE"
   | "NO_TERMINAL_NODE"
   | "CYCLE";
@@ -132,6 +134,12 @@ export function validateJourneyGraph(
     return { valid: false, errors };
   }
 
+  /*
+   * Build the complete node registry first.
+   *
+   * Parent references must not depend on node ordering. A child is allowed
+   * to appear before its parent in the serialized graph.
+   */
   const nodeIds = new Set<string>();
 
   for (const node of graph.nodes) {
@@ -144,7 +152,9 @@ export function validateJourneyGraph(
     }
 
     nodeIds.add(node.id);
+  }
 
+  for (const node of graph.nodes) {
     if (!SUPPORTED_NODE_TYPES.has(node.type)) {
       errors.push(
         error(
@@ -188,6 +198,52 @@ export function validateJourneyGraph(
             "UNKNOWN_MILESTONE",
             `Milestone node ${node.id} references unknown milestone ${milestoneId}.`,
             { nodeId: node.id },
+          ),
+        );
+      }
+    }
+  }
+
+  /*
+   * Every active milestone must be represented exactly once in the journey.
+   *
+   * A milestone node referencing an unknown milestone is already reported
+   * above. Here we additionally make sure no current milestone disappears
+   * from the graph.
+   */
+  if (milestones.length > 0) {
+    const milestoneNodeCounts = new Map<string, number>();
+
+    for (const node of graph.nodes) {
+      if (node.type !== "milestone_group") continue;
+
+      const milestoneId = node.data.milestoneId;
+
+      if (typeof milestoneId !== "string" || !milestoneId) {
+        continue;
+      }
+
+      milestoneNodeCounts.set(
+        milestoneId,
+        (milestoneNodeCounts.get(milestoneId) ?? 0) + 1,
+      );
+    }
+
+    for (const milestone of milestones) {
+      const count = milestoneNodeCounts.get(milestone.id) ?? 0;
+
+      if (count === 0) {
+        errors.push(
+          error(
+            "MISSING_MILESTONE_NODE",
+            `Milestone ${milestone.id} is not represented in the journey.`,
+          ),
+        );
+      } else if (count > 1) {
+        errors.push(
+          error(
+            "DUPLICATE_MILESTONE_NODE",
+            `Milestone ${milestone.id} is represented by ${count} journey nodes.`,
           ),
         );
       }
