@@ -22,6 +22,8 @@ import {
   recordMilestoneAdvancement,
 } from "../db/milestones.js";
 import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
+import { qualificationToCapturedFacts } from "./leadQualification.js";
+import { recalculateLeadIntelligence } from "./leadScoring.js";
 import { getFieldDefinitionValueTypes } from "../db/fieldDefinitions.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
@@ -212,6 +214,7 @@ export function createLeadEventReplyHandler(
     // R6-01: milestone progress (captured facts and/or advancement) is
     // computed here but only committed after a confirmed send, below.
     let commitMilestoneProgress: (() => Promise<void>) | null = null;
+    let commitQualification: (() => Promise<void>) | undefined;
 
     if (milestones.length === 0 || campaign.replyMode === "rule_based") {
       // No Milestone Engine configured, or the campaign opted out of AI
@@ -289,6 +292,25 @@ export function createLeadEventReplyHandler(
         effectiveSpendGuard,
         rag,
       );
+
+      // Qualification comes from the same structured model response as the
+      // normal milestone decision. Defer persistence until delivery succeeds,
+      // so a reply that never reaches Instagram cannot mutate lead state.
+  
+      if (result.qualification) {
+        const qualificationFacts = qualificationToCapturedFacts(result.qualification);
+
+        if (Object.keys(qualificationFacts).length > 0) {
+          commitQualification = async () => {
+            await mergeCapturedFacts(
+              pool,
+              job.tenantId,
+              job.leadId,
+              qualificationFacts,
+            );
+          };
+        }
+      }
 
       // Multi-field capture, partial-across-turns: a field answered this
       // turn must be persisted even when the milestone isn't fully
@@ -429,12 +451,27 @@ export function createLeadEventReplyHandler(
       });
     }
 
-    // R6-01: only commit milestone advancement once at least one channel
+    // R6-01: only commit lead-state mutations once at least one channel
     // actually delivered — a throw above propagates out of this handler
     // and the job retries with nothing committed yet, so the retry redoes
-    // the LLM/milestone work cleanly instead of skipping ahead.
-    if (commitMilestoneProgress && delivered) {
-      await commitMilestoneProgress();
+    // the LLM work cleanly instead of persisting state for an undelivered reply.
+    if (delivered) {
+      if (commitQualification) {
+        await commitQualification();
+      }
+
+      if (commitMilestoneProgress) {
+        await commitMilestoneProgress();
+      }
+
+      // Qualification and engagement are now reflected in the durable lead
+      // intelligence projection. This is deterministic and does not make
+      // another LLM request.
+      await recalculateLeadIntelligence(
+        pool,
+        job.tenantId,
+        job.leadId,
+      );
     }
 
     return { advance: true };

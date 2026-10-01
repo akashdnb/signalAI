@@ -11,6 +11,7 @@ import { findOrCreateLeadByInstagramUserId, getLead, updateHandoffStatus, update
 import { insertEventIdempotent } from "../../db/events.js";
 import { insertPii } from "../../db/pii.js";
 import { getCapturedFacts } from "../../db/capturedFacts.js";
+import { getLeadIntelligence } from "../../db/leadIntelligence.js";
 import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import type { LLMProvider } from "../../llm/provider.js";
@@ -833,6 +834,150 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
       expect(provider.generateReply).toHaveBeenCalled(); // a paid tier has no trial allowance to hit
+    });
+  });
+
+  describe("Phase 2C Lead Intelligence", () => {
+    it("persists qualification and updates the lead score", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(
+        pool,
+        tenant.id,
+        "Qualification",
+        ["BUY"],
+        { replyMode: "ai_generated" },
+      );
+
+      await setCampaignMilestones(pool, tenant.id, campaign.id, [
+        {
+          goalDescription: "understand the prospect",
+          captureFields: [],
+        },
+      ]);
+
+      const provider = mockProvider([
+        JSON.stringify({
+          reply: "Got it.",
+          milestone_satisfied: false,
+          qualification: {
+            intent: "ready_to_buy",
+            need: "3BHK apartment",
+            budget: "₹1.5 crore",
+            location: "Bangalore",
+          },
+        }),
+      ]);
+
+      const handler = createLeadEventReplyHandler(
+        pool,
+        fakeBoss,
+        provider,
+        keyring,
+        DEFAULT_AI_CAP,
+      );
+
+      const { lead, event } = await seedMatchedEvent(
+        pool,
+        tenant.id,
+        campaign.id,
+        "BUY",
+        "I want a 3BHK in Bangalore around ₹1.5 crore",
+      );
+
+      await handler({
+        tenantId: tenant.id,
+        leadId: lead.id,
+        leadEventId: event.id,
+        sequence: 1,
+      });
+
+      expect(await getCapturedFacts(pool, tenant.id, lead.id)).toMatchObject({
+        intent: "ready_to_buy",
+        need: "3BHK apartment",
+        budget: "₹1.5 crore",
+        location: "Bangalore",
+      });
+
+      const intelligence = await getLeadIntelligence(
+        pool,
+        tenant.id,
+        lead.id,
+      );
+
+      expect(intelligence).not.toBeNull();
+      expect(intelligence!.score).toBe(75);
+      expect(intelligence!.scoreBand).toBe("hot");
+      expect(intelligence!.intent).toBe("ready_to_buy");
+      expect(intelligence!.need).toBe("3BHK apartment");
+      expect(intelligence!.budgetText).toBe("₹1.5 crore");
+      expect(intelligence!.location).toBe("Bangalore");
+    });
+
+    it("does not persist qualification when Instagram delivery fails", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(
+        pool,
+        tenant.id,
+        "Qualification delivery failure",
+        ["BUY"],
+        { replyMode: "ai_generated" },
+      );
+
+      await setCampaignMilestones(pool, tenant.id, campaign.id, [
+        {
+          goalDescription: "understand the prospect",
+          captureFields: [],
+        },
+      ]);
+
+      const provider = mockProvider([
+        JSON.stringify({
+          reply: "Got it.",
+          milestone_satisfied: false,
+          qualification: {
+            intent: "ready_to_buy",
+            need: "3BHK apartment",
+            budget: "₹1.5 crore",
+            location: "Bangalore",
+          },
+        }),
+      ]);
+
+      vi.mocked(sendInstagramMessage).mockRejectedValueOnce(
+        new Error("Instagram unavailable"),
+      );
+
+      const handler = createLeadEventReplyHandler(
+        pool,
+        fakeBoss,
+        provider,
+        keyring,
+        DEFAULT_AI_CAP,
+      );
+
+      const { lead, event } = await seedMatchedEvent(
+        pool,
+        tenant.id,
+        campaign.id,
+        "BUY",
+        "I want a 3BHK in Bangalore around ₹1.5 crore",
+      );
+
+      await expect(
+        handler({
+          tenantId: tenant.id,
+          leadId: lead.id,
+          leadEventId: event.id,
+          sequence: 1,
+        }),
+      ).rejects.toThrow("Instagram unavailable");
+
+      expect(await getCapturedFacts(pool, tenant.id, lead.id)).toEqual({});
+      expect(
+        await getLeadIntelligence(pool, tenant.id, lead.id),
+      ).toBeNull();
     });
   });
 

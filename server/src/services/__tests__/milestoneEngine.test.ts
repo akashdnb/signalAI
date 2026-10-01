@@ -32,6 +32,40 @@ function mockProvider(impl: LLMProvider["generateReply"]): LLMProvider {
 }
 
 describe("runMilestoneCheck", () => {
+  it("extracts qualification from the same structured response", async () => {
+    const provider = mockProvider(
+      vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          reply: "Perfect.",
+          milestone_satisfied: false,
+          qualification: {
+            intent: "ready_to_buy",
+            need: "3BHK apartment",
+            budget: "₹1.5 crore",
+            location: "Bangalore",
+          },
+        }),
+      }),
+    );
+
+    const result = await runMilestoneCheck(
+      {
+        milestone: makeMilestone({ captureFields: [] }),
+        capturedFactsSoFar: {},
+        sourceText: "I want a 3BHK in Bangalore around ₹1.5 crore",
+        tier: "dm",
+      },
+      provider,
+    );
+
+    expect(result.qualification).toEqual({
+      intent: "ready_to_buy",
+      need: "3BHK apartment",
+      budget: "₹1.5 crore",
+      location: "Bangalore",
+    });
+  });
+
   it("parses structured output and reports satisfaction with the captured value", async () => {
     const provider = mockProvider(
       vi.fn().mockResolvedValue({ text:

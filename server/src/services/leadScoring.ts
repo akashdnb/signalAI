@@ -7,12 +7,20 @@ import {
   type LeadIntelligence,
 } from "../db/leadIntelligence.js";
 
-const INTENT_WEIGHT = 25;
 const NEED_WEIGHT = 20;
 const BUDGET_WEIGHT = 20;
 const LOCATION_WEIGHT = 10;
 const ENGAGEMENT_MAX_WEIGHT = 15;
 const MILESTONE_PROGRESS_MAX_WEIGHT = 10;
+
+const INTENT_WEIGHTS: Record<string, number> = {
+  ready_to_buy: 25,
+  high_intent: 25,
+  considering: 15,
+  researching: 5,
+  not_interested: 0,
+  support: 0,
+};
 
 const INTENT_KEYS = [
   "intent",
@@ -60,17 +68,67 @@ function firstNonEmptyFact(
   return null;
 }
 
+const INTENT_ALIASES: Record<string, string> = {
+  buying: "ready_to_buy",
+  buy: "ready_to_buy",
+  purchase: "ready_to_buy",
+  purchasing: "ready_to_buy",
+  ready: "ready_to_buy",
+  "ready to buy": "ready_to_buy",
+  "ready-to-buy": "ready_to_buy",
+  interested: "high_intent",
+  "high intent": "high_intent",
+  "high-intent": "high_intent",
+  evaluating: "considering",
+  "still deciding": "considering",
+  exploring: "researching",
+  exploring_options: "researching",
+  "just researching": "researching",
+  disinterested: "not_interested",
+  "not interested": "not_interested",
+  support_request: "support",
+};
+
+function normalizeIntent(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\\s-]+/g, "_");
+
+  return INTENT_ALIASES[normalized] ?? normalized;
+}
+
 function parseBudgetValue(value: string | null): number | null {
   if (!value) return null;
 
-  const normalized = value.replace(/,/g, "").trim();
+  const normalized = value
+    .toLowerCase()
+    .replace(/,/g, "")
+    .replace(/₹/g, "")
+    .replace(/inr|rs\.?/g, "")
+    .trim();
 
   if (/^-?\d+(\.\d+)?$/.test(normalized)) {
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  return null;
+  const match = normalized.match(/^(\d+(\.\d+)?)\s*(crore|cr|lakh|lac|k)$/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+
+  const multiplier =
+    match[3] === "crore" || match[3] === "cr"
+      ? 10_000_000
+      : match[3] === "lakh" || match[3] === "lac"
+        ? 100_000
+        : 1_000;
+
+  return amount * multiplier;
 }
 
 export interface LeadScoreResult {
@@ -90,9 +148,14 @@ export function calculateLeadScore(input: {
   let score = 0;
   const reasons: string[] = [];
 
-  if (input.intent?.trim()) {
-    score += INTENT_WEIGHT;
-    reasons.push(`Intent captured +${INTENT_WEIGHT}`);
+  const normalizedIntent = normalizeIntent(input.intent);
+  if (normalizedIntent) {
+    const intentPoints = INTENT_WEIGHTS[normalizedIntent];
+
+    if (intentPoints !== undefined && intentPoints > 0) {
+      score += intentPoints;
+      reasons.push(`Intent ${normalizedIntent} +${intentPoints}`);
+    }
   }
 
   if (input.need?.trim()) {

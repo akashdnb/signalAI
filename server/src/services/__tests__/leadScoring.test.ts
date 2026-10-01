@@ -28,7 +28,7 @@ describe("calculateLeadScore", () => {
     expect(result.score).toBe(75);
     expect(result.scoreBand).toBe("hot");
     expect(result.reasons).toEqual([
-      "Intent captured +25",
+      "Intent ready_to_buy +25",
       "Need captured +20",
       "Budget captured +20",
       "Location captured +10",
