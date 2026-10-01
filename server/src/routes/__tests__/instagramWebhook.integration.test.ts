@@ -1,37 +1,85 @@
 import { createHmac, randomUUID } from "node:crypto";
 import express from "express";
 import request from "supertest";
-import { afterAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
-import { createInstagramWebhookRouter } from "../instagramWebhook.js";
-import { JourneyRuntime } from "../../domain/journey/runtime.js";
+import {
+  createInstagramWebhookRouter,
+} from "../instagramWebhook.js";
+
+import {
+  JourneyRuntime,
+} from "../../domain/journey/runtime.js";
+
 import {
   createPublishedJourneyWithClient,
 } from "../../db/journeyVersions.js";
-import { getPool, closePool } from "../../db/pool.js";
-import { createTenant } from "../../db/tenants.js";
-import type { BuilderGraph } from "../../db/journeyGraph.js";
+
+import {
+  getPool,
+  closePool,
+} from "../../db/pool.js";
+
+import {
+  createTenant,
+} from "../../db/tenants.js";
+
+import {
+  upsertToken,
+} from "../../db/tokens.js";
+
+import type {
+  BuilderGraph,
+} from "../../db/journeyGraph.js";
 
 const pool = getPool();
-const runtime = new JourneyRuntime(pool);
 
-const APP_SECRET = "integration-app-secret";
-const VERIFY_TOKEN = "integration-verify-token";
+const runtime =
+  new JourneyRuntime(pool);
 
-function sign(body: string): string {
-  return `sha256=${createHmac("sha256", APP_SECRET)
+const APP_SECRET =
+  "integration-app-secret";
+
+const VERIFY_TOKEN =
+  "integration-verify-token";
+
+const TOKEN_KEYRING =
+  new Map<string, Buffer>([
+    [
+      "integration-test",
+      Buffer.alloc(32, 4),
+    ],
+  ]);
+
+function sign(
+  body: string,
+): string {
+  return `sha256=${createHmac(
+    "sha256",
+    APP_SECRET,
+  )
     .update(body)
     .digest("hex")}`;
 }
 
-function makeGraph(version: number): BuilderGraph {
+function makeGraph(
+  version: number,
+): BuilderGraph {
   return {
     version,
     nodes: [
       {
         id: "trigger",
         type: "trigger",
-        position: { x: 0, y: 0 },
+        position: {
+          x: 0,
+          y: 0,
+        },
         data: {},
         parentGroupId: null,
         collapsed: false,
@@ -39,7 +87,10 @@ function makeGraph(version: number): BuilderGraph {
       {
         id: "message-1",
         type: "message",
-        position: { x: 200, y: 0 },
+        position: {
+          x: 200,
+          y: 0,
+        },
         data: {
           text: "Hello",
         },
@@ -49,7 +100,10 @@ function makeGraph(version: number): BuilderGraph {
       {
         id: "handoff-1",
         type: "human_handoff",
-        position: { x: 400, y: 0 },
+        position: {
+          x: 400,
+          y: 0,
+        },
         data: {},
         parentGroupId: null,
         collapsed: false,
@@ -75,16 +129,23 @@ function makeGraph(version: number): BuilderGraph {
 }
 
 async function setup() {
-  const tenant = await createTenant(
-    pool,
-    `instagram-webhook-route-${randomUUID()}`,
-  );
+  const tenant =
+    await createTenant(
+      pool,
+      `instagram-webhook-route-${randomUUID()}`,
+    );
 
-  const campaignId = randomUUID();
-  const instagramAccountId = randomUUID();
-  const instagramProviderAccountId = `instagram-${randomUUID()}`;
-  const subjectKey = `instagram-user-${randomUUID()}`;
-  const providerEventId = `mid.${randomUUID()}`;
+  const campaignId =
+    randomUUID();
+
+  const instagramProviderAccountId =
+    `instagram-${randomUUID()}`;
+
+  const subjectKey =
+    `instagram-user-${randomUUID()}`;
+
+  const providerEventId =
+    `mid.${randomUUID()}`;
 
   await pool.query(
     `
@@ -105,28 +166,25 @@ async function setup() {
     ],
   );
 
-  await pool.query(
-    `
-      insert into instagram_accounts (
-        id,
-        tenant_id,
-        instagram_user_id,
-        access_token_encrypted
-      )
-      values ($1, $2, $3, $4)
-    `,
-    [
-      instagramAccountId,
-      tenant.id,
-      instagramProviderAccountId,
-      "test-encrypted-token",
-    ],
+  await upsertToken(
+    pool,
+    TOKEN_KEYRING,
+    {
+      tenantId: tenant.id,
+      instagramAccountId:
+        instagramProviderAccountId,
+      accessToken:
+        "integration-test-token",
+    },
   );
 
-  const client = await pool.connect();
+  const client =
+    await pool.connect();
 
   try {
-    await client.query("begin");
+    await client.query(
+      "begin",
+    );
 
     await createPublishedJourneyWithClient(
       client,
@@ -135,32 +193,39 @@ async function setup() {
       makeGraph(1),
     );
 
-    await client.query("commit");
+    await client.query(
+      "commit",
+    );
   } catch (error) {
-    await client.query("rollback");
+    await client.query(
+      "rollback",
+    );
     throw error;
   } finally {
     client.release();
   }
 
-  const started = await runtime.start({
-    tenantId: tenant.id,
-    campaignId,
-    subjectKey,
-  });
+  const started =
+    await runtime.start({
+      tenantId: tenant.id,
+      campaignId,
+      subjectKey,
+    });
 
   return {
     tenantId: tenant.id,
     campaignId,
-    instagramAccountId,
     instagramProviderAccountId,
     subjectKey,
     providerEventId,
-    executionId: started.execution.id,
+    executionId:
+      started.execution.id,
   };
 }
 
-async function cleanup(tenantId: string): Promise<void> {
+async function cleanup(
+  tenantId: string,
+): Promise<void> {
   await pool.query(
     `
       delete from instagram_inbound_events
@@ -227,7 +292,7 @@ async function cleanup(tenantId: string): Promise<void> {
 
   await pool.query(
     `
-      delete from instagram_accounts
+      delete from meta_tokens
        where tenant_id = $1
     `,
     [tenantId],
@@ -242,121 +307,199 @@ async function cleanup(tenantId: string): Promise<void> {
   );
 }
 
-describe("Instagram webhook end-to-end", () => {
-  afterAll(async () => {
-    await closePool();
-  });
+describe(
+  "Instagram webhook end-to-end",
+  () => {
+    afterAll(async () => {
+      await closePool();
+    });
 
-  it("routes an Instagram message into the active journey execution", async () => {
-    const data = await setup();
+    it(
+      "routes an Instagram message into the active journey execution",
+      async () => {
+        const data =
+          await setup();
 
-    try {
-      const app = express();
+        try {
+          const app =
+            express();
 
-      app.use(
-        express.json({
-          verify: (req, _res, buf) => {
-            (req as express.Request).rawBody = buf;
-          },
-        }),
-      );
+          app.use(
+            express.json({
+              verify: (
+                req,
+                _res,
+                buf,
+              ) => {
+                (
+                  req as express.Request
+                ).rawBody = buf;
+              },
+            }),
+          );
 
-      app.use(
-        createInstagramWebhookRouter({
-          pool,
-          runtime,
-          verifyToken: VERIFY_TOKEN,
-          appSecret: APP_SECRET,
-        }),
-      );
+          app.use(
+            createInstagramWebhookRouter({
+              pool,
+              runtime,
+              verifyToken:
+                VERIFY_TOKEN,
+              appSecret:
+                APP_SECRET,
+            }),
+          );
 
-      const payload = {
-        object: "instagram",
-        entry: [
-          {
-            id: data.instagramProviderAccountId,
-            messaging: [
+          const payload = {
+            object:
+              "instagram",
+            entry: [
               {
-                sender: {
-                  id: data.subjectKey,
-                },
-                recipient: {
-                  id: data.instagramProviderAccountId,
-                },
-                timestamp: Date.now(),
-                message: {
-                  mid: data.providerEventId,
-                  text: "Hello",
-                },
+                id:
+                  data.instagramProviderAccountId,
+                messaging: [
+                  {
+                    sender: {
+                      id:
+                        data.subjectKey,
+                    },
+                    recipient: {
+                      id:
+                        data.instagramProviderAccountId,
+                    },
+                    timestamp:
+                      Date.now(),
+                    message: {
+                      mid:
+                        data.providerEventId,
+                      text:
+                        "Hello",
+                    },
+                  },
+                ],
               },
             ],
-          },
-        ],
-      };
+          };
 
-      const body = JSON.stringify(payload);
-
-      const response = await request(app)
-        .post("/instagram")
-        .set("content-type", "application/json")
-        .set("x-hub-signature-256", sign(body))
-        .send(body);
-
-      expect(response.status).toBe(200);
-
-      const deadline = Date.now() + 5000;
-
-      let inboundStatus: string | null = null;
-
-      while (Date.now() < deadline) {
-        const result = await pool.query(
-          `
-            select status, journey_execution_id
-              from instagram_inbound_events
-             where tenant_id = $1
-               and provider_event_id = $2
-          `,
-          [data.tenantId, data.providerEventId],
-        );
-
-        if (result.rows.length > 0) {
-          inboundStatus = result.rows[0].status;
-
-          if (inboundStatus === "processed") {
-            expect(result.rows[0].journey_execution_id).toBe(
-              data.executionId,
+          const body =
+            JSON.stringify(
+              payload,
             );
-            break;
+
+          const response =
+            await request(app)
+              .post("/instagram")
+              .set(
+                "content-type",
+                "application/json",
+              )
+              .set(
+                "x-hub-signature-256",
+                sign(body),
+              )
+              .send(body);
+
+          expect(
+            response.status,
+          ).toBe(200);
+
+          const deadline =
+            Date.now() + 5000;
+
+          let inboundStatus:
+            string | null =
+            null;
+
+          while (
+            Date.now() <
+            deadline
+          ) {
+            const result =
+              await pool.query(
+                `
+                  select
+                    status,
+                    journey_execution_id
+                  from instagram_inbound_events
+                  where tenant_id = $1
+                    and provider_event_id = $2
+                `,
+                [
+                  data.tenantId,
+                  data.providerEventId,
+                ],
+              );
+
+            if (
+              result.rows.length >
+              0
+            ) {
+              inboundStatus =
+                result.rows[0].status;
+
+              if (
+                inboundStatus ===
+                "processed"
+              ) {
+                expect(
+                  result.rows[0]
+                    .journey_execution_id,
+                ).toBe(
+                  data.executionId,
+                );
+
+                break;
+              }
+            }
+
+            await new Promise(
+              (resolve) =>
+                setTimeout(
+                  resolve,
+                  25,
+                ),
+            );
           }
+
+          expect(
+            inboundStatus,
+          ).toBe("processed");
+
+          const event =
+            await pool.query(
+              `
+                select
+                  event_id,
+                  event_type
+                from journey_events
+                where tenant_id = $1
+                  and execution_id = $2
+                  and event_id = $3
+              `,
+              [
+                data.tenantId,
+                data.executionId,
+                data.providerEventId,
+              ],
+            );
+
+          expect(
+            event.rows,
+          ).toHaveLength(1);
+
+          expect(
+            event.rows[0],
+          ).toEqual({
+            event_id:
+              data.providerEventId,
+            event_type:
+              "message",
+          });
+        } finally {
+          await cleanup(
+            data.tenantId,
+          );
         }
-
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-
-      expect(inboundStatus).toBe("processed");
-
-      const event = await pool.query(
-        `
-          select event_id, event_type
-            from journey_events
-           where tenant_id = $1
-             and execution_id = $2
-             and event_id = $3
-        `,
-        [
-          data.tenantId,
-          data.executionId,
-          data.providerEventId,
-        ],
-      );
-
-      expect(event.rows).toHaveLength(1);
-      expect(event.rows[0]).toEqual({
-        event_id: data.providerEventId,
-        event_type: "message",
-      });
-    } finally {
-      await cleanup(data.tenantId);
-    }
-  });
-});
+      },
+    );
+  },
+);

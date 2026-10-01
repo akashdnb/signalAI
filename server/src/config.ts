@@ -43,6 +43,12 @@ export const config = {
   get instagramRedirectUri() {
     return process.env.INSTAGRAM_REDIRECT_URI ?? "";
   },
+  get instagramGraphApiBaseUrl() {
+    return (
+      process.env.INSTAGRAM_GRAPH_API_BASE_URL ??
+      "https://graph.facebook.com/v24.0"
+    );
+  },
   // B11: Single Flat Plan via Stripe Checkout. Unset in dev/test — the
   // billing route degrades to a clear 503 rather than crashing (same
   // graceful-degradation pattern as the LLM provider).

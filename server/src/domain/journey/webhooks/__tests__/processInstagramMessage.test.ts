@@ -95,19 +95,21 @@ async function setup() {
 
   await pool.query(
     `
-      insert into instagram_accounts (
+      insert into meta_tokens (
         id,
         tenant_id,
-        instagram_user_id,
-        access_token_encrypted
+        instagram_account_id,
+        encrypted_token,
+        key_version
       )
-      values ($1, $2, $3, $4)
+      values ($1, $2, $3, $4, $5)
     `,
     [
       instagramAccountId,
       tenant.id,
       `provider-account-${randomUUID()}`,
-      "test-encrypted-token",
+      Buffer.from("test-encrypted-token"),
+      "test-v1",
     ],
   );
 
@@ -206,7 +208,7 @@ async function cleanup(tenantId: string) {
 
   await pool.query(
     `
-      delete from instagram_accounts
+      delete from meta_tokens
        where tenant_id = $1
     `,
     [tenantId],

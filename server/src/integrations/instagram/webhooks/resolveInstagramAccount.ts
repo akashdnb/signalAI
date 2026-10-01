@@ -10,28 +10,32 @@ export async function resolveInstagramAccount(
   pool: Pool,
   instagramAccountId: string,
 ): Promise<InstagramAccountResolution | null> {
-  const result = await pool.query(
+  const result = await pool.query<{
+    id: string;
+    tenant_id: string;
+    instagram_account_id: string;
+  }>(
     `
       select
         id,
         tenant_id,
-        instagram_user_id
-      from instagram_accounts
-      where instagram_user_id = $1
+        instagram_account_id
+      from meta_tokens
+      where instagram_account_id = $1
       limit 1
     `,
     [instagramAccountId],
   );
 
-  if (!result.rowCount) {
+  const row = result.rows[0];
+
+  if (!row) {
     return null;
   }
-
-  const row = result.rows[0];
 
   return {
     id: String(row.id),
     tenantId: String(row.tenant_id),
-    instagramUserId: String(row.instagram_user_id),
+    instagramUserId: String(row.instagram_account_id),
   };
 }
