@@ -28,6 +28,20 @@ export function JourneyBuilderPage() {
     }
   }, [tenantId, campaignId]);
 
+  // Refresh only the campaign document. Keep the builder mounted while
+  // inspector saves update campaign metadata.
+  const refreshCampaign = useCallback(async () => {
+    if (!tenantId || !campaignId) return;
+
+    try {
+      const current = await api.getCampaign(tenantId, campaignId);
+      setCampaign(current);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to refresh journey");
+    }
+  }, [tenantId, campaignId]);
+
   useEffect(() => {
     void loadCampaign();
   }, [loadCampaign]);
@@ -63,7 +77,7 @@ export function JourneyBuilderPage() {
       <JourneyBuilder
         tenantId={tenantId}
         campaign={campaign}
-        onChanged={loadCampaign}
+        onChanged={refreshCampaign}
         onBack={() => navigate(`/dashboard/${tenantId}/automation`)}
       />
     </div>

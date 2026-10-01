@@ -328,6 +328,8 @@ export function BuilderCanvas({
   const backendEdgesRef = useRef<JourneyEdge[]>([]);
   const builderVersionRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
+  const initialFitDoneRef = useRef(false);
+  const fitViewRef = useRef<(() => void) | null>(null);
 
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -429,6 +431,7 @@ export function BuilderCanvas({
 
   useEffect(() => {
     initializedRef.current = false;
+    initialFitDoneRef.current = false;
     void loadGraph(false);
   }, [loadGraph]);
 
@@ -569,17 +572,25 @@ export function BuilderCanvas({
         nodeTypes={nodeTypes}
         onNodesChange={locked ? undefined : onNodesChange}
         onEdgesChange={onEdgesChange}
+        onInit={(instance) => {
+          fitViewRef.current = () =>
+            instance.fitView({
+              padding: 0.2,
+              minZoom: 0.5,
+              maxZoom: 1.2,
+              duration: 0,
+            });
+
+          if (!initialFitDoneRef.current && initializedRef.current) {
+            initialFitDoneRef.current = true;
+            requestAnimationFrame(() => fitViewRef.current?.());
+          }
+        }}
         onNodeClick={(_event, node) => selectForNode(node)}
         onNodeDragStop={handleNodeDragStop}
         nodesDraggable={!locked}
         nodesConnectable={false}
         elementsSelectable={!locked}
-        fitView
-        fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.5,
-          maxZoom: 1.2,
-        }}
         minZoom={0.35}
         maxZoom={1.5}
         defaultEdgeOptions={{
