@@ -272,6 +272,37 @@ describe("generateReply", () => {
     expect(call.systemPrompt).not.toContain("PUBLIC comment reply");
   });
 
+  // Comment Reply vs DM Reply tier audit: the opening line used to
+  // unconditionally describe every reply as being "to a comment", even for
+  // a DM-triggered one — actively wrong, not just vague, for the dm tier.
+  describe("tier-explicit role description (Comment Reply vs DM Reply audit)", () => {
+    it("the comment tier's prompt explicitly describes a public comment, never DM/private wording", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }), tier: "comment" });
+
+      await generateReply(ctx, provider);
+      const systemPrompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+
+      expect(systemPrompt).toContain("PUBLIC INSTAGRAM COMMENT");
+      expect(systemPrompt).not.toContain("PRIVATE INSTAGRAM DIRECT MESSAGE");
+      expect(systemPrompt).not.toContain("private direct message conversation");
+    });
+
+    it("the dm tier's prompt explicitly describes a private DM, never public-comment wording", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }), tier: "dm" });
+
+      await generateReply(ctx, provider);
+      const systemPrompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+
+      expect(systemPrompt).toContain("PRIVATE INSTAGRAM DIRECT MESSAGE");
+      expect(systemPrompt).not.toContain("PUBLIC INSTAGRAM COMMENT");
+      expect(systemPrompt).not.toMatch(/to a (public )?comment containing the keyword/i);
+    });
+  });
+
   // B10: the cap is checked immediately before the provider call, inside
   // generateReply itself, reusing the same fail-closed fallback as every
   // other failure mode.

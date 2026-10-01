@@ -142,6 +142,13 @@ export interface LeadEventForHistory {
  * `limit` most-recent, so the query stays cheap regardless of how long the
  * lead's total history is. Excludes `excludeEventId` — the event currently
  * being replied to, whose text is already the LLM's userMessage, not history.
+ *
+ * `eventType`, when given, restricts to that event type (`"comment"` or
+ * `"message"`) at the SQL level — the Comment Reply vs DM Reply privacy
+ * boundary (conversationHistory.ts): a public comment reply's history must
+ * never even be fetched from a private DM event, not just filtered out
+ * afterward. Omitted (the default) preserves the original mixed-channel
+ * query, unchanged, for the DM tier's existing behavior.
  */
 export async function listRecentEventsForLead(
   pool: Queryable,
@@ -149,15 +156,23 @@ export async function listRecentEventsForLead(
   leadId: string,
   limit: number,
   excludeEventId: string,
+  eventType?: string,
 ): Promise<LeadEventForHistory[]> {
   const result = await pool.query<{ occurred_at: Date; comment_text: string | null; dm_text: string | null }>(
-    `select e.occurred_at, p.comment_text, p.dm_text
-     from lead_events e
-     left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
-     where e.tenant_id = $1 and e.lead_id = $2 and e.id != $3
-     order by e.occurred_at desc
-     limit $4`,
-    [tenantId, leadId, excludeEventId, limit],
+    eventType
+      ? `select e.occurred_at, p.comment_text, p.dm_text
+         from lead_events e
+         left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
+         where e.tenant_id = $1 and e.lead_id = $2 and e.id != $3 and e.event_type = $5
+         order by e.occurred_at desc
+         limit $4`
+      : `select e.occurred_at, p.comment_text, p.dm_text
+         from lead_events e
+         left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
+         where e.tenant_id = $1 and e.lead_id = $2 and e.id != $3
+         order by e.occurred_at desc
+         limit $4`,
+    eventType ? [tenantId, leadId, excludeEventId, limit, eventType] : [tenantId, leadId, excludeEventId, limit],
   );
   return result.rows.map((row) => ({
     occurredAt: row.occurred_at,

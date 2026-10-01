@@ -18,7 +18,7 @@ import type { LLMProvider } from "../../llm/provider.js";
 import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
 import { createProcessingDocument, insertChunks, markDocumentReady } from "../../db/knowledgeBase.js";
 import { upsertGuardrailsConfig } from "../../db/guardrailsConfig.js";
-import { listSentRepliesForLead } from "../../db/sentReplies.js";
+import { listSentRepliesForLead, recordSentReply } from "../../db/sentReplies.js";
 import { sendInstagramCommentReply, sendInstagramMessage } from "../../lib/instagramSend.js";
 import { enqueueLeadEvent } from "../../queue/leadEventsQueue.js";
 import { createLeadEventReplyHandler } from "../leadEventReplyHandler.js";
@@ -1184,6 +1184,189 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       const [, , text] = vi.mocked(sendInstagramMessage).mock.calls[0]!;
       expect(text).not.toContain("competitor");
       expect((await getLead(pool, tenant.id, lead.id))!.handoffStatus).toBe("ai");
+    });
+  });
+
+  // Comment Reply vs DM Reply privacy audit: a public comment reply must
+  // never be built from a lead's private DM history — not "told not to
+  // repeat it," never given it at all. These seed a PRIOR private DM
+  // containing a distinctive marker, then trigger a PUBLIC comment-tier
+  // event for the SAME lead and assert the marker never reaches the
+  // provider (prompt, history, or the generated reply) and never gets
+  // extracted as a qualification fact.
+  describe("Comment Reply vs DM Reply privacy boundary", () => {
+    const PRIVATE_PHONE = "PRIVATE_PHONE_9999999999";
+
+    async function seedPriorPrivateDm(
+      pool: ReturnType<typeof getPool>,
+      tenantId: string,
+      leadId: string,
+      dmText: string,
+    ) {
+      const dmEvent = await insertEventIdempotent(pool, {
+        tenantId,
+        leadId,
+        metaEventId: `prior-dm-${Math.random()}`,
+        eventType: "message",
+        occurredAt: new Date(Date.now() - 60_000),
+        sequence: 0,
+      });
+      await insertPii(pool, { tenantId, leadEventId: dmEvent!.id, leadId, dmText });
+      await recordSentReply(pool, {
+        tenantId,
+        leadId,
+        leadEventId: dmEvent!.id,
+        channel: "dm",
+        engine: "ai_generated",
+        text: `Noted — I'll reach you at ${PRIVATE_PHONE}`,
+      });
+    }
+
+    it("a public comment-triggered AI reply never receives prior private DM content in its history", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+      const { lead } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "placeholder");
+      await seedPriorPrivateDm(pool, tenant.id, lead.id, `call me at ${PRIVATE_PHONE}`);
+
+      const provider = mockProvider(["Thanks for the comment!"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const event = await insertEventIdempotent(pool, {
+        tenantId: tenant.id,
+        leadId: lead.id,
+        metaEventId: "current-comment",
+        eventType: "comment",
+        occurredAt: new Date(),
+        sequence: 1,
+        attributes: { matchedCampaignId: campaign.id, matchedKeyword: "LINK" },
+      });
+      await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, commentText: "LINK please", username: "real_handle" });
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event!.id, sequence: 2 });
+
+      const call = vi.mocked(provider.generateReply).mock.calls[0]![0];
+      expect(JSON.stringify(call)).not.toContain(PRIVATE_PHONE);
+
+      const [, , sentText] = vi.mocked(sendInstagramMessage).mock.calls[0] ?? [];
+      expect(sentText ?? "").not.toContain(PRIVATE_PHONE);
+    });
+
+    it("a private DM-triggered AI reply still receives its own prior DM history (unchanged dm-tier behavior)", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated", triggerSource: "message" });
+
+      const { lead } = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "LINK", "placeholder");
+      await seedPriorPrivateDm(pool, tenant.id, lead.id, `my budget is ${PRIVATE_PHONE}`);
+
+      const provider = mockProvider(["Sure thing!"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const event = await insertEventIdempotent(pool, {
+        tenantId: tenant.id,
+        leadId: lead.id,
+        metaEventId: "current-dm",
+        eventType: "message",
+        occurredAt: new Date(),
+        sequence: 1,
+        attributes: { matchedCampaignId: campaign.id, matchedKeyword: "LINK" },
+      });
+      await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, dmText: "LINK please" });
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event!.id, sequence: 2 });
+
+      const call = vi.mocked(provider.generateReply).mock.calls[0]![0];
+      expect(JSON.stringify(call)).toContain(PRIVATE_PHONE); // deliberately UNCHANGED — the dm tier may see its own private history
+    });
+
+    it("qualification extraction for a public comment never picks up a fact only stated in prior private DM history", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated" });
+
+      const { lead } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "placeholder");
+      await seedPriorPrivateDm(pool, tenant.id, lead.id, "my budget is ₹5 crore and my number is 9999999999");
+
+      // The provider is told to extract qualification — if it were ever
+      // given the private DM text, a real model could plausibly surface
+      // "budget: 5 crore" from it despite never being asked about budget in
+      // the current public comment. Simulating a provider that always
+      // returns a budget regardless of what's actually asked makes this a
+      // meaningful test of what CONTEXT it received, not what it chose to
+      // do with it.
+      const provider: LLMProvider = {
+        name: "mock",
+        generateReply: vi.fn(async ({ systemPrompt, history }) => {
+          const sawPrivateBudget = JSON.stringify({ systemPrompt, history }).includes("5 crore");
+          return {
+            text: JSON.stringify({
+              reply: "Thanks!",
+              qualification: sawPrivateBudget ? { budget: "₹5 crore" } : null,
+            }),
+          };
+        }),
+      };
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const event = await insertEventIdempotent(pool, {
+        tenantId: tenant.id,
+        leadId: lead.id,
+        metaEventId: "current-comment",
+        eventType: "comment",
+        occurredAt: new Date(),
+        sequence: 1,
+        attributes: { matchedCampaignId: campaign.id, matchedKeyword: "LINK" },
+      });
+      await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, commentText: "LINK please", username: "real_handle" });
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event!.id, sequence: 2 });
+
+      // Facts captured are deferred until after delivery — this asserts
+      // the private budget was never captured for this lead at all.
+      expect(await getCapturedFacts(pool, tenant.id, lead.id)).not.toHaveProperty("budget");
+    });
+
+    it("replyChannel 'both' on a comment-triggered event: the one generated reply sent to both channels never contains private DM-only context", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Simple", ["LINK"], { replyMode: "ai_generated", replyChannel: "both" });
+
+      const { lead } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "placeholder", { commentId: "comment-1" });
+      await seedPriorPrivateDm(pool, tenant.id, lead.id, `reach me at ${PRIVATE_PHONE}`);
+
+      const provider = mockProvider(["Thanks for asking!"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+      const event = await insertEventIdempotent(pool, {
+        tenantId: tenant.id,
+        leadId: lead.id,
+        metaEventId: "current-comment-both",
+        eventType: "comment",
+        occurredAt: new Date(),
+        sequence: 1,
+        attributes: { matchedCampaignId: campaign.id, matchedKeyword: "LINK", commentId: "comment-1" },
+      });
+      await insertPii(pool, { tenantId: tenant.id, leadEventId: event!.id, leadId: lead.id, commentText: "LINK please", username: "real_handle" });
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event!.id, sequence: 2 });
+
+      // A comment-triggered event's single generated reply is reused for
+      // BOTH the public comment send and the DM send (see
+      // leadEventReplyHandler.ts) — safe specifically because that reply
+      // was generated under the comment tier's public-only context in the
+      // first place, so there is no private content in it to leak either way.
+      expect(sendInstagramCommentReply).toHaveBeenCalledWith("token-1", "comment-1", expect.any(String));
+      expect(sendInstagramMessage).toHaveBeenCalledWith("token-1", "ig-user-1", expect.any(String));
+      const [, , commentText] = vi.mocked(sendInstagramCommentReply).mock.calls[0]!;
+      const [, , dmText] = vi.mocked(sendInstagramMessage).mock.calls[0]!;
+      expect(commentText).not.toContain(PRIVATE_PHONE);
+      expect(dmText).not.toContain(PRIVATE_PHONE);
+      expect(commentText).toBe(dmText); // documents the actual current "one generation, two sends" behavior
+
+      const call = vi.mocked(provider.generateReply).mock.calls[0]![0];
+      expect(JSON.stringify(call)).not.toContain(PRIVATE_PHONE);
     });
   });
 });

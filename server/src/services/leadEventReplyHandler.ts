@@ -161,22 +161,30 @@ export function createLeadEventReplyHandler(
 
     const milestones = await listMilestones(pool, job.tenantId, campaign.id);
     const sourceText = (isCommentTrigger ? event.commentText : event.dmText) ?? "";
-    // Conversation memory: prior turns for this lead, fed into the LLM
-    // alongside sourceText so "what's my name?" right after "my name is
-    // akash" can actually be answered — see conversationHistory.ts. Skipped
-    // entirely for a rule_based campaign, which never calls the provider
-    // and so never reads ctx.history.
-    const history =
-      campaign.replyMode === "rule_based"
-        ? []
-        : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns);
-    // Governs prompt length/strictness (guardrails.ts), not delivery — a
+    // Governs prompt length/strictness (guardrails.ts) AND, below, which
+    // conversation history is even fetched — not delivery. A
     // message-triggered event is inherently private-origin, so it gets the
     // fuller "dm" prompt even if the campaign's reply_channel also tries a
     // public comment reply (which, for a DM-triggered event, never has a
     // comment id to attach to and so never actually fires — see
     // commentReady above).
     const tier = isCommentTrigger ? "comment" : "dm";
+    // Conversation memory: prior turns for this lead, fed into the LLM
+    // alongside sourceText so "what's my name?" right after "my name is
+    // akash" can actually be answered — see conversationHistory.ts. Skipped
+    // entirely for a rule_based campaign, which never calls the provider
+    // and so never reads ctx.history.
+    //
+    // Comment Reply vs DM Reply privacy boundary: `tier` here is what makes
+    // a comment-triggered reply's history PUBLIC-ONLY — passing it through
+    // restricts the query itself to same-channel rows, so a lead's private
+    // DM history is never fetched for a public reply at all, not merely
+    // withheld after the fact. The dm tier's existing mixed-channel history
+    // is unchanged.
+    const history =
+      campaign.replyMode === "rule_based"
+        ? []
+        : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns, tier);
     // B10: one guard per event, shared by whichever path below actually
     // calls the provider — rule-based replies never reach it, so they
     // never count against the cap.

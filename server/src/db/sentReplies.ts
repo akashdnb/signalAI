@@ -114,16 +114,29 @@ export interface SentReplyForHistory {
   sentAt: Date;
 }
 
-/** Bounded companion to listSentRepliesForLead, for LLM conversation history — see listRecentEventsForLead in db/events.ts for why this is capped rather than fetching the whole lead history. */
+/**
+ * Bounded companion to listSentRepliesForLead, for LLM conversation history
+ * — see listRecentEventsForLead in db/events.ts for why this is capped
+ * rather than fetching the whole lead history.
+ *
+ * `channel`, when given, restricts to that send channel — same Comment
+ * Reply vs DM Reply privacy boundary as listRecentEventsForLead: the
+ * comment tier must never even fetch a bot/human reply that was actually
+ * sent as a private DM. Omitted (the default) preserves the original
+ * mixed-channel query, unchanged, for the DM tier's existing behavior.
+ */
 export async function listRecentSentRepliesForLead(
   pool: Queryable,
   tenantId: string,
   leadId: string,
   limit: number,
+  channel?: SentReplyChannel,
 ): Promise<SentReplyForHistory[]> {
   const result = await pool.query<{ text: string; sent_at: Date }>(
-    `select text, sent_at from sent_replies where tenant_id = $1 and lead_id = $2 order by sent_at desc limit $3`,
-    [tenantId, leadId, limit],
+    channel
+      ? `select text, sent_at from sent_replies where tenant_id = $1 and lead_id = $2 and channel = $4 order by sent_at desc limit $3`
+      : `select text, sent_at from sent_replies where tenant_id = $1 and lead_id = $2 order by sent_at desc limit $3`,
+    channel ? [tenantId, leadId, limit, channel] : [tenantId, leadId, limit],
   );
   return result.rows.map((row) => ({ text: row.text, sentAt: row.sent_at }));
 }
