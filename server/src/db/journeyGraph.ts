@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { Pool } from "pg";
-import { listMilestones, type Milestone } from "./milestones.js";
+import type { Pool, PoolClient } from "pg";
+import { listMilestonesWithClient, type Milestone } from "./milestones.js";
 
 /**
  * Deliberately a plain string, not a union, at this layer — the node
@@ -136,26 +136,30 @@ function buildDefaultGraph(
   return { nodes, edges };
 }
 
-export async function getBuilderGraph(pool: Pool, tenantId: string, campaignId: string): Promise<BuilderGraph | null> {
-  const campaignRes = await pool.query<{ builder_version: number; cta_link: string | null }>(
+export async function getBuilderGraphWithClient(
+  client: PoolClient,
+  tenantId: string,
+  campaignId: string,
+): Promise<BuilderGraph | null> {
+  const campaignRes = await client.query<{ builder_version: number; cta_link: string | null }>(
     `select builder_version, cta_link from campaigns where id = $1 and tenant_id = $2`,
     [campaignId, tenantId],
   );
   const campaignRow = campaignRes.rows[0];
   if (!campaignRow) return null;
 
-  const nodesRes = await pool.query<NodeRow>(
+  const nodesRes = await client.query<NodeRow>(
     `select * from journey_nodes where campaign_id = $1 and tenant_id = $2 order by created_at`,
     [campaignId, tenantId],
   );
 
   if (nodesRes.rowCount === 0) {
-    const milestones = await listMilestones(pool, tenantId, campaignId);
+    const milestones = await listMilestonesWithClient(client, tenantId, campaignId);
     const { nodes, edges } = buildDefaultGraph(campaignRow.cta_link, milestones);
     return { nodes, edges, version: campaignRow.builder_version };
   }
 
-  const edgesRes = await pool.query<EdgeRow>(
+  const edgesRes = await client.query<EdgeRow>(
     `select * from journey_edges where campaign_id = $1 and tenant_id = $2 order by created_at`,
     [campaignId, tenantId],
   );
@@ -167,6 +171,18 @@ export async function getBuilderGraph(pool: Pool, tenantId: string, campaignId: 
   };
 }
 
+export async function getBuilderGraph(
+  pool: Pool,
+  tenantId: string,
+  campaignId: string,
+): Promise<BuilderGraph | null> {
+  const client = await pool.connect();
+  try {
+    return await getBuilderGraphWithClient(client, tenantId, campaignId);
+  } finally {
+    client.release();
+  }
+}
 
 /**
  * Keep the visual graph aligned with the semantic milestone list. The index
@@ -386,8 +402,8 @@ export type SaveBuilderGraphResult =
  * silently overwriting their change, using `for update` to close the
  * read-check-write race between two concurrent saves.
  */
-export async function saveBuilderGraph(
-  pool: Pool,
+export async function saveBuilderGraphWithClient(
+  client: PoolClient,
   tenantId: string,
   campaignId: string,
   expectedVersion: number,
@@ -397,69 +413,91 @@ export async function saveBuilderGraph(
   const errors = validateGraph(nodes, edges);
   if (errors.length > 0) return { status: "invalid", errors };
 
+  const campaignRes = await client.query<{ builder_version: number }>(
+    `select builder_version from campaigns where id = $1 and tenant_id = $2 for update`,
+    [campaignId, tenantId],
+  );
+  const campaignRow = campaignRes.rows[0];
+  if (!campaignRow) return { status: "not_found" };
+  if (campaignRow.builder_version !== expectedVersion) {
+    return { status: "conflict", currentVersion: campaignRow.builder_version };
+  }
+
+  // Full replace, not a diff — the same "replace the whole list" shape
+  // as setCampaignMilestones. Deleting the whole node set in one
+  // statement is safe even with the self-referential parent_group_id FK:
+  // Postgres checks a NOT DEFERRABLE FK at the end of the statement, by
+  // which point every row in the deleted set (parents included) is already
+  // gone. journey_edges would cascade-delete via its own FK regardless;
+  // deleted explicitly first anyway so that's never load-bearing.
+  await client.query(
+    `delete from journey_edges where campaign_id = $1 and tenant_id = $2`,
+    [campaignId, tenantId],
+  );
+  await client.query(
+    `delete from journey_nodes where campaign_id = $1 and tenant_id = $2`,
+    [campaignId, tenantId],
+  );
+
+  for (const node of nodes) {
+    await client.query(
+      `insert into journey_nodes (id, tenant_id, campaign_id, type, position_x, position_y, data, parent_group_id, collapsed)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        node.id,
+        tenantId,
+        campaignId,
+        node.type,
+        Math.round(node.position.x),
+        Math.round(node.position.y),
+        node.data,
+        node.parentGroupId,
+        node.collapsed,
+      ],
+    );
+  }
+  for (const edge of edges) {
+    await client.query(
+      `insert into journey_edges (id, tenant_id, campaign_id, source_node_id, target_node_id, label, condition)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [edge.id, tenantId, campaignId, edge.sourceNodeId, edge.targetNodeId, edge.label, edge.condition],
+    );
+  }
+
+  const newVersion = expectedVersion + 1;
+  await client.query(
+    `update campaigns set builder_version = $3, updated_at = now() where id = $1 and tenant_id = $2`,
+    [campaignId, tenantId, newVersion],
+  );
+
+  return { status: "ok", graph: { nodes, edges, version: newVersion } };
+}
+
+export async function saveBuilderGraph(
+  pool: Pool,
+  tenantId: string,
+  campaignId: string,
+  expectedVersion: number,
+  nodes: JourneyNode[],
+  edges: JourneyEdge[],
+): Promise<SaveBuilderGraphResult> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    const campaignRes = await client.query<{ builder_version: number }>(
-      `select builder_version from campaigns where id = $1 and tenant_id = $2 for update`,
-      [campaignId, tenantId],
-    );
-    const campaignRow = campaignRes.rows[0];
-    if (!campaignRow) {
-      await client.query("ROLLBACK");
-      return { status: "not_found" };
-    }
-    if (campaignRow.builder_version !== expectedVersion) {
-      await client.query("ROLLBACK");
-      return { status: "conflict", currentVersion: campaignRow.builder_version };
-    }
-
-    // Full replace, not a diff — the same "replace the whole list" shape
-    // as setCampaignMilestones. Deleting the whole node set in one
-    // statement is safe even with the self-referential parent_group_id FK:
-    // Postgres checks a NOT DEFERRABLE FK at the end of the statement, by
-    // which point every row in the deleted set (parents included) is
-    // already gone, so nothing is left pointing at a missing parent.
-    // journey_edges would cascade-delete via its own FK regardless; deleted
-    // explicitly first anyway so that's never load-bearing.
-    await client.query(`delete from journey_edges where campaign_id = $1 and tenant_id = $2`, [campaignId, tenantId]);
-    await client.query(`delete from journey_nodes where campaign_id = $1 and tenant_id = $2`, [campaignId, tenantId]);
-
-    for (const node of nodes) {
-      await client.query(
-        `insert into journey_nodes (id, tenant_id, campaign_id, type, position_x, position_y, data, parent_group_id, collapsed)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          node.id,
-          tenantId,
-          campaignId,
-          node.type,
-          Math.round(node.position.x),
-          Math.round(node.position.y),
-          node.data,
-          node.parentGroupId,
-          node.collapsed,
-        ],
-      );
-    }
-    for (const edge of edges) {
-      await client.query(
-        `insert into journey_edges (id, tenant_id, campaign_id, source_node_id, target_node_id, label, condition)
-         values ($1, $2, $3, $4, $5, $6, $7)`,
-        [edge.id, tenantId, campaignId, edge.sourceNodeId, edge.targetNodeId, edge.label, edge.condition],
-      );
-    }
-
-    const newVersion = expectedVersion + 1;
-    await client.query(`update campaigns set builder_version = $3, updated_at = now() where id = $1 and tenant_id = $2`, [
-      campaignId,
+    const result = await saveBuilderGraphWithClient(
+      client,
       tenantId,
-      newVersion,
-    ]);
-
+      campaignId,
+      expectedVersion,
+      nodes,
+      edges,
+    );
+    if (result.status !== "ok") {
+      await client.query("ROLLBACK");
+      return result;
+    }
     await client.query("COMMIT");
-    return { status: "ok", graph: { nodes, edges, version: newVersion } };
+    return result;
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

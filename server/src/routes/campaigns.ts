@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { PoolClient } from "pg";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import {
@@ -8,8 +9,8 @@ import {
   setCampaignTargetMediaIds,
   setCampaignReplyTemplates,
 } from "../db/campaigns.js";
-import { listMilestones, setCampaignMilestones } from "../db/milestones.js";
-import { getBuilderGraph, saveBuilderGraph, synchronizeMilestoneGraph, type JourneyNode, type JourneyEdge } from "../db/journeyGraph.js";
+import { listMilestones, listMilestonesWithClient, setCampaignMilestonesWithClient } from "../db/milestones.js";
+import { getBuilderGraph, getBuilderGraphWithClient, saveBuilderGraph, saveBuilderGraphWithClient, synchronizeMilestoneGraph, type JourneyNode, type JourneyEdge } from "../db/journeyGraph.js";
 import { listKnownMediaForTenant, upsertMediaMetadata } from "../db/mediaMetadata.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { fetchMediaMetadata, findMediaByPermalink } from "../lib/instagramMedia.js";
@@ -84,57 +85,79 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/milestones", async
   }
 
   const pool = getPool();
-  const previousMilestones = await listMilestones(pool, tenantId, campaignId);
-  let oldIndexToNewIndex: Array<number | null>;
-  if (requestedIndexMap === undefined) {
-    oldIndexToNewIndex = previousMilestones.map((_, index) =>
-      index < milestones.length ? index : null,
-    );
-  } else {
-    if (
-      !Array.isArray(requestedIndexMap) ||
-      requestedIndexMap.length !== previousMilestones.length ||
-      !requestedIndexMap.every((index) =>
-        index === null ||
-        (Number.isInteger(index) && index >= 0 && index < milestones.length),
-      ) ||
-      new Set(requestedIndexMap.filter((index): index is number => index !== null)).size !==
-        requestedIndexMap.filter((index: unknown) => index !== null).length
-    ) {
-      return res.status(400).json({ error: "oldIndexToNewIndex must map each previous milestone to a unique new index or null" });
+  const client: PoolClient = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const previousMilestones = await listMilestonesWithClient(client, tenantId, campaignId);
+    let oldIndexToNewIndex: Array<number | null>;
+    if (requestedIndexMap === undefined) {
+      oldIndexToNewIndex = previousMilestones.map((_, index) =>
+        index < milestones.length ? index : null,
+      );
+    } else {
+      if (
+        !Array.isArray(requestedIndexMap) ||
+        requestedIndexMap.length !== previousMilestones.length ||
+        !requestedIndexMap.every((index) =>
+          index === null ||
+          (Number.isInteger(index) && index >= 0 && index < milestones.length),
+        ) ||
+        new Set(requestedIndexMap.filter((index): index is number => index !== null)).size !==
+          requestedIndexMap.filter((index: unknown) => index !== null).length
+      ) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "oldIndexToNewIndex must map each previous milestone to a unique new index or null" });
+      }
+      oldIndexToNewIndex = requestedIndexMap as Array<number | null>;
     }
-    oldIndexToNewIndex = requestedIndexMap as Array<number | null>;
-  }
 
-  const graph = await getBuilderGraph(pool, tenantId, campaignId);
-  if (!graph) return res.status(404).json({ error: "campaign not found for this tenant" });
+    const graph = await getBuilderGraphWithClient(client, tenantId, campaignId);
+    if (!graph) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "campaign not found for this tenant" });
+    }
 
-  const saved = await setCampaignMilestones(pool, tenantId, campaignId, milestones);
-  const synchronized = synchronizeMilestoneGraph(
-    graph,
-    previousMilestones,
-    saved,
-    oldIndexToNewIndex,
-  );
-  const graphSave = await saveBuilderGraph(
-    pool,
-    tenantId,
-    campaignId,
-    graph.version,
-    synchronized.nodes,
-    synchronized.edges,
-  );
-  if (graphSave.status === "conflict") {
-    return res.status(409).json({
-      error: "milestones were saved but the journey graph changed elsewhere; reload the builder",
-      currentVersion: graphSave.currentVersion,
-    });
-  }
-  if (graphSave.status !== "ok") {
-    return res.status(500).json({ error: "milestones were saved but the journey graph could not be synchronized" });
-  }
+    const saved = await setCampaignMilestonesWithClient(
+      client,
+      tenantId,
+      campaignId,
+      milestones,
+    );
+    const synchronized = synchronizeMilestoneGraph(
+      graph,
+      previousMilestones,
+      saved,
+      oldIndexToNewIndex,
+    );
+    const graphSave = await saveBuilderGraphWithClient(
+      client,
+      tenantId,
+      campaignId,
+      graph.version,
+      synchronized.nodes,
+      synchronized.edges,
+    );
+    if (graphSave.status === "conflict") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "journey graph changed elsewhere; reload the builder",
+        currentVersion: graphSave.currentVersion,
+      });
+    }
+    if (graphSave.status !== "ok") {
+      await client.query("ROLLBACK");
+      return res.status(500).json({ error: "could not synchronize journey graph" });
+    }
 
-  return res.status(200).json(saved);
+    await client.query("COMMIT");
+    return res.status(200).json(saved);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/milestones", async (req, res) => {
