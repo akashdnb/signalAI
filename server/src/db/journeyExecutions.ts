@@ -15,6 +15,13 @@ export interface JourneyPendingAction {
   payload: Record<string, unknown>;
 }
 
+export interface JourneyExecutionContext {
+  executionId: string;
+  tenantId: string;
+  campaignId: string;
+  subjectKey: string;
+}
+
 export interface JourneyExecution {
   id: string;
   tenantId: string;
@@ -79,6 +86,35 @@ export async function getExecution(
   );
 
   return result.rows[0] ? toExecution(result.rows[0]) : null;
+}
+
+export async function getJourneyExecutionContext(
+  pool: Pool,
+  executionId: string,
+): Promise<JourneyExecutionContext | null> {
+  const result = await pool.query<JourneyExecutionRow>(
+    `select
+       id,
+       tenant_id,
+       campaign_id,
+       subject_key
+       from journey_executions
+      where id = $1`,
+    [executionId],
+  );
+
+  const row = result.rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    executionId: row.id,
+    tenantId: row.tenant_id,
+    campaignId: row.campaign_id,
+    subjectKey: row.subject_key,
+  };
 }
 
 export async function getActiveExecutionForSubject(
@@ -217,4 +253,50 @@ export async function recordNodeExecution(
       error,
     ],
   );
+}
+
+
+export interface ActiveJourneyExecution {
+  id: string;
+  tenantId: string;
+  campaignId: string;
+  subjectKey: string;
+  status: string;
+  currentNodeId: string | null;
+}
+
+export async function getActiveExecutionsForSubject(
+  pool: Pool,
+  tenantId: string,
+  subjectKey: string,
+): Promise<ActiveJourneyExecution[]> {
+  const result = await pool.query(
+    `
+      select
+        id,
+        tenant_id,
+        campaign_id,
+        subject_key,
+        status,
+        current_node_id
+      from journey_executions
+      where tenant_id = $1
+        and subject_key = $2
+        and status in ('running', 'waiting', 'handoff')
+      order by updated_at desc
+    `,
+    [tenantId, subjectKey],
+  );
+
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    tenantId: String(row.tenant_id),
+    campaignId: String(row.campaign_id),
+    subjectKey: String(row.subject_key),
+    status: String(row.status),
+    currentNodeId:
+      row.current_node_id == null
+        ? null
+        : String(row.current_node_id),
+  }));
 }

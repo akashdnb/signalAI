@@ -3,7 +3,8 @@ import type { JourneyPendingAction } from "./journeyExecutions.js";
 
 export type JourneyActionStatus =
   | "pending"
-  | "acknowledged";
+  | "acknowledged"
+  | "processing";
 
 export interface JourneyAction {
   id: string;
@@ -12,8 +13,12 @@ export interface JourneyAction {
   actionType: JourneyPendingAction["type"];
   payload: Record<string, unknown>;
   status: JourneyActionStatus;
+  attemptCount: number;
+  nextAttemptAt: string | null;
+  lastError: Record<string, unknown> | null;
   createdAt: string;
   acknowledgedAt: string | null;
+  claimedAt: string | null;
 }
 
 interface JourneyActionRow {
@@ -23,8 +28,12 @@ interface JourneyActionRow {
   action_type: JourneyPendingAction["type"];
   payload: Record<string, unknown>;
   status: JourneyActionStatus;
+  attempt_count: number;
+  next_attempt_at: string | null;
+  last_error: Record<string, unknown> | null;
   created_at: string;
   acknowledged_at: string | null;
+  claimed_at: string | null;
 }
 
 function toJourneyAction(row: JourneyActionRow): JourneyAction {
@@ -35,8 +44,12 @@ function toJourneyAction(row: JourneyActionRow): JourneyAction {
     actionType: row.action_type,
     payload: row.payload,
     status: row.status,
+    attemptCount: row.attempt_count,
+    nextAttemptAt: row.next_attempt_at,
+    lastError: row.last_error,
     createdAt: row.created_at,
     acknowledgedAt: row.acknowledged_at,
+    claimedAt: row.claimed_at,
   };
 }
 
@@ -94,6 +107,26 @@ export async function getPendingJourneyAction(
     : null;
 }
 
+export async function consumeJourneyAction(
+  client: PoolClient,
+  actionId: string,
+): Promise<JourneyAction | null> {
+  const result = await client.query<JourneyActionRow>(
+    `update journey_actions
+        set status = 'acknowledged',
+            acknowledged_at = coalesce(acknowledged_at, now()),
+            claimed_at = null
+      where id = $1
+        and status = 'pending'
+      returning *`,
+    [actionId],
+  );
+
+  return result.rows[0]
+    ? toJourneyAction(result.rows[0])
+    : null;
+}
+
 export async function acknowledgeJourneyAction(
   client: PoolClient,
   actionId: string,
@@ -101,16 +134,105 @@ export async function acknowledgeJourneyAction(
   const result = await client.query<JourneyActionRow>(
     `update journey_actions
         set status = 'acknowledged',
-            acknowledged_at = coalesce(acknowledged_at, now())
+            acknowledged_at = coalesce(acknowledged_at, now()),
+            claimed_at = null
       where id = $1
-        and status = 'pending'
+        and status = 'processing'
       returning *`,
     [actionId],
   );
 
   if (!result.rows[0]) {
-    throw new Error(`journey action is already acknowledged: ${actionId}`);
+    throw new Error(`journey action is not processing: ${actionId}`);
   }
 
   return toJourneyAction(result.rows[0]);
+}
+
+
+export async function retryJourneyAction(
+  client: PoolClient,
+  actionId: string,
+  nextAttemptAt: Date,
+  error: Record<string, unknown>,
+): Promise<JourneyAction> {
+  const result = await client.query<JourneyActionRow>(
+    `update journey_actions
+        set status = 'pending',
+            attempt_count = attempt_count + 1,
+            next_attempt_at = $2,
+            last_error = $3,
+            claimed_at = null
+      where id = $1
+        and status = 'processing'
+      returning *`,
+    [actionId, nextAttemptAt, error],
+  );
+
+  if (!result.rows[0]) {
+    throw new Error(`journey action is not processing: ${actionId}`);
+  }
+
+  return toJourneyAction(result.rows[0]);
+}
+
+export async function failJourneyAction(
+  client: PoolClient,
+  actionId: string,
+  error: Record<string, unknown>,
+): Promise<JourneyAction> {
+  const result = await client.query<JourneyActionRow>(
+    `update journey_actions
+        set status = 'failed',
+            attempt_count = attempt_count + 1,
+            next_attempt_at = null,
+            last_error = $2,
+            claimed_at = null
+      where id = $1
+        and status = 'processing'
+      returning *`,
+    [actionId, error],
+  );
+
+  if (!result.rows[0]) {
+    throw new Error(`journey action is not processing: ${actionId}`);
+  }
+
+  return toJourneyAction(result.rows[0]);
+}
+
+export async function claimNextJourneyAction(
+  client: PoolClient,
+  leaseSeconds = 60,
+): Promise<JourneyAction | null> {
+  const result = await client.query<JourneyActionRow>(
+    `with candidate as (
+       select id
+         from journey_actions
+        where (
+          status = 'pending'
+          and (
+            next_attempt_at is null
+            or next_attempt_at <= now()
+          )
+        )
+           or (
+             status = 'processing'
+             and claimed_at < now() - ($1::int * interval '1 second')
+           )
+        order by created_at asc
+        for update skip locked
+        limit 1
+     )
+     update journey_actions
+        set status = 'processing',
+            claimed_at = now()
+       where id = (select id from candidate)
+     returning *`,
+    [leaseSeconds],
+  );
+
+  return result.rows[0]
+    ? toJourneyAction(result.rows[0])
+    : null;
 }

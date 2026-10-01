@@ -21,7 +21,7 @@ import {
   claimJourneyEvent,
 } from "../../db/journeyEvents.js";
 import {
-  acknowledgeJourneyAction,
+  consumeJourneyAction,
   createJourneyAction,
   getPendingJourneyAction,
 } from "../../db/journeyActions.js";
@@ -320,10 +320,16 @@ export class JourneyRuntime {
         );
 
       if (pendingAction) {
-        await acknowledgeJourneyAction(
+        const consumedAction = await consumeJourneyAction(
           client,
           pendingAction.id,
         );
+
+        if (!consumedAction) {
+          throw new Error(
+            `journey action could not be consumed: ${pendingAction.id}`,
+          );
+        }
       }
 
       /*

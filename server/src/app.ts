@@ -8,6 +8,7 @@
 import "express-async-errors";
 import express from "express";
 import { config } from "./config.js";
+import { getPool } from "./db/pool.js";
 import { Sentry } from "./lib/sentry.js";
 import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
@@ -24,6 +25,7 @@ import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
 import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
 import { fieldDefinitionsRouter } from "./routes/fieldDefinitions.js";
 import { onboardingRouter } from "./routes/onboarding.js";
+import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
 
@@ -85,6 +87,10 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(legalRouter);
   app.use(dataDeletionRouter);
   app.use(webhooksRouter);
+
+  // Instagram webhook uses req.rawBody captured by the global JSON middleware
+  // above so Meta's HMAC signature is verified against the exact request bytes.
+  app.use(createProductionInstagramWebhookRouter(getPool()));
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(campaignsRouter);

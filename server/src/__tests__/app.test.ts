@@ -34,6 +34,9 @@ function sleep(ms: number) {
 describe("app", () => {
   beforeAll(async () => {
     process.env.META_APP_SECRET = APP_SECRET;
+    process.env.INSTAGRAM_APP_SECRET = APP_SECRET;
+    process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN = "test-instagram-verify-token";
+
     if (!process.env.DATABASE_URL) {
       throw new Error(
         "DATABASE_URL must point at a migrated test database to run this suite " +
