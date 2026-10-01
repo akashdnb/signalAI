@@ -29,6 +29,7 @@ const ACCENT_ICON_BG: Record<NodeAccent, string> = {
 export function BuilderNode({
   icon: Icon,
   accent,
+  eyebrow,
   title,
   subtitle,
   selected,
@@ -38,6 +39,7 @@ export function BuilderNode({
 }: {
   icon: ComponentType<{ className?: string }>;
   accent: NodeAccent;
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   selected: boolean;
@@ -56,7 +58,7 @@ export function BuilderNode({
           onClick();
         }
       }}
-      className={`w-[260px] max-w-[calc(100vw-36px)] cursor-pointer rounded-xl border border-l-4 bg-card p-3.5 text-left shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-shadow ${
+      className={`w-[300px] max-w-[calc(100vw-40px)] cursor-grab active:cursor-grabbing rounded-xl border border-l-4 bg-card p-3.5 text-left shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-shadow ${
         ACCENT_BORDER[accent]
       } ${
         selected
@@ -73,7 +75,13 @@ export function BuilderNode({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <div className="truncate text-[13px] font-semibold leading-5 text-ink">
+          {eyebrow && (
+            <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+              {eyebrow}
+            </div>
+          )}
+
+          <div className="break-words text-[13px] font-semibold leading-[1.35] text-ink">
               {title}
             </div>
             {menu}
@@ -87,8 +95,15 @@ export function BuilderNode({
         </div>
       </div>
 
+      {selected && (
+        <span
+          aria-hidden="true"
+          className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_3px_rgba(124,58,237,0.10)]"
+        />
+      )}
+
       {children && (
-        <div className="mt-2 text-[11px] leading-4 text-subtle">
+        <div className="mt-2 break-words text-[11px] leading-4 text-subtle">
           {children}
         </div>
       )}

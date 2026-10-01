@@ -7,6 +7,7 @@ import {
   Controls,
   Handle,
   MiniMap,
+  MarkerType,
   Position,
   ReactFlow,
   useEdgesState,
@@ -72,9 +73,11 @@ const HANDLE_CLASS =
 function FlowHandles({
   source,
   target,
+  selected,
 }: {
   source?: boolean;
   target?: boolean;
+  selected?: boolean;
 }) {
   const positions = [
     [Position.Top, "top"],
@@ -82,6 +85,10 @@ function FlowHandles({
     [Position.Bottom, "bottom"],
     [Position.Left, "left"],
   ] as const;
+
+  const className = `${HANDLE_CLASS} flow-handle ${
+    selected ? "!opacity-100" : "!opacity-0"
+  }`;
 
   return (
     <>
@@ -92,7 +99,7 @@ function FlowHandles({
             type="target"
             id={`target-${id}`}
             position={position}
-            className={HANDLE_CLASS}
+            className={className}
           />
         ))}
       {source &&
@@ -102,7 +109,7 @@ function FlowHandles({
             type="source"
             id={`source-${id}`}
             position={position}
-            className={HANDLE_CLASS}
+            className={className}
           />
         ))}
     </>
@@ -203,10 +210,11 @@ function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <FlowHandles source />
+      <FlowHandles source selected={Boolean(data.selected)} />
       <BuilderNode
         icon={InstagramMarkIcon}
         accent="pink"
+        eyebrow="Trigger"
         title="Trigger"
         subtitle={triggerSubtitle(campaign)}
         selected={Boolean(data.selected)}
@@ -226,10 +234,11 @@ function MessageFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <FlowHandles source target />
+      <FlowHandles source target selected={Boolean(data.selected)} />
       <BuilderNode
         icon={BotIcon}
         accent="blue"
+        eyebrow={campaign.replyMode === "ai_generated" ? "AI Reply" : "Message"}
         title={campaign.replyMode === "ai_generated" ? "AI Reply" : "Reply Message"}
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
@@ -248,12 +257,13 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <FlowHandles source target />
+      <FlowHandles source target selected={Boolean(data.selected)} />
 
       <BuilderNode
         icon={ListChecksIcon}
         accent="green"
-        title={`${index + 1}. ${milestone.goalDescription}`}
+        eyebrow="Goal"
+        title={`${String(index + 1).padStart(2, "0")}. ${milestone.goalDescription}`}
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
         menu={
@@ -275,10 +285,11 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
 function HandoffFlowNode({ data }: NodeProps<FlowNode>) {
   return (
     <>
-      <FlowHandles target />
+      <FlowHandles target selected={Boolean(data.selected)} />
       <BuilderNode
         icon={HandshakeIcon}
         accent="neutral"
+        eyebrow="Handoff"
         title="Handoff to Human"
         subtitle="Escalate to team when needed"
         selected={Boolean(data.selected)}
@@ -301,6 +312,7 @@ function LinkFlowNode({ data }: NodeProps<FlowNode>) {
       <BuilderNode
         icon={SendIcon}
         accent="blue"
+        eyebrow="Action"
         title="Send Link"
         subtitle="Sends the CTA link"
         selected={Boolean(data.selected)}
@@ -462,6 +474,15 @@ function toFlowEdges(graph: BuilderGraph): Edge[] {
       label: edge.label ?? undefined,
       type: "smoothstep",
       selectable: false,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 14,
+        height: 14,
+      },
+      style: {
+        stroke: "var(--text-muted)",
+        strokeWidth: 1.6,
+      },
     };
   });
 }
@@ -487,6 +508,7 @@ export function BuilderCanvas({
   onReorderMilestone,
   reloadSignal = 0,
   onBuilderVersionChange,
+  onSaveStateChange,
 }: {
   tenantId: string;
   campaign: Campaign;
@@ -498,6 +520,7 @@ export function BuilderCanvas({
   onReorderMilestone: (index: number, direction: -1 | 1) => void;
   reloadSignal?: number;
   onBuilderVersionChange?: (version: number) => void;
+  onSaveStateChange?: (state: "saved" | "saving" | "unsaved") => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -627,6 +650,7 @@ export function BuilderCanvas({
         backendNodesRef.current = graph.nodes;
         backendEdgesRef.current = graph.edges;
         setVersion(graph.version);
+        onSaveStateChange?.("saved");
 
         setNodes(toFlowNodes(graph));
         setEdges(toFlowEdges(graph));
@@ -669,6 +693,7 @@ export function BuilderCanvas({
       if (version === null) return;
 
       setSaving(true);
+      onSaveStateChange?.("saving");
 
       try {
         const saved = await api.saveBuilderGraph(
@@ -684,7 +709,9 @@ export function BuilderCanvas({
         backendNodesRef.current = saved.nodes;
         backendEdgesRef.current = saved.edges;
         setVersion(saved.version);
+        onSaveStateChange?.("saved");
       } catch (error) {
+        onSaveStateChange?.("unsaved");
         setLoadError(
           error instanceof Error ? error.message : "Failed to save journey",
         );
@@ -701,7 +728,7 @@ export function BuilderCanvas({
         setSaving(false);
       }
     },
-    [campaign.id, loadGraph, locked, setVersion, tenantId],
+    [campaign.id, loadGraph, locked, onSaveStateChange, setVersion, tenantId],
   );
 
   const handleConnect = useCallback(
@@ -773,6 +800,7 @@ export function BuilderCanvas({
 
           return {
             ...node,
+            selected: isSelected(node),
             data: {
               ...node.data,
               milestone,
@@ -789,6 +817,7 @@ export function BuilderCanvas({
 
         return {
           ...node,
+          selected: isSelected(node),
           data: {
             ...node.data,
             campaign,
@@ -845,6 +874,10 @@ export function BuilderCanvas({
           Trigger
         </button>
 
+        <div className="px-2.5 pb-1 pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+          Actions
+        </div>
+
         <button
           type="button"
           className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
@@ -877,6 +910,10 @@ export function BuilderCanvas({
           </span>
           New Goal
         </button>
+
+        <div className="px-2.5 pb-1 pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+          Flow
+        </div>
 
         {[
           ["Condition", "Condition coming soon"],
@@ -973,6 +1010,15 @@ export function BuilderCanvas({
           defaultEdgeOptions={{
             type: "smoothstep",
             animated: false,
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 14,
+              height: 14,
+            },
+            style: {
+              stroke: "var(--text-muted)",
+              strokeWidth: 1.6,
+            },
           }}
           proOptions={{ hideAttribution: true }}
         >

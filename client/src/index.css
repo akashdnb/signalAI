@@ -678,3 +678,28 @@ button:disabled {
 .automation-builder label {
   font-size: 0.8rem;
 }
+
+/*
+ * Automation builder: keep the four-sided connection affordance available
+ * without making every node look covered in handles.
+ */
+.automation-builder .flow-handle {
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.automation-builder .react-flow__node:hover .flow-handle,
+.automation-builder .react-flow__node.selected .flow-handle {
+  opacity: 1 !important;
+}
+
+.automation-builder .react-flow__node:hover .flow-handle:hover,
+.automation-builder .react-flow__node.selected .flow-handle:hover {
+  transform: scale(1.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .automation-builder .flow-handle {
+    transition: none;
+  }
+}

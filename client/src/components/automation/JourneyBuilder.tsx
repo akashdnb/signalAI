@@ -62,7 +62,11 @@ export function JourneyBuilder({
   const [pendingTab, setPendingTab] = useState<BuilderTab | null>(null);
   const [graphReloadSignal, setGraphReloadSignal] = useState(0);
   const [builderVersion, setBuilderVersion] = useState<number | null>(null);
+  const [builderSaveState, setBuilderSaveState] = useState<
+    "saved" | "saving" | "unsaved"
+  >("saved");
   const [publishing, setPublishing] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
@@ -104,6 +108,8 @@ export function JourneyBuilder({
   }
 
   async function persistMilestones(next: Milestone[]) {
+    setBuilderSaveState("saving");
+
     const oldIndexToNewIndex = milestones.map((milestone) => {
       const nextIndex = next.findIndex((candidate) => candidate.id === milestone.id);
       return nextIndex < 0 ? null : nextIndex;
@@ -121,6 +127,7 @@ export function JourneyBuilder({
 
     setMilestonesState(saved);
     setGraphReloadSignal((value) => value + 1);
+    setBuilderSaveState("saved");
     return saved;
   }
 
@@ -178,18 +185,25 @@ export function JourneyBuilder({
     await onChanged();
   }
 
-  async function handlePublish() {
+  function requestPublish() {
     if (builderVersion === null) {
       setPublishError("The journey version is still loading.");
       return;
     }
+
+    setMenuOpen(false);
+    setShowPublishConfirm(true);
+  }
+
+  async function handlePublish() {
+    if (builderVersion === null) return;
 
     setPublishing(true);
     setPublishError(null);
 
     try {
       await api.publishJourney(tenantId, campaign.id, builderVersion);
-      setMenuOpen(false);
+      setShowPublishConfirm(false);
       await onChanged();
     } catch (error) {
       setPublishError(
@@ -211,7 +225,7 @@ export function JourneyBuilder({
                 className="flex h-7 shrink-0 items-center text-[13px] font-medium text-ink hover:text-accent"
                 onClick={onBack}
               >
-                ← Back to journeys
+                ← Journeys
               </button>
 
               <div className="h-5 w-px bg-line" />
@@ -226,7 +240,7 @@ export function JourneyBuilder({
                     className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                       campaign.enabled
                         ? "bg-[#D1FAE5] text-[#047857]"
-                        : "bg-[#F3E8FF] text-[#312E81]"
+                        : "bg-[#E2E8F0] text-[#475569]"
                     }`}
                   >
                     <span className="mr-1">●</span>
@@ -243,8 +257,24 @@ export function JourneyBuilder({
 
             <div className="flex shrink-0 items-center gap-1">
               {subTab === "builder" && builderVersion !== null && (
-                <span className="mr-1 hidden text-[11px] text-subtle lg:inline">
-                  Draft v{builderVersion}
+                <span className="mr-2 hidden items-center gap-1.5 text-[11px] text-subtle lg:inline-flex">
+                  <span>Draft v{builderVersion}</span>
+                  <span aria-hidden="true">·</span>
+                  <span
+                    className={
+                      builderSaveState === "saving"
+                        ? "text-subtle"
+                        : builderSaveState === "unsaved"
+                          ? "font-semibold text-[#B45309]"
+                          : "font-semibold text-[#059669]"
+                    }
+                  >
+                    {builderSaveState === "saving"
+                      ? "Saving…"
+                      : builderSaveState === "unsaved"
+                        ? "Unsaved changes"
+                        : "Saved"}
+                  </span>
                 </span>
               )}
 
@@ -279,7 +309,7 @@ export function JourneyBuilder({
                 type="button"
                 disabled={publishing || builderVersion === null}
                 className="hidden h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50 md:inline-flex"
-                onClick={() => void handlePublish()}
+                onClick={() => requestPublish()}
               >
                 {publishing ? "Publishing…" : "Publish"}
                 <ChevronDownIcon className="h-4 w-4" />
@@ -327,7 +357,7 @@ export function JourneyBuilder({
                       type="button"
                       disabled={publishing || builderVersion === null}
                       className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip disabled:opacity-40 md:hidden"
-                      onClick={() => void handlePublish()}
+                      onClick={() => requestPublish()}
                     >
                       {publishing ? "Publishing…" : "Publish"}
                     </button>
@@ -381,6 +411,7 @@ export function JourneyBuilder({
               }
               reloadSignal={graphReloadSignal}
               onBuilderVersionChange={setBuilderVersion}
+              onSaveStateChange={setBuilderSaveState}
             />
           )}
 
@@ -443,6 +474,42 @@ export function JourneyBuilder({
         onSaveMilestone={handleSaveMilestone}
         onFieldDefinitionsChanged={setFieldDefinitions}
       />
+
+      {showPublishConfirm && (
+        <BottomSheet
+          title="Publish changes"
+          onClose={() => {
+            if (!publishing) setShowPublishConfirm(false);
+          }}
+        >
+          <p className="m-0 text-sm text-ink">
+            Draft v{builderVersion ?? "—"} will become the active version.
+          </p>
+          <p className="muted mt-2 text-xs">
+            Your currently published journey remains active until these changes are published.
+          </p>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={publishing}
+              onClick={() => setShowPublishConfirm(false)}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={publishing}
+              onClick={() => void handlePublish()}
+            >
+              {publishing ? "Publishing…" : "Publish"}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
 
       {showPreview && (
         <PreviewDialog

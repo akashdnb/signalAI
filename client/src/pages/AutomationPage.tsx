@@ -75,6 +75,7 @@ export function AutomationPage() {
             navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)
           }
           onNewJourney={() => setShowNewJourney(true)}
+          onChanged={loadJourneys}
         />
       )}
 
