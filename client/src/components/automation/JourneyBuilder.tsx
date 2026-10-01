@@ -344,13 +344,13 @@ export function JourneyBuilder({
             </div>
           </div>
 
-          <div className="mt-2 flex gap-7 overflow-x-auto">
+          <div className="mt-1.5 flex gap-7 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => requestSubTabChange(tab.key)}
-                className={`-mb-px shrink-0 border-b-2 px-0 pb-2 text-[13px] transition-colors ${
+                className={`-mb-px shrink-0 border-b-2 px-0 pb-2 text-[13px] leading-5 transition-colors ${
                   subTab === tab.key
                     ? "border-accent font-semibold text-accent"
                     : "border-transparent text-subtle hover:text-ink"

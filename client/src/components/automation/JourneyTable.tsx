@@ -125,7 +125,7 @@ export function JourneyTable({
   }
 
   return (
-    <section className="mt-6">
+    <section className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h2 className="m-0 text-[21px] font-semibold tracking-[-0.015em] text-ink">
           Journeys ({campaigns?.length ?? 0})
@@ -151,7 +151,7 @@ export function JourneyTable({
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_200px_270px_200px]">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_200px_270px_200px]">
         <div className="relative">
           <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-subtle" />
           <input
@@ -207,7 +207,7 @@ export function JourneyTable({
         </select>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
+      <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
         <div className="overflow-x-auto">
           {campaigns === null ? (
             <div className="space-y-3 p-5">

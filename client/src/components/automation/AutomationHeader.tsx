@@ -1,11 +1,7 @@
 import { useState } from "react";
-import { FileTextIcon, PlusIcon } from "../icons";
+import { FileTextIcon } from "../icons";
 
-export function AutomationHeader({
-  onNewJourney,
-}: {
-  onNewJourney: () => void;
-}) {
+export function AutomationHeader() {
   const [showDocsNote, setShowDocsNote] = useState(false);
 
   return (
@@ -37,26 +33,10 @@ export function AutomationHeader({
           )}
         </div>
 
-        <button
-          type="button"
-          className="btn-primary flex h-10 items-center gap-2 px-4 text-sm"
-          onClick={onNewJourney}
-        >
-          <PlusIcon className="h-4 w-4" />
-          New Journey
-        </button>
+
       </div>
 
       <div className="flex shrink-0 items-center gap-2 md:hidden">
-        <button
-          type="button"
-          className="btn-primary flex h-10 items-center gap-2 px-4 text-sm"
-          onClick={onNewJourney}
-        >
-          <PlusIcon className="h-4 w-4" />
-          New Journey
-        </button>
-
         <button
           type="button"
           aria-label="Documentation"

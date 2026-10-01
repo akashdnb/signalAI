@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  addEdge,
   Background,
+  ConnectionMode,
+  ConnectionLineType,
   Controls,
   Handle,
   MiniMap,
@@ -8,6 +11,7 @@ import {
   ReactFlow,
   useEdgesState,
   useNodesState,
+  type Connection,
   type Edge,
   type Node,
   type NodeProps,
@@ -60,6 +64,49 @@ function triggerSubtitle(campaign: Campaign): string {
   if (campaign.triggerSource === "message") return "Direct message";
   if (campaign.triggerSource === "both") return "Comment + direct message";
   return "Comment on post or Reel";
+}
+
+const HANDLE_CLASS =
+  "!h-2 !w-2 !border-2 !border-card !bg-accent !cursor-crosshair";
+
+function FlowHandles({
+  source,
+  target,
+}: {
+  source?: boolean;
+  target?: boolean;
+}) {
+  const positions = [
+    [Position.Top, "top"],
+    [Position.Right, "right"],
+    [Position.Bottom, "bottom"],
+    [Position.Left, "left"],
+  ] as const;
+
+  return (
+    <>
+      {target &&
+        positions.map(([position, id]) => (
+          <Handle
+            key={`target-${id}`}
+            type="target"
+            id={`target-${id}`}
+            position={position}
+            className={HANDLE_CLASS}
+          />
+        ))}
+      {source &&
+        positions.map(([position, id]) => (
+          <Handle
+            key={`source-${id}`}
+            type="source"
+            id={`source-${id}`}
+            position={position}
+            className={HANDLE_CLASS}
+          />
+        ))}
+    </>
+  );
 }
 
 function DotsMenu() {
@@ -156,7 +203,7 @@ function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
+      <FlowHandles source />
       <BuilderNode
         icon={InstagramMarkIcon}
         accent="pink"
@@ -179,8 +226,7 @@ function MessageFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
-      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
+      <FlowHandles source target />
       <BuilderNode
         icon={BotIcon}
         accent="blue"
@@ -202,8 +248,7 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
-      <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
+      <FlowHandles source target />
 
       <BuilderNode
         icon={ListChecksIcon}
@@ -230,7 +275,7 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
 function HandoffFlowNode({ data }: NodeProps<FlowNode>) {
   return (
     <>
-      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
+      <FlowHandles target />
       <BuilderNode
         icon={HandshakeIcon}
         accent="neutral"
@@ -252,7 +297,7 @@ function LinkFlowNode({ data }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-2 !border-card !bg-accent" />
+      <FlowHandles target />
       <BuilderNode
         icon={SendIcon}
         accent="blue"
@@ -374,14 +419,60 @@ function toFlowNodes(graph: BuilderGraph): FlowNode[] {
   }));
 }
 
+function inferHandlePair(
+  source: JourneyNode | undefined,
+  target: JourneyNode | undefined,
+): { sourceHandle: string; targetHandle: string } {
+  if (!source || !target) {
+    return {
+      sourceHandle: "source-bottom",
+      targetHandle: "target-top",
+    };
+  }
+
+  const dx = target.position.x - source.position.x;
+  const dy = target.position.y - source.position.y;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx >= 0
+      ? { sourceHandle: "source-right", targetHandle: "target-left" }
+      : { sourceHandle: "source-left", targetHandle: "target-right" };
+  }
+
+  return dy >= 0
+    ? { sourceHandle: "source-bottom", targetHandle: "target-top" }
+    : { sourceHandle: "source-top", targetHandle: "target-bottom" };
+}
+
 function toFlowEdges(graph: BuilderGraph): Edge[] {
-  return graph.edges.map((edge) => ({
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+
+  return graph.edges.map((edge) => {
+    const handles = inferHandlePair(
+      nodeById.get(edge.sourceNodeId),
+      nodeById.get(edge.targetNodeId),
+    );
+
+    return {
+      id: edge.id,
+      source: edge.sourceNodeId,
+      target: edge.targetNodeId,
+      sourceHandle: handles.sourceHandle,
+      targetHandle: handles.targetHandle,
+      label: edge.label ?? undefined,
+      type: "smoothstep",
+      selectable: false,
+    };
+  });
+}
+
+function toJourneyEdges(edges: Edge[]): JourneyEdge[] {
+  return edges.map((edge) => ({
     id: edge.id,
-    source: edge.sourceNodeId,
-    target: edge.targetNodeId,
-    label: edge.label ?? undefined,
-    type: "smoothstep",
-    selectable: false,
+    sourceNodeId: edge.source,
+    targetNodeId: edge.target,
+    label: typeof edge.label === "string" ? edge.label : null,
+    condition: null,
   }));
 }
 
@@ -419,6 +510,7 @@ export function BuilderCanvas({
   const initialFitDoneRef = useRef(false);
 
   const [locked, setLocked] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -569,6 +661,80 @@ export function BuilderCanvas({
     void loadGraph(true);
   }, [loadGraph, reloadSignal]);
 
+  const persistGraph = useCallback(
+    async (nextNodes: JourneyNode[], nextEdges: JourneyEdge[]) => {
+      if (locked) return;
+
+      const version = builderVersionRef.current;
+      if (version === null) return;
+
+      setSaving(true);
+
+      try {
+        const saved = await api.saveBuilderGraph(
+          tenantId,
+          campaign.id,
+          {
+            expectedVersion: version,
+            nodes: nextNodes,
+            edges: nextEdges,
+          },
+        );
+
+        backendNodesRef.current = saved.nodes;
+        backendEdgesRef.current = saved.edges;
+        setVersion(saved.version);
+      } catch (error) {
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to save journey",
+        );
+
+        if (
+          error &&
+          typeof error === "object" &&
+          "status" in error &&
+          (error as { status?: number }).status === 409
+        ) {
+          await loadGraph(true);
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [campaign.id, loadGraph, locked, setVersion, tenantId],
+  );
+
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      if (
+        locked ||
+        !connection.source ||
+        !connection.target ||
+        connection.source === connection.target
+      ) {
+        return;
+      }
+
+      const nextEdge: Edge = {
+        id: crypto.randomUUID(),
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: connection.sourceHandle ?? undefined,
+        targetHandle: connection.targetHandle ?? undefined,
+        type: "smoothstep",
+        selectable: false,
+      };
+
+      const nextEdges = addEdge(nextEdge, edges);
+      setEdges(nextEdges);
+
+      const nextBackendEdges = toJourneyEdges(nextEdges);
+      backendEdgesRef.current = nextBackendEdges;
+      void persistGraph(backendNodesRef.current, nextBackendEdges);
+    },
+    [edges, locked, persistGraph, setEdges],
+  );
+
   const handleNodeDragStop = useCallback(
     (_event: MouseEvent | TouchEvent, draggedNode: FlowNode) => {
       if (locked) return;
@@ -589,44 +755,9 @@ export function BuilderCanvas({
       );
 
       backendNodesRef.current = updatedNodes;
-      setSaving(true);
-
-      const save = async () => {
-        try {
-          const saved = await api.saveBuilderGraph(
-            tenantId,
-            campaign.id,
-            {
-              expectedVersion: version,
-              nodes: updatedNodes,
-              edges: backendEdgesRef.current,
-            },
-          );
-
-          backendNodesRef.current = saved.nodes;
-          backendEdgesRef.current = saved.edges;
-          setVersion(saved.version);
-        } catch (error) {
-          setLoadError(
-            error instanceof Error ? error.message : "Failed to save journey",
-          );
-
-          if (
-            error &&
-            typeof error === "object" &&
-            "status" in error &&
-            (error as { status?: number }).status === 409
-          ) {
-            await loadGraph(true);
-          }
-        } finally {
-          setSaving(false);
-        }
-      };
-
-      void save();
+      void persistGraph(updatedNodes, backendEdgesRef.current);
     },
-    [campaign.id, loadGraph, locked, setVersion, tenantId],
+    [campaign.id, locked, persistGraph],
   );
 
   const decoratedNodes = useMemo<FlowNode[]>(
@@ -686,13 +817,23 @@ export function BuilderCanvas({
   }, [decoratedNodes.length, scheduleInitialFit]);
 
   const palette = (
-    <div className="absolute left-4 top-4 z-20 hidden w-[178px] overflow-hidden rounded-xl border border-line bg-card shadow-lg md:block">
-      <div className="flex h-11 items-center gap-2 border-b border-line px-4 text-[13px] font-semibold text-ink">
+    <div
+      className={`absolute left-4 top-4 z-20 hidden overflow-hidden rounded-xl border border-line bg-card shadow-lg md:block ${
+        paletteOpen ? "w-[178px]" : "w-[128px]"
+      }`}
+    >
+      <button
+        type="button"
+        aria-expanded={paletteOpen}
+        className="flex h-11 w-full items-center gap-2 border-b border-line px-3.5 text-left text-[13px] font-semibold text-ink hover:bg-chip"
+        onClick={() => setPaletteOpen((value) => !value)}
+      >
         <PlusIcon className="h-4 w-4" />
-        Add node
-      </div>
+        <span className="flex-1">Add node</span>
+        <span className="text-[11px] text-subtle">{paletteOpen ? "−" : "+"}</span>
+      </button>
 
-      <div className="p-2.5">
+      {paletteOpen && <div className="p-2.5">
         <button
           type="button"
           className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
@@ -762,7 +903,7 @@ export function BuilderCanvas({
             </span>
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 
@@ -777,6 +918,10 @@ export function BuilderCanvas({
   return (
     <div className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-canvas">
       {palette}
+
+      <div className="pointer-events-none absolute left-[195px] top-4 z-10 hidden rounded-lg bg-card/85 px-2.5 py-1.5 text-[10px] text-subtle backdrop-blur md:block">
+        Drag between handles to connect
+      </div>
 
       {loadError && (
         <div className="absolute left-4 right-4 top-4 z-30 flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-subtle shadow-sm md:left-[205px]">
@@ -803,10 +948,25 @@ export function BuilderCanvas({
           }}
           onNodesChange={locked ? undefined : onNodesChange}
           onEdgesChange={onEdgesChange}
+          onConnect={handleConnect}
           onNodeClick={(_event, node) => selectForNode(node)}
           onNodeDragStop={handleNodeDragStop}
           nodesDraggable={!locked}
-          nodesConnectable={false}
+          nodesConnectable={!locked}
+          connectionMode={ConnectionMode.Loose}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          isValidConnection={(connection) =>
+            Boolean(
+              connection.source &&
+                connection.target &&
+                connection.source !== connection.target &&
+                !edges.some(
+                  (edge) =>
+                    edge.source === connection.source &&
+                    edge.target === connection.target,
+                ),
+            )
+          }
           elementsSelectable={!locked}
           minZoom={0.35}
           maxZoom={1.5}
