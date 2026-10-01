@@ -1,24 +1,42 @@
+import type { Pool } from "pg";
+
 import { getPool, closePool } from "../../../db/pool.js";
 import { ActionDispatcher } from "./dispatcher.js";
 import { JourneyActionWorker } from "./worker.js";
 import { createJourneyActionWorkerLoop } from "./workerLoop.js";
 
-/*
- * This is intentionally a composition root.
- *
- * Provider construction will be completed when the application's
- * tenant/provider registry is wired in. For now the process is
- * implemented as a reusable lifecycle entrypoint.
- */
-
 export interface WorkerProcessDependencies {
   dispatcher: ActionDispatcher;
+
+  /*
+   * Embedded mode:
+   *   pass the API process' existing pool.
+   *
+   * Standalone mode:
+   *   omit this and a dedicated pool will be created.
+   */
+  pool?: Pool;
+
+  /*
+   * Only relevant when the process owns the pool.
+   *
+   * Standalone worker:
+   *   true
+   *
+   * Embedded worker:
+   *   false
+   */
+  closePoolOnStop?: boolean;
 }
 
 export function createWorkerProcess(
   dependencies: WorkerProcessDependencies,
 ) {
-  const pool = getPool();
+  const pool = dependencies.pool ?? getPool();
+
+  const ownsPool =
+    dependencies.closePoolOnStop ??
+    dependencies.pool == null;
 
   const worker = new JourneyActionWorker(
     pool,
@@ -50,9 +68,13 @@ export function createWorkerProcess(
 
   return {
     loop,
+
     async stop() {
       await loop.stop();
-      await closePool();
+
+      if (ownsPool) {
+        await closePool();
+      }
     },
   };
 }

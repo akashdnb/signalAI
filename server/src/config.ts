@@ -150,6 +150,18 @@ export const config = {
   get apiBaseUrl() {
     return stripTrailingSlashes(process.env.API_BASE_URL ?? "http://localhost:3000");
   },
+
+  /*
+   * Free Render mode:
+   *   true  -> API embeds the JourneyActionWorker.
+   *
+   * Paid Render mode:
+   *   false -> API does not run the JourneyActionWorker.
+   *            A separate Background Worker runs src/worker.ts.
+   */
+  get journeyWorkerEnabled() {
+    return process.env.JOURNEY_WORKER_ENABLED === "true";
+  },
   // Identity Refactor U2: optional, unlike every other setting below this
   // point being "genuinely optional" — see lib/resend.ts's docstring for
   // why an unconfigured Resend still has a real (not silent) fallback.

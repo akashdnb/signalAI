@@ -11,6 +11,9 @@ import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs
 import { createLLMProviderFromEnv, createEmbeddingProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
+import {
+  createProductionJourneyWorker,
+} from "./domain/journey/actions/createProductionWorker.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "./db/emailOtpCodes.js";
@@ -146,6 +149,41 @@ async function main() {
       await sendTelegramAlert(`⚠️ Token refresh failure(s) — Account Health Monitoring:\n${JSON.stringify(failures)}`);
     }
   });
+
+  /*
+   * Render Free:
+   *
+   *   The API process also owns the JourneyActionWorker.
+   *
+   * Render Paid:
+   *
+   *   Set JOURNEY_WORKER_ENABLED=false on the API service and run
+   *   npm run worker:prod in a separate Background Worker.
+   *
+   * The worker's durable queue is PostgreSQL-backed, so a process restart
+   * does not lose pending actions.
+   */
+  if (config.journeyWorkerEnabled) {
+    const journeyWorkerProcess =
+      createProductionJourneyWorker({
+        pool,
+      });
+
+    console.info(
+      "Journey action worker enabled in API process",
+    );
+
+    void journeyWorkerProcess.loop.start().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error(
+        "Embedded journey worker stopped unexpectedly",
+        error,
+      );
+
+      Sentry.captureException(error);
+      process.exit(1);
+    });
+  }
 
   const app = createApp({ llmProvider, embeddingProvider });
   app.listen(config.port, () => {

@@ -1,9 +1,7 @@
 import { config } from "./config.js";
-import { getPool } from "./db/pool.js";
 import {
-  createProductionJourneyActionDispatcher,
-} from "./domain/journey/actions/createProductionDispatcher.js";
-import { createWorkerProcess } from "./domain/journey/actions/workerProcess.js";
+  createProductionJourneyWorker,
+} from "./domain/journey/actions/createProductionWorker.js";
 
 function assertWorkerConfig(): void {
   if (!process.env.DATABASE_URL) {
@@ -22,17 +20,8 @@ function assertWorkerConfig(): void {
 async function main(): Promise<void> {
   assertWorkerConfig();
 
-  const pool = getPool();
-
-  const dispatcher =
-    createProductionJourneyActionDispatcher({
-      pool,
-    });
-
   const workerProcess =
-    createWorkerProcess({
-      dispatcher,
-    });
+    createProductionJourneyWorker();
 
   let shuttingDown = false;
 

@@ -90,7 +90,22 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
 
   // Instagram webhook uses req.rawBody captured by the global JSON middleware
   // above so Meta's HMAC signature is verified against the exact request bytes.
-  app.use(createProductionInstagramWebhookRouter(getPool()));
+  const instagramWebhookVerifyToken =
+    config.metaWebhookVerifyToken;
+
+  const instagramAppSecret =
+    config.metaAppSecret;
+
+  if (
+    instagramWebhookVerifyToken &&
+    instagramAppSecret
+  ) {
+    app.use(
+      createProductionInstagramWebhookRouter(
+        getPool(),
+      ),
+    );
+  }
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(campaignsRouter);

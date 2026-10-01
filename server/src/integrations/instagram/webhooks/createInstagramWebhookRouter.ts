@@ -8,24 +8,26 @@ import {
   createInstagramWebhookRouter,
 } from "../../../routes/instagramWebhook.js";
 
+import { config } from "../../../config.js";
+
 export function createProductionInstagramWebhookRouter(
   pool: Pool,
 ) {
   const verifyToken =
-    process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
+    config.metaWebhookVerifyToken;
 
   const appSecret =
-    process.env.INSTAGRAM_APP_SECRET;
+    config.metaAppSecret;
 
   if (!verifyToken) {
     throw new Error(
-      "INSTAGRAM_WEBHOOK_VERIFY_TOKEN is required",
+      "META_WEBHOOK_VERIFY_TOKEN is required",
     );
   }
 
   if (!appSecret) {
     throw new Error(
-      "INSTAGRAM_APP_SECRET is required",
+      "META_APP_SECRET is required",
     );
   }
 
