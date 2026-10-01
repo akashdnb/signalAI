@@ -114,22 +114,22 @@ export function NodeInspectorDialog({
           Cancel
         </button>
 
-        {actions.canSave && (
-          <button
-            type="button"
-            className="btn-primary min-h-10 px-4"
-            onClick={async () => {
-              const saved = await inspectorRef.current?.save();
+        <button
+          type="button"
+          className="btn-primary min-h-10 px-4"
+          onClick={async () => {
+            if (!actions.canSave) return;
 
-              if (saved) {
-                onClose();
-              }
-            }}
-            disabled={actions.saving}
-          >
-            {actions.saving ? "Saving…" : "Save changes"}
-          </button>
-        )}
+            const saved = await inspectorRef.current?.save();
+
+            if (saved) {
+              onClose();
+            }
+          }}
+          disabled={actions.saving || !actions.canSave}
+        >
+          {actions.saving ? "Saving…" : "Save changes"}
+        </button>
       </div>
     ),
     [actions, onClose],
@@ -145,6 +145,7 @@ export function NodeInspectorDialog({
         title={title}
         onClose={requestClose}
         maxWidth={860}
+        height={640}
         bodyClassName="md:px-7"
         headerContent={
           selectedNode.type === "milestone" ? (

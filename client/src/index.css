@@ -680,6 +680,79 @@ button:disabled {
 }
 
 /*
+ * Builder chrome: toolbar controls should read as interactive buttons
+ * without becoming visually heavy.
+ */
+.automation-builder .builder-toolbar-button,
+.automation-builder .builder-palette-toggle {
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.automation-builder .builder-toolbar-button:hover:not(:disabled),
+.automation-builder .builder-palette-toggle:hover:not(:disabled) {
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+}
+
+.automation-builder .builder-toolbar-button:active:not(:disabled),
+.automation-builder .builder-palette-toggle:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.automation-builder .react-flow__controls {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  border-radius: 11px !important;
+  background: var(--card-bg) !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1) !important;
+}
+
+.automation-builder .react-flow__controls-button {
+  width: 38px;
+  height: 38px;
+  border: 0 !important;
+  border-right: 1px solid var(--border) !important;
+  background: var(--card-bg) !important;
+  color: var(--text-muted);
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease;
+}
+
+.automation-builder .react-flow__controls-button:last-child {
+  border-right: 0 !important;
+}
+
+.automation-builder .react-flow__controls-button:hover {
+  background: var(--pill-bg) !important;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.08);
+}
+
+.automation-builder [data-canvas-locked="true"] .react-flow__controls-button:last-child {
+  background: var(--pill-bg) !important;
+  color: var(--accent);
+}
+
+.automation-builder .react-flow__controls-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .automation-builder .builder-toolbar-button,
+  .automation-builder .builder-palette-toggle,
+  .automation-builder .react-flow__controls-button {
+    transition: none;
+  }
+}
+
+/*
  * Automation builder: keep the four-sided connection affordance available
  * without making every node look covered in handles.
  */

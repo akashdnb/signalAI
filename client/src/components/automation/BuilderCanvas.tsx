@@ -29,11 +29,11 @@ import {
 } from "../../api";
 import {
   BotIcon,
+  ChevronDownIcon,
   DotsVerticalIcon,
   HandshakeIcon,
   InstagramMarkIcon,
   ListChecksIcon,
-  LockIcon,
   PlusIcon,
   SendIcon,
   TrashIcon,
@@ -848,21 +848,30 @@ export function BuilderCanvas({
   const palette = (
     <div
       className={`absolute left-4 top-4 z-20 hidden overflow-hidden rounded-xl border border-line bg-card shadow-lg md:block ${
-        paletteOpen ? "w-[178px]" : "w-[128px]"
+        paletteOpen ? "w-[190px]" : "w-[154px]"
       }`}
     >
       <button
         type="button"
         aria-expanded={paletteOpen}
-        className="flex h-11 w-full items-center gap-2 border-b border-line px-3.5 text-left text-[13px] font-semibold text-ink hover:bg-chip"
+        aria-controls="journey-builder-node-palette"
+        className="builder-palette-toggle flex h-12 w-full items-center gap-2 border-b border-line px-3.5 text-left text-[13px] font-semibold text-ink hover:bg-chip"
         onClick={() => setPaletteOpen((value) => !value)}
       >
-        <PlusIcon className="h-4 w-4" />
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-chip text-accent">
+          <PlusIcon className="h-4 w-4" />
+        </span>
         <span className="flex-1">Add node</span>
-        <span className="text-[11px] text-subtle">{paletteOpen ? "−" : "+"}</span>
+        <span className="flex h-7 w-7 items-center justify-center rounded-md text-subtle">
+          <ChevronDownIcon
+            className={`h-4 w-4 transition-transform ${
+              paletteOpen ? "rotate-180" : ""
+            }`}
+          />
+        </span>
       </button>
 
-      {paletteOpen && <div className="p-2.5">
+      {paletteOpen && <div id="journey-builder-node-palette" className="p-2.5">
         <button
           type="button"
           className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
@@ -953,7 +962,10 @@ export function BuilderCanvas({
   }
 
   return (
-    <div className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-canvas">
+    <div
+      className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-canvas"
+      data-canvas-locked={locked}
+    >
       {palette}
 
       <div className="pointer-events-none absolute left-[195px] top-4 z-10 hidden rounded-lg bg-card/85 px-2.5 py-1.5 text-[10px] text-subtle backdrop-blur md:block">
@@ -1025,8 +1037,11 @@ export function BuilderCanvas({
           <Background gap={18} size={1} color="var(--border)" />
 
           <Controls
-            showInteractive={false}
-            className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card !shadow-sm"
+            orientation="horizontal"
+            showInteractive
+            onInteractiveChange={(interactive) => setLocked(!interactive)}
+            aria-label="Canvas controls"
+            className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card !shadow-sm md:!m-0 md:!bottom-5 md:!left-[258px]"
           />
 
           <MiniMap
@@ -1037,18 +1052,6 @@ export function BuilderCanvas({
           />
         </ReactFlow>
       </div>
-
-      <button
-        type="button"
-        aria-label={locked ? "Unlock canvas" : "Lock canvas"}
-        aria-pressed={locked}
-        className={`absolute bottom-[76px] left-4 z-20 hidden h-9 w-9 items-center justify-center rounded-lg border border-line bg-card shadow-sm md:flex ${
-          locked ? "text-accent" : "text-subtle hover:text-ink"
-        }`}
-        onClick={() => setLocked((value) => !value)}
-      >
-        <LockIcon className="h-4 w-4" />
-      </button>
 
       <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-20 flex justify-start md:hidden">
         <div className="rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">

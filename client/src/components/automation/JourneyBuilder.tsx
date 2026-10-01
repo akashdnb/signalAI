@@ -217,53 +217,25 @@ export function JourneyBuilder({
   return (
     <>
       <div className="automation-builder flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-card">
-        <div className="border-b border-line px-4 pt-2.5 md:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                className="flex h-7 shrink-0 items-center text-[13px] font-medium text-ink hover:text-accent"
-                onClick={onBack}
-              >
-                ← Journeys
-              </button>
-
-              <div className="h-5 w-px bg-line" />
-
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <h1 className="m-0 truncate text-[18px] font-semibold tracking-[-0.01em] text-ink">
-                    {campaign.name}
-                  </h1>
-
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                      campaign.enabled
-                        ? "bg-[#D1FAE5] text-[#047857]"
-                        : "bg-[#E2E8F0] text-[#475569]"
-                    }`}
-                  >
-                    <span className="mr-1">●</span>
-                    {campaign.enabled ? "Active" : "Inactive"}
-                  </span>
-                </div>
-
-                <p className="muted m-0 mt-0.5 truncate text-[11px]">
-                  {describeCampaign(campaign)} · Updated{" "}
-                  {new Date(campaign.updatedAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
+        <div className="relative border-b border-line px-4 pt-2.5 md:px-5">
+          <div className="flex items-start justify-between gap-4">
+            <button
+              type="button"
+              className="builder-toolbar-button mt-0.5 flex h-8 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-ink hover:bg-chip"
+              onClick={onBack}
+            >
+              ← Back to journeys
+            </button>
 
             <div className="flex shrink-0 items-center gap-1">
               {subTab === "builder" && builderVersion !== null && (
-                <span className="mr-2 hidden items-center gap-1.5 text-[11px] text-subtle lg:inline-flex">
-                  <span>Draft v{builderVersion}</span>
+                <span className="mr-1 hidden items-center gap-1.5 rounded-lg px-2 text-[11px] text-subtle lg:inline-flex">
+                  <span className="font-medium text-ink">v{builderVersion}</span>
                   <span aria-hidden="true">·</span>
                   <span
                     className={
                       builderSaveState === "saving"
-                        ? "text-subtle"
+                        ? "font-medium text-subtle"
                         : builderSaveState === "unsaved"
                           ? "font-semibold text-[#B45309]"
                           : "font-semibold text-[#059669]"
@@ -281,7 +253,7 @@ export function JourneyBuilder({
               <button
                 type="button"
                 aria-label="Documentation"
-                className="hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip lg:inline-flex"
+                className="builder-toolbar-button hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip lg:inline-flex"
                 title="Documentation is coming soon"
               >
                 <FileTextIcon className="h-4 w-4" />
@@ -290,7 +262,7 @@ export function JourneyBuilder({
 
               <button
                 type="button"
-                className="hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip md:inline-flex"
+                className="builder-toolbar-button hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip md:inline-flex"
                 onClick={() => setShowPreview(true)}
               >
                 <EyeIcon className="h-4 w-4" />
@@ -299,7 +271,7 @@ export function JourneyBuilder({
 
               <button
                 type="button"
-                className="hidden h-9 rounded-lg bg-chip px-3 text-sm font-semibold text-ink hover:bg-[#EBDDFF] md:inline-flex md:items-center"
+                className="builder-toolbar-button hidden h-9 rounded-lg bg-chip px-3 text-sm font-semibold text-ink hover:bg-[#EBDDFF] md:inline-flex md:items-center"
                 onClick={() => setShowTestJourney(true)}
               >
                 Test Journey
@@ -308,7 +280,7 @@ export function JourneyBuilder({
               <button
                 type="button"
                 disabled={publishing || builderVersion === null}
-                className="hidden h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50 md:inline-flex"
+                className="builder-toolbar-button hidden h-9 items-center gap-1.5 rounded-lg border border-accent/20 bg-accent px-4 text-sm font-semibold text-white shadow-sm hover:bg-accent-hover disabled:opacity-50 md:inline-flex"
                 onClick={() => requestPublish()}
               >
                 {publishing ? "Publishing…" : "Publish"}
@@ -318,7 +290,7 @@ export function JourneyBuilder({
               <button
                 type="button"
                 aria-label="More actions"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+                className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
                 onClick={() => setMenuOpen((value) => !value)}
               >
                 <DotsVerticalIcon className="h-5 w-5" />
@@ -374,19 +346,49 @@ export function JourneyBuilder({
             </div>
           </div>
 
+          <div className="min-w-0 pb-2 pt-1">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h1 className="m-0 truncate text-[20px] font-semibold tracking-[-0.015em] text-ink">
+                {campaign.name}
+              </h1>
+
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                  campaign.enabled
+                    ? "bg-[#D1FAE5] text-[#047857]"
+                    : "bg-[#E2E8F0] text-[#475569]"
+                }`}
+              >
+                <span className="mr-1">●</span>
+                {campaign.enabled ? "Active" : "Inactive"}
+              </span>
+            </div>
+
+            <p className="muted m-0 mt-0.5 truncate text-[11px]">
+              {describeCampaign(campaign)} · Updated{" "}
+              {new Date(campaign.updatedAt).toLocaleDateString()}
+            </p>
+          </div>
+
           <div className="mt-1.5 flex gap-7 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => requestSubTabChange(tab.key)}
-                className={`-mb-px shrink-0 border-b-2 px-0 pb-2 text-[13px] leading-5 transition-colors ${
+                className={`relative -mb-px shrink-0 px-0 pb-2.5 pt-0.5 text-[13px] leading-5 transition-colors ${
                   subTab === tab.key
-                    ? "border-accent font-semibold text-accent"
-                    : "border-transparent text-subtle hover:text-ink"
+                    ? "font-semibold text-ink"
+                    : "text-subtle hover:text-ink"
                 }`}
               >
                 {tab.label}
+                <span
+                  aria-hidden="true"
+                  className={`absolute bottom-[-1px] left-0 h-[3px] rounded-full bg-accent transition-opacity ${
+                    subTab === tab.key ? "w-full opacity-100" : "w-0 opacity-0"
+                  }`}
+                />
               </button>
             ))}
           </div>
@@ -453,7 +455,7 @@ export function JourneyBuilder({
                   </div>
 
                   <span className="rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-subtle">
-                    Draft v{builderVersion ?? "—"}
+                    v{builderVersion ?? "—"}
                   </span>
                 </div>
               </div>
@@ -483,7 +485,7 @@ export function JourneyBuilder({
           }}
         >
           <p className="m-0 text-sm text-ink">
-            Draft v{builderVersion ?? "—"} will become the active version.
+            v{builderVersion ?? "—"} will become the active version.
           </p>
           <p className="muted mt-2 text-xs">
             Your currently published journey remains active until these changes are published.

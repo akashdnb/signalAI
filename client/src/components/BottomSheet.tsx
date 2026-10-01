@@ -5,7 +5,7 @@ import { CloseIcon } from "./icons";
  * Shared modal primitive:
  * - mobile: bottom sheet
  * - desktop: centered dialog
- * - content-aware height
+ * - content-aware by default, with optional fixed-height mode
  * - fixed header/footer with scrollable body
  */
 export function BottomSheet({
@@ -16,6 +16,7 @@ export function BottomSheet({
   headerContent,
   footer,
   bodyClassName = "",
+  height,
   zIndex = 50,
 }: {
   title: string;
@@ -25,6 +26,7 @@ export function BottomSheet({
   headerContent?: ReactNode;
   footer?: ReactNode;
   bodyClassName?: string;
+  height?: number | string;
   zIndex?: number;
 }) {
   return (
@@ -44,7 +46,12 @@ export function BottomSheet({
         aria-modal="true"
         aria-label={title}
         className="relative flex max-h-[92vh] w-full min-h-0 flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-xl md:max-h-[88vh] md:rounded-2xl"
-        style={{ maxWidth }}
+        style={{
+          maxWidth,
+          ...(height !== undefined
+            ? { height: typeof height === "number" ? `${height}px` : height }
+            : {}),
+        }}
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 md:px-6 md:py-4">
           <div className="min-w-0 flex-1">
