@@ -227,11 +227,11 @@ export function JourneyBuilder({
               ← Back to journeys
             </button>
 
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1.5">
               {subTab === "builder" && builderVersion !== null && (
-                <span className="mr-1 hidden items-center gap-1.5 rounded-lg px-2 text-[11px] text-subtle lg:inline-flex">
-                  <span className="font-medium text-ink">v{builderVersion}</span>
-                  <span aria-hidden="true">·</span>
+                <span className="toolbar-version hidden h-9 min-w-[76px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-[11px] lg:inline-flex">
+                  <span className="font-semibold text-ink">v{builderVersion}</span>
+                  <span aria-hidden="true" className="text-subtle">·</span>
                   <span
                     className={
                       builderSaveState === "saving"
@@ -244,7 +244,7 @@ export function JourneyBuilder({
                     {builderSaveState === "saving"
                       ? "Saving…"
                       : builderSaveState === "unsaved"
-                        ? "Unsaved changes"
+                        ? "Unsaved"
                         : "Saved"}
                   </span>
                 </span>
@@ -253,25 +253,25 @@ export function JourneyBuilder({
               <button
                 type="button"
                 aria-label="Documentation"
-                className="builder-toolbar-button hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip lg:inline-flex"
+                className="builder-toolbar-button hidden h-9 min-w-[72px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink lg:inline-flex"
                 title="Documentation is coming soon"
               >
-                <FileTextIcon className="h-4 w-4" />
+                <FileTextIcon className="h-4 w-4 shrink-0" />
                 Docs
               </button>
 
               <button
                 type="button"
-                className="builder-toolbar-button hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip md:inline-flex"
+                className="builder-toolbar-button hidden h-9 min-w-[88px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink md:inline-flex"
                 onClick={() => setShowPreview(true)}
               >
-                <EyeIcon className="h-4 w-4" />
+                <EyeIcon className="h-4 w-4 shrink-0" />
                 Preview
               </button>
 
               <button
                 type="button"
-                className="builder-toolbar-button hidden h-9 rounded-lg bg-chip px-3 text-sm font-semibold text-ink hover:bg-[#EBDDFF] md:inline-flex md:items-center"
+                className="builder-toolbar-button hidden h-9 min-w-[112px] items-center justify-center rounded-lg bg-chip px-3 text-[13px] font-semibold text-ink md:inline-flex"
                 onClick={() => setShowTestJourney(true)}
               >
                 Test Journey
@@ -280,11 +280,11 @@ export function JourneyBuilder({
               <button
                 type="button"
                 disabled={publishing || builderVersion === null}
-                className="builder-toolbar-button hidden h-9 items-center gap-1.5 rounded-lg border border-accent/20 bg-accent px-4 text-sm font-semibold text-white shadow-sm hover:bg-accent-hover disabled:opacity-50 md:inline-flex"
+                className="builder-toolbar-button builder-publish-button hidden h-9 min-w-[108px] items-center justify-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold text-white shadow-sm disabled:opacity-50 md:inline-flex"
                 onClick={() => requestPublish()}
               >
                 {publishing ? "Publishing…" : "Publish"}
-                <ChevronDownIcon className="h-4 w-4" />
+                <ChevronDownIcon className="h-4 w-4 shrink-0" />
               </button>
 
               <button

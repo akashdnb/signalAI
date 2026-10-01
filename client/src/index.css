@@ -683,8 +683,25 @@ button:disabled {
  * Builder chrome: toolbar controls should read as interactive buttons
  * without becoming visually heavy.
  */
+.automation-builder .toolbar-version {
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.automation-builder .builder-publish-button,
+.automation-builder .builder-publish-button:hover:not(:disabled),
+.automation-builder .builder-publish-button:focus-visible {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.automation-builder .builder-publish-button:hover:not(:disabled) {
+  background: var(--accent-hover) !important;
+}
+
 .automation-builder .builder-toolbar-button,
-.automation-builder .builder-palette-toggle {
+.automation-builder .builder-palette-toggle,
+.automation-builder .toolbar-version {
   transition:
     background-color 150ms ease,
     box-shadow 150ms ease,
