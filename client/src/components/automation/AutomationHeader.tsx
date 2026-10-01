@@ -9,10 +9,12 @@ export function AutomationHeader({
   const [showDocsNote, setShowDocsNote] = useState(false);
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 md:gap-4">
+    <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="m-0 text-xl font-bold leading-tight text-ink">Automation</h1>
-        <p className="muted m-0 mt-0.5 max-w-2xl text-xs leading-snug md:text-sm">
+        <h1 className="m-0 text-[29px] font-bold leading-[1.15] tracking-[-0.025em] text-ink">
+          Automation
+        </h1>
+        <p className="muted m-0 mt-1 text-sm leading-5 md:text-[15px]">
           Create AI-powered conversations that turn Instagram comments and DMs into qualified leads.
         </p>
       </div>
@@ -21,7 +23,7 @@ export function AutomationHeader({
         <div className="relative">
           <button
             type="button"
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-semibold text-ink hover:bg-chip"
+            className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink hover:bg-chip"
             onClick={() => setShowDocsNote((value) => !value)}
           >
             <FileTextIcon className="h-4 w-4" />
@@ -29,7 +31,7 @@ export function AutomationHeader({
           </button>
 
           {showDocsNote && (
-            <div className="absolute right-0 top-10 z-30 w-52 rounded-lg border border-line bg-card p-2.5 text-xs text-subtle shadow-lg">
+            <div className="absolute right-0 top-11 z-30 w-56 rounded-xl border border-line bg-card p-3 text-xs text-subtle shadow-lg">
               Documentation is coming soon.
             </div>
           )}
@@ -37,7 +39,7 @@ export function AutomationHeader({
 
         <button
           type="button"
-          className="btn-primary flex h-9 items-center gap-1.5 px-4 text-sm"
+          className="btn-primary flex h-10 items-center gap-2 px-4 text-sm"
           onClick={onNewJourney}
         >
           <PlusIcon className="h-4 w-4" />
@@ -45,33 +47,30 @@ export function AutomationHeader({
         </button>
       </div>
 
-      <div className="flex w-full shrink-0 items-center gap-2.5 md:hidden">
+      <div className="flex shrink-0 items-center gap-2 md:hidden">
         <button
           type="button"
-          className="btn-primary flex h-11 flex-1 items-center justify-center gap-2"
+          className="btn-primary flex h-11 items-center gap-2 px-4 text-sm"
           onClick={onNewJourney}
         >
-          <PlusIcon className="h-4.5 w-4.5" />
+          <PlusIcon className="h-4 w-4" />
           New Journey
         </button>
-
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-card text-ink"
-            aria-label="Documentation"
-            onClick={() => setShowDocsNote((value) => !value)}
-          >
-            <FileTextIcon className="h-5 w-5" />
-          </button>
-
-          {showDocsNote && (
-            <div className="absolute right-0 top-12 z-30 w-56 rounded-lg border border-line bg-card p-3 text-sm text-subtle shadow-lg">
-              Documentation is coming soon.
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          aria-label="Documentation"
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-card text-ink"
+          onClick={() => setShowDocsNote((value) => !value)}
+        >
+          <FileTextIcon className="h-5 w-5" />
+        </button>
       </div>
+
+      {showDocsNote && (
+        <div className="fixed left-4 right-4 top-16 z-40 rounded-xl border border-line bg-card p-3 text-sm text-subtle shadow-lg md:hidden">
+          Documentation is coming soon.
+        </div>
+      )}
     </div>
   );
 }

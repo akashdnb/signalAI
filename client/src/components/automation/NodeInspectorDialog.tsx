@@ -3,10 +3,10 @@ import { Inspector } from "./Inspector";
 import type { SelectedNode } from "./BuilderCanvas";
 import type { Campaign, FieldDefinition, Milestone } from "../../api";
 
-function inspectorTitle(selectedNode: SelectedNode): string {
+function titleFor(selectedNode: SelectedNode): string {
   if (selectedNode.type === "trigger") return "Edit Trigger";
   if (selectedNode.type === "message") return "Edit Message";
-  if (selectedNode.type === "milestone") return `Edit Milestone ${selectedNode.milestoneIndex + 1}`;
+  if (selectedNode.type === "milestone") return "Edit Goal";
   return selectedNode.action === "link" ? "Edit Send Link" : "Handoff to Human";
 }
 
@@ -29,7 +29,7 @@ export function NodeInspectorDialog({
   fieldDefinitions: FieldDefinition[];
   selectedNode: SelectedNode;
   onClose: () => void;
-  onCampaignChanged: () => void;
+  onCampaignChanged: () => Promise<void> | void;
   onSaveMilestone: (
     index: number,
     updates: { goalDescription: string; captureFields: string[] },
@@ -40,7 +40,11 @@ export function NodeInspectorDialog({
 
   return (
     <div className="inspector-compact">
-      <BottomSheet title={inspectorTitle(selectedNode)} onClose={onClose} maxWidth={560}>
+      <BottomSheet
+        title={titleFor(selectedNode)}
+        onClose={onClose}
+        maxWidth={760}
+      >
         <Inspector
           tenantId={tenantId}
           campaign={campaign}

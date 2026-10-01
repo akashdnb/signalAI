@@ -10,7 +10,12 @@ import {
   type Milestone,
   type TriggerSource,
 } from "../../api";
-import { BotIcon, HandshakeIcon, InstagramMarkIcon, SendIcon } from "../icons";
+import {
+  BotIcon,
+  HandshakeIcon,
+  InstagramMarkIcon,
+  SendIcon,
+} from "../icons";
 import type { SelectedNode } from "./BuilderCanvas";
 
 const VALUE_TYPES: { value: FieldDefinitionValueType; label: string }[] = [
@@ -22,24 +27,75 @@ const VALUE_TYPES: { value: FieldDefinitionValueType; label: string }[] = [
   { value: "text", label: "Text" },
 ];
 
-function InspectorHeader({ icon: Icon, title, description }: { icon: typeof BotIcon; title: string; description: string }) {
+function PanelHeader({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof BotIcon;
+  title: string;
+  description: string;
+}) {
   return (
-    <div className="mb-4 flex items-start gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
+    <div className="flex items-start gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
         <Icon className="h-4.5 w-4.5" />
       </span>
-      <div>
-        <h3 className="m-0 text-base font-semibold text-ink">{title}</h3>
-        <p className="muted small m-0 mt-0.5">{description}</p>
+
+      <div className="min-w-0">
+        <h3 className="m-0 text-[15px] font-semibold text-ink">{title}</h3>
+        <p className="muted m-0 mt-1 text-[11px] leading-4">{description}</p>
       </div>
     </div>
   );
 }
 
-function TriggerPanel({ tenantId, campaign, onCampaignChanged }: { tenantId: string; campaign: Campaign; onCampaignChanged: () => void }) {
-  const [baseType, setBaseType] = useState<"comment" | "message">(campaign.triggerSource === "message" ? "message" : "comment");
+function SectionTabs({
+  items,
+  active,
+  onChange,
+}: {
+  items: { key: string; label: string }[];
+  active: string;
+  onChange: (key: string) => void;
+}) {
+  return (
+    <div className="w-[122px] shrink-0 space-y-1 border-r border-line pr-3">
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onChange(item.key)}
+          className={`flex min-h-9 w-full items-center rounded-lg px-2.5 text-left text-[12px] ${
+            active === item.key
+              ? "bg-chip font-semibold text-accent"
+              : "text-subtle hover:bg-chip hover:text-ink"
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TriggerPanel({
+  tenantId,
+  campaign,
+  onCampaignChanged,
+}: {
+  tenantId: string;
+  campaign: Campaign;
+  onCampaignChanged: () => Promise<void> | void;
+}) {
+  const [tab, setTab] = useState("basic");
+  const [baseType, setBaseType] = useState<"comment" | "message">(
+    campaign.triggerSource === "message" ? "message" : "comment",
+  );
   const [alsoDm, setAlsoDm] = useState(campaign.triggerSource === "both");
   const [keywords, setKeywords] = useState(campaign.keywords.join(", "));
+  const [storyReplies, setStoryReplies] = useState(false);
+  const [caseInsensitive, setCaseInsensitive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,18 +108,26 @@ function TriggerPanel({ tenantId, campaign, onCampaignChanged }: { tenantId: str
   async function handleSave() {
     const parsedKeywords = keywords
       .split(",")
-      .map((k) => k.trim())
+      .map((keyword) => keyword.trim())
       .filter(Boolean);
+
     if (parsedKeywords.length === 0) {
       setError("Add at least one keyword.");
       return;
     }
-    const triggerSource: TriggerSource = baseType === "message" ? "message" : alsoDm ? "both" : "comment";
+
+    const triggerSource: TriggerSource =
+      baseType === "message" ? "message" : alsoDm ? "both" : "comment";
+
     setSaving(true);
     setError(null);
+
     try {
-      await api.updateReplyConfig(tenantId, campaign.id, { triggerSource, keywords: parsedKeywords });
-      onCampaignChanged();
+      await api.updateReplyConfig(tenantId, campaign.id, {
+        triggerSource,
+        keywords: parsedKeywords,
+      });
+      await onCampaignChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save trigger");
     } finally {
@@ -72,45 +136,145 @@ function TriggerPanel({ tenantId, campaign, onCampaignChanged }: { tenantId: str
   }
 
   return (
-    <div>
-      <InspectorHeader
-        icon={InstagramMarkIcon}
-        title="Trigger"
-        description="Starts the journey when someone comments on your post or sends a DM."
+    <div className="flex gap-5">
+      <SectionTabs
+        items={[
+          { key: "basic", label: "Basic" },
+          { key: "advanced", label: "Advanced" },
+          { key: "ai", label: "AI Settings" },
+        ]}
+        active={tab}
+        onChange={setTab}
       />
 
-      <label>
-        Trigger Type
-        <select value={baseType} onChange={(e) => setBaseType(e.target.value as "comment" | "message")}>
-          <option value="comment">Comment on post or Reel</option>
-          <option value="message">Direct message</option>
-        </select>
-      </label>
+      <div className="min-w-0 flex-1">
+        {tab === "basic" ? (
+          <>
+            <PanelHeader
+              icon={InstagramMarkIcon}
+              title="Trigger"
+              description="Starts the journey when someone comments or sends a DM."
+            />
 
-      <label>
-        Keywords (comma separated)
-        <textarea value={keywords} onChange={(e) => setKeywords(e.target.value)} rows={3} />
-      </label>
+            <div className="mt-5 space-y-4">
+              <div>
+                <div className="text-[11px] font-semibold text-ink">Trigger type</div>
 
-      <label className="radio-row" style={{ opacity: baseType === "message" ? 0.5 : 1 }}>
-        <input
-          type="checkbox"
-          checked={baseType === "message" ? true : alsoDm}
-          disabled={baseType === "message"}
-          onChange={(e) => setAlsoDm(e.target.checked)}
-        />
-        Also trigger on direct messages
-      </label>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 text-left text-[12px] ${
+                      baseType === "message"
+                        ? "border-accent bg-chip text-ink"
+                        : "border-line bg-card text-subtle"
+                    }`}
+                    onClick={() => setBaseType("message")}
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-accent">
+                      {baseType === "message" && (
+                        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                      )}
+                    </span>
+                    Direct message
+                  </button>
 
-      {error && <div className="banner banner-error">{error}</div>}
-      <button type="button" className="btn-primary btn-small" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving…" : "Save trigger"}
-      </button>
+                  <button
+                    type="button"
+                    className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 text-left text-[12px] ${
+                      baseType === "comment"
+                        ? "border-accent bg-chip text-ink"
+                        : "border-line bg-card text-subtle"
+                    }`}
+                    onClick={() => setBaseType("comment")}
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-line">
+                      {baseType === "comment" && (
+                        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                      )}
+                    </span>
+                    Comment on post
+                  </button>
+                </div>
+              </div>
+
+              <label>
+                <span className="text-[11px] font-semibold text-ink">
+                  Keywords (comma separated)
+                </span>
+                <textarea
+                  value={keywords}
+                  onChange={(event) => setKeywords(event.target.value)}
+                  rows={3}
+                  className="!mt-1.5 !text-[12px]"
+                />
+              </label>
+
+              <label className="flex items-center gap-2 !mb-0 text-[11px] text-subtle">
+                <input
+                  type="checkbox"
+                  checked={storyReplies}
+                  onChange={(event) => setStoryReplies(event.target.checked)}
+                />
+                Also trigger on story replies
+              </label>
+
+              <label className="flex items-center gap-2 !mb-0 text-[11px] text-subtle">
+                <input
+                  type="checkbox"
+                  checked={caseInsensitive}
+                  onChange={(event) => setCaseInsensitive(event.target.checked)}
+                />
+                Case insensitive matching
+              </label>
+
+              {baseType === "comment" && (
+                <label className="flex items-center gap-2 !mb-0 text-[11px] text-subtle">
+                  <input
+                    type="checkbox"
+                    checked={alsoDm}
+                    onChange={(event) => setAlsoDm(event.target.checked)}
+                  />
+                  Also trigger on direct messages
+                </label>
+              )}
+
+              {error && <div className="banner banner-error !mb-0">{error}</div>}
+
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleSave()}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div>
+            <h3 className="m-0 text-[15px] font-semibold text-ink">
+              {tab === "advanced" ? "Advanced trigger settings" : "AI settings"}
+            </h3>
+            <p className="muted mt-2 text-[12px]">
+              These controls are reserved for the next automation settings pass.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function MessagePanel({ tenantId, campaign, onCampaignChanged }: { tenantId: string; campaign: Campaign; onCampaignChanged: () => void }) {
+function MessagePanel({
+  tenantId,
+  campaign,
+  onCampaignChanged,
+}: {
+  tenantId: string;
+  campaign: Campaign;
+  onCampaignChanged: () => Promise<void> | void;
+}) {
+  const [tab, setTab] = useState("basic");
   const [message, setMessage] = useState(campaign.defaultReplyTemplate);
   const [tone, setTone] = useState<CampaignTone>(campaign.tone);
   const [useKnowledgeBase, setUseKnowledgeBase] = useState(campaign.useKnowledgeBase);
@@ -127,13 +291,16 @@ function MessagePanel({ tenantId, campaign, onCampaignChanged }: { tenantId: str
   function insertVariable() {
     const el = textareaRef.current;
     if (!el) {
-      setMessage((m) => `${m}{name}`);
+      setMessage((value) => `${value}{name}`);
       return;
     }
+
     const start = el.selectionStart ?? message.length;
     const end = el.selectionEnd ?? message.length;
     const next = `${message.slice(0, start)}{name}${message.slice(end)}`;
+
     setMessage(next);
+
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + 6, start + 6);
@@ -143,13 +310,14 @@ function MessagePanel({ tenantId, campaign, onCampaignChanged }: { tenantId: str
   async function handleSave() {
     setSaving(true);
     setError(null);
+
     try {
       await api.updateReplyConfig(tenantId, campaign.id, {
         defaultReplyTemplate: message,
         tone,
         useKnowledgeBase,
       });
-      onCampaignChanged();
+      await onCampaignChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save message");
     } finally {
@@ -158,41 +326,89 @@ function MessagePanel({ tenantId, campaign, onCampaignChanged }: { tenantId: str
   }
 
   return (
-    <div>
-      <InspectorHeader
-        icon={BotIcon}
-        title={campaign.replyMode === "ai_generated" ? "AI Message" : "Reply Message"}
-        description="The first reply sent once the trigger matches."
+    <div className="flex gap-5">
+      <SectionTabs
+        items={[
+          { key: "basic", label: "Basic" },
+          { key: "ai", label: "AI Settings" },
+        ]}
+        active={tab}
+        onChange={setTab}
       />
 
-      <label>
-        Message
-        <textarea ref={textareaRef} value={message} onChange={(e) => setMessage(e.target.value)} rows={4} />
-      </label>
-      <button type="button" className="btn-secondary btn-small" onClick={insertVariable} style={{ marginBottom: "0.9rem" }}>
-        {"{ }"} Insert Variable
-      </button>
+      <div className="min-w-0 flex-1">
+        {tab === "basic" ? (
+          <>
+            <PanelHeader
+              icon={BotIcon}
+              title={campaign.replyMode === "ai_generated" ? "AI Reply" : "Reply Message"}
+              description="The first reply sent once the trigger matches."
+            />
 
-      <label>
-        AI Behavior
-        <select value={tone} onChange={(e) => setTone(e.target.value as CampaignTone)}>
-          {(Object.keys(TONE_LABEL) as CampaignTone[]).map((t) => (
-            <option key={t} value={t}>
-              {TONE_LABEL[t]}
-            </option>
-          ))}
-        </select>
-      </label>
+            <div className="mt-5">
+              <label>
+                <span className="text-[11px] font-semibold text-ink">Message</span>
+                <textarea
+                  ref={textareaRef}
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={5}
+                  className="!mt-1.5 !text-[12px]"
+                />
+              </label>
 
-      <label className="radio-row">
-        <input type="checkbox" checked={useKnowledgeBase} onChange={(e) => setUseKnowledgeBase(e.target.checked)} />
-        Use knowledge base for context
-      </label>
+              <button
+                type="button"
+                className="btn-secondary btn-small mb-4"
+                onClick={insertVariable}
+              >
+                {"{ }"} Insert Variable
+              </button>
 
-      {error && <div className="banner banner-error">{error}</div>}
-      <button type="button" className="btn-primary btn-small" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving…" : "Save message"}
-      </button>
+              <label>
+                <span className="text-[11px] font-semibold text-ink">AI Behavior</span>
+                <select
+                  value={tone}
+                  onChange={(event) => setTone(event.target.value as CampaignTone)}
+                >
+                  {(Object.keys(TONE_LABEL) as CampaignTone[]).map((toneKey) => (
+                    <option key={toneKey} value={toneKey}>
+                      {TONE_LABEL[toneKey]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 text-[11px] text-subtle">
+                <input
+                  type="checkbox"
+                  checked={useKnowledgeBase}
+                  onChange={(event) => setUseKnowledgeBase(event.target.checked)}
+                />
+                Use knowledge base for context
+              </label>
+
+              {error && <div className="banner banner-error">{error}</div>}
+
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleSave()}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div>
+            <h3 className="m-0 text-[15px] font-semibold text-ink">AI Settings</h3>
+            <p className="muted mt-2 text-[12px]">
+              Tune tone and knowledge context from the Basic section.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -210,10 +426,15 @@ function MilestonePanel({
   index: number;
   fieldDefinitions: FieldDefinition[];
   onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
-  onSaveMilestone: (index: number, updates: { goalDescription: string; captureFields: string[] }) => Promise<void>;
+  onSaveMilestone: (
+    index: number,
+    updates: { goalDescription: string; captureFields: string[] },
+  ) => Promise<void>;
 }) {
+  const [tab, setTab] = useState("basic");
   const [goalDescription, setGoalDescription] = useState(milestone.goalDescription);
   const [captureFields, setCaptureFields] = useState<string[]>(milestone.captureFields);
+  const [description, setDescription] = useState("");
   const [showNewField, setShowNewField] = useState(false);
   const [newFieldKey, setNewFieldKey] = useState("");
   const [newFieldLabel, setNewFieldLabel] = useState("");
@@ -224,37 +445,48 @@ function MilestonePanel({
   useEffect(() => {
     setGoalDescription(milestone.goalDescription);
     setCaptureFields(milestone.captureFields);
+    setDescription("");
   }, [milestone]);
 
-  const availableFields = fieldDefinitions.filter((fd) => !captureFields.includes(fd.fieldKey));
+  const availableFields = fieldDefinitions.filter(
+    (field) => !captureFields.includes(field.fieldKey),
+  );
 
   async function handleSave() {
     if (!goalDescription.trim()) {
       setError("Goal can't be empty.");
       return;
     }
+
     setSaving(true);
     setError(null);
+
     try {
-      await onSaveMilestone(index, { goalDescription: goalDescription.trim(), captureFields });
+      await onSaveMilestone(index, {
+        goalDescription: goalDescription.trim(),
+        captureFields,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save milestone");
+      setError(err instanceof Error ? err.message : "Failed to save goal");
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleCreateField(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreateField(event: React.FormEvent) {
+    event.preventDefault();
+
     if (!newFieldKey.trim() || !newFieldLabel.trim()) return;
+
     try {
       const created = await api.createFieldDefinition(tenantId, {
         fieldKey: newFieldKey.trim(),
         label: newFieldLabel.trim(),
         valueType: newFieldType,
       });
+
       onFieldDefinitionsChanged([...fieldDefinitions, created]);
-      setCaptureFields((prev) => [...prev, created.fieldKey]);
+      setCaptureFields((fields) => [...fields, created.fieldKey]);
       setShowNewField(false);
       setNewFieldKey("");
       setNewFieldLabel("");
@@ -264,103 +496,238 @@ function MilestonePanel({
   }
 
   return (
-    <div>
-      <InspectorHeader
-        icon={BotIcon}
-        title={`Milestone ${index + 1}`}
-        description="A conversational goal the AI works toward, in order."
+    <div className="flex gap-5">
+      <SectionTabs
+        items={[
+          { key: "basic", label: "Basic" },
+          { key: "capture", label: "Capture Fields" },
+          { key: "validation", label: "Validation" },
+          { key: "success", label: "Success Message" },
+        ]}
+        active={tab}
+        onChange={setTab}
       />
 
-      <label>
-        Goal
-        <input type="text" value={goalDescription} onChange={(e) => setGoalDescription(e.target.value)} />
-      </label>
+      <div className="min-w-0 flex-1">
+        {tab === "basic" && (
+          <>
+            <PanelHeader
+              icon={BotIcon}
+              title={`Goal ${index + 1}`}
+              description="A conversational goal the AI works toward."
+            />
 
-      <div className="mb-1 text-sm">Captured fields</div>
-      <div style={{ marginBottom: "0.6rem" }}>
-        {captureFields.length === 0 ? (
-          <span className="muted small">Nothing captured by this goal yet.</span>
-        ) : (
-          captureFields.map((fieldKey) => (
-            <span className="tag-chip" key={fieldKey}>
-              {fieldDefinitions.find((fd) => fd.fieldKey === fieldKey)?.label ?? fieldKey}
-              <button type="button" aria-label={`Remove ${fieldKey}`} onClick={() => setCaptureFields((prev) => prev.filter((k) => k !== fieldKey))}>
-                ×
+            <div className="mt-5">
+              <label>
+                <span className="text-[11px] font-semibold text-ink">Goal title</span>
+                <input
+                  value={goalDescription}
+                  onChange={(event) => setGoalDescription(event.target.value)}
+                  className="!mt-1.5 !text-[12px]"
+                />
+              </label>
+
+              <label>
+                <span className="text-[11px] font-semibold text-ink">
+                  Description (optional)
+                </span>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={3}
+                  placeholder="Describe what this goal should accomplish."
+                  className="!mt-1.5 !text-[12px]"
+                />
+              </label>
+
+              <p className="muted m-0 mb-4 text-[10px]">
+                The current journey model stores one goal description; the title above is the persisted goal text.
+              </p>
+
+              {error && <div className="banner banner-error">{error}</div>}
+
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleSave()}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save changes"}
               </button>
-            </span>
-          ))
+            </div>
+          </>
+        )}
+
+        {tab === "capture" && (
+          <div>
+            <h3 className="m-0 text-[15px] font-semibold text-ink">Capture Fields</h3>
+            <p className="muted m-0 mt-1 text-[11px]">
+              Decide which structured values this goal captures.
+            </p>
+
+            <div className="mt-4 space-y-2">
+              {captureFields.map((fieldKey) => (
+                <div
+                  key={fieldKey}
+                  className="flex items-center justify-between rounded-lg border border-line px-3 py-2"
+                >
+                  <span className="text-[12px] text-ink">
+                    {fieldDefinitions.find((field) => field.fieldKey === fieldKey)?.label ?? fieldKey}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-subtle hover:text-ink"
+                    onClick={() =>
+                      setCaptureFields((fields) =>
+                        fields.filter((field) => field !== fieldKey),
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+
+              {availableFields.length > 0 && (
+                <select
+                  value=""
+                  onChange={(event) => {
+                    if (!event.target.value) return;
+                    setCaptureFields((fields) => [...fields, event.target.value]);
+                  }}
+                >
+                  <option value="">+ Add field to capture…</option>
+                  {availableFields.map((field) => (
+                    <option key={field.fieldKey} value={field.fieldKey}>
+                      {field.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <button
+                type="button"
+                className="btn-secondary btn-small"
+                onClick={() => setShowNewField((value) => !value)}
+              >
+                {showNewField ? "Cancel" : "+ Add field"}
+              </button>
+
+              {showNewField && (
+                <form onSubmit={handleCreateField} className="space-y-2">
+                  <input
+                    value={newFieldKey}
+                    onChange={(event) => setNewFieldKey(event.target.value)}
+                    placeholder="Key, e.g. budget"
+                    className="!text-[12px]"
+                  />
+                  <input
+                    value={newFieldLabel}
+                    onChange={(event) => setNewFieldLabel(event.target.value)}
+                    placeholder="Label, e.g. Budget"
+                    className="!text-[12px]"
+                  />
+                  <select
+                    value={newFieldType}
+                    onChange={(event) =>
+                      setNewFieldType(event.target.value as FieldDefinitionValueType)
+                    }
+                  >
+                    {VALUE_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="submit"
+                    className="btn-primary btn-small"
+                    disabled={!newFieldKey.trim() || !newFieldLabel.trim()}
+                  >
+                    Add field
+                  </button>
+                </form>
+              )}
+
+              {error && <div className="banner banner-error">{error}</div>}
+
+              <button
+                type="button"
+                className="btn-primary mt-3"
+                onClick={() => void handleSave()}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(tab === "validation" || tab === "success") && (
+          <div>
+            <h3 className="m-0 text-[15px] font-semibold text-ink">
+              {tab === "validation" ? "Validation" : "Success Message"}
+            </h3>
+            <p className="muted m-0 mt-2 text-[12px]">
+              This configuration surface is reserved for the next milestone engine pass.
+            </p>
+          </div>
         )}
       </div>
-
-      {availableFields.length > 0 && (
-        <select
-          value=""
-          onChange={(e) => {
-            if (!e.target.value) return;
-            setCaptureFields((prev) => [...prev, e.target.value]);
-          }}
-        >
-          <option value="">+ Add field to capture…</option>
-          {availableFields.map((fd) => (
-            <option key={fd.fieldKey} value={fd.fieldKey}>
-              {fd.label}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <button type="button" className="btn-secondary btn-small" onClick={() => setShowNewField((v) => !v)} style={{ margin: "0.5rem 0" }}>
-        {showNewField ? "Cancel" : "+ New field"}
-      </button>
-      {showNewField && (
-        <form onSubmit={handleCreateField} className="inline-form">
-          <input type="text" placeholder="Key, e.g. budget" value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} />
-          <input type="text" placeholder="Label, e.g. Budget" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-          <select value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDefinitionValueType)}>
-            {VALUE_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary btn-small" disabled={!newFieldKey.trim() || !newFieldLabel.trim()}>
-            Add field
-          </button>
-        </form>
-      )}
-
-      {error && <div className="banner banner-error">{error}</div>}
-      <button type="button" className="btn-primary btn-small" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving…" : "Save milestone"}
-      </button>
     </div>
   );
 }
 
-function ActionPanel({ tenantId, campaign, action }: { tenantId: string; campaign: Campaign; action: "handoff" | "link" }) {
+function ActionPanel({
+  tenantId,
+  campaign,
+  action,
+}: {
+  tenantId: string;
+  campaign: Campaign;
+  action: "handoff" | "link";
+}) {
   if (action === "link") {
     return (
       <div>
-        <InspectorHeader icon={SendIcon} title="Send Link" description="Sends the campaign's CTA link as a reply." />
-        <p className="small">
-          Link: <a href={campaign.ctaLink ?? undefined} target="_blank" rel="noreferrer">{campaign.ctaLink}</a>
+        <PanelHeader
+          icon={SendIcon}
+          title="Send Link"
+          description="Sends the campaign CTA link as a reply."
+        />
+        <p className="mt-5 text-[12px]">
+          Link:{" "}
+          <a href={campaign.ctaLink ?? undefined} target="_blank" rel="noreferrer">
+            {campaign.ctaLink ?? "Not configured"}
+          </a>
         </p>
-        <p className="muted small">
-          Edit this in the <Link to={`/dashboard/${tenantId}/automation`}>Details tab</Link>'s "CTA link" field.
+        <p className="muted text-[11px]">
+          Edit this in the{" "}
+          <Link to={`/dashboard/${tenantId}/automation/journeys/${campaign.id}`}>
+            journey details
+          </Link>
+          .
         </p>
       </div>
     );
   }
+
   return (
     <div>
-      <InspectorHeader icon={HandshakeIcon} title="Handoff to Human" description="Pauses the AI for this lead so a teammate can take over." />
-      <p className="small">
-        This happens automatically whenever the AI detects it can't confidently continue — e.g. an escalation trigger,
-        or a question outside the knowledge base.
+      <PanelHeader
+        icon={HandshakeIcon}
+        title="Handoff to Human"
+        description="Pauses the AI when a teammate should take over."
+      />
+      <p className="muted mt-5 text-[12px] leading-5">
+        Handoff happens automatically when the AI cannot confidently continue.
       </p>
-      <p className="muted small">
-        Escalation triggers are configured in <Link to={`/dashboard/${tenantId}/settings`}>Settings → Guardrails</Link>.
-      </p>
+      <Link
+        to={`/dashboard/${tenantId}/settings`}
+        className="text-[11px] font-medium text-accent"
+      >
+        Configure guardrails in Settings →
+      </Link>
     </div>
   );
 }
@@ -380,19 +747,37 @@ export function Inspector({
   milestones: Milestone[];
   fieldDefinitions: FieldDefinition[];
   selectedNode: SelectedNode;
-  onCampaignChanged: () => void;
-  onSaveMilestone: (index: number, updates: { goalDescription: string; captureFields: string[] }) => Promise<void>;
+  onCampaignChanged: () => Promise<void> | void;
+  onSaveMilestone: (
+    index: number,
+    updates: { goalDescription: string; captureFields: string[] },
+  ) => Promise<void>;
   onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
 }) {
   if (selectedNode.type === "trigger") {
-    return <TriggerPanel tenantId={tenantId} campaign={campaign} onCampaignChanged={onCampaignChanged} />;
+    return (
+      <TriggerPanel
+        tenantId={tenantId}
+        campaign={campaign}
+        onCampaignChanged={onCampaignChanged}
+      />
+    );
   }
+
   if (selectedNode.type === "message") {
-    return <MessagePanel tenantId={tenantId} campaign={campaign} onCampaignChanged={onCampaignChanged} />;
+    return (
+      <MessagePanel
+        tenantId={tenantId}
+        campaign={campaign}
+        onCampaignChanged={onCampaignChanged}
+      />
+    );
   }
+
   if (selectedNode.type === "milestone") {
     const milestone = milestones[selectedNode.milestoneIndex];
     if (!milestone) return null;
+
     return (
       <MilestonePanel
         tenantId={tenantId}
@@ -404,5 +789,12 @@ export function Inspector({
       />
     );
   }
-  return <ActionPanel tenantId={tenantId} campaign={campaign} action={selectedNode.action} />;
+
+  return (
+    <ActionPanel
+      tenantId={tenantId}
+      campaign={campaign}
+      action={selectedNode.action}
+    />
+  );
 }

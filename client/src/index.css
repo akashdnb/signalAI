@@ -665,3 +665,16 @@ button:disabled {
 .inspector-compact h3 {
   font-size: 0.95rem;
 }
+
+/*
+ * Final Automation mock pass: builder nodes and inspector controls are
+ * intentionally denser than the legacy global form controls.
+ */
+.automation-builder input[type="text"],
+.automation-builder textarea,
+.automation-builder select {
+  font-size: 0.85rem;
+}
+.automation-builder label {
+  font-size: 0.8rem;
+}

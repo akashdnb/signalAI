@@ -2,24 +2,32 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Campaign, type FieldDefinition, type Milestone } from "../../api";
 import { BottomSheet } from "../BottomSheet";
 import { CampaignEditor, type CampaignEditorHandle } from "../CampaignEditor";
-import { DotsVerticalIcon } from "../icons";
+import {
+  ChevronDownIcon,
+  DotsVerticalIcon,
+  EyeIcon,
+  FileTextIcon,
+} from "../icons";
 import { AnalyticsPanel } from "./AnalyticsPanel";
 import { BuilderCanvas, type SelectedNode } from "./BuilderCanvas";
 import { LeadsPanel } from "./LeadsPanel";
 import { NodeInspectorDialog } from "./NodeInspectorDialog";
+import { PreviewDialog } from "./PreviewDialog";
 import { TestJourneyDialog } from "./TestJourneyDialog";
 
-type BuilderTab = "builder" | "details" | "analytics" | "leads";
+type BuilderTab = "builder" | "details" | "analytics" | "leads" | "versions";
 
 const TABS: { key: BuilderTab; label: string }[] = [
   { key: "builder", label: "Builder" },
   { key: "details", label: "Details" },
   { key: "analytics", label: "Analytics" },
   { key: "leads", label: "Leads" },
+  { key: "versions", label: "Versions" },
 ];
 
 function describeCampaign(campaign: Campaign): string {
   if (campaign.description) return campaign.description;
+
   const count = campaign.keywords.length;
   const kind =
     campaign.triggerSource === "message"
@@ -27,6 +35,7 @@ function describeCampaign(campaign: Campaign): string {
       : campaign.triggerSource === "both"
         ? "comments & DMs"
         : "comments";
+
   return `Replies to ${kind} matching ${count} keyword${count === 1 ? "" : "s"}`;
 }
 
@@ -44,10 +53,10 @@ export function JourneyBuilder({
   const [subTab, setSubTab] = useState<BuilderTab>("builder");
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([]);
-  const [milestonesLoaded, setMilestonesLoaded] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [showTestJourney, setShowTestJourney] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<BuilderTab | null>(null);
@@ -59,24 +68,24 @@ export function JourneyBuilder({
   const detailsRef = useRef<CampaignEditorHandle>(null);
 
   async function loadMilestones() {
-    setMilestonesLoaded(false);
     const [ms, defs] = await Promise.all([
       api.listMilestones(tenantId, campaign.id),
       api.listFieldDefinitions(tenantId),
     ]);
+
     setMilestonesState(ms);
     setFieldDefinitions(defs);
-    setMilestonesLoaded(true);
   }
 
   useEffect(() => {
     void loadMilestones();
     setSelectedNode({ type: "trigger" });
     setInspectorOpen(false);
+    setMenuOpen(false);
     setBuilderVersion(null);
     setGraphReloadSignal(0);
     setPublishError(null);
-    // campaign.id is the editor/document boundary.
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, campaign.id]);
 
@@ -90,6 +99,7 @@ export function JourneyBuilder({
       setPendingTab(next);
       return;
     }
+
     setSubTab(next);
   }
 
@@ -110,12 +120,7 @@ export function JourneyBuilder({
     );
 
     setMilestonesState(saved);
-
-    // The milestone endpoint also synchronizes journey_nodes/journey_edges
-    // and advances builder_version. Ask the canvas for one explicit silent
-    // reconciliation instead of letting unrelated UI state trigger a GET.
     setGraphReloadSignal((value) => value + 1);
-
     return saved;
   }
 
@@ -123,10 +128,11 @@ export function JourneyBuilder({
     index: number,
     updates: { goalDescription: string; captureFields: string[] },
   ) {
-    const next = milestones.map((milestone, i) =>
-      i === index ? { ...milestone, ...updates } : milestone,
+    await persistMilestones(
+      milestones.map((milestone, milestoneIndex) =>
+        milestoneIndex === index ? { ...milestone, ...updates } : milestone,
+      ),
     );
-    await persistMilestones(next);
   }
 
   async function handleAddMilestone() {
@@ -146,7 +152,7 @@ export function JourneyBuilder({
   }
 
   async function handleRemoveMilestone(index: number) {
-    const next = milestones.filter((_, i) => i !== index);
+    const next = milestones.filter((_, milestoneIndex) => milestoneIndex !== index);
     if (next.length === 0) return;
 
     await persistMilestones(next);
@@ -174,7 +180,7 @@ export function JourneyBuilder({
 
   async function handlePublish() {
     if (builderVersion === null) {
-      setPublishError("The journey version is still loading. Try again in a moment.");
+      setPublishError("The journey version is still loading.");
       return;
     }
 
@@ -183,9 +189,12 @@ export function JourneyBuilder({
 
     try {
       await api.publishJourney(tenantId, campaign.id, builderVersion);
+      setMenuOpen(false);
       await onChanged();
-    } catch (err) {
-      setPublishError(err instanceof Error ? err.message : "Couldn't publish this journey");
+    } catch (error) {
+      setPublishError(
+        error instanceof Error ? error.message : "Couldn't publish this journey",
+      );
     } finally {
       setPublishing(false);
     }
@@ -193,47 +202,74 @@ export function JourneyBuilder({
 
   return (
     <>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-card">
-        <div className="border-b border-line px-3 py-3 md:px-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
+      <div className="automation-builder flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-card">
+        <div className="border-b border-line px-4 pt-3.5 md:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                className="flex h-8 shrink-0 items-center rounded-lg border border-line px-2.5 text-xs font-semibold text-ink hover:bg-chip"
+                className="flex h-8 shrink-0 items-center text-sm font-medium text-ink hover:text-accent"
                 onClick={onBack}
               >
-                ← Journeys
+                ← Back to journeys
               </button>
 
               <div className="h-5 w-px bg-line" />
 
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <h1 className="m-0 truncate text-sm font-semibold text-ink">{campaign.name}</h1>
+                  <h1 className="m-0 truncate text-[19px] font-semibold tracking-[-0.01em] text-ink">
+                    {campaign.name}
+                  </h1>
+
                   <span
-                    className={`shrink-0 text-[11px] ${campaign.enabled ? "pill pill-ok" : "pill"}`}
-                    style={{ marginLeft: 0, padding: "0.05rem 0.5rem" }}
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                      campaign.enabled
+                        ? "bg-[#D1FAE5] text-[#047857]"
+                        : "bg-[#F3E8FF] text-[#312E81]"
+                    }`}
                   >
                     <span className="mr-1">●</span>
                     {campaign.enabled ? "Active" : "Inactive"}
                   </span>
                 </div>
-                <p className="muted small m-0 truncate">
-                  {describeCampaign(campaign)} · Updated {new Date(campaign.updatedAt).toLocaleDateString()}
+
+                <p className="muted m-0 mt-0.5 truncate text-[12px]">
+                  {describeCampaign(campaign)} · Updated{" "}
+                  {new Date(campaign.updatedAt).toLocaleDateString()}
                 </p>
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1">
               {subTab === "builder" && builderVersion !== null && (
-                <span className="hidden text-[11px] text-subtle md:inline">
+                <span className="mr-1 hidden text-[11px] text-subtle lg:inline">
                   Draft v{builderVersion}
                 </span>
               )}
 
               <button
                 type="button"
-                className="btn-secondary btn-small hidden md:inline-flex"
+                aria-label="Documentation"
+                className="hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip lg:inline-flex"
+                title="Documentation is coming soon"
+              >
+                <FileTextIcon className="h-4 w-4" />
+                Docs
+              </button>
+
+              <button
+                type="button"
+                className="hidden h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink hover:bg-chip md:inline-flex"
+                onClick={() => setShowPreview(true)}
+              >
+                <EyeIcon className="h-4 w-4" />
+                Preview
+              </button>
+
+              <button
+                type="button"
+                className="hidden h-9 rounded-lg bg-chip px-3 text-sm font-semibold text-ink hover:bg-[#EBDDFF] md:inline-flex md:items-center"
                 onClick={() => setShowTestJourney(true)}
               >
                 Test Journey
@@ -242,75 +278,79 @@ export function JourneyBuilder({
               <button
                 type="button"
                 disabled={publishing || builderVersion === null}
-                className="btn-primary btn-small hidden md:inline-flex disabled:cursor-not-allowed disabled:opacity-50"
+                className="hidden h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50 md:inline-flex"
                 onClick={() => void handlePublish()}
               >
                 {publishing ? "Publishing…" : "Publish"}
+                <ChevronDownIcon className="h-4 w-4" />
               </button>
 
-              <div className="relative">
-                <button
-                  type="button"
-                  aria-label="More actions"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-subtle hover:bg-chip hover:text-ink"
-                  onClick={() => setMenuOpen((value) => !value)}
-                >
-                  <DotsVerticalIcon className="h-4 w-4" />
-                </button>
+              <button
+                type="button"
+                aria-label="More actions"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+                onClick={() => setMenuOpen((value) => !value)}
+              >
+                <DotsVerticalIcon className="h-5 w-5" />
+              </button>
 
-                {menuOpen && (
-                  <>
+              {menuOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close actions"
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute right-5 top-12 z-50 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl">
                     <button
                       type="button"
-                      aria-label="Close menu"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={() => setMenuOpen(false)}
-                    />
-                    <div className="absolute right-0 top-9 z-50 w-44 rounded-xl border border-line bg-card p-1 shadow-lg">
-                      <button
-                        type="button"
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip md:hidden"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setShowTestJourney(true);
-                        }}
-                      >
-                        Test Journey
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={publishing || builderVersion === null}
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip disabled:opacity-40 md:hidden"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          void handlePublish();
-                        }}
-                      >
-                        {publishing ? "Publishing…" : "Publish"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip"
-                        onClick={() => void handleToggleEnabled()}
-                      >
-                        {campaign.enabled ? "Disable journey" : "Enable journey"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip md:hidden"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setShowPreview(true);
+                      }}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip md:hidden"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setShowTestJourney(true);
+                      }}
+                    >
+                      Test Journey
+                    </button>
+                    <button
+                      type="button"
+                      disabled={publishing || builderVersion === null}
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip disabled:opacity-40 md:hidden"
+                      onClick={() => void handlePublish()}
+                    >
+                      {publishing ? "Publishing…" : "Publish"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip"
+                      onClick={() => void handleToggleEnabled()}
+                    >
+                      {campaign.enabled ? "Disable journey" : "Enable journey"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="-mx-3 mt-2 flex min-w-0 gap-5 overflow-x-auto px-3 text-xs md:mx-0 md:px-0">
+          <div className="mt-3 flex gap-7 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => requestSubTabChange(tab.key)}
-                className={`-mb-px flex min-h-10 shrink-0 items-center whitespace-nowrap border-b-2 pb-0.5 transition-colors ${
+                className={`-mb-px shrink-0 border-b-2 px-0 pb-2.5 text-[13px] transition-colors ${
                   subTab === tab.key
                     ? "border-accent font-semibold text-accent"
                     : "border-transparent text-subtle hover:text-ink"
@@ -323,57 +363,71 @@ export function JourneyBuilder({
         </div>
 
         {publishError && (
-          <div className="banner banner-error mx-3 mt-3 md:mx-4">{publishError}</div>
+          <div className="banner banner-error mx-4 mt-3 md:mx-5">{publishError}</div>
         )}
 
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col">
-            {subTab === "builder" &&
-              (milestonesLoaded ? (
-                <BuilderCanvas
-                  tenantId={tenantId}
-                  campaign={campaign}
-                  milestones={milestones}
-                  selectedNode={selectedNode}
-                  onSelectNode={selectNode}
-                  onAddMilestone={() => void handleAddMilestone()}
-                  onRemoveMilestone={(index) => void handleRemoveMilestone(index)}
-                  onReorderMilestone={(index, direction) =>
-                    void handleReorderMilestone(index, direction)
-                  }
-                  reloadSignal={graphReloadSignal}
-                  onBuilderVersionChange={setBuilderVersion}
-                />
-              ) : (
-                <div className="relative flex min-h-[420px] flex-1 items-center justify-center bg-canvas">
-                  <span className="text-sm text-subtle">Loading journey…</span>
+          {subTab === "builder" && (
+            <BuilderCanvas
+              tenantId={tenantId}
+              campaign={campaign}
+              milestones={milestones}
+              selectedNode={selectedNode}
+              onSelectNode={selectNode}
+              onAddMilestone={() => void handleAddMilestone()}
+              onRemoveMilestone={(index) => void handleRemoveMilestone(index)}
+              onReorderMilestone={(index, direction) =>
+                void handleReorderMilestone(index, direction)
+              }
+              reloadSignal={graphReloadSignal}
+              onBuilderVersionChange={setBuilderVersion}
+            />
+          )}
+
+          {subTab === "details" && (
+            <div className="py-4 md:h-full md:overflow-y-auto md:p-5">
+              <CampaignEditor
+                ref={detailsRef}
+                tenantId={tenantId}
+                campaign={campaign}
+                onChanged={onChanged}
+                onDirtyChange={setDetailsDirty}
+              />
+            </div>
+          )}
+
+          {subTab === "analytics" && (
+            <div className="py-4 md:h-full md:overflow-y-auto md:p-5">
+              <AnalyticsPanel tenantId={tenantId} campaign={campaign} />
+            </div>
+          )}
+
+          {subTab === "leads" && (
+            <div className="py-4 md:h-full md:overflow-y-auto md:p-5">
+              <LeadsPanel tenantId={tenantId} campaign={campaign} />
+            </div>
+          )}
+
+          {subTab === "versions" && (
+            <div className="h-full overflow-y-auto p-4 md:p-6">
+              <div className="rounded-2xl border border-line bg-card p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="m-0 text-base font-semibold text-ink">
+                      Journey versions
+                    </h2>
+                    <p className="muted m-0 mt-1 text-sm">
+                      Draft and published journey snapshots will appear here.
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-subtle">
+                    Draft v{builderVersion ?? "—"}
+                  </span>
                 </div>
-              ))}
-
-            {subTab === "details" && (
-              <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
-                <CampaignEditor
-                  ref={detailsRef}
-                  tenantId={tenantId}
-                  campaign={campaign}
-                  onChanged={onChanged}
-                  onDirtyChange={setDetailsDirty}
-                />
               </div>
-            )}
-
-            {subTab === "analytics" && (
-              <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
-                <AnalyticsPanel tenantId={tenantId} campaign={campaign} />
-              </div>
-            )}
-
-            {subTab === "leads" && (
-              <div className="py-4 md:h-full md:overflow-y-auto md:p-4">
-                <LeadsPanel tenantId={tenantId} campaign={campaign} />
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -389,6 +443,14 @@ export function JourneyBuilder({
         onSaveMilestone={handleSaveMilestone}
         onFieldDefinitionsChanged={setFieldDefinitions}
       />
+
+      {showPreview && (
+        <PreviewDialog
+          tenantId={tenantId}
+          campaign={campaign}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
 
       {showTestJourney && (
         <TestJourneyDialog

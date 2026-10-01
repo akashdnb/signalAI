@@ -1,4 +1,10 @@
-export type AutomationTab = "journeys" | "templates" | "keywords" | "quickReplies" | "handoffRules" | "settings";
+export type AutomationTab =
+  | "journeys"
+  | "templates"
+  | "keywords"
+  | "quickReplies"
+  | "handoffRules"
+  | "settings";
 
 const TABS: { key: AutomationTab; label: string }[] = [
   { key: "journeys", label: "Journeys" },
@@ -9,17 +15,23 @@ const TABS: { key: AutomationTab; label: string }[] = [
   { key: "settings", label: "Settings" },
 ];
 
-export function AutomationTabs({ active, onChange }: { active: AutomationTab; onChange: (tab: AutomationTab) => void }) {
+export function AutomationTabs({
+  active,
+  onChange,
+}: {
+  active: AutomationTab;
+  onChange: (tab: AutomationTab) => void;
+}) {
   return (
-    <div className="mt-1.5 flex gap-6 border-b border-line">
+    <div className="mt-5 flex gap-8 overflow-x-auto border-b border-line">
       {TABS.map((tab) => (
         <button
           key={tab.key}
           type="button"
           onClick={() => onChange(tab.key)}
-          className={`-mb-px border-b-2 px-0.5 pb-1 text-xs transition-colors ${
+          className={`-mb-px shrink-0 border-b-2 px-0 pb-3 text-[15px] transition-colors ${
             active === tab.key
-              ? "border-accent font-semibold text-accent"
+              ? "border-accent font-semibold text-ink"
               : "border-transparent text-subtle hover:text-ink"
           }`}
         >
