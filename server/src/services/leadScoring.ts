@@ -1,0 +1,203 @@
+import type { Pool } from "pg";
+import { getCapturedFacts } from "../db/capturedFacts.js";
+import {
+  getLeadIntelligence,
+  upsertLeadIntelligence,
+  type LeadScoreBand,
+  type LeadIntelligence,
+} from "../db/leadIntelligence.js";
+
+const INTENT_WEIGHT = 25;
+const NEED_WEIGHT = 20;
+const BUDGET_WEIGHT = 20;
+const LOCATION_WEIGHT = 10;
+const ENGAGEMENT_MAX_WEIGHT = 15;
+const MILESTONE_PROGRESS_MAX_WEIGHT = 10;
+
+const INTENT_KEYS = [
+  "intent",
+  "lead_intent",
+  "purchase_intent",
+];
+
+const NEED_KEYS = [
+  "need",
+  "lead_need",
+  "requirement",
+  "use_case",
+];
+
+const BUDGET_KEYS = [
+  "budget",
+  "budget_range",
+  "budget_amount",
+];
+
+const LOCATION_KEYS = [
+  "location",
+  "city",
+  "country",
+  "preferred_location",
+];
+
+function firstNonEmptyFact(
+  facts: Record<string, string>,
+  keys: string[],
+): string | null {
+  const entries = Object.entries(facts);
+
+  for (const key of keys) {
+    const match = entries.find(
+      ([factKey, value]) =>
+        factKey.toLowerCase() === key &&
+        typeof value === "string" &&
+        value.trim().length > 0,
+    );
+
+    if (match) return match[1].trim();
+  }
+
+  return null;
+}
+
+function parseBudgetValue(value: string | null): number | null {
+  if (!value) return null;
+
+  const normalized = value.replace(/,/g, "").trim();
+
+  if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+export interface LeadScoreResult {
+  score: number;
+  scoreBand: LeadScoreBand;
+  reasons: string[];
+}
+
+export function calculateLeadScore(input: {
+  intent?: string | null;
+  need?: string | null;
+  budget?: string | null;
+  location?: string | null;
+  inboundEventsLast7Days: number;
+  milestonesAdvanced: number;
+}): LeadScoreResult {
+  let score = 0;
+  const reasons: string[] = [];
+
+  if (input.intent?.trim()) {
+    score += INTENT_WEIGHT;
+    reasons.push(`Intent captured +${INTENT_WEIGHT}`);
+  }
+
+  if (input.need?.trim()) {
+    score += NEED_WEIGHT;
+    reasons.push(`Need captured +${NEED_WEIGHT}`);
+  }
+
+  if (input.budget?.trim()) {
+    score += BUDGET_WEIGHT;
+    reasons.push(`Budget captured +${BUDGET_WEIGHT}`);
+  }
+
+  if (input.location?.trim()) {
+    score += LOCATION_WEIGHT;
+    reasons.push(`Location captured +${LOCATION_WEIGHT}`);
+  }
+
+  const engagementPoints = Math.min(
+    Math.max(0, input.inboundEventsLast7Days) * 3,
+    ENGAGEMENT_MAX_WEIGHT,
+  );
+
+  if (engagementPoints > 0) {
+    score += engagementPoints;
+    reasons.push(`Recent engagement +${engagementPoints}`);
+  }
+
+  const progressPoints = Math.min(
+    Math.max(0, input.milestonesAdvanced) * 2,
+    MILESTONE_PROGRESS_MAX_WEIGHT,
+  );
+
+  if (progressPoints > 0) {
+    score += progressPoints;
+    reasons.push(`Milestone progress +${progressPoints}`);
+  }
+
+  score = Math.min(100, score);
+
+  let scoreBand: LeadScoreBand = "cold";
+
+  if (score >= 80) {
+    scoreBand = "very_hot";
+  } else if (score >= 60) {
+    scoreBand = "hot";
+  } else if (score >= 30) {
+    scoreBand = "warm";
+  }
+
+  return {
+    score,
+    scoreBand,
+    reasons,
+  };
+}
+
+export async function recalculateLeadIntelligence(
+  pool: Pool,
+  tenantId: string,
+  leadId: string,
+): Promise<LeadIntelligence> {
+  const facts = await getCapturedFacts(pool, tenantId, leadId);
+
+  const intent = firstNonEmptyFact(facts, INTENT_KEYS);
+  const need = firstNonEmptyFact(facts, NEED_KEYS);
+  const budget = firstNonEmptyFact(facts, BUDGET_KEYS);
+  const location = firstNonEmptyFact(facts, LOCATION_KEYS);
+
+  const engagementResult = await pool.query<{ count: string }>(
+    `select count(*)::text as count
+       from lead_events
+      where tenant_id = $1
+        and lead_id = $2
+        and occurred_at >= now() - interval '7 days'
+        and event_type = 'message'`,
+    [tenantId, leadId],
+  );
+
+  const milestoneResult = await pool.query<{ count: string }>(
+    `select count(distinct milestone_id)::text as count
+       from milestone_advancements
+      where tenant_id = $1
+        and lead_id = $2`,
+    [tenantId, leadId],
+  );
+
+  const scoring = calculateLeadScore({
+    intent,
+    need,
+    budget,
+    location,
+    inboundEventsLast7Days: Number(engagementResult.rows[0]?.count ?? "0"),
+    milestonesAdvanced: Number(milestoneResult.rows[0]?.count ?? "0"),
+  });
+
+  return upsertLeadIntelligence(pool, {
+    tenantId,
+    leadId,
+    intent,
+    need,
+    budgetValue: parseBudgetValue(budget),
+    budgetText: budget,
+    location,
+    score: scoring.score,
+    scoreBand: scoring.scoreBand,
+    scoreReasons: scoring.reasons,
+  });
+}
