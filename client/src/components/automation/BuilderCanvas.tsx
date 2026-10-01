@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -14,7 +14,14 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { api, type Campaign, type JourneyEdge, type JourneyNode, type Milestone } from "../../api";
+import {
+  api,
+  type BuilderGraph,
+  type Campaign,
+  type JourneyEdge,
+  type JourneyNode,
+  type Milestone,
+} from "../../api";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -39,6 +46,7 @@ type FlowNodeData = {
   milestone?: Milestone;
   milestoneId?: string;
   milestoneIndex?: number;
+  ordinal?: number;
   selected?: boolean;
   locked?: boolean;
   onSelect?: () => void;
@@ -56,7 +64,6 @@ function triggerSubtitle(campaign: Campaign): string {
 
 function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
   const campaign = data.campaign;
-
   if (!campaign) return null;
 
   return (
@@ -66,7 +73,6 @@ function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
         position={Position.Bottom}
         className="!h-2 !w-2 !border-2 !border-card !bg-accent"
       />
-
       <BuilderNode
         icon={InstagramMarkIcon}
         accent="pink"
@@ -84,7 +90,6 @@ function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
 
 function MessageFlowNode({ data }: NodeProps<FlowNode>) {
   const campaign = data.campaign;
-
   if (!campaign) return null;
 
   return (
@@ -94,13 +99,11 @@ function MessageFlowNode({ data }: NodeProps<FlowNode>) {
         position={Position.Top}
         className="!h-2 !w-2 !border-2 !border-card !bg-accent"
       />
-
       <Handle
         type="source"
         position={Position.Bottom}
         className="!h-2 !w-2 !border-2 !border-card !bg-accent"
       />
-
       <BuilderNode
         icon={BotIcon}
         accent="blue"
@@ -117,7 +120,6 @@ function MessageFlowNode({ data }: NodeProps<FlowNode>) {
 function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
   const milestone = data.milestone;
   const index = data.milestoneIndex ?? 0;
-
   if (!milestone) return null;
 
   return (
@@ -127,7 +129,6 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
         position={Position.Top}
         className="!h-2 !w-2 !border-2 !border-card !bg-accent"
       />
-
       <Handle
         type="source"
         position={Position.Bottom}
@@ -147,8 +148,8 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
               aria-label="Move up"
               disabled={index === 0 || data.locked}
               className="flex h-6 w-6 items-center justify-center rounded text-subtle hover:bg-chip disabled:opacity-30"
-              onClick={(e) => {
-                e.stopPropagation();
+              onClick={(event) => {
+                event.stopPropagation();
                 data.onMove?.(-1);
               }}
             >
@@ -160,8 +161,8 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
               aria-label="Move down"
               disabled={data.locked}
               className="flex h-6 w-6 items-center justify-center rounded text-subtle hover:bg-chip disabled:opacity-30"
-              onClick={(e) => {
-                e.stopPropagation();
+              onClick={(event) => {
+                event.stopPropagation();
                 data.onMove?.(1);
               }}
             >
@@ -173,8 +174,8 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
               aria-label="Remove milestone"
               disabled={data.locked}
               className="flex h-6 w-6 items-center justify-center rounded text-subtle hover:bg-chip disabled:opacity-30"
-              onClick={(e) => {
-                e.stopPropagation();
+              onClick={(event) => {
+                event.stopPropagation();
                 data.onRemove?.();
               }}
             >
@@ -199,7 +200,6 @@ function HandoffFlowNode({ data }: NodeProps<FlowNode>) {
         position={Position.Top}
         className="!h-2 !w-2 !border-2 !border-card !bg-accent"
       />
-
       <BuilderNode
         icon={HandshakeIcon}
         accent="neutral"
@@ -216,7 +216,6 @@ function HandoffFlowNode({ data }: NodeProps<FlowNode>) {
 
 function LinkFlowNode({ data }: NodeProps<FlowNode>) {
   const campaign = data.campaign;
-
   if (!campaign) return null;
 
   return (
@@ -226,7 +225,6 @@ function LinkFlowNode({ data }: NodeProps<FlowNode>) {
         position={Position.Top}
         className="!h-2 !w-2 !border-2 !border-card !bg-accent"
       />
-
       <BuilderNode
         icon={SendIcon}
         accent="blue"
@@ -249,32 +247,18 @@ const nodeTypes = {
   action_link: LinkFlowNode,
 };
 
-function getMilestoneIndexFromNode(
-  node: JourneyNode,
+function getMilestoneIndex(
+  milestoneId: string | undefined,
+  ordinal: number | undefined,
   milestones: Milestone[],
 ): number {
-  const milestoneId =
-    typeof node.data?.milestoneId === "string"
-      ? node.data.milestoneId
-      : null;
-
   if (milestoneId) {
-    const index = milestones.findIndex(
-      (milestone) => milestone.id === milestoneId,
-    );
-
-    if (index >= 0) {
-      return index;
-    }
+    const byId = milestones.findIndex((milestone) => milestone.id === milestoneId);
+    if (byId >= 0) return byId;
   }
 
-  const ordinal =
-    typeof node.data?.ordinal === "number"
-      ? node.data.ordinal
-      : null;
-
   if (
-    ordinal !== null &&
+    typeof ordinal === "number" &&
     ordinal >= 0 &&
     ordinal < milestones.length
   ) {
@@ -282,6 +266,37 @@ function getMilestoneIndexFromNode(
   }
 
   return 0;
+}
+
+function toFlowNodes(graph: BuilderGraph): FlowNode[] {
+  return graph.nodes
+    .map((node) => ({
+      id: node.id,
+      type: node.type === "milestone_group" ? "milestone" : node.type,
+      position: node.position,
+      data: {
+        ...node.data,
+        milestoneId:
+          typeof node.data?.milestoneId === "string"
+            ? node.data.milestoneId
+            : undefined,
+        ordinal:
+          typeof node.data?.ordinal === "number"
+            ? node.data.ordinal
+            : undefined,
+      },
+    }));
+}
+
+function toFlowEdges(graph: BuilderGraph): Edge[] {
+  return graph.edges.map((edge) => ({
+    id: edge.id,
+    source: edge.sourceNodeId,
+    target: edge.targetNodeId,
+    label: edge.label ?? undefined,
+    type: "smoothstep",
+    selectable: false,
+  }));
 }
 
 export function BuilderCanvas({
@@ -293,6 +308,8 @@ export function BuilderCanvas({
   onAddMilestone,
   onRemoveMilestone,
   onReorderMilestone,
+  reloadSignal = 0,
+  onBuilderVersionChange,
 }: {
   tenantId: string;
   campaign: Campaign;
@@ -302,16 +319,28 @@ export function BuilderCanvas({
   onAddMilestone: () => void;
   onRemoveMilestone: (index: number) => void;
   onReorderMilestone: (index: number, direction: -1 | 1) => void;
+  reloadSignal?: number;
+  onBuilderVersionChange?: (version: number) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [backendNodes, setBackendNodes] = useState<JourneyNode[]>([]);
-  const [backendEdges, setBackendEdges] = useState<JourneyEdge[]>([]);
-  const [builderVersion, setBuilderVersion] = useState<number | null>(null);
+  const backendNodesRef = useRef<JourneyNode[]>([]);
+  const backendEdgesRef = useRef<JourneyEdge[]>([]);
+  const builderVersionRef = useRef<number | null>(null);
+  const initializedRef = useRef(false);
+
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const setVersion = useCallback(
+    (version: number) => {
+      builderVersionRef.current = version;
+      onBuilderVersionChange?.(version);
+    },
+    [onBuilderVersionChange],
+  );
 
   const selectForNode = useCallback(
     (node: FlowNode) => {
@@ -328,41 +357,29 @@ export function BuilderCanvas({
       }
 
       if (node.type === "milestone") {
-        const index = node.data.milestoneIndex ?? 0;
         onSelectNode({
           type: "milestone",
-          milestoneIndex: index,
+          milestoneIndex: node.data.milestoneIndex ?? 0,
         });
         return;
       }
 
       if (node.type === "action_link") {
-        onSelectNode({
-          type: "action",
-          action: "link",
-        });
+        onSelectNode({ type: "action", action: "link" });
         return;
       }
 
       if (node.type === "human_handoff") {
-        onSelectNode({
-          type: "action",
-          action: "handoff",
-        });
+        onSelectNode({ type: "action", action: "handoff" });
       }
     },
     [locked, onSelectNode],
   );
 
   const isSelected = useCallback(
-    (node: FlowNode): boolean => {
-      if (node.type === "trigger") {
-        return selectedNode.type === "trigger";
-      }
-
-      if (node.type === "message") {
-        return selectedNode.type === "message";
-      }
+    (node: FlowNode) => {
+      if (node.type === "trigger") return selectedNode.type === "trigger";
+      if (node.type === "message") return selectedNode.type === "message";
 
       if (node.type === "milestone") {
         return (
@@ -372,17 +389,11 @@ export function BuilderCanvas({
       }
 
       if (node.type === "action_link") {
-        return (
-          selectedNode.type === "action" &&
-          selectedNode.action === "link"
-        );
+        return selectedNode.type === "action" && selectedNode.action === "link";
       }
 
       if (node.type === "human_handoff") {
-        return (
-          selectedNode.type === "action" &&
-          selectedNode.action === "handoff"
-        );
+        return selectedNode.type === "action" && selectedNode.action === "handoff";
       }
 
       return false;
@@ -390,177 +401,91 @@ export function BuilderCanvas({
     [selectedNode],
   );
 
-  const loadGraph = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  const loadGraph = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setLoadError(null);
 
-    try {
-      const graph = await api.getBuilderGraph(
-        tenantId,
-        campaign.id,
-      );
+      try {
+        const graph = await api.getBuilderGraph(tenantId, campaign.id);
 
-      setBuilderVersion(graph.version);
-      setBackendNodes(graph.nodes);
-      setBackendEdges(graph.edges);
+        backendNodesRef.current = graph.nodes;
+        backendEdgesRef.current = graph.edges;
+        setVersion(graph.version);
 
-      const flowNodes: FlowNode[] = [];
-
-      for (const node of graph.nodes) {
-        if (node.type === "milestone_group") {
-          const index = getMilestoneIndexFromNode(
-            node,
-            milestones,
-          );
-
-          const milestone = milestones[index];
-
-          if (!milestone) {
-            continue;
-          }
-
-          flowNodes.push({
-            id: node.id,
-            type: "milestone",
-            position: node.position,
-            data: {
-              ...node.data,
-              milestoneId: milestone.id,
-              milestone,
-              milestoneIndex: index,
-              selected: false,
-              locked,
-              onSelect: () => {
-                if (!locked) {
-                  onSelectNode({
-                    type: "milestone",
-                    milestoneIndex: index,
-                  });
-                }
-              },
-              onRemove: () => onRemoveMilestone(index),
-              onMove: (direction: -1 | 1) =>
-                onReorderMilestone(index, direction),
-            },
-          });
-
-          continue;
-        }
-
-        flowNodes.push({
-          id: node.id,
-          type: node.type,
-          position: node.position,
-          data: {
-            campaign,
-            selected: false,
-            locked,
-            onSelect: () => {
-              if (!locked) {
-                selectForNode({
-                  id: node.id,
-                  type: node.type,
-                  position: node.position,
-                  data: {
-                    campaign,
-                  },
-                });
-              }
-            },
-          },
-        });
+        setNodes(toFlowNodes(graph));
+        setEdges(toFlowEdges(graph));
+        initializedRef.current = true;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to load journey";
+        setLoadError(message);
+      } finally {
+        if (!silent) setLoading(false);
       }
-
-      const flowEdges: Edge[] = graph.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.sourceNodeId,
-        target: edge.targetNodeId,
-        label: edge.label ?? undefined,
-        type: "smoothstep",
-        selectable: false,
-      }));
-
-      setNodes(flowNodes);
-      setEdges(flowEdges);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to load journey";
-
-      setLoadError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    campaign,
-    locked,
-    milestones,
-    onRemoveMilestone,
-    onReorderMilestone,
-    onSelectNode,
-    selectForNode,
-    setEdges,
-    setNodes,
-    tenantId,
-  ]);
+    },
+    [campaign.id, setEdges, setNodes, setVersion, tenantId],
+  );
 
   useEffect(() => {
-    void loadGraph();
+    initializedRef.current = false;
+    void loadGraph(false);
   }, [loadGraph]);
+
+  useEffect(() => {
+    if (reloadSignal <= 0 || !initializedRef.current) return;
+    void loadGraph(true);
+  }, [loadGraph, reloadSignal]);
 
   const handleNodeDragStop = useCallback(
     (_event: MouseEvent | TouchEvent, draggedNode: FlowNode) => {
-      if (locked || builderVersion === null) {
-        return;
-      }
+      if (locked) return;
 
+      const version = builderVersionRef.current;
+      if (version === null) return;
+
+      const updatedNodes = backendNodesRef.current.map((node) =>
+        node.id === draggedNode.id
+          ? {
+              ...node,
+              position: {
+                x: draggedNode.position.x,
+                y: draggedNode.position.y,
+              },
+            }
+          : node,
+      );
+
+      backendNodesRef.current = updatedNodes;
       setSaving(true);
 
       const save = async () => {
         try {
-          const updatedNodes = backendNodes.map((node) =>
-            node.id === draggedNode.id
-              ? {
-                  ...node,
-                  position: {
-                    x: draggedNode.position.x,
-                    y: draggedNode.position.y,
-                  },
-                }
-              : node,
-          );
-
           const saved = await api.saveBuilderGraph(
             tenantId,
             campaign.id,
             {
-              expectedVersion: builderVersion,
+              expectedVersion: version,
               nodes: updatedNodes,
-              edges: backendEdges,
+              edges: backendEdgesRef.current,
             },
           );
 
-          setBackendNodes(updatedNodes);
-          setBuilderVersion(saved.version);
+          backendNodesRef.current = saved.nodes;
+          backendEdgesRef.current = saved.edges;
+          setVersion(saved.version);
         } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Failed to save journey";
-
-          setLoadError(message);
+          setLoadError(
+            error instanceof Error ? error.message : "Failed to save journey",
+          );
 
           if (
             error &&
             typeof error === "object" &&
-            "status" in error
+            "status" in error &&
+            (error as { status?: number }).status === 409
           ) {
-            const status = (error as { status?: number }).status;
-
-            if (status === 409) {
-              await loadGraph();
-            }
+            await loadGraph(true);
           }
         } finally {
           setSaving(false);
@@ -569,41 +494,63 @@ export function BuilderCanvas({
 
       void save();
     },
-    [
-      builderVersion,
-      campaign.id,
-      backendEdges,
-      backendNodes,
-      loadGraph,
-      locked,
-      tenantId,
-    ],
+    [campaign.id, loadGraph, locked, setVersion, tenantId],
   );
-
-  const handlePaneClick = useCallback(() => {
-    // Keep the existing Inspector selection intact.
-    // The current Inspector expects a non-null SelectedNode.
-  }, []);
 
   const decoratedNodes = useMemo<FlowNode[]>(
     () =>
-      nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          selected: isSelected(node),
-          locked,
-        },
-      })),
-    [isSelected, locked, nodes],
+      nodes.map((node) => {
+        if (node.type === "milestone") {
+          const milestoneIndex = getMilestoneIndex(
+            node.data.milestoneId,
+            node.data.ordinal,
+            milestones,
+          );
+          const milestone = milestones[milestoneIndex];
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              milestone,
+              milestoneIndex,
+              selected: isSelected(node),
+              locked,
+              onSelect: () => selectForNode(node),
+              onRemove: () => onRemoveMilestone(milestoneIndex),
+              onMove: (direction: -1 | 1) =>
+                onReorderMilestone(milestoneIndex, direction),
+            },
+          };
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            campaign,
+            selected: isSelected(node),
+            locked,
+            onSelect: () => selectForNode(node),
+          },
+        };
+      }),
+    [
+      campaign,
+      isSelected,
+      locked,
+      milestones,
+      nodes,
+      onRemoveMilestone,
+      onReorderMilestone,
+      selectForNode,
+    ],
   );
 
   if (loading) {
     return (
       <div className="relative flex min-h-[420px] flex-1 items-center justify-center bg-canvas">
-        <div className="text-sm text-subtle">
-          Loading journey…
-        </div>
+        <div className="text-sm text-subtle">Loading journey…</div>
       </div>
     );
   }
@@ -623,7 +570,6 @@ export function BuilderCanvas({
         onNodesChange={locked ? undefined : onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={(_event, node) => selectForNode(node)}
-        onPaneClick={handlePaneClick}
         onNodeDragStop={handleNodeDragStop}
         nodesDraggable={!locked}
         nodesConnectable={false}
@@ -640,15 +586,9 @@ export function BuilderCanvas({
           type: "smoothstep",
           animated: false,
         }}
-        proOptions={{
-          hideAttribution: true,
-        }}
+        proOptions={{ hideAttribution: true }}
       >
-        <Background
-          gap={18}
-          size={1}
-          color="var(--border)"
-        />
+        <Background gap={18} size={1} color="var(--border)" />
 
         <Controls
           showInteractive={false}
@@ -664,9 +604,7 @@ export function BuilderCanvas({
       <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs shadow-sm">
         <button
           type="button"
-          aria-label={
-            locked ? "Unlock canvas" : "Lock canvas"
-          }
+          aria-label={locked ? "Unlock canvas" : "Lock canvas"}
           aria-pressed={locked}
           className={`flex h-7 w-7 items-center justify-center rounded-lg ${
             locked
