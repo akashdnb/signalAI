@@ -210,6 +210,7 @@ export function JourneyBuilder({
         <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
           {subTab === "builder" && (
             <BuilderCanvas
+              tenantId={tenantId}
               campaign={campaign}
               milestones={milestones}
               selectedNode={selectedNode}
