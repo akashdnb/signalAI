@@ -1,4 +1,4 @@
-import type { HandoffStatus, PipelineStage } from "../api";
+import type { HandoffStatus, LeadScoreBand, PipelineStage } from "../api";
 
 /** Shared by DashboardPage, LeadDetailPage, and InboxPage — was independently duplicated in the first two before InboxPage made it a third. */
 export const PIPELINE_STAGES: { value: PipelineStage; label: string }[] = [
@@ -46,4 +46,25 @@ export function handoffLabel(status: HandoffStatus): { text: string; className: 
   if (status === "human") return { text: "Human is replying", className: "pill pill-ok" };
   if (status === "requested") return { text: "Escalated — needs attention", className: "pill pill-error" };
   return { text: "AI is replying", className: "pill" };
+}
+
+/** Phase 2C Lead Intelligence: creator-facing label/style for a score band. */
+export function scoreBandLabel(band: LeadScoreBand): { text: string; className: string } {
+  if (band === "very_hot") return { text: "VERY HOT", className: "pill pill-ok" };
+  if (band === "hot") return { text: "HOT", className: "pill pill-ok" };
+  if (band === "warm") return { text: "WARM", className: "pill" };
+  return { text: "COLD", className: "pill" };
+}
+
+/** "ready_to_buy" -> "Ready to buy" — the canonical intent value is a storage key, never shown raw. */
+export function formatIntentLabel(intent: string): string {
+  const spaced = intent.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** ₹ formatting with lakh/crore grouping, matching how budgets are discussed in the captured text itself. */
+export function formatBudgetValue(value: number): string {
+  if (value >= 10_000_000) return `₹${(value / 10_000_000).toLocaleString("en-IN", { maximumFractionDigits: 2 })} crore`;
+  if (value >= 100_000) return `₹${(value / 100_000).toLocaleString("en-IN", { maximumFractionDigits: 2 })} lakh`;
+  return `₹${value.toLocaleString("en-IN")}`;
 }

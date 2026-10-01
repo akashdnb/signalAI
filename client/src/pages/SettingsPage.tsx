@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { FieldDefinitionsPanel } from "../components/FieldDefinitionsPanel";
 import { GuardrailsConfigPanel } from "../components/GuardrailsConfigPanel";
+import { ScoringRulesPanel } from "../components/ScoringRulesPanel";
 import { useTenant } from "../context/TenantContext";
 
 /** Knowledge Base and Billing moved to their own nav destinations (R8) — this page is now tenant-wide config only: captured-fact schema and AI guardrails. */
@@ -16,6 +17,7 @@ export function SettingsPage() {
 
       <FieldDefinitionsPanel tenantId={tenantId} />
       <GuardrailsConfigPanel tenantId={tenantId} />
+      <ScoringRulesPanel tenantId={tenantId} />
     </div>
   );
 }

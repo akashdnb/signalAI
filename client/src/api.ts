@@ -315,6 +315,57 @@ export interface LeadDetail extends LeadListItem {
   customerId: string | null;
 }
 
+export type LeadScoreBand = "cold" | "warm" | "hot" | "very_hot";
+
+/** Phase 2C Lead Intelligence: the current qualification/scoring projection for one lead. null when nothing has been calculated for this lead yet — a normal, common state, not an error. */
+export interface LeadIntelligence {
+  leadId: string;
+  tenantId: string;
+  intent: string | null;
+  need: string | null;
+  budgetValue: number | null;
+  budgetText: string | null;
+  location: string | null;
+  score: number;
+  scoreBand: LeadScoreBand;
+  scoreReasons: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadIntelligenceHistoryEntry {
+  id: string;
+  leadId: string;
+  tenantId: string;
+  intent: string | null;
+  need: string | null;
+  budgetValue: number | null;
+  budgetText: string | null;
+  location: string | null;
+  score: number;
+  scoreBand: LeadScoreBand;
+  scoreReasons: string[];
+  createdAt: string;
+}
+
+export type ScoringRuleField = "budget_value" | "intent" | "need" | "location";
+export type ScoringRuleOperator = "gte" | "lte" | "eq" | "exists";
+
+export type ScoringRuleDefinition =
+  | { kind: "field_compare"; field: ScoringRuleField; operator: ScoringRuleOperator; value?: number | string }
+  | { kind: "milestone_completed"; milestoneId: string };
+
+export interface ScoringRule {
+  id: string;
+  tenantId: string;
+  name: string;
+  definition: ScoringRuleDefinition;
+  points: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TenantMember {
   userId: string;
   email: string;
@@ -545,6 +596,34 @@ export const api = {
     }),
   getCapturedFacts: (tenantId: string, leadId: string) =>
     request<{ facts: Record<string, string> }>(`/tenants/${tenantId}/leads/${leadId}/captured-facts`).then((r) => r.facts),
+
+  // Phase 2C Lead Intelligence
+  getLeadIntelligence: (tenantId: string, leadId: string) =>
+    request<LeadIntelligence | null>(`/tenants/${tenantId}/leads/${leadId}/intelligence`),
+  getLeadIntelligenceHistory: (tenantId: string, leadId: string) =>
+    request<LeadIntelligenceHistoryEntry[]>(`/tenants/${tenantId}/leads/${leadId}/intelligence/history`),
+  recalculateLeadIntelligence: (tenantId: string, leadId: string) =>
+    request<LeadIntelligence>(`/tenants/${tenantId}/leads/${leadId}/intelligence/recalculate`, { method: "POST" }),
+
+  // SLICE C: tenant-configurable custom lead scoring rules
+  listScoringRules: (tenantId: string) =>
+    request<{ rules: ScoringRule[] }>(`/tenants/${tenantId}/scoring-rules`).then((r) => r.rules),
+  createScoringRule: (tenantId: string, input: { name: string; definition: ScoringRuleDefinition; points: number; enabled?: boolean }) =>
+    request<{ rule: ScoringRule }>(`/tenants/${tenantId}/scoring-rules`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }).then((r) => r.rule),
+  updateScoringRule: (
+    tenantId: string,
+    id: string,
+    updates: { name?: string; definition?: ScoringRuleDefinition; points?: number; enabled?: boolean },
+  ) =>
+    request<{ rule: ScoringRule }>(`/tenants/${tenantId}/scoring-rules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }).then((r) => r.rule),
+  deleteScoringRule: (tenantId: string, id: string) =>
+    request<void>(`/tenants/${tenantId}/scoring-rules/${id}`, { method: "DELETE" }),
 
   listMembers: (tenantId: string) => request<TenantMember[]>(`/tenants/${tenantId}/members`),
 
