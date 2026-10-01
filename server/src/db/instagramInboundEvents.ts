@@ -172,6 +172,25 @@ export async function markInstagramInboundEventFailed(
   );
 }
 
+export async function getInstagramInboundEventById(
+  pool: Pool,
+  eventId: string,
+): Promise<InstagramInboundEvent | null> {
+  const result = await pool.query(
+    `
+      select *
+        from instagram_inbound_events
+       where id = $1
+       limit 1
+    `,
+    [eventId],
+  );
+
+  return result.rowCount
+    ? mapRow(result.rows[0])
+    : null;
+}
+
 export async function getInstagramInboundEvent(
   pool: Pool,
   tenantId: string,
