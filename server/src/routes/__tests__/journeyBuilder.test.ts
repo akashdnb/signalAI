@@ -39,7 +39,6 @@ describe("journey builder graph routes", () => {
     expect(res.body.nodes.map((n: { type: string }) => n.type)).toEqual([
       "trigger",
       "message",
-      "milestone_group",
       "human_handoff",
     ]);
   });

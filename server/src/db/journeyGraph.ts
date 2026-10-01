@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { listMilestones, type Milestone } from "./milestones.js";
 
 /**
  * Deliberately a plain string, not a union, at this layer — the node
@@ -80,31 +81,56 @@ function toEdge(row: EdgeRow): JourneyEdge {
  * for campaigns created after this model existed too. Nodes carry no field
  * data of their own yet (`data: {}`): campaigns/campaign_milestones stay
  * the source of truth for keywords/message text/etc. until the Inspector
- * is ported to read/write through the graph. Once the caller saves any
- * graph, these ids become the real, persisted ones.
+ * is ported to read/write through the graph. Milestone nodes carry only
+ * milestone identity metadata. Once the caller saves any graph, these ids
+ * become the real, persisted ones.
  */
-function buildDefaultGraph(ctaLink: string | null): { nodes: JourneyNode[]; edges: JourneyEdge[] } {
+function buildDefaultGraph(
+  ctaLink: string | null,
+  milestones: Milestone[],
+): { nodes: JourneyNode[]; edges: JourneyEdge[] } {
   const triggerId = randomUUID();
   const messageId = randomUUID();
-  const milestonesId = randomUUID();
+  const milestoneIds = milestones.map(() => randomUUID());
   const handoffId = randomUUID();
+  const handoffY = 320 + milestones.length * 160;
 
   const nodes: JourneyNode[] = [
     { id: triggerId, type: "trigger", position: { x: 0, y: 0 }, data: {}, parentGroupId: null, collapsed: false },
     { id: messageId, type: "message", position: { x: 0, y: 160 }, data: {}, parentGroupId: null, collapsed: false },
-    { id: milestonesId, type: "milestone_group", position: { x: 0, y: 320 }, data: {}, parentGroupId: null, collapsed: false },
-    { id: handoffId, type: "human_handoff", position: { x: 0, y: 480 }, data: {}, parentGroupId: null, collapsed: false },
+    ...milestones.map((milestone, index): JourneyNode => ({
+      id: milestoneIds[index]!,
+      type: "milestone_group",
+      position: { x: 0, y: 320 + index * 160 },
+      data: { milestoneId: milestone.id },
+      parentGroupId: null,
+      collapsed: false,
+    })),
+    { id: handoffId, type: "human_handoff", position: { x: 0, y: handoffY }, data: {}, parentGroupId: null, collapsed: false },
   ];
+
+  const journeyPath = [messageId, ...milestoneIds, handoffId];
   const edges: JourneyEdge[] = [
     { id: randomUUID(), sourceNodeId: triggerId, targetNodeId: messageId, label: null, condition: null },
-    { id: randomUUID(), sourceNodeId: messageId, targetNodeId: milestonesId, label: null, condition: null },
-    { id: randomUUID(), sourceNodeId: milestonesId, targetNodeId: handoffId, label: null, condition: null },
+    ...journeyPath.slice(1).map((targetNodeId, index): JourneyEdge => ({
+      id: randomUUID(),
+      sourceNodeId: journeyPath[index]!,
+      targetNodeId,
+      label: null,
+      condition: null,
+    })),
   ];
 
   if (ctaLink) {
     const linkId = randomUUID();
-    nodes.push({ id: linkId, type: "action_link", position: { x: 220, y: 480 }, data: {}, parentGroupId: null, collapsed: false });
-    edges.push({ id: randomUUID(), sourceNodeId: milestonesId, targetNodeId: linkId, label: null, condition: null });
+    nodes.push({ id: linkId, type: "action_link", position: { x: 220, y: handoffY }, data: {}, parentGroupId: null, collapsed: false });
+    edges.push({
+      id: randomUUID(),
+      sourceNodeId: milestoneIds[milestoneIds.length - 1] ?? messageId,
+      targetNodeId: linkId,
+      label: null,
+      condition: null,
+    });
   }
 
   return { nodes, edges };
@@ -124,7 +150,8 @@ export async function getBuilderGraph(pool: Pool, tenantId: string, campaignId: 
   );
 
   if (nodesRes.rowCount === 0) {
-    const { nodes, edges } = buildDefaultGraph(campaignRow.cta_link);
+    const milestones = await listMilestones(pool, tenantId, campaignId);
+    const { nodes, edges } = buildDefaultGraph(campaignRow.cta_link, milestones);
     return { nodes, edges, version: campaignRow.builder_version };
   }
 

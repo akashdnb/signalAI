@@ -14,7 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { api, type Campaign, type JourneyNode, type Milestone } from "../../api";
+import { api, type Campaign, type JourneyEdge, type JourneyNode, type Milestone } from "../../api";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -37,6 +37,7 @@ export type SelectedNode =
 type FlowNodeData = {
   campaign?: Campaign;
   milestone?: Milestone;
+  milestoneId?: string;
   milestoneIndex?: number;
   selected?: boolean;
   locked?: boolean;
@@ -304,6 +305,8 @@ export function BuilderCanvas({
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [backendNodes, setBackendNodes] = useState<JourneyNode[]>([]);
+  const [backendEdges, setBackendEdges] = useState<JourneyEdge[]>([]);
   const [builderVersion, setBuilderVersion] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -398,6 +401,8 @@ export function BuilderCanvas({
       );
 
       setBuilderVersion(graph.version);
+      setBackendNodes(graph.nodes);
+      setBackendEdges(graph.edges);
 
       const flowNodes: FlowNode[] = [];
 
@@ -420,6 +425,7 @@ export function BuilderCanvas({
             position: node.position,
             data: {
               ...node.data,
+              milestoneId: milestone.id,
               milestone,
               milestoneIndex: index,
               selected: false,
@@ -513,56 +519,29 @@ export function BuilderCanvas({
 
       const save = async () => {
         try {
-          const currentNodes = nodes.map((node) => {
-            if (node.id !== draggedNode.id) {
-              return node;
-            }
-
-            return {
-              ...node,
-              position: draggedNode.position,
-            };
-          });
-
-          const backendNodes: JourneyNode[] =
-            currentNodes.map((node) => ({
-              id: node.id,
-              type:
-                node.type === "milestone"
-                  ? "milestone_group"
-                  : node.type ?? "unknown",
-              position: {
-                x: node.position.x,
-                y: node.position.y,
-              },
-              data: {
-                ...(node.data as Record<string, unknown>),
-              },
-              parentGroupId: null,
-              collapsed: false,
-            }));
-
-          const backendEdges = edges.map((edge) => ({
-            id: edge.id,
-            sourceNodeId: edge.source,
-            targetNodeId: edge.target,
-            label:
-              typeof edge.label === "string"
-                ? edge.label
-                : null,
-            condition: null,
-          }));
+          const updatedNodes = backendNodes.map((node) =>
+            node.id === draggedNode.id
+              ? {
+                  ...node,
+                  position: {
+                    x: draggedNode.position.x,
+                    y: draggedNode.position.y,
+                  },
+                }
+              : node,
+          );
 
           const saved = await api.saveBuilderGraph(
             tenantId,
             campaign.id,
             {
               expectedVersion: builderVersion,
-              nodes: backendNodes,
+              nodes: updatedNodes,
               edges: backendEdges,
             },
           );
 
+          setBackendNodes(updatedNodes);
           setBuilderVersion(saved.version);
         } catch (error) {
           const message =
@@ -593,10 +572,10 @@ export function BuilderCanvas({
     [
       builderVersion,
       campaign.id,
-      edges,
+      backendEdges,
+      backendNodes,
       loadGraph,
       locked,
-      nodes,
       tenantId,
     ],
   );

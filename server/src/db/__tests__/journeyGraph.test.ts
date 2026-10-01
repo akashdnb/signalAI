@@ -35,7 +35,7 @@ describe("journey graph (advanced Automation Builder)", () => {
     const graph = await getBuilderGraph(pool, tenant.id, campaign.id);
     expect(graph).not.toBeNull();
     expect(graph!.version).toBe(1);
-    expect(graph!.nodes.map((n) => n.type)).toEqual(["trigger", "message", "milestone_group", "human_handoff"]);
+    expect(graph!.nodes.map((n) => n.type)).toEqual(["trigger", "message", "human_handoff"]);
     expect(graph!.edges).toHaveLength(3);
     // chained trigger -> message -> milestones -> handoff
     const byId = new Map(graph!.nodes.map((n) => [n.id, n]));
