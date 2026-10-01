@@ -2,50 +2,90 @@ import type { ReactNode } from "react";
 import { CloseIcon } from "./icons";
 
 /**
- * Mobile-first sheet: slides up from the bottom and fills the width on
- * narrow viewports (safe-area aware), becomes a centered dialog at md+ —
- * one primitive instead of a phone-only component plus a separate desktop
- * modal, since every call site wants "bottom sheet on phone, small dialog
- * on desktop" rather than two different components to keep in sync.
+ * Shared modal primitive:
+ * - mobile: bottom sheet
+ * - desktop: centered dialog
+ * - content-aware height
+ * - fixed header/footer with scrollable body
  */
 export function BottomSheet({
   title,
   onClose,
   children,
   maxWidth = 480,
+  headerContent,
+  footer,
+  bodyClassName = "",
+  zIndex = 50,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   maxWidth?: number;
+  headerContent?: ReactNode;
+  footer?: ReactNode;
+  bodyClassName?: string;
+  zIndex?: number;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-      <button type="button" aria-label="Close" className="fixed inset-0 bg-black/40" onClick={onClose} />
+    <div
+      className="fixed inset-0 flex items-end justify-center md:items-center"
+      style={{ zIndex }}
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        className="fixed inset-0 bg-black/40"
+        onClick={onClose}
+      />
+
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex max-h-[88vh] w-full flex-col rounded-t-2xl border border-line bg-card shadow-xl transition-transform duration-200 motion-reduce:transition-none md:max-h-[85vh] md:w-full md:rounded-2xl"
+        className="relative flex max-h-[92vh] w-full min-h-0 flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-xl md:max-h-[88vh] md:rounded-2xl"
         style={{ maxWidth }}
       >
-        <div className="flex justify-center pb-1 pt-2 md:hidden" aria-hidden="true">
-          <div className="h-1 w-10 rounded-full bg-chip" />
-        </div>
-        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="m-0 text-base font-semibold text-ink">{title}</h2>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 md:px-6 md:py-4">
+          <div className="min-w-0 flex-1">
+            {headerContent ?? (
+              <h2 className="m-0 text-[17px] font-semibold tracking-[-0.01em] text-ink">
+                {title}
+              </h2>
+            )}
+          </div>
+
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 md:px-6 ${bodyClassName}`}
+          style={{
+            paddingBottom:
+              "calc(1.25rem + env(safe-area-inset-bottom))",
+          }}
+        >
           {children}
         </div>
+
+        {footer && (
+          <div
+            className="shrink-0 border-t border-line bg-card px-5 py-3.5 md:px-6"
+            style={{
+              paddingBottom:
+                "calc(0.875rem + env(safe-area-inset-bottom))",
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

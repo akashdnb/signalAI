@@ -1,5 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   api,
   TONE_LABEL,
@@ -27,6 +33,46 @@ const VALUE_TYPES: { value: FieldDefinitionValueType; label: string }[] = [
   { value: "text", label: "Text" },
 ];
 
+export interface InspectorHandle {
+  save: () => Promise<boolean>;
+  discard: () => void;
+  dirty: boolean;
+  saving: boolean;
+  canSave: boolean;
+}
+
+type EditorActions = InspectorHandle;
+
+/**
+ * Sends current editor state to the dialog without creating a render loop.
+ * The ref always points to the latest save/discard closures.
+ */
+function useEditorActions(
+  actions: EditorActions,
+  onActionsChange?: (actions: EditorActions) => void,
+) {
+  const latest = useRef(actions);
+  latest.current = actions;
+
+  useEffect(() => {
+    const bridge: EditorActions = {
+      save: () => latest.current.save(),
+      discard: () => latest.current.discard(),
+      get dirty() {
+        return latest.current.dirty;
+      },
+      get saving() {
+        return latest.current.saving;
+      },
+      get canSave() {
+        return latest.current.canSave;
+      },
+    };
+
+    onActionsChange?.(bridge);
+  }, [actions.dirty, actions.saving, actions.canSave, onActionsChange]);
+}
+
 function PanelHeader({
   icon: Icon,
   title,
@@ -38,7 +84,7 @@ function PanelHeader({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">
         <Icon className="h-4.5 w-4.5" />
       </span>
 
@@ -60,33 +106,41 @@ function SectionTabs({
   onChange: (key: string) => void;
 }) {
   return (
-    <div className="w-[122px] shrink-0 space-y-1 border-r border-line pr-3">
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          onClick={() => onChange(item.key)}
-          className={`flex min-h-9 w-full items-center rounded-lg px-2.5 text-left text-[12px] ${
-            active === item.key
-              ? "bg-chip font-semibold text-accent"
-              : "text-subtle hover:bg-chip hover:text-ink"
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
+    <nav className="w-[128px] shrink-0 border-r border-line pr-3">
+      <div className="space-y-1">
+        {items.map((item) => {
+          const selected = active === item.key;
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onChange(item.key)}
+              className={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
+                selected
+                  ? "bg-chip font-semibold text-accent"
+                  : "text-subtle hover:bg-chip hover:text-ink"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
-function TriggerPanel({
+function TriggerEditor({
   tenantId,
   campaign,
   onCampaignChanged,
+  onActionsChange,
 }: {
   tenantId: string;
   campaign: Campaign;
   onCampaignChanged: () => Promise<void> | void;
+  onActionsChange?: (actions: EditorActions) => void;
 }) {
   const [tab, setTab] = useState("basic");
   const [baseType, setBaseType] = useState<"comment" | "message">(
@@ -105,7 +159,35 @@ function TriggerPanel({
     setKeywords(campaign.keywords.join(", "));
   }, [campaign]);
 
-  async function handleSave() {
+  const original = useMemo<{
+    baseType: "comment" | "message";
+    alsoDm: boolean;
+    keywords: string;
+  }>(
+    () => ({
+      baseType:
+        campaign.triggerSource === "message" ? "message" : "comment",
+      alsoDm: campaign.triggerSource === "both",
+      keywords: campaign.keywords.join(", "),
+    }),
+    [campaign],
+  );
+
+  const dirty =
+    baseType !== original.baseType ||
+    alsoDm !== original.alsoDm ||
+    keywords !== original.keywords;
+
+  const discard = () => {
+    setBaseType(original.baseType);
+    setAlsoDm(original.alsoDm);
+    setKeywords(original.keywords);
+    setStoryReplies(false);
+    setCaseInsensitive(true);
+    setError(null);
+  };
+
+  const save = async (): Promise<boolean> => {
     const parsedKeywords = keywords
       .split(",")
       .map((keyword) => keyword.trim())
@@ -113,11 +195,15 @@ function TriggerPanel({
 
     if (parsedKeywords.length === 0) {
       setError("Add at least one keyword.");
-      return;
+      return false;
     }
 
     const triggerSource: TriggerSource =
-      baseType === "message" ? "message" : alsoDm ? "both" : "comment";
+      baseType === "message"
+        ? "message"
+        : alsoDm
+          ? "both"
+          : "comment";
 
     setSaving(true);
     setError(null);
@@ -128,15 +214,28 @@ function TriggerPanel({
         keywords: parsedKeywords,
       });
       await onCampaignChanged();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save trigger");
+      return false;
     } finally {
       setSaving(false);
     }
-  }
+  };
+
+  useEditorActions(
+    {
+      save,
+      discard,
+      dirty,
+      saving,
+      canSave: true,
+    },
+    onActionsChange,
+  );
 
   return (
-    <div className="flex gap-5">
+    <div className="flex gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -153,131 +252,138 @@ function TriggerPanel({
             <PanelHeader
               icon={InstagramMarkIcon}
               title="Trigger"
-              description="Starts the journey when someone comments or sends a DM."
+              description="Choose when this journey should start."
             />
 
-            <div className="mt-5 space-y-4">
-              <div>
-                <div className="text-[11px] font-semibold text-ink">Trigger type</div>
+            <div className="mt-6 space-y-5">
+              <fieldset className="m-0 border-0 p-0">
+                <legend className="text-[11px] font-semibold text-ink">
+                  Trigger type
+                </legend>
 
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 text-left text-[12px] ${
-                      baseType === "message"
-                        ? "border-accent bg-chip text-ink"
-                        : "border-line bg-card text-subtle"
-                    }`}
-                    onClick={() => setBaseType("message")}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-accent">
-                      {baseType === "message" && (
-                        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-                      )}
-                    </span>
-                    Direct message
-                  </button>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {[
+                    { value: "message" as const, label: "Direct message" },
+                    { value: "comment" as const, label: "Comment on post" },
+                  ].map((option) => {
+                    const selected = baseType === option.value;
 
-                  <button
-                    type="button"
-                    className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 text-left text-[12px] ${
-                      baseType === "comment"
-                        ? "border-accent bg-chip text-ink"
-                        : "border-line bg-card text-subtle"
-                    }`}
-                    onClick={() => setBaseType("comment")}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-line">
-                      {baseType === "comment" && (
-                        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-                      )}
-                    </span>
-                    Comment on post
-                  </button>
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`flex min-h-11 items-center gap-2 rounded-lg border px-3 text-left text-[12px] ${
+                          selected
+                            ? "border-accent/40 bg-chip text-ink"
+                            : "border-line bg-card text-subtle"
+                        }`}
+                        onClick={() => setBaseType(option.value)}
+                      >
+                        <span
+                          className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                            selected ? "border-accent" : "border-line"
+                          }`}
+                        >
+                          {selected && (
+                            <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                          )}
+                        </span>
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
+              </fieldset>
 
-              <label>
+              <label className="block">
                 <span className="text-[11px] font-semibold text-ink">
-                  Keywords (comma separated)
+                  Keywords{" "}
+                  <span className="font-normal text-subtle">
+                    (comma separated)
+                  </span>
                 </span>
                 <textarea
                   value={keywords}
                   onChange={(event) => setKeywords(event.target.value)}
                   rows={3}
-                  className="!mt-1.5 !text-[12px]"
+                  placeholder="details, signalAI, demo"
+                  className="!mt-1.5 !min-h-[84px] !text-[13px]"
                 />
               </label>
 
-              <label className="flex items-center gap-2 !mb-0 text-[11px] text-subtle">
-                <input
-                  type="checkbox"
-                  checked={storyReplies}
-                  onChange={(event) => setStoryReplies(event.target.checked)}
-                />
-                Also trigger on story replies
-              </label>
-
-              <label className="flex items-center gap-2 !mb-0 text-[11px] text-subtle">
-                <input
-                  type="checkbox"
-                  checked={caseInsensitive}
-                  onChange={(event) => setCaseInsensitive(event.target.checked)}
-                />
-                Case insensitive matching
-              </label>
-
-              {baseType === "comment" && (
-                <label className="flex items-center gap-2 !mb-0 text-[11px] text-subtle">
+              <div className="space-y-3">
+                <label className="flex items-start gap-2 text-[11px] leading-4 text-subtle">
                   <input
                     type="checkbox"
-                    checked={alsoDm}
-                    onChange={(event) => setAlsoDm(event.target.checked)}
+                    checked={storyReplies}
+                    onChange={(event) =>
+                      setStoryReplies(event.target.checked)
+                    }
                   />
-                  Also trigger on direct messages
+                  <span>Also trigger on story replies</span>
                 </label>
-              )}
 
-              {error && <div className="banner banner-error !mb-0">{error}</div>}
+                <label className="flex items-start gap-2 text-[11px] leading-4 text-subtle">
+                  <input
+                    type="checkbox"
+                    checked={caseInsensitive}
+                    onChange={(event) =>
+                      setCaseInsensitive(event.target.checked)
+                    }
+                  />
+                  <span>Case insensitive matching</span>
+                </label>
 
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleSave()}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
+                {baseType === "comment" && (
+                  <label className="flex items-start gap-2 text-[11px] leading-4 text-subtle">
+                    <input
+                      type="checkbox"
+                      checked={alsoDm}
+                      onChange={(event) =>
+                        setAlsoDm(event.target.checked)
+                      }
+                    />
+                    <span>Also trigger on direct messages</span>
+                  </label>
+                )}
+              </div>
+
+              {error && <div className="banner banner-error">{error}</div>}
             </div>
           </>
         ) : (
-          <div>
+          <>
             <h3 className="m-0 text-[15px] font-semibold text-ink">
-              {tab === "advanced" ? "Advanced trigger settings" : "AI settings"}
+              {tab === "advanced" ? "Advanced" : "AI Settings"}
             </h3>
-            <p className="muted mt-2 text-[12px]">
-              These controls are reserved for the next automation settings pass.
+            <p className="muted m-0 mt-2 max-w-md text-[12px] leading-5">
+              Additional trigger controls will appear here as they become
+              available.
             </p>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function MessagePanel({
+function MessageEditor({
   tenantId,
   campaign,
   onCampaignChanged,
+  onActionsChange,
 }: {
   tenantId: string;
   campaign: Campaign;
   onCampaignChanged: () => Promise<void> | void;
+  onActionsChange?: (actions: EditorActions) => void;
 }) {
   const [tab, setTab] = useState("basic");
   const [message, setMessage] = useState(campaign.defaultReplyTemplate);
   const [tone, setTone] = useState<CampaignTone>(campaign.tone);
-  const [useKnowledgeBase, setUseKnowledgeBase] = useState(campaign.useKnowledgeBase);
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(
+    campaign.useKnowledgeBase,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -288,8 +394,30 @@ function MessagePanel({
     setUseKnowledgeBase(campaign.useKnowledgeBase);
   }, [campaign]);
 
+  const original = useMemo(
+    () => ({
+      message: campaign.defaultReplyTemplate,
+      tone: campaign.tone,
+      useKnowledgeBase: campaign.useKnowledgeBase,
+    }),
+    [campaign],
+  );
+
+  const dirty =
+    message !== original.message ||
+    tone !== original.tone ||
+    useKnowledgeBase !== original.useKnowledgeBase;
+
+  const discard = () => {
+    setMessage(original.message);
+    setTone(original.tone);
+    setUseKnowledgeBase(original.useKnowledgeBase);
+    setError(null);
+  };
+
   function insertVariable() {
     const el = textareaRef.current;
+
     if (!el) {
       setMessage((value) => `${value}{name}`);
       return;
@@ -307,7 +435,7 @@ function MessagePanel({
     });
   }
 
-  async function handleSave() {
+  const save = async (): Promise<boolean> => {
     setSaving(true);
     setError(null);
 
@@ -318,15 +446,28 @@ function MessagePanel({
         useKnowledgeBase,
       });
       await onCampaignChanged();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save message");
+      return false;
     } finally {
       setSaving(false);
     }
-  }
+  };
+
+  useEditorActions(
+    {
+      save,
+      discard,
+      dirty,
+      saving,
+      canSave: true,
+    },
+    onActionsChange,
+  );
 
   return (
-    <div className="flex gap-5">
+    <div className="flex gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -342,34 +483,42 @@ function MessagePanel({
             <PanelHeader
               icon={BotIcon}
               title={campaign.replyMode === "ai_generated" ? "AI Reply" : "Reply Message"}
-              description="The first reply sent once the trigger matches."
+              description="Configure the response sent after this step."
             />
 
-            <div className="mt-5">
-              <label>
-                <span className="text-[11px] font-semibold text-ink">Message</span>
+            <div className="mt-6 space-y-5">
+              <label className="block">
+                <span className="text-[11px] font-semibold text-ink">
+                  Message
+                </span>
                 <textarea
                   ref={textareaRef}
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
-                  rows={5}
-                  className="!mt-1.5 !text-[12px]"
+                  rows={6}
+                  placeholder="Write the reply you want leads to receive."
+                  className="!mt-1.5 !min-h-[128px] !text-[13px]"
                 />
               </label>
 
               <button
                 type="button"
-                className="btn-secondary btn-small mb-4"
+                className="btn-secondary btn-small"
                 onClick={insertVariable}
               >
-                {"{ }"} Insert Variable
+                {"{ }"} Insert variable
               </button>
 
-              <label>
-                <span className="text-[11px] font-semibold text-ink">AI Behavior</span>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-ink">
+                  AI behavior
+                </span>
                 <select
                   value={tone}
-                  onChange={(event) => setTone(event.target.value as CampaignTone)}
+                  onChange={(event) =>
+                    setTone(event.target.value as CampaignTone)
+                  }
+                  className="!mt-1.5"
                 >
                   {(Object.keys(TONE_LABEL) as CampaignTone[]).map((toneKey) => (
                     <option key={toneKey} value={toneKey}>
@@ -379,47 +528,43 @@ function MessagePanel({
                 </select>
               </label>
 
-              <label className="flex items-center gap-2 text-[11px] text-subtle">
+              <label className="flex items-start gap-2 text-[11px] leading-4 text-subtle">
                 <input
                   type="checkbox"
                   checked={useKnowledgeBase}
-                  onChange={(event) => setUseKnowledgeBase(event.target.checked)}
+                  onChange={(event) =>
+                    setUseKnowledgeBase(event.target.checked)
+                  }
                 />
-                Use knowledge base for context
+                <span>Use knowledge base for context</span>
               </label>
-
-              {error && <div className="banner banner-error">{error}</div>}
-
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleSave()}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
             </div>
           </>
         ) : (
-          <div>
-            <h3 className="m-0 text-[15px] font-semibold text-ink">AI Settings</h3>
-            <p className="muted mt-2 text-[12px]">
-              Tune tone and knowledge context from the Basic section.
+          <>
+            <h3 className="m-0 text-[15px] font-semibold text-ink">
+              AI Settings
+            </h3>
+            <p className="muted m-0 mt-2 max-w-md text-[12px] leading-5">
+              Configure tone and knowledge context from the Basic tab.
             </p>
-          </div>
+          </>
         )}
+
+        {error && <div className="banner banner-error mt-5">{error}</div>}
       </div>
     </div>
   );
 }
 
-function MilestonePanel({
+function GoalEditor({
   tenantId,
   milestone,
   index,
   fieldDefinitions,
   onFieldDefinitionsChanged,
   onSaveMilestone,
+  onActionsChange,
 }: {
   tenantId: string;
   milestone: Milestone;
@@ -430,32 +575,53 @@ function MilestonePanel({
     index: number,
     updates: { goalDescription: string; captureFields: string[] },
   ) => Promise<void>;
+  onActionsChange?: (actions: EditorActions) => void;
 }) {
   const [tab, setTab] = useState("basic");
-  const [goalDescription, setGoalDescription] = useState(milestone.goalDescription);
-  const [captureFields, setCaptureFields] = useState<string[]>(milestone.captureFields);
-  const [description, setDescription] = useState("");
+  const [goalDescription, setGoalDescription] = useState(
+    milestone.goalDescription,
+  );
+  const [captureFields, setCaptureFields] = useState<string[]>(
+    milestone.captureFields,
+  );
   const [showNewField, setShowNewField] = useState(false);
   const [newFieldKey, setNewFieldKey] = useState("");
   const [newFieldLabel, setNewFieldLabel] = useState("");
-  const [newFieldType, setNewFieldType] = useState<FieldDefinitionValueType>("text");
+  const [newFieldType, setNewFieldType] =
+    useState<FieldDefinitionValueType>("text");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setGoalDescription(milestone.goalDescription);
     setCaptureFields(milestone.captureFields);
-    setDescription("");
   }, [milestone]);
 
-  const availableFields = fieldDefinitions.filter(
-    (field) => !captureFields.includes(field.fieldKey),
+  const original = useMemo(
+    () => ({
+      goalDescription: milestone.goalDescription,
+      captureFields: milestone.captureFields,
+    }),
+    [milestone],
   );
 
-  async function handleSave() {
-    if (!goalDescription.trim()) {
-      setError("Goal can't be empty.");
-      return;
+  const dirty =
+    goalDescription !== original.goalDescription ||
+    JSON.stringify(captureFields) !== JSON.stringify(original.captureFields);
+
+  const discard = () => {
+    setGoalDescription(original.goalDescription);
+    setCaptureFields([...original.captureFields]);
+    setError(null);
+    setShowNewField(false);
+  };
+
+  const save = async (): Promise<boolean> => {
+    const nextGoal = goalDescription.trim();
+
+    if (!nextGoal) {
+      setError("Goal title cannot be empty.");
+      return false;
     }
 
     setSaving(true);
@@ -463,15 +629,28 @@ function MilestonePanel({
 
     try {
       await onSaveMilestone(index, {
-        goalDescription: goalDescription.trim(),
+        goalDescription: nextGoal,
         captureFields,
       });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save goal");
+      return false;
     } finally {
       setSaving(false);
     }
-  }
+  };
+
+  useEditorActions(
+    {
+      save,
+      discard,
+      dirty,
+      saving,
+      canSave: true,
+    },
+    onActionsChange,
+  );
 
   async function handleCreateField(event: React.FormEvent) {
     event.preventDefault();
@@ -490,13 +669,24 @@ function MilestonePanel({
       setShowNewField(false);
       setNewFieldKey("");
       setNewFieldLabel("");
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create field");
     }
   }
 
+  const fieldByKey = useMemo(
+    () =>
+      new Map(fieldDefinitions.map((field) => [field.fieldKey, field])),
+    [fieldDefinitions],
+  );
+
+  const availableFields = fieldDefinitions.filter(
+    (field) => !captureFields.includes(field.fieldKey),
+  );
+
   return (
-    <div className="flex gap-5">
+    <div className="flex gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -510,96 +700,114 @@ function MilestonePanel({
 
       <div className="min-w-0 flex-1">
         {tab === "basic" && (
-          <>
-            <PanelHeader
-              icon={BotIcon}
-              title={`Goal ${index + 1}`}
-              description="A conversational goal the AI works toward."
-            />
-
-            <div className="mt-5">
-              <label>
-                <span className="text-[11px] font-semibold text-ink">Goal title</span>
+          <div className="max-w-[590px]">
+            <div className="space-y-5">
+              <label className="block">
+                <span className="text-[11px] font-semibold text-ink">
+                  Goal title
+                </span>
                 <input
                   value={goalDescription}
-                  onChange={(event) => setGoalDescription(event.target.value)}
-                  className="!mt-1.5 !text-[12px]"
+                  onChange={(event) =>
+                    setGoalDescription(event.target.value)
+                  }
+                  className="!mt-1.5 !w-full !text-[13px]"
+                  aria-label="Goal title"
                 />
               </label>
 
-              <label>
+              <div>
                 <span className="text-[11px] font-semibold text-ink">
-                  Description (optional)
+                  Description
                 </span>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  rows={3}
-                  placeholder="Describe what this goal should accomplish."
-                  className="!mt-1.5 !text-[12px]"
-                />
-              </label>
-
-              <p className="muted m-0 mb-4 text-[10px]">
-                The current journey model stores one goal description; the title above is the persisted goal text.
-              </p>
-
-              {error && <div className="banner banner-error">{error}</div>}
-
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleSave()}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
+                <p className="muted m-0 mt-1.5 text-[12px] leading-5">
+                  Conversational goal the AI works toward.
+                </p>
+              </div>
             </div>
-          </>
+          </div>
         )}
 
         {tab === "capture" && (
-          <div>
-            <h3 className="m-0 text-[15px] font-semibold text-ink">Capture Fields</h3>
-            <p className="muted m-0 mt-1 text-[11px]">
-              Decide which structured values this goal captures.
-            </p>
+          <div className="max-w-[620px]">
+            <div>
+              <h3 className="m-0 text-[15px] font-semibold text-ink">
+                Captured fields
+              </h3>
+              <p className="muted m-0 mt-1 text-[11px]">
+                Structured values this goal should capture.
+              </p>
+            </div>
 
-            <div className="mt-4 space-y-2">
-              {captureFields.map((fieldKey) => (
-                <div
-                  key={fieldKey}
-                  className="flex items-center justify-between rounded-lg border border-line px-3 py-2"
-                >
-                  <span className="text-[12px] text-ink">
-                    {fieldDefinitions.find((field) => field.fieldKey === fieldKey)?.label ?? fieldKey}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-subtle hover:text-ink"
-                    onClick={() =>
-                      setCaptureFields((fields) =>
-                        fields.filter((field) => field !== fieldKey),
-                      )
-                    }
-                  >
-                    ×
-                  </button>
+            <div className="mt-4 space-y-3">
+              {captureFields.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-line px-4 py-7 text-center">
+                  <p className="m-0 text-[12px] font-medium text-ink">
+                    No captured fields yet
+                  </p>
+                  <p className="muted m-0 mt-1 text-[11px]">
+                    Add a field when this goal needs structured information.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                captureFields.map((fieldKey) => {
+                  const field = fieldByKey.get(fieldKey);
+
+                  return (
+                    <div
+                      key={fieldKey}
+                      className="rounded-xl border border-line bg-card px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="break-words text-[12px] font-semibold text-ink">
+                            {fieldKey}
+                          </div>
+                          <div className="mt-1 break-words text-[11px] leading-4 text-subtle">
+                            {field?.label ?? fieldKey}
+                          </div>
+
+                          {field && (
+                            <span className="mt-2 inline-flex rounded-md bg-chip px-2 py-1 text-[10px] font-medium text-subtle">
+                              {field.valueType}
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-subtle hover:bg-chip hover:text-ink"
+                          onClick={() =>
+                            setCaptureFields((fields) =>
+                              fields.filter((item) => item !== fieldKey),
+                            )
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
 
               {availableFields.length > 0 && (
                 <select
                   value=""
                   onChange={(event) => {
                     if (!event.target.value) return;
-                    setCaptureFields((fields) => [...fields, event.target.value]);
+                    setCaptureFields((fields) => [
+                      ...fields,
+                      event.target.value,
+                    ]);
                   }}
+                  className="!text-[12px]"
+                  aria-label="Add captured field"
                 >
-                  <option value="">+ Add field to capture…</option>
+                  <option value="">+ Add field</option>
                   {availableFields.map((field) => (
                     <option key={field.fieldKey} value={field.fieldKey}>
-                      {field.label}
+                      {field.label} ({field.fieldKey})
                     </option>
                   ))}
                 </select>
@@ -610,80 +818,101 @@ function MilestonePanel({
                 className="btn-secondary btn-small"
                 onClick={() => setShowNewField((value) => !value)}
               >
-                {showNewField ? "Cancel" : "+ Add field"}
+                {showNewField ? "Cancel" : "+ Create field"}
               </button>
 
               {showNewField && (
-                <form onSubmit={handleCreateField} className="space-y-2">
-                  <input
-                    value={newFieldKey}
-                    onChange={(event) => setNewFieldKey(event.target.value)}
-                    placeholder="Key, e.g. budget"
-                    className="!text-[12px]"
-                  />
-                  <input
-                    value={newFieldLabel}
-                    onChange={(event) => setNewFieldLabel(event.target.value)}
-                    placeholder="Label, e.g. Budget"
-                    className="!text-[12px]"
-                  />
-                  <select
-                    value={newFieldType}
-                    onChange={(event) =>
-                      setNewFieldType(event.target.value as FieldDefinitionValueType)
-                    }
-                  >
-                    {VALUE_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
+                <form
+                  onSubmit={handleCreateField}
+                  className="rounded-xl border border-line bg-canvas/50 p-3.5"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label>
+                      Field key
+                      <input
+                        value={newFieldKey}
+                        onChange={(event) =>
+                          setNewFieldKey(event.target.value)
+                        }
+                        placeholder="automation_interest"
+                      />
+                    </label>
+
+                    <label>
+                      Label
+                      <input
+                        value={newFieldLabel}
+                        onChange={(event) =>
+                          setNewFieldLabel(event.target.value)
+                        }
+                        placeholder="Automation interest"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="mt-3 block">
+                    Value type
+                    <select
+                      value={newFieldType}
+                      onChange={(event) =>
+                        setNewFieldType(
+                          event.target.value as FieldDefinitionValueType,
+                        )
+                      }
+                    >
+                      {VALUE_TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
                   <button
                     type="submit"
-                    className="btn-primary btn-small"
+                    className="btn-primary btn-small mt-3"
                     disabled={!newFieldKey.trim() || !newFieldLabel.trim()}
                   >
                     Add field
                   </button>
                 </form>
               )}
-
-              {error && <div className="banner banner-error">{error}</div>}
-
-              <button
-                type="button"
-                className="btn-primary mt-3"
-                onClick={() => void handleSave()}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
             </div>
           </div>
         )}
 
-        {(tab === "validation" || tab === "success") && (
-          <div>
+        {tab === "validation" && (
+          <div className="max-w-[620px]">
             <h3 className="m-0 text-[15px] font-semibold text-ink">
-              {tab === "validation" ? "Validation" : "Success Message"}
+              Validation
             </h3>
-            <p className="muted m-0 mt-2 text-[12px]">
-              This configuration surface is reserved for the next milestone engine pass.
+            <p className="muted m-0 mt-2 text-[12px] leading-5">
+              No validation rules are configured for this goal.
             </p>
           </div>
         )}
+
+        {tab === "success" && (
+          <div className="max-w-[620px]">
+            <h3 className="m-0 text-[15px] font-semibold text-ink">
+              Success Message
+            </h3>
+            <p className="muted m-0 mt-2 text-[12px] leading-5">
+              No success message is configured for this goal.
+            </p>
+          </div>
+        )}
+
+        {error && <div className="banner banner-error mt-5">{error}</div>}
       </div>
     </div>
   );
 }
 
 function ActionPanel({
-  tenantId,
   campaign,
   action,
 }: {
-  tenantId: string;
   campaign: Campaign;
   action: "handoff" | "link";
 }) {
@@ -695,19 +924,15 @@ function ActionPanel({
           title="Send Link"
           description="Sends the campaign CTA link as a reply."
         />
-        <p className="mt-5 text-[12px]">
-          Link:{" "}
-          <a href={campaign.ctaLink ?? undefined} target="_blank" rel="noreferrer">
+
+        <div className="mt-6 rounded-xl border border-line bg-canvas/50 px-4 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-subtle">
+            CTA link
+          </div>
+          <div className="mt-1 break-all text-[12px] text-ink">
             {campaign.ctaLink ?? "Not configured"}
-          </a>
-        </p>
-        <p className="muted text-[11px]">
-          Edit this in the{" "}
-          <Link to={`/dashboard/${tenantId}/automation/journeys/${campaign.id}`}>
-            journey details
-          </Link>
-          .
-        </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -719,82 +944,111 @@ function ActionPanel({
         title="Handoff to Human"
         description="Pauses the AI when a teammate should take over."
       />
-      <p className="muted mt-5 text-[12px] leading-5">
-        Handoff happens automatically when the AI cannot confidently continue.
-      </p>
-      <Link
-        to={`/dashboard/${tenantId}/settings`}
-        className="text-[11px] font-medium text-accent"
-      >
-        Configure guardrails in Settings →
-      </Link>
+
+      <div className="mt-6 rounded-xl border border-line bg-canvas/50 px-4 py-3 text-[12px] leading-5 text-subtle">
+        Handoff pauses automation so a teammate can continue the conversation.
+      </div>
     </div>
   );
 }
 
-export function Inspector({
-  tenantId,
-  campaign,
-  milestones,
-  fieldDefinitions,
-  selectedNode,
-  onCampaignChanged,
-  onSaveMilestone,
-  onFieldDefinitionsChanged,
-}: {
-  tenantId: string;
-  campaign: Campaign;
-  milestones: Milestone[];
-  fieldDefinitions: FieldDefinition[];
-  selectedNode: SelectedNode;
-  onCampaignChanged: () => Promise<void> | void;
-  onSaveMilestone: (
-    index: number,
-    updates: { goalDescription: string; captureFields: string[] },
-  ) => Promise<void>;
-  onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
-}) {
-  if (selectedNode.type === "trigger") {
-    return (
-      <TriggerPanel
-        tenantId={tenantId}
-        campaign={campaign}
-        onCampaignChanged={onCampaignChanged}
-      />
-    );
+export const Inspector = forwardRef<
+  InspectorHandle,
+  {
+    tenantId: string;
+    campaign: Campaign;
+    milestones: Milestone[];
+    fieldDefinitions: FieldDefinition[];
+    selectedNode: SelectedNode;
+    onCampaignChanged: () => Promise<void> | void;
+    onSaveMilestone: (
+      index: number,
+      updates: { goalDescription: string; captureFields: string[] },
+    ) => Promise<void>;
+    onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
+    onActionsChange?: (actions: InspectorHandle) => void;
   }
+>(
+  (
+    {
+      tenantId,
+      campaign,
+      milestones,
+      fieldDefinitions,
+      selectedNode,
+      onCampaignChanged,
+      onSaveMilestone,
+      onFieldDefinitionsChanged,
+      onActionsChange,
+    },
+    ref,
+  ) => {
+    const emptyActions: InspectorHandle = {
+      save: async () => true,
+      discard: () => undefined,
+      dirty: false,
+      saving: false,
+      canSave: false,
+    };
 
-  if (selectedNode.type === "message") {
-    return (
-      <MessagePanel
-        tenantId={tenantId}
-        campaign={campaign}
-        onCampaignChanged={onCampaignChanged}
-      />
-    );
-  }
+    const [actions, setActions] = useState<InspectorHandle>(emptyActions);
 
-  if (selectedNode.type === "milestone") {
-    const milestone = milestones[selectedNode.milestoneIndex];
-    if (!milestone) return null;
+    useEffect(() => {
+      onActionsChange?.(actions);
+    }, [actions, onActionsChange]);
 
-    return (
-      <MilestonePanel
-        tenantId={tenantId}
-        milestone={milestone}
-        index={selectedNode.milestoneIndex}
-        fieldDefinitions={fieldDefinitions}
-        onFieldDefinitionsChanged={onFieldDefinitionsChanged}
-        onSaveMilestone={onSaveMilestone}
-      />
-    );
-  }
+    useImperativeHandle(ref, () => actions, [actions]);
 
-  return (
-    <ActionPanel
-      tenantId={tenantId}
-      campaign={campaign}
-      action={selectedNode.action}
-    />
-  );
-}
+    if (selectedNode.type === "trigger") {
+      return (
+        <TriggerEditor
+          tenantId={tenantId}
+          campaign={campaign}
+          onCampaignChanged={onCampaignChanged}
+          onActionsChange={setActions}
+        />
+      );
+    }
+
+    if (selectedNode.type === "message") {
+      return (
+        <MessageEditor
+          tenantId={tenantId}
+          campaign={campaign}
+          onCampaignChanged={onCampaignChanged}
+          onActionsChange={setActions}
+        />
+      );
+    }
+
+    if (selectedNode.type === "milestone") {
+      const milestone = milestones[selectedNode.milestoneIndex];
+
+      if (!milestone) {
+        return (
+          <div className="rounded-xl border border-line bg-canvas/50 px-4 py-5 text-sm text-subtle">
+            This goal is no longer available.
+          </div>
+        );
+      }
+
+      return (
+        <GoalEditor
+          tenantId={tenantId}
+          milestone={milestone}
+          index={selectedNode.milestoneIndex}
+          fieldDefinitions={fieldDefinitions}
+          onFieldDefinitionsChanged={onFieldDefinitionsChanged}
+          onSaveMilestone={onSaveMilestone}
+          onActionsChange={setActions}
+        />
+      );
+    }
+
+    useEditorActions(emptyActions, onActionsChange);
+
+    return <ActionPanel campaign={campaign} action={selectedNode.action} />;
+  },
+);
+
+Inspector.displayName = "Inspector";
