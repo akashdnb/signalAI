@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { classifyInput } from "../lib/guardrails.js";
 
 const MAX_GOAL_DESCRIPTION_LENGTH = 200;
@@ -78,6 +78,36 @@ function toMilestone(row: MilestoneRow): Milestone {
  * list), so "edit the milestones" is naturally "replace the list," not a
  * per-row CRUD dance.
  */
+export async function setCampaignMilestonesWithClient(
+  client: PoolClient,
+  tenantId: string,
+  campaignId: string,
+  milestones: Array<{ goalDescription: string; captureFields?: string[] }>,
+): Promise<Milestone[]> {
+  // Soft-delete, not delete: milestone_advancements is an append-only
+  // analytics log with a not-null FK to these rows, so a hard delete
+  // fails as soon as any lead has advanced past a milestone.
+  await client.query(
+    `update campaign_milestones set deleted_at = now()
+     where campaign_id = $1 and tenant_id = $2 and deleted_at is null`,
+    [campaignId, tenantId],
+  );
+
+  const inserted: MilestoneRow[] = [];
+  for (let i = 0; i < milestones.length; i++) {
+    const m = milestones[i]!;
+    validateMilestoneInput(m.goalDescription, m.captureFields);
+    const result = await client.query<MilestoneRow>(
+      `insert into campaign_milestones (tenant_id, campaign_id, ordinal, goal_description, capture_fields)
+       values ($1, $2, $3, $4, $5) returning *`,
+      [tenantId, campaignId, i, m.goalDescription, m.captureFields ?? []],
+    );
+    inserted.push(result.rows[0]!);
+  }
+
+  return inserted.map(toMilestone);
+}
+
 export async function setCampaignMilestones(
   pool: Pool,
   tenantId: string,
@@ -87,29 +117,14 @@ export async function setCampaignMilestones(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Soft-delete, not delete: milestone_advancements is an append-only
-    // analytics log with a not-null FK to these rows, so a hard delete
-    // fails as soon as any lead has advanced past a milestone.
-    await client.query(
-      `update campaign_milestones set deleted_at = now()
-       where campaign_id = $1 and tenant_id = $2 and deleted_at is null`,
-      [campaignId, tenantId],
+    const result = await setCampaignMilestonesWithClient(
+      client,
+      tenantId,
+      campaignId,
+      milestones,
     );
-
-    const inserted: MilestoneRow[] = [];
-    for (let i = 0; i < milestones.length; i++) {
-      const m = milestones[i]!;
-      validateMilestoneInput(m.goalDescription, m.captureFields);
-      const result = await client.query<MilestoneRow>(
-        `insert into campaign_milestones (tenant_id, campaign_id, ordinal, goal_description, capture_fields)
-         values ($1, $2, $3, $4, $5) returning *`,
-        [tenantId, campaignId, i, m.goalDescription, m.captureFields ?? []],
-      );
-      inserted.push(result.rows[0]!);
-    }
-
     await client.query("COMMIT");
-    return inserted.map(toMilestone);
+    return result;
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -120,6 +135,19 @@ export async function setCampaignMilestones(
 
 export async function listMilestones(pool: Pool, tenantId: string, campaignId: string): Promise<Milestone[]> {
   const result = await pool.query<MilestoneRow>(
+    `select * from campaign_milestones
+     where campaign_id = $1 and tenant_id = $2 and deleted_at is null order by ordinal`,
+    [campaignId, tenantId],
+  );
+  return result.rows.map(toMilestone);
+}
+
+export async function listMilestonesWithClient(
+  client: PoolClient,
+  tenantId: string,
+  campaignId: string,
+): Promise<Milestone[]> {
+  const result = await client.query<MilestoneRow>(
     `select * from campaign_milestones
      where campaign_id = $1 and tenant_id = $2 and deleted_at is null order by ordinal`,
     [campaignId, tenantId],

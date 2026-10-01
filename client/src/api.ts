@@ -228,6 +228,29 @@ export interface Milestone {
   captureFields: string[];
 }
 
+export interface JourneyNode {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: Record<string, unknown>;
+  parentGroupId: string | null;
+  collapsed: boolean;
+}
+
+export interface JourneyEdge {
+  id: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  label: string | null;
+  condition: Record<string, unknown> | null;
+}
+
+export interface BuilderGraph {
+  nodes: JourneyNode[];
+  edges: JourneyEdge[];
+  version: number;
+}
+
 export type FieldDefinitionValueType = "email" | "phone" | "country" | "number" | "date" | "text";
 
 export interface FieldDefinition {
@@ -595,10 +618,26 @@ export const api = {
 
   listMilestones: (tenantId: string, campaignId: string) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`),
-  setMilestones: (tenantId: string, campaignId: string, milestones: Array<{ goalDescription: string; captureFields?: string[] }>) =>
+  setMilestones: (
+    tenantId: string,
+    campaignId: string,
+    milestones: Array<{ goalDescription: string; captureFields?: string[] }>,
+    oldIndexToNewIndex?: Array<number | null>,
+  ) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`, {
       method: "PUT",
-      body: JSON.stringify({ milestones }),
+      body: JSON.stringify({ milestones, oldIndexToNewIndex }),
+    }),
+  getBuilderGraph: (tenantId: string, campaignId: string) =>
+    request<BuilderGraph>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`),
+  saveBuilderGraph: (
+    tenantId: string,
+    campaignId: string,
+    graph: { expectedVersion: number; nodes: JourneyNode[]; edges: JourneyEdge[] },
+  ) =>
+    request<BuilderGraph>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`, {
+      method: "PUT",
+      body: JSON.stringify(graph),
     }),
 
   getBilling: (tenantId: string) => request<BillingSummary>(`/tenants/${tenantId}/billing`),

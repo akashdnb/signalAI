@@ -2,7 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPool, closePool } from "../pool.js";
 import { createTenant } from "../tenants.js";
 import { createCampaign, updateCampaignReplyConfig } from "../campaigns.js";
-import { getBuilderGraph, saveBuilderGraph, type JourneyEdge, type JourneyNode } from "../journeyGraph.js";
+import { setCampaignMilestones } from "../milestones.js";
+import { getBuilderGraph, saveBuilderGraph, synchronizeMilestoneGraph, type JourneyEdge, type JourneyNode } from "../journeyGraph.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
 function makeChain(): { nodes: JourneyNode[]; edges: JourneyEdge[] } {
@@ -35,14 +36,87 @@ describe("journey graph (advanced Automation Builder)", () => {
     const graph = await getBuilderGraph(pool, tenant.id, campaign.id);
     expect(graph).not.toBeNull();
     expect(graph!.version).toBe(1);
-    expect(graph!.nodes.map((n) => n.type)).toEqual(["trigger", "message", "milestone_group", "human_handoff"]);
-    expect(graph!.edges).toHaveLength(3);
-    // chained trigger -> message -> milestones -> handoff
+    expect(graph!.nodes.map((n) => n.type)).toEqual(["trigger", "message", "human_handoff"]);
+    expect(graph!.edges).toHaveLength(2);
+    // chained trigger -> message -> handoff
     const byId = new Map(graph!.nodes.map((n) => [n.id, n]));
     for (const edge of graph!.edges) {
       expect(byId.get(edge.sourceNodeId)).toBeDefined();
       expect(byId.get(edge.targetNodeId)).toBeDefined();
     }
+  });
+
+  it("synthesizes one identified node per milestone and chains them in order", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    const milestones = await setCampaignMilestones(pool, tenant.id, campaign.id, [
+      { goalDescription: "capture email" },
+      { goalDescription: "send pricing" },
+      { goalDescription: "book a call" },
+    ]);
+
+    const graph = await getBuilderGraph(pool, tenant.id, campaign.id);
+    expect(graph).not.toBeNull();
+    const milestoneNodes = graph!.nodes.filter((node) => node.type === "milestone_group");
+    expect(milestoneNodes).toHaveLength(3);
+    expect(milestoneNodes.map((node) => node.data.milestoneId)).toEqual(milestones.map((m) => m.id));
+
+    const trigger = graph!.nodes.find((node) => node.type === "trigger")!;
+    const message = graph!.nodes.find((node) => node.type === "message")!;
+    const handoff = graph!.nodes.find((node) => node.type === "human_handoff")!;
+    const path = [trigger, message, ...milestoneNodes, handoff].map((node) => node.id);
+    expect(graph!.edges.map((edge) => [edge.sourceNodeId, edge.targetNodeId])).toEqual(
+      path.slice(1).map((target, index) => [path[index], target]),
+    );
+  });
+
+  it("synchronizes milestone graph nodes for add, remove, and reorder without losing node identity", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+    const previousMilestones = await setCampaignMilestones(pool, tenant.id, campaign.id, [
+      { goalDescription: "M1" },
+      { goalDescription: "M2" },
+      { goalDescription: "M3" },
+    ]);
+    const graph = await getBuilderGraph(pool, tenant.id, campaign.id);
+    expect(graph).not.toBeNull();
+    const originalNodes = graph!.nodes.filter((node) => node.type === "milestone_group");
+    const nextMilestones = [
+      { ...previousMilestones[2]!, id: "new-m3", ordinal: 0 },
+      { ...previousMilestones[0]!, id: "new-m1", ordinal: 1 },
+      { ...previousMilestones[1]!, id: "new-m2", ordinal: 2 },
+    ];
+
+    const reordered = synchronizeMilestoneGraph(graph!, previousMilestones, nextMilestones, [1, 2, 0]);
+    const reorderedNodes = reordered.nodes.filter((node) => node.type === "milestone_group");
+    expect(reorderedNodes.map((node) => node.id)).toEqual([
+      originalNodes[2]!.id,
+      originalNodes[0]!.id,
+      originalNodes[1]!.id,
+    ]);
+    expect(reorderedNodes.map((node) => node.data.milestoneId)).toEqual(["new-m3", "new-m1", "new-m2"]);
+    expect(reorderedNodes.map((node) => node.position.y)).toEqual([320, 480, 640]);
+
+    const addedMilestones = [...previousMilestones, { ...previousMilestones[2]!, id: "new-m4", ordinal: 3 }];
+    const added = synchronizeMilestoneGraph(graph!, previousMilestones, addedMilestones, [0, 1, 2]);
+    expect(added.nodes.filter((node) => node.type === "milestone_group")).toHaveLength(4);
+    expect(new Set(added.edges.flatMap((edge) => [edge.sourceNodeId, edge.targetNodeId]))).toContain(
+      added.nodes.find((node) => node.type === "milestone_group" && node.data.milestoneId === "new-m4")!.id,
+    );
+
+    const removedMilestones = [
+      { ...previousMilestones[0]!, id: "new-m1", ordinal: 0 },
+      { ...previousMilestones[2]!, id: "new-m3", ordinal: 1 },
+    ];
+    const removed = synchronizeMilestoneGraph(graph!, previousMilestones, removedMilestones, [0, null, 1]);
+    expect(removed.nodes.filter((node) => node.type === "milestone_group").map((node) => node.data.milestoneId)).toEqual([
+      "new-m1",
+      "new-m3",
+    ]);
+    const remainingIds = new Set(removed.nodes.map((node) => node.id));
+    expect(removed.edges.every((edge) => remainingIds.has(edge.sourceNodeId) && remainingIds.has(edge.targetNodeId))).toBe(true);
   });
 
   it("includes an action_link node in the default graph when the campaign has a CTA link", async () => {
