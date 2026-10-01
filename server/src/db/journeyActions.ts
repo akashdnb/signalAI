@@ -3,8 +3,9 @@ import type { JourneyPendingAction } from "./journeyExecutions.js";
 
 export type JourneyActionStatus =
   | "pending"
+  | "processing"
   | "acknowledged"
-  | "processing";
+  | "failed";
 
 export interface JourneyAction {
   id: string;
@@ -85,6 +86,23 @@ export async function createJourneyAction(
   );
 
   return toJourneyAction(result.rows[0]!);
+}
+
+export async function getJourneyActionForUpdate(
+  client: PoolClient,
+  actionId: string,
+): Promise<JourneyAction | null> {
+  const result = await client.query<JourneyActionRow>(
+    `select *
+       from journey_actions
+      where id = $1
+      for update`,
+    [actionId],
+  );
+
+  return result.rows[0]
+    ? toJourneyAction(result.rows[0])
+    : null;
 }
 
 export async function getPendingJourneyAction(

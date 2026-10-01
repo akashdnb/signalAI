@@ -14,6 +14,7 @@ import {
   getRetryAt,
   type JourneyActionRetryPolicy,
 } from "./retryPolicy.js";
+import { JourneyRuntime } from "../runtime.js";
 
 export interface JourneyActionWorkerResult {
   claimed: boolean;
@@ -35,12 +36,16 @@ function serializeActionError(error: unknown): Record<string, unknown> {
 }
 
 export class JourneyActionWorker {
+  private readonly runtime: JourneyRuntime;
+
   constructor(
     private readonly pool: Pool,
     private readonly dispatcher: ActionDispatcher,
     private readonly retryPolicy: JourneyActionRetryPolicy =
       DEFAULT_JOURNEY_ACTION_RETRY_POLICY,
-  ) {}
+  ) {
+    this.runtime = new JourneyRuntime(pool);
+  }
 
   async processOne(): Promise<JourneyActionWorkerResult> {
     const client = await this.pool.connect();
@@ -84,7 +89,9 @@ export class JourneyActionWorker {
         throw error;
       }
 
-      await this.acknowledge(action.id);
+      await this.runtime.completeAction(
+        action.id,
+      );
 
       return {
         claimed: true,
@@ -163,18 +170,4 @@ export class JourneyActionWorker {
     }
   }
 
-  private async acknowledge(actionId: string): Promise<void> {
-    const client = await this.pool.connect();
-
-    try {
-      await client.query("begin");
-      await acknowledgeJourneyAction(client, actionId);
-      await client.query("commit");
-    } catch (error) {
-      await client.query("rollback");
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
 }

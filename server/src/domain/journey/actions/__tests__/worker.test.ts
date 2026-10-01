@@ -1,6 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { Pool } from "pg";
+
+const completeAction = vi.hoisted(() => vi.fn());
+
+vi.mock("../../runtime.js", () => ({
+  JourneyRuntime: class {
+    completeAction = completeAction;
+  },
+}));;
 
 import type { JourneyAction } from "../../../../db/journeyActions.js";
 import { ActionDispatcher } from "../dispatcher.js";
@@ -78,6 +92,10 @@ function makeClient() {
 }
 
 describe("JourneyActionWorker", () => {
+  beforeEach(() => {
+    completeAction.mockReset();
+  });
+
   it("claims and executes a pending action", async () => {
     const action = makeActionRow();
     const client = makeClient();
@@ -125,6 +143,12 @@ describe("JourneyActionWorker", () => {
     };
 
     const dispatcher = new ActionDispatcher([handler]);
+
+    completeAction.mockResolvedValueOnce({
+      execution: makeExecutionContext(action),
+      action: null,
+    });
+
     const worker = new JourneyActionWorker(pool, dispatcher);
 
     const result = await worker.processOne();
@@ -132,6 +156,8 @@ describe("JourneyActionWorker", () => {
     expect(result.claimed).toBe(true);
     expect(result.acknowledged).toBe(true);
     expect(handler.execute).toHaveBeenCalledTimes(1);
+    expect(completeAction).toHaveBeenCalledTimes(1);
+    expect(completeAction).toHaveBeenCalledWith(action.id);
 
     const executionInput = vi.mocked(handler.execute).mock.calls[0]![0];
 
@@ -143,7 +169,7 @@ describe("JourneyActionWorker", () => {
       executionInput.action.executionId,
     );
 
-    expect(client.release).toHaveBeenCalledTimes(2);
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 
   it("does nothing when no action is available", async () => {

@@ -117,6 +117,23 @@ export async function getJourneyExecutionContext(
   };
 }
 
+export async function getJourneyExecutionByIdForUpdate(
+  client: PoolClient,
+  executionId: string,
+): Promise<JourneyExecution | null> {
+  const result = await client.query<JourneyExecutionRow>(
+    `select *
+       from journey_executions
+      where id = $1
+      for update`,
+    [executionId],
+  );
+
+  return result.rows[0]
+    ? toExecution(result.rows[0])
+    : null;
+}
+
 export async function getActiveExecutionForSubject(
   client: PoolClient,
   tenantId: string,

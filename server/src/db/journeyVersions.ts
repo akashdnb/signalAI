@@ -53,6 +53,26 @@ export async function getLatestPublishedJourneyWithClient(
     : null;
 }
 
+export async function getPublishedJourneyWithClient(
+  client: PoolClient,
+  tenantId: string,
+  campaignId: string,
+  version: number,
+): Promise<PublishedJourney | null> {
+  const result = await client.query<PublishedJourneyRow>(
+    `select *
+       from campaign_journey_versions
+      where tenant_id = $1
+        and campaign_id = $2
+        and version = $3`,
+    [tenantId, campaignId, version],
+  );
+
+  return result.rows[0]
+    ? toPublishedJourney(result.rows[0])
+    : null;
+}
+
 export async function getPublishedJourney(
   pool: Pool,
   tenantId: string,

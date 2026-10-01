@@ -6,12 +6,14 @@ import type {
 import {
   getLatestPublishedJourneyWithClient,
   getPublishedJourney,
+  getPublishedJourneyWithClient,
   type PublishedJourney,
 } from "../../db/journeyVersions.js";
 import {
   createJourneyExecution,
   getActiveExecutionForSubject,
   getExecution,
+  getJourneyExecutionByIdForUpdate,
   recordNodeExecution,
   updateJourneyExecution,
   type JourneyExecution,
@@ -21,9 +23,9 @@ import {
   claimJourneyEvent,
 } from "../../db/journeyEvents.js";
 import {
-  consumeJourneyAction,
+  acknowledgeJourneyAction,
   createJourneyAction,
-  getPendingJourneyAction,
+  getJourneyActionForUpdate,
 } from "../../db/journeyActions.js";
 import { getPool } from "../../db/pool.js";
 
@@ -262,13 +264,16 @@ export class JourneyRuntime {
     try {
       await client.query("begin");
 
-      const execution = await getExecutionForUpdate(
-        client,
-        input.tenantId,
-        input.executionId,
-      );
+      const execution =
+        await getJourneyExecutionByIdForUpdate(
+          client,
+          input.executionId,
+        );
 
-      if (!execution) {
+      if (
+        !execution ||
+        execution.tenantId !== input.tenantId
+      ) {
         throw new Error(
           `journey execution not found: ${input.executionId}`,
         );
@@ -313,29 +318,14 @@ export class JourneyRuntime {
         };
       }
 
-      const pendingAction =
-        await getPendingJourneyAction(
-          client,
-          input.executionId,
-        );
-
-      if (pendingAction) {
-        const consumedAction = await consumeJourneyAction(
-          client,
-          pendingAction.id,
-        );
-
-        if (!consumedAction) {
-          throw new Error(
-            `journey action could not be consumed: ${pendingAction.id}`,
-          );
-        }
-      }
-
       /*
-       * Clear the legacy pending_action field while advancing.
-       * journey_actions is now the durable source of action state.
+       * journey_actions is the source of truth for outbound actions.
+       *
+       * An inbound event must never acknowledge an outbound action.
+       * Only the worker may acknowledge an action after the external
+       * provider confirms success.
        */
+
       const context = mergeContext(
         execution.context,
         input.payload,
@@ -379,23 +369,269 @@ export class JourneyRuntime {
     }
   }
 
-  /*
-   * Backward-compatible wrapper for the existing runtime API.
+  /**
+   * Complete one externally-dispatched action and continue the journey.
    *
-   * New integrations should use resumeFromEvent().
+   * Exactly-once progression is enforced by:
+   *
+   *   1. locking the execution first,
+   *   2. locking the action second,
+   *   3. only transitioning a processing action,
+   *   4. acknowledging the action and advancing the execution
+   *      in the same PostgreSQL transaction.
+   *
+   * If the same action is completed again after a successful transition,
+   * the second caller observes status='acknowledged' and becomes a no-op.
+   *
+   * The external provider call happens BEFORE this method is invoked.
+   * Therefore a database failure after provider success leaves the action
+   * recoverable as processing; the worker can retry using the same
+   * idempotency key.
    */
-  async resume(
-    tenantId: string,
-    executionId: string,
-    context?: Record<string, unknown>,
+  async completeAction(
+    actionId: string,
   ): Promise<JourneyRuntimeResult> {
-    return this.resumeFromEvent({
-      tenantId,
-      executionId,
-      eventId: `legacy-resume:${executionId}:${Date.now()}`,
-      eventType: "LEGACY_RESUME",
-      payload: context,
-    });
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("begin");
+
+      /*
+       * Read the execution id first, then lock the execution before
+       * locking the action. This establishes a single lock ordering
+       * for action completion and prevents concurrent completions
+       * from advancing the same execution twice.
+       */
+      const referenceResult = await client.query<{
+        execution_id: string;
+      }>(
+        `
+          select execution_id
+          from journey_actions
+          where id = $1
+        `,
+        [actionId],
+      );
+
+      const executionId =
+        referenceResult.rows[0]?.execution_id;
+
+      if (!executionId) {
+        throw new Error(
+          `journey action not found: ${actionId}`,
+        );
+      }
+
+      const execution =
+        await getJourneyExecutionByIdForUpdate(
+          client,
+          executionId,
+        );
+
+      if (!execution) {
+        throw new Error(
+          `journey execution not found: ${executionId}`,
+        );
+      }
+
+      const action =
+        await getJourneyActionForUpdate(
+          client,
+          actionId,
+        );
+
+      if (!action) {
+        throw new Error(
+          `journey action not found: ${actionId}`,
+        );
+      }
+
+      /*
+       * Idempotent duplicate completion.
+       *
+       * A previous worker already completed this action and advanced
+       * the execution. Do not traverse the graph again.
+       */
+      if (action.status === "acknowledged") {
+        await client.query("commit");
+
+        return {
+          execution,
+          action: execution.pendingAction,
+          duplicateEvent: true,
+        };
+      }
+
+      if (action.status !== "processing") {
+        throw new Error(
+          `journey action cannot be completed from status ${action.status}: ${action.id}`,
+        );
+      }
+
+      if (!execution.currentNodeId) {
+        throw new Error(
+          `journey execution has no current node: ${execution.id}`,
+        );
+      }
+
+      if (!action.nodeExecutionId) {
+        throw new Error(
+          `journey action ${action.id} has no node execution`,
+        );
+      }
+
+      /*
+       * nodeExecutionId is the UUID of a journey_node_executions row.
+       * currentNodeId is the graph node id.
+       *
+       * Validate the relationship through the node execution row:
+       *
+       * journey_actions.node_execution_id
+       *        -> journey_node_executions.id
+       *        -> journey_node_executions.node_id
+       *        -> journey_executions.current_node_id
+       */
+      const nodeExecutionResult = await client.query<{
+        execution_id: string;
+        node_id: string;
+      }>(
+        `
+          select
+            execution_id,
+            node_id
+          from journey_node_executions
+          where id = $1
+          for update
+        `,
+        [action.nodeExecutionId],
+      );
+
+      const linkedNodeExecution =
+        nodeExecutionResult.rows[0];
+
+      if (!linkedNodeExecution) {
+        throw new Error(
+          `journey node execution not found: ${action.nodeExecutionId}`,
+        );
+      }
+
+      if (
+        linkedNodeExecution.execution_id !== execution.id ||
+        linkedNodeExecution.node_id !== execution.currentNodeId
+      ) {
+        throw new Error(
+          `journey action ${action.id} does not match current node ${execution.currentNodeId}`,
+        );
+      }
+
+      /*
+       * Keep the graph version pinned to the journey execution.
+       * Loading it with the same transaction guarantees that the
+       * acknowledgement and graph transition are committed together.
+       */
+      const published =
+        await getPublishedJourneyWithClient(
+          client,
+          execution.tenantId,
+          execution.campaignId,
+          execution.publishedVersion,
+        );
+
+      if (!published) {
+        throw new Error(
+          `published journey version not found: ${execution.publishedVersion}`,
+        );
+      }
+
+      const node = getNode(
+        published.graph,
+        execution.currentNodeId,
+      );
+
+      const next =
+        outgoingNodes(
+          published.graph,
+          node.id,
+        )[0];
+
+      /*
+       * The action succeeded externally, so mark the node execution
+       * completed in the same transaction as the action acknowledgement.
+       *
+       * Node execution history is append-only, so create a completed
+       * record rather than mutating the previous waiting record.
+       */
+      await recordNodeExecution(
+        client,
+        execution.id,
+        node,
+        "completed",
+        null,
+        {
+          actionId: action.id,
+          actionType: action.actionType,
+        },
+      );
+
+      await acknowledgeJourneyAction(
+        client,
+        action.id,
+      );
+
+      if (!next) {
+        const completedExecution =
+          await updateJourneyExecution(
+            client,
+            execution.id,
+            {
+              status: "completed",
+              currentNodeId: null,
+              context: execution.context,
+              pendingAction: null,
+              completed: true,
+            },
+          );
+
+        await client.query("commit");
+
+        return {
+          execution: completedExecution,
+          action: null,
+        };
+      }
+
+      /*
+       * Move to the next graph node and let the normal runtime
+       * advance logic create the next durable action if required.
+       */
+      const resumedExecution =
+        await updateJourneyExecution(
+          client,
+          execution.id,
+          {
+            status: "running",
+            currentNodeId: next.id,
+            context: execution.context,
+            pendingAction: null,
+            completed: false,
+          },
+        );
+
+      const result = await this.advance(
+        client,
+        published,
+        resumedExecution,
+      );
+
+      await client.query("commit");
+
+      return result;
+    } catch (error) {
+      await safeRollback(client);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async advance(
@@ -646,44 +882,6 @@ export class JourneyRuntime {
       "journey runtime exceeded 100 traversal steps",
     );
   }
-}
-
-async function getExecutionForUpdate(
-  client: PoolClient,
-  tenantId: string,
-  executionId: string,
-): Promise<JourneyExecution | null> {
-  const result = await client.query<any>(
-    `select *
-       from journey_executions
-      where tenant_id = $1
-        and id = $2
-      for update`,
-    [tenantId, executionId],
-  );
-
-  if (!result.rows[0]) {
-    return null;
-  }
-
-  const row = result.rows[0];
-
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    campaignId: row.campaign_id,
-    publishedJourneyVersionId:
-      row.published_journey_version_id,
-    publishedVersion: row.published_version,
-    subjectKey: row.subject_key,
-    status: row.status,
-    currentNodeId: row.current_node_id,
-    context: row.context,
-    pendingAction: row.pending_action,
-    startedAt: row.started_at,
-    updatedAt: row.updated_at,
-    completedAt: row.completed_at,
-  };
 }
 
 function isUniqueViolation(
