@@ -251,6 +251,31 @@ export interface BuilderGraph {
   version: number;
 }
 
+
+export type JourneyStatus = "draft" | "published";
+
+export interface JourneyValidationError {
+  code: string;
+  message: string;
+  nodeId?: string;
+  edgeId?: string;
+}
+
+export interface JourneyValidationResult {
+  valid: boolean;
+  errors: JourneyValidationError[];
+}
+
+export interface PublishedJourney {
+  id: string;
+  tenantId: string;
+  campaignId: string;
+  version: number;
+  graph: BuilderGraph;
+  createdAt: string;
+  publishedAt: string;
+}
+
 export type FieldDefinitionValueType = "email" | "phone" | "country" | "number" | "date" | "text";
 
 export interface FieldDefinition {
@@ -639,6 +664,27 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(graph),
     }),
+
+  publishJourney: (
+    tenantId: string,
+    campaignId: string,
+    expectedBuilderVersion: number,
+  ) =>
+    request<PublishedJourney>(
+      `/tenants/${tenantId}/campaigns/${campaignId}/journey/publish`,
+      {
+        method: "POST",
+        body: JSON.stringify({ expectedBuilderVersion }),
+      },
+    ),
+
+  getLatestPublishedJourney: (
+    tenantId: string,
+    campaignId: string,
+  ) =>
+    request<PublishedJourney | null>(
+      `/tenants/${tenantId}/campaigns/${campaignId}/journey/published`,
+    ),
 
   getBilling: (tenantId: string) => request<BillingSummary>(`/tenants/${tenantId}/billing`),
   startCheckout: (tenantId: string, tier: PlanTier = "starter") =>
