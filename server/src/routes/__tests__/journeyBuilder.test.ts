@@ -43,6 +43,79 @@ describe("journey builder graph routes", () => {
     ]);
   });
 
+  it("synchronizes graph milestone nodes across add, remove, and reorder operations", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+    const create = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Reel", keywords: ["LINK"] });
+    const campaignId = create.body.id as string;
+    const milestonesPath = `/tenants/${tenant.id}/campaigns/${campaignId}/milestones`;
+    const graphPath = `/tenants/${tenant.id}/campaigns/${campaignId}/builder`;
+
+    const firstSave = await request(app).put(milestonesPath).set(authHeader).send({
+      milestones: ["M1", "M2", "M3"].map((goalDescription) => ({ goalDescription })),
+      oldIndexToNewIndex: [],
+    });
+    expect(firstSave.status).toBe(200);
+    const initialGraphResponse = await request(app).get(graphPath).set(authHeader);
+    const initialGroups = initialGraphResponse.body.nodes.filter((node: { type: string }) => node.type === "milestone_group");
+    expect(initialGroups).toHaveLength(3);
+    expect(initialGroups.map((node: { data: { milestoneId: string } }) => node.data.milestoneId)).toEqual(
+      firstSave.body.map((milestone: { id: string }) => milestone.id),
+    );
+    const originalNodeIds = initialGroups.map((node: { id: string }) => node.id);
+
+    const addSave = await request(app).put(milestonesPath).set(authHeader).send({
+      milestones: ["M1", "M2", "M3", "M4"].map((goalDescription) => ({ goalDescription })),
+      oldIndexToNewIndex: [0, 1, 2],
+    });
+    expect(addSave.status).toBe(200);
+    let graphResponse = await request(app).get(graphPath).set(authHeader);
+    let groups = graphResponse.body.nodes
+      .filter((node: { type: string }) => node.type === "milestone_group")
+      .sort((a: { position: { y: number } }, b: { position: { y: number } }) => a.position.y - b.position.y);
+    expect(groups).toHaveLength(4);
+    expect(groups.slice(0, 3).map((node: { id: string }) => node.id)).toEqual(originalNodeIds);
+
+    const removeSave = await request(app).put(milestonesPath).set(authHeader).send({
+      milestones: ["M1", "M3", "M4"].map((goalDescription) => ({ goalDescription })),
+      oldIndexToNewIndex: [0, null, 1, 2],
+    });
+    expect(removeSave.status).toBe(200);
+    graphResponse = await request(app).get(graphPath).set(authHeader);
+    groups = graphResponse.body.nodes
+      .filter((node: { type: string }) => node.type === "milestone_group")
+      .sort((a: { position: { y: number } }, b: { position: { y: number } }) => a.position.y - b.position.y);
+    expect(groups).toHaveLength(3);
+    expect(groups.map((node: { data: { milestoneId: string } }) => node.data.milestoneId)).toEqual(
+      removeSave.body.map((milestone: { id: string }) => milestone.id),
+    );
+    const nodeIdsBeforeReorder = groups.map((node: { id: string }) => node.id);
+    const remainingNodeIds = new Set(graphResponse.body.nodes.map((node: { id: string }) => node.id));
+    expect(graphResponse.body.edges.every((edge: { sourceNodeId: string; targetNodeId: string }) =>
+      remainingNodeIds.has(edge.sourceNodeId) && remainingNodeIds.has(edge.targetNodeId),
+    )).toBe(true);
+
+    const reorderedSave = await request(app).put(milestonesPath).set(authHeader).send({
+      milestones: ["M4", "M1", "M3"].map((goalDescription) => ({ goalDescription })),
+      oldIndexToNewIndex: [1, 2, 0],
+    });
+    expect(reorderedSave.status).toBe(200);
+    graphResponse = await request(app).get(graphPath).set(authHeader);
+    groups = graphResponse.body.nodes
+      .filter((node: { type: string }) => node.type === "milestone_group")
+      .sort((a: { position: { y: number } }, b: { position: { y: number } }) => a.position.y - b.position.y);
+    expect(groups.map((node: { data: { milestoneId: string } }) => node.data.milestoneId)).toEqual(
+      reorderedSave.body.map((milestone: { id: string }) => milestone.id),
+    );
+    expect(groups.map((node: { id: string }) => node.id)).toEqual([
+      nodeIdsBeforeReorder[2], nodeIdsBeforeReorder[0], nodeIdsBeforeReorder[1],
+    ]);
+  });
+
   it("GET 404s for a campaign that doesn't belong to the tenant", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");

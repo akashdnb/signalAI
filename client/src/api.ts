@@ -618,10 +618,15 @@ export const api = {
 
   listMilestones: (tenantId: string, campaignId: string) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`),
-  setMilestones: (tenantId: string, campaignId: string, milestones: Array<{ goalDescription: string; captureFields?: string[] }>) =>
+  setMilestones: (
+    tenantId: string,
+    campaignId: string,
+    milestones: Array<{ goalDescription: string; captureFields?: string[] }>,
+    oldIndexToNewIndex?: Array<number | null>,
+  ) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`, {
       method: "PUT",
-      body: JSON.stringify({ milestones }),
+      body: JSON.stringify({ milestones, oldIndexToNewIndex }),
     }),
   getBuilderGraph: (tenantId: string, campaignId: string) =>
     request<BuilderGraph>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`),

@@ -167,6 +167,177 @@ export async function getBuilderGraph(pool: Pool, tenantId: string, campaignId: 
   };
 }
 
+
+/**
+ * Keep the visual graph aligned with the semantic milestone list. The index
+ * map describes where each old milestone moved (or null if it was removed).
+ * Existing graph node ids and positions' horizontal coordinates are retained.
+ */
+export function synchronizeMilestoneGraph(
+  graph: BuilderGraph,
+  previousMilestones: Milestone[],
+  nextMilestones: Milestone[],
+  oldIndexToNewIndex: Array<number | null>,
+): { nodes: JourneyNode[]; edges: JourneyEdge[] } {
+  if (oldIndexToNewIndex.length !== previousMilestones.length) {
+    throw new Error("milestone index map must have one entry per previous milestone");
+  }
+
+  const milestoneNodes = graph.nodes.filter((node) => node.type === "milestone_group");
+  const oldIndexById = new Map(previousMilestones.map((milestone, index) => [milestone.id, index]));
+  const nodeByOldIndex = new Map<number, JourneyNode>();
+  const unresolved: JourneyNode[] = [];
+
+  for (const node of milestoneNodes) {
+    const milestoneId = typeof node.data.milestoneId === "string" ? node.data.milestoneId : null;
+    if (milestoneId !== null) {
+      const oldIndex = oldIndexById.get(milestoneId);
+      if (oldIndex !== undefined && !nodeByOldIndex.has(oldIndex)) {
+        nodeByOldIndex.set(oldIndex, node);
+      }
+      continue;
+    }
+
+    const ordinal = typeof node.data.ordinal === "number" ? node.data.ordinal : null;
+    if (
+      ordinal !== null &&
+      Number.isInteger(ordinal) &&
+      ordinal >= 0 &&
+      ordinal < previousMilestones.length &&
+      !nodeByOldIndex.has(ordinal)
+    ) {
+      nodeByOldIndex.set(ordinal, node);
+    } else {
+      unresolved.push(node);
+    }
+  }
+
+  const unassignedOldIndexes = previousMilestones
+    .map((_, index) => index)
+    .filter((index) => !nodeByOldIndex.has(index));
+  unresolved.sort((a, b) => a.position.y - b.position.y);
+  for (const [index, node] of unresolved.entries()) {
+    const oldIndex = unassignedOldIndexes[index];
+    if (oldIndex !== undefined) nodeByOldIndex.set(oldIndex, node);
+  }
+
+  const nodeByNewIndex = new Map<number, JourneyNode>();
+  for (const [oldIndex, newIndex] of oldIndexToNewIndex.entries()) {
+    if (
+      newIndex === null ||
+      !Number.isInteger(newIndex) ||
+      newIndex < 0 ||
+      newIndex >= nextMilestones.length
+    ) continue;
+
+    const oldNode = nodeByOldIndex.get(oldIndex);
+    if (oldNode) nodeByNewIndex.set(newIndex, oldNode);
+  }
+
+  const nextNodeByIndex = new Map<number, JourneyNode>();
+  for (let index = 0; index < nextMilestones.length; index += 1) {
+    const milestone = nextMilestones[index]!;
+    const existing = nodeByNewIndex.get(index);
+    nextNodeByIndex.set(index, {
+      ...(existing ?? {
+        id: randomUUID(),
+        type: "milestone_group",
+        position: { x: 0, y: 0 },
+        data: {},
+        parentGroupId: null,
+        collapsed: false,
+      }),
+      position: {
+        x: existing?.position.x ?? 0,
+        y: 320 + index * 160,
+      },
+      data: {
+        ...(existing?.data ?? {}),
+        milestoneId: milestone.id,
+        ordinal: index,
+      },
+    });
+  }
+
+  const handoffY = 320 + nextMilestones.length * 160;
+  const nodes = graph.nodes
+    .filter((node) => node.type !== "milestone_group")
+    .map((node) =>
+      node.type === "human_handoff" || node.type === "action_link"
+        ? { ...node, position: { ...node.position, y: handoffY } }
+        : node,
+    );
+  const orderedMilestoneNodes = Array.from(nextNodeByIndex.values());
+  const messageIndex = nodes.findIndex((node) => node.type === "message");
+  const handoffIndex = nodes.findIndex((node) => node.type === "human_handoff");
+  const insertAt = messageIndex >= 0 ? messageIndex + 1 : handoffIndex >= 0 ? handoffIndex : nodes.length;
+  nodes.splice(insertAt, 0, ...orderedMilestoneNodes);
+
+  const trigger = nodes.find((node) => node.type === "trigger");
+  const message = nodes.find((node) => node.type === "message");
+  const handoff = nodes.find((node) => node.type === "human_handoff");
+  const oldPath = [
+    trigger?.id,
+    message?.id,
+    ...previousMilestones.map((_, index) => nodeByOldIndex.get(index)?.id),
+    handoff?.id,
+  ].filter((id): id is string => id !== undefined);
+  const newPath = [
+    trigger?.id,
+    message?.id,
+    ...nextMilestones.map((_, index) => nextNodeByIndex.get(index)!.id),
+    handoff?.id,
+  ].filter((id): id is string => id !== undefined);
+
+  const consumedEdgeIds = new Set<string>();
+  const oldSpineEdges: Array<JourneyEdge | undefined> = [];
+  for (let index = 0; index < oldPath.length - 1; index += 1) {
+    const edge = graph.edges.find(
+      (candidate) =>
+        candidate.sourceNodeId === oldPath[index] &&
+        candidate.targetNodeId === oldPath[index + 1],
+    );
+    oldSpineEdges.push(edge);
+    if (edge) consumedEdgeIds.add(edge.id);
+  }
+
+  const spineEdges: JourneyEdge[] = [];
+  for (let index = 0; index < newPath.length - 1; index += 1) {
+    const oldEdge = oldSpineEdges[index];
+    spineEdges.push({
+      id: oldEdge?.id ?? randomUUID(),
+      sourceNodeId: newPath[index]!,
+      targetNodeId: newPath[index + 1]!,
+      label: oldEdge?.label ?? null,
+      condition: oldEdge?.condition ?? null,
+    });
+  }
+
+  const oldMilestoneNodeIds = new Set(milestoneNodes.map((node) => node.id));
+  const nextMilestoneNodeIds = new Set(orderedMilestoneNodes.map((node) => node.id));
+  const removedNodeIds = new Set(
+    milestoneNodes
+      .filter((node) => !nextMilestoneNodeIds.has(node.id))
+      .map((node) => node.id),
+  );
+  const finalMilestoneId = orderedMilestoneNodes.at(-1)?.id ?? message?.id;
+  const otherEdges = graph.edges.flatMap((edge) => {
+    if (consumedEdgeIds.has(edge.id)) return [];
+    const targetNode = nodes.find((node) => node.id === edge.targetNodeId);
+    if (
+      targetNode?.type === "action_link" &&
+      finalMilestoneId &&
+      (edge.sourceNodeId === message?.id || oldMilestoneNodeIds.has(edge.sourceNodeId))
+    ) {
+      return [{ ...edge, sourceNodeId: finalMilestoneId }];
+    }
+    if (removedNodeIds.has(edge.sourceNodeId) || removedNodeIds.has(edge.targetNodeId)) return [];
+    return [edge];
+  });
+
+  return { nodes, edges: [...spineEdges, ...otherEdges] };
+}
+
 /**
  * Structural validation (roadmap: no broken edges, no orphaned/duplicate
  * ids, no invalid group references) — checked against the incoming payload

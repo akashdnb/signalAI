@@ -78,10 +78,15 @@ export function JourneyBuilder({
   }
 
   async function persistMilestones(next: Milestone[]) {
+    const oldIndexToNewIndex = milestones.map((milestone) => {
+      const nextIndex = next.findIndex((candidate) => candidate.id === milestone.id);
+      return nextIndex < 0 ? null : nextIndex;
+    });
     const saved = await api.setMilestones(
       tenantId,
       campaign.id,
       next.map((m) => ({ goalDescription: m.goalDescription, captureFields: m.captureFields })),
+      oldIndexToNewIndex,
     );
     setMilestonesState(saved);
     return saved;
