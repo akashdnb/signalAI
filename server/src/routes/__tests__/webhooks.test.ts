@@ -9,6 +9,7 @@ import { createCampaign } from "../../db/campaigns.js";
 import { getBoss, stopBoss } from "../../queue/boss.js";
 import { ensureQueues } from "../../queue/leadEventsQueue.js";
 import { ensureUsernameResolutionQueue } from "../../queue/usernameResolutionQueue.js";
+import { ensureAlertsQueue } from "../../queue/alertsQueue.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
 const APP_SECRET = "test-webhook-secret";
@@ -25,17 +26,18 @@ describe("webhooks route", () => {
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL must point at a migrated test database to run this suite.");
     }
-    // webhookIngestService.ts enqueues onto both of these — previously this
-    // suite only passed because some OTHER test file happened to run first
-    // in the same `npm test` invocation and created them as a side effect
-    // (queue definitions persist in the pgboss schema across files/test
-    // runs, so this was invisible locally with a long-lived dev database).
-    // A genuinely fresh database — e.g. a CI service container — has
-    // neither queue yet, and boss.send() throws "Queue ... does not
-    // exist" rather than silently creating it.
+    // webhookIngestService.ts enqueues onto all three of these — previously
+    // this suite only passed because some OTHER test file happened to run
+    // first in the same `npm test` invocation and created them as a side
+    // effect (queue definitions persist in the pgboss schema across
+    // files/test runs, so this was invisible locally with a long-lived dev
+    // database). A genuinely fresh database — e.g. a CI service container
+    // — has none of these queues yet, and boss.send() throws "Queue ...
+    // does not exist" rather than silently creating it.
     const boss = await getBoss();
     await ensureQueues(boss);
     await ensureUsernameResolutionQueue(boss);
+    await ensureAlertsQueue(boss);
   });
 
   beforeEach(async () => {

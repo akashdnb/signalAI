@@ -10,6 +10,7 @@ import { CONTINUATION_KEYWORD } from "../../lib/keywordMatch.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { ensureQueues } from "../../queue/leadEventsQueue.js";
 import { ensureUsernameResolutionQueue } from "../../queue/usernameResolutionQueue.js";
+import { ensureAlertsQueue } from "../../queue/alertsQueue.js";
 import { ingestWebhookEvents } from "../webhookIngestService.js";
 
 function sleep(ms: number) {
@@ -42,9 +43,11 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     await boss.start();
     await ensureQueues(boss);
     // DM ingestion (webhookIngestService.ts) also enqueues onto
-    // username-resolution — previously only passed against a dev database
-    // where some other test file had already created it as a side effect.
+    // username-resolution and (for a brand-new lead) alerts — previously
+    // only passed against a dev database where some other test file had
+    // already created them as a side effect.
     await ensureUsernameResolutionQueue(boss);
+    await ensureAlertsQueue(boss);
   });
 
   afterEach(async () => {
