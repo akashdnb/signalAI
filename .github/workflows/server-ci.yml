@@ -52,4 +52,11 @@ jobs:
       # and its absence is why a broken build reached the deploy.
       - run: npm run build
       - run: npx node-pg-migrate up --migration-file-language sql
-      - run: npm test
+      # --no-file-parallelism: CI runners have far fewer CPU cores than a
+      # typical dev machine, and several queue test files (leadEventsQueue,
+      # dlqUnblocks, deadLetterEvidence, ...) share the same pgboss.job
+      # table — observed failing here with mismatched job counts/ids under
+      # default parallelism, never reproducing when any one of those files
+      # is run in isolation. Serializing test files removes the
+      # cross-file race rather than chasing it as a "flaky" production bug.
+      - run: npm test -- --run --no-file-parallelism
