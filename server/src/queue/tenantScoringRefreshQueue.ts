@@ -1,7 +1,8 @@
 import type { PgBoss, Job } from "pg-boss";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { recalculateLeadIntelligence } from "../services/leadScoring.js";
 import { listLeadIdsWithIntelligence } from "../db/leadIntelligence.js";
+import { asPgBossDb } from "./leadEventsQueue.js";
 
 export const TENANT_SCORING_REFRESH_QUEUE = "tenant-scoring-refresh";
 
@@ -38,12 +39,27 @@ export async function ensureTenantScoringRefreshQueue(boss: PgBoss): Promise<voi
  * when it actually runs (never from this job's payload) — whichever edit's
  * send "won" the dedupe doesn't matter, since the job that eventually runs
  * reflects every edit made before it started.
+ *
+ * `client`, when passed, makes the enqueue part of the CALLER's own
+ * transaction (same pattern as leadEventsQueue.ts's enqueueLeadEvent) — the
+ * scoring-rule mutation and this job row commit or roll back together, so
+ * a queue-send failure can never leave a committed rule with no pending
+ * refresh, and an enqueue that "succeeded" can never outlive a rolled-back
+ * mutation.
  */
-export async function enqueueTenantScoringRefresh(boss: PgBoss, tenantId: string): Promise<void> {
+export async function enqueueTenantScoringRefresh(
+  boss: PgBoss,
+  tenantId: string,
+  options?: { client?: PoolClient },
+): Promise<void> {
   await boss.send(
     TENANT_SCORING_REFRESH_QUEUE,
     { tenantId },
-    { singletonKey: tenantId, singletonSeconds: REFRESH_DEBOUNCE_SECONDS },
+    {
+      singletonKey: tenantId,
+      singletonSeconds: REFRESH_DEBOUNCE_SECONDS,
+      ...(options?.client ? { db: asPgBossDb(options.client) } : {}),
+    },
   );
 }
 

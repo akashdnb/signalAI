@@ -1,4 +1,6 @@
+import type { Pool } from "pg";
 import type { Queryable } from "./types.js";
+import { getMilestone } from "./milestones.js";
 
 /**
  * Structured, non-executable rule records — never an arbitrary expression
@@ -159,6 +161,53 @@ export function validateScoringRulePoints(points: unknown): number {
     throw new Error("points must be an integer between -100 and 100");
   }
   return points;
+}
+
+/**
+ * Strict boolean validation — `!!value` previously coerced "false" (a
+ * string) to `true`, letting a client that mis-serializes a form field
+ * silently create an ENABLED rule when they asked for disabled. Only the
+ * actual JSON boolean values are ever accepted; `undefined` (field
+ * omitted) returns `undefined` so the route can tell "not provided" apart
+ * from an explicit `false` — POST defaults that to `true`, PATCH leaves
+ * the existing value unchanged.
+ */
+export function validateOptionalBoolean(value: unknown, fieldName: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error(`${fieldName} must be a boolean`);
+  return value;
+}
+
+/**
+ * Distinguished from a plain Error specifically so route code can tell
+ * "this milestoneId is invalid" (a 400) apart from an infra failure in the
+ * lookup itself — a DB connection error from getMilestone must still
+ * surface as a 500, never get reinterpreted as bad input.
+ */
+export class ScoringRuleMilestoneNotFoundError extends Error {}
+
+/**
+ * Configuration validation, not scoring evaluation (leadScoring.ts does
+ * that): a `milestone_completed` rule's `milestoneId` was previously only
+ * checked for UUID *syntax* — a well-formed but nonexistent id, a
+ * soft-deleted milestone, or (critically) a milestone belonging to a
+ * DIFFERENT tenant would all be silently accepted and stored. Reuses the
+ * existing tenant-scoped, soft-delete-aware lookup (db/milestones.ts) —
+ * same boundary every other tenant-scoped table in this schema uses, never
+ * a bespoke milestone query here. No-op for a field_compare definition.
+ */
+export async function assertScoringRuleMilestoneOwnership(
+  pool: Pool,
+  tenantId: string,
+  definition: ScoringRuleDefinition,
+): Promise<void> {
+  if (definition.kind !== "milestone_completed") return;
+  const milestone = await getMilestone(pool, tenantId, definition.milestoneId);
+  if (!milestone) {
+    throw new ScoringRuleMilestoneNotFoundError(
+      "definition.milestoneId does not reference an active milestone belonging to this tenant",
+    );
+  }
 }
 
 /** Tenant-isolated: every query below is scoped by tenant_id, never by id alone. */

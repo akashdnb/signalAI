@@ -193,4 +193,71 @@ describe("tenant scoring refresh queue (Objective B)", () => {
 
     expect(await countPendingJobs(TENANT_SCORING_REFRESH_QUEUE)).toBe(1);
   });
+
+  // Objective 4 (follow-up review): documents the CHOSEN refresh semantics
+  // explicitly, rather than leaving it implicit in listLeadIdsWithIntelligence's
+  // query. A lead that has never had intelligence calculated (no captured
+  // facts, no milestone ever reached, no AI reply ever delivered) has
+  // nothing a scoring rule could affect — its "no intelligence yet" state
+  // from leadIntelligence.ts is itself a valid, intentional product state,
+  // not an omission. Refreshing it would mean calculating a score of 0 and
+  // writing a brand-new history row for a lead the rule change couldn't
+  // possibly have changed anything about, for every untouched lead a
+  // tenant has — unbounded, wasteful, and not what "existing lead
+  // intelligence must not remain silently stale" asked for.
+  it("only refreshes leads that already have an intelligence projection — a lead with captured facts but no prior recalculation is left with none", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const untouchedLead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-untouched");
+    // Facts captured, but recalculateLeadIntelligence was never called for
+    // this lead — mirrors a lead whose only AI turn never got far enough
+    // to be delivered/committed (leadEventReplyHandler.ts's deferred-commit
+    // invariant), or a lead created before any scoring ever ran.
+    await mergeCapturedFacts(pool, tenant.id, untouchedLead.id, { intent: "ready_to_buy" });
+    expect(await getLeadIntelligence(pool, tenant.id, untouchedLead.id)).toBeNull();
+
+    await createScoringRule(pool, tenant.id, {
+      name: "Intent bonus",
+      definition: { kind: "field_compare", field: "intent", operator: "eq", value: "ready_to_buy" },
+      points: 10,
+    });
+
+    await startTenantScoringRefreshWorker(boss, pool);
+    await enqueueTenantScoringRefresh(boss, tenant.id);
+    await waitUntil(async () => (await countPendingJobs(TENANT_SCORING_REFRESH_QUEUE)) === 0);
+
+    expect(await getLeadIntelligence(pool, tenant.id, untouchedLead.id)).toBeNull();
+  }, 15000);
+
+  // Concurrency: the worker must read whichever rules exist AT RUN TIME,
+  // never anything captured in the job payload at enqueue time — two rule
+  // mutations landing back-to-back (the debounce window coalesces their
+  // enqueues into one pending job) must both be reflected once that one
+  // job actually runs.
+  it("converges to the state of ALL rule mutations made before the job ran, not just the one that triggered the send", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
+    await mergeCapturedFacts(pool, tenant.id, lead.id, { intent: "ready_to_buy", location: "Bangalore" });
+    await recalculateLeadIntelligence(pool, tenant.id, lead.id); // score 35 (intent 25 + location 10)
+
+    // Two rapid mutations — only one enqueue actually lands (coalesced by
+    // the debounce window), but by the time the worker runs both must be
+    // reflected: +10 intent bonus AND +5 location bonus = score 50.
+    await createScoringRule(pool, tenant.id, {
+      name: "Intent bonus",
+      definition: { kind: "field_compare", field: "intent", operator: "eq", value: "ready_to_buy" },
+      points: 10,
+    });
+    await createScoringRule(pool, tenant.id, {
+      name: "Location bonus",
+      definition: { kind: "field_compare", field: "location", operator: "eq", value: "Bangalore" },
+      points: 5,
+    });
+
+    await startTenantScoringRefreshWorker(boss, pool);
+    await enqueueTenantScoringRefresh(boss, tenant.id);
+
+    await waitUntil(async () => (await getLeadIntelligence(pool, tenant.id, lead.id))?.score === 50);
+  }, 15000);
 });

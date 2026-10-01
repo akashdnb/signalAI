@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPool, closePool } from "../pool.js";
 import { createTenant } from "../tenants.js";
+import { createCampaign } from "../campaigns.js";
+import { setCampaignMilestones } from "../milestones.js";
 import {
   createScoringRule,
   deleteScoringRule,
@@ -9,6 +11,9 @@ import {
   validateScoringRuleDefinition,
   validateScoringRuleName,
   validateScoringRulePoints,
+  validateOptionalBoolean,
+  assertScoringRuleMilestoneOwnership,
+  ScoringRuleMilestoneNotFoundError,
 } from "../leadScoringRules.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
@@ -199,5 +204,84 @@ describe("lead scoring rules", () => {
 
     const all = await listScoringRules(pool, tenant.id);
     expect(all).toHaveLength(2);
+  });
+
+  describe("validateOptionalBoolean", () => {
+    it("accepts true and false", () => {
+      expect(validateOptionalBoolean(true, "enabled")).toBe(true);
+      expect(validateOptionalBoolean(false, "enabled")).toBe(false);
+    });
+
+    it("returns undefined when omitted — caller decides the default/leave-unchanged meaning", () => {
+      expect(validateOptionalBoolean(undefined, "enabled")).toBeUndefined();
+    });
+
+    it("rejects a string that merely looks like a boolean, never coercing it", () => {
+      expect(() => validateOptionalBoolean("false", "enabled")).toThrow();
+      expect(() => validateOptionalBoolean("true", "enabled")).toThrow();
+    });
+
+    it("rejects numeric and null values rather than coercing them", () => {
+      expect(() => validateOptionalBoolean(0, "enabled")).toThrow();
+      expect(() => validateOptionalBoolean(1, "enabled")).toThrow();
+      expect(() => validateOptionalBoolean(null, "enabled")).toThrow();
+    });
+  });
+
+  describe("assertScoringRuleMilestoneOwnership", () => {
+    it("is a no-op for a field_compare definition", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      await expect(
+        assertScoringRuleMilestoneOwnership(pool, tenant.id, { kind: "field_compare", field: "location", operator: "exists" }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("accepts a milestone belonging to the same tenant", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+      const [milestone] = await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "ask for budget" }]);
+
+      await expect(
+        assertScoringRuleMilestoneOwnership(pool, tenant.id, { kind: "milestone_completed", milestoneId: milestone!.id }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("rejects a nonexistent milestone id", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      await expect(
+        assertScoringRuleMilestoneOwnership(pool, tenant.id, {
+          kind: "milestone_completed",
+          milestoneId: "123e4567-e89b-12d3-a456-426614174000",
+        }),
+      ).rejects.toBeInstanceOf(ScoringRuleMilestoneNotFoundError);
+    });
+
+    it("rejects a milestone belonging to a DIFFERENT tenant", async () => {
+      const pool = getPool();
+      const tenantA = await createTenant(pool, "creator-a");
+      const tenantB = await createTenant(pool, "creator-b");
+      const campaignB = await createCampaign(pool, tenantB.id, "Giveaway", ["LINK"]);
+      const [milestoneB] = await setCampaignMilestones(pool, tenantB.id, campaignB.id, [{ goalDescription: "ask for budget" }]);
+
+      await expect(
+        assertScoringRuleMilestoneOwnership(pool, tenantA.id, { kind: "milestone_completed", milestoneId: milestoneB!.id }),
+      ).rejects.toBeInstanceOf(ScoringRuleMilestoneNotFoundError);
+    });
+
+    it("rejects a soft-deleted milestone", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Giveaway", ["LINK"]);
+      const [milestone] = await setCampaignMilestones(pool, tenant.id, campaign.id, [{ goalDescription: "ask for budget" }]);
+      // Replacing a campaign's milestone list soft-deletes the previous set.
+      await setCampaignMilestones(pool, tenant.id, campaign.id, []);
+
+      await expect(
+        assertScoringRuleMilestoneOwnership(pool, tenant.id, { kind: "milestone_completed", milestoneId: milestone!.id }),
+      ).rejects.toBeInstanceOf(ScoringRuleMilestoneNotFoundError);
+    });
   });
 });
