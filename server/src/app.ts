@@ -16,6 +16,7 @@ import { webhooksRouter } from "./routes/webhooks.js";
 import { authRouter } from "./routes/auth.js";
 import { authEmailRouter } from "./routes/authEmail.js";
 import { campaignsRouter } from "./routes/campaigns.js";
+import { journeyRuntimeRouter } from "./routes/journeyRuntime.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
@@ -87,6 +88,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(campaignsRouter);
+  app.use(journeyRuntimeRouter);
   app.use(billingRouter);
   app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
   app.use(leadsRouter);
