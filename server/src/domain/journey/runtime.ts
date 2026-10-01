@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import type {
   BuilderGraph,
   JourneyNode,
@@ -17,11 +17,20 @@ import {
   type JourneyExecution,
   type JourneyPendingAction,
 } from "../../db/journeyExecutions.js";
+import {
+  claimJourneyEvent,
+} from "../../db/journeyEvents.js";
+import {
+  acknowledgeJourneyAction,
+  createJourneyAction,
+  getPendingJourneyAction,
+} from "../../db/journeyActions.js";
 import { getPool } from "../../db/pool.js";
 
 export interface JourneyRuntimeResult {
   execution: JourneyExecution;
   action: JourneyPendingAction | null;
+  duplicateEvent?: boolean;
 }
 
 export interface JourneyRuntimeInput {
@@ -29,6 +38,14 @@ export interface JourneyRuntimeInput {
   campaignId: string;
   subjectKey: string;
   context?: Record<string, unknown>;
+}
+
+export interface JourneyRuntimeEventInput {
+  tenantId: string;
+  executionId: string;
+  eventId: string;
+  eventType: string;
+  payload?: Record<string, unknown>;
 }
 
 function outgoingNodes(
@@ -40,7 +57,9 @@ function outgoingNodes(
     .map((edge) => edge.targetNodeId);
 
   return targetIds
-    .map((targetId) => graph.nodes.find((node) => node.id === targetId))
+    .map((targetId) =>
+      graph.nodes.find((node) => node.id === targetId),
+    )
     .filter((node): node is JourneyNode => Boolean(node));
 }
 
@@ -52,7 +71,9 @@ function getNode(
     throw new Error("journey execution has no current node");
   }
 
-  const node = graph.nodes.find((candidate) => candidate.id === nodeId);
+  const node = graph.nodes.find(
+    (candidate) => candidate.id === nodeId,
+  );
 
   if (!node) {
     throw new Error(`journey node not found: ${nodeId}`);
@@ -61,7 +82,9 @@ function getNode(
   return node;
 }
 
-function buildAction(node: JourneyNode): JourneyPendingAction {
+function buildAction(
+  node: JourneyNode,
+): JourneyPendingAction {
   switch (node.type) {
     case "message":
       return {
@@ -91,13 +114,15 @@ function buildAction(node: JourneyNode): JourneyPendingAction {
       };
 
     default:
-      throw new Error(`node ${node.id} does not produce an external action`);
+      throw new Error(
+        `node ${node.id} does not produce an external action`,
+      );
   }
 }
 
 function mergeContext(
   current: Record<string, unknown>,
-  additional: Record<string, unknown> | undefined,
+  additional?: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
     ...current,
@@ -106,34 +131,41 @@ function mergeContext(
 }
 
 /**
- * Runtime contract:
+ * IMPORTANT:
  *
- * - always loads an immutable published snapshot
- * - never reads journey_nodes/journey_edges directly
- * - execution is pinned to one published version
- * - deterministic nodes advance automatically
- * - external-action nodes pause with pending_action
+ * Runtime transactions use PostgreSQL row locks and unique constraints
+ * as the source of truth.
+ *
+ * Never implement:
+ *
+ *   SELECT -> if missing -> INSERT
+ *
+ * without a database constraint protecting the INSERT.
  */
 export class JourneyRuntime {
   constructor(
     private readonly pool: Pool = getPool(),
   ) {}
 
-  async start(input: JourneyRuntimeInput): Promise<JourneyRuntimeResult> {
+  async start(
+    input: JourneyRuntimeInput,
+  ): Promise<JourneyRuntimeResult> {
     const client = await this.pool.connect();
 
     try {
       await client.query("begin");
 
-      const published = await getLatestPublishedJourneyWithClient(
-        client,
-        input.tenantId,
-        input.campaignId,
-      );
+      const published =
+        await getLatestPublishedJourneyWithClient(
+          client,
+          input.tenantId,
+          input.campaignId,
+        );
 
       if (!published) {
-        await client.query("rollback");
-        throw new Error("campaign has no published journey");
+        throw new Error(
+          "campaign has no published journey",
+        );
       }
 
       const trigger = published.graph.nodes.find(
@@ -141,33 +173,62 @@ export class JourneyRuntime {
       );
 
       if (!trigger) {
-        await client.query("rollback");
-        throw new Error("published journey has no trigger");
+        throw new Error(
+          "published journey has no trigger",
+        );
       }
 
-      const existing = await getActiveExecutionForSubject(
-        client,
-        input.tenantId,
-        input.campaignId,
-        input.subjectKey,
-      );
+      const existing =
+        await getActiveExecutionForSubject(
+          client,
+          input.tenantId,
+          input.campaignId,
+          input.subjectKey,
+        );
 
       if (existing) {
         await client.query("commit");
+
         return {
           execution: existing,
           action: existing.pendingAction,
         };
       }
 
-      const execution = await createJourneyExecution(
-        client,
-        input.tenantId,
-        input.campaignId,
-        published,
-        input.subjectKey,
-        trigger.id,
-      );
+      let execution: JourneyExecution;
+
+      try {
+        execution = await createJourneyExecution(
+          client,
+          input.tenantId,
+          input.campaignId,
+          published,
+          input.subjectKey,
+          trigger.id,
+        );
+      } catch (error) {
+        /*
+         * Two concurrent starts can both observe no active row.
+         *
+         * The partial unique index prevents both inserts.
+         *
+         * If this transaction loses the race, PostgreSQL aborts the
+         * transaction on the unique violation, so rollback and retry
+         * the lookup in a fresh transaction.
+         */
+        if (
+          isUniqueViolation(
+            error,
+            "journey_executions_active_subject_unique",
+          )
+        ) {
+          await client.query("rollback");
+
+          return this.start(input);
+        }
+
+        throw error;
+      }
 
       const updated = await this.advance(
         client,
@@ -180,315 +241,413 @@ export class JourneyRuntime {
 
       return updated;
     } catch (error) {
-      await client.query("rollback");
+      await safeRollback(client);
       throw error;
     } finally {
       client.release();
     }
   }
 
-  async resume(
-    tenantId: string,
-    executionId: string,
-    context?: Record<string, unknown>,
+  /**
+   * Process an external event exactly once.
+   *
+   * The event id is claimed inside the same transaction that mutates
+   * the journey execution.
+   */
+  async resumeFromEvent(
+    input: JourneyRuntimeEventInput,
   ): Promise<JourneyRuntimeResult> {
-    const existing = await getExecution(
-      this.pool,
-      tenantId,
-      executionId,
-    );
-
-    if (!existing) {
-      throw new Error("journey execution not found");
-    }
-
-    /*
-     * Important:
-     * We reload the exact immutable version the execution started with.
-     * A newer publication must never mutate an existing execution.
-     */
-    const published = await getPublishedJourney(
-      this.pool,
-      tenantId,
-      existing.campaignId,
-      existing.publishedVersion,
-    );
-
-    if (!published) {
-      throw new Error(
-        `published journey version ${existing.publishedVersion} not found`,
-      );
-    }
-
     const client = await this.pool.connect();
 
     try {
       await client.query("begin");
 
-      const locked = await getExecutionForUpdate(
+      const execution = await getExecutionForUpdate(
         client,
-        tenantId,
-        executionId,
+        input.tenantId,
+        input.executionId,
       );
 
-      if (!locked) {
-        await client.query("rollback");
-        throw new Error("journey execution not found");
+      if (!execution) {
+        throw new Error(
+          `journey execution not found: ${input.executionId}`,
+        );
       }
 
-      /*
-       * If an external worker retries the same event, do not execute a
-       * completed/handoff execution again.
-       */
-      if (
-        locked.status === "completed" ||
-        locked.status === "failed"
-      ) {
+      const event = await claimJourneyEvent(
+        client,
+        {
+          tenantId: input.tenantId,
+          executionId: input.executionId,
+          eventId: input.eventId,
+          eventType: input.eventType,
+          payload: input.payload ?? {},
+        },
+      );
+
+      if (!event) {
+        /*
+         * Event was already processed.
+         *
+         * Because the event claim and execution mutation happen in
+         * the same transaction, this is safe under concurrent delivery.
+         */
+        const current = await getExecution(
+          this.pool,
+          input.tenantId,
+          input.executionId,
+        );
+
+        if (!current) {
+          throw new Error(
+            `journey execution not found: ${input.executionId}`,
+          );
+        }
+
         await client.query("commit");
 
         return {
-          execution: locked,
-          action: locked.pendingAction,
+          execution: current,
+          action: current.pendingAction,
+          duplicateEvent: true,
         };
       }
 
-      const updated = await this.advance(
+      const pendingAction =
+        await getPendingJourneyAction(
+          client,
+          input.executionId,
+        );
+
+      if (pendingAction) {
+        await acknowledgeJourneyAction(
+          client,
+          pendingAction.id,
+        );
+      }
+
+      /*
+       * Clear the legacy pending_action field while advancing.
+       * journey_actions is now the durable source of action state.
+       */
+      const context = mergeContext(
+        execution.context,
+        input.payload,
+      );
+
+      const published =
+        await getPublishedJourney(
+          this.pool,
+          input.tenantId,
+          execution.campaignId,
+          execution.publishedVersion,
+        );
+
+      if (!published) {
+        throw new Error(
+          `published journey version not found: ${execution.publishedVersion}`,
+        );
+      }
+
+      const resumedExecution = {
+        ...execution,
+        pendingAction: null,
+        status: "running" as const,
+      };
+
+      const result = await this.advance(
         client,
         published,
-        locked,
+        resumedExecution,
         context,
       );
 
       await client.query("commit");
 
-      return updated;
+      return result;
     } catch (error) {
-      await client.query("rollback");
+      await safeRollback(client);
       throw error;
     } finally {
       client.release();
     }
   }
 
+  /*
+   * Backward-compatible wrapper for the existing runtime API.
+   *
+   * New integrations should use resumeFromEvent().
+   */
+  async resume(
+    tenantId: string,
+    executionId: string,
+    context?: Record<string, unknown>,
+  ): Promise<JourneyRuntimeResult> {
+    return this.resumeFromEvent({
+      tenantId,
+      executionId,
+      eventId: `legacy-resume:${executionId}:${Date.now()}`,
+      eventType: "LEGACY_RESUME",
+      payload: context,
+    });
+  }
+
   private async advance(
-    client: import("pg").PoolClient,
+    client: PoolClient,
     published: PublishedJourney,
-    execution: JourneyExecution,
+    initialExecution: JourneyExecution,
     additionalContext?: Record<string, unknown>,
   ): Promise<JourneyRuntimeResult> {
-    let current = execution;
-    let context = mergeContext(
-      current.context,
-      additionalContext,
-    );
+    let execution = {
+      ...initialExecution,
+      context: mergeContext(
+        initialExecution.context,
+        additionalContext,
+      ),
+    };
 
-    /*
-     * Safety limit prevents a malformed future graph from looping forever.
-     * The publish validator already rejects cycles, but the runtime keeps
-     * its own defensive bound.
-     */
-    for (let step = 0; step < 100; step += 1) {
+    let steps = 0;
+
+    while (steps++ < 100) {
       const node = getNode(
         published.graph,
-        current.currentNodeId,
+        execution.currentNodeId,
       );
 
-      if (node.type === "trigger") {
-        await recordNodeExecution(
-          client,
-          current.id,
-          node,
-          "completed",
-          null,
-          { type: "TRIGGER" },
-        );
+      await recordNodeExecution(
+        client,
+        execution.id,
+        node,
+        "started",
+        {
+          context: execution.context,
+        },
+        null,
+      );
 
-        const next = outgoingNodes(
-          published.graph,
-          node.id,
-        );
+      switch (node.type) {
+        case "trigger": {
+          const next = outgoingNodes(
+            published.graph,
+            node.id,
+          );
 
-        if (next.length === 0) {
-          current = await updateJourneyExecution(
+          await recordNodeExecution(
             client,
-            current.id,
+            execution.id,
+            node,
+            "completed",
+            null,
             {
-              status: "completed",
-              currentNodeId: node.id,
-              context,
-              pendingAction: null,
-              completed: true,
+              nextNodeId: next[0]?.id ?? null,
             },
           );
 
-          return { execution: current, action: null };
+          if (!next[0]) {
+            execution =
+              await updateJourneyExecution(
+                client,
+                execution.id,
+                {
+                  status: "completed",
+                  currentNodeId: null,
+                  context: execution.context,
+                  pendingAction: null,
+                  completed: true,
+                },
+              );
+
+            return {
+              execution,
+              action: null,
+            };
+          }
+
+          execution =
+            await updateJourneyExecution(
+              client,
+              execution.id,
+              {
+                status: "running",
+                currentNodeId: next[0].id,
+                context: execution.context,
+                pendingAction: null,
+                completed: false,
+              },
+            );
+
+          continue;
         }
 
-        if (next.length > 1) {
-          throw new Error(
-            `node ${node.id} has multiple outgoing edges; branching runtime is not implemented`,
-          );
-        }
+        case "milestone_group": {
+          const milestoneId =
+            typeof node.data.milestoneId === "string"
+              ? node.data.milestoneId
+              : null;
 
-        current = await updateJourneyExecution(
-          client,
-          current.id,
-          {
-            status: "running",
-            currentNodeId: next[0]!.id,
-            context,
-            pendingAction: null,
-            completed: false,
-          },
-        );
+          const completedMilestones =
+            Array.isArray(
+              execution.context.completedMilestones,
+            )
+              ? execution.context.completedMilestones
+              : [];
 
-        continue;
-      }
+          const nextCompleted =
+            milestoneId &&
+            !completedMilestones.includes(milestoneId)
+              ? [
+                  ...completedMilestones,
+                  milestoneId,
+                ]
+              : completedMilestones;
 
-      if (node.type === "milestone_group") {
-        const milestoneId =
-          typeof node.data.milestoneId === "string"
-            ? node.data.milestoneId
-            : null;
+          const next =
+            outgoingNodes(
+              published.graph,
+              node.id,
+            )[0];
 
-        await recordNodeExecution(
-          client,
-          current.id,
-          node,
-          "completed",
-          null,
-          {
-            type: "MILESTONE_COMPLETED",
-            milestoneId,
-          },
-        );
+          const context = {
+            ...execution.context,
+            completedMilestones:
+              nextCompleted,
+          };
 
-        context = {
-          ...context,
-          completedMilestones: [
-            ...(
-              Array.isArray(context.completedMilestones)
-                ? context.completedMilestones
-                : []
-            ),
-            ...(milestoneId ? [milestoneId] : []),
-          ],
-        };
-
-        const next = outgoingNodes(
-          published.graph,
-          node.id,
-        );
-
-        if (next.length === 0) {
-          current = await updateJourneyExecution(
+          await recordNodeExecution(
             client,
-            current.id,
+            execution.id,
+            node,
+            "completed",
+            null,
             {
-              status: "completed",
-              currentNodeId: node.id,
-              context,
-              pendingAction: null,
-              completed: true,
+              milestoneId,
+              completedMilestones:
+                nextCompleted,
             },
           );
 
-          return { execution: current, action: null };
+          if (!next) {
+            execution =
+              await updateJourneyExecution(
+                client,
+                execution.id,
+                {
+                  status: "completed",
+                  currentNodeId: null,
+                  context,
+                  pendingAction: null,
+                  completed: true,
+                },
+              );
+
+            return {
+              execution,
+              action: null,
+            };
+          }
+
+          execution =
+            await updateJourneyExecution(
+              client,
+              execution.id,
+              {
+                status: "running",
+                currentNodeId: next.id,
+                context,
+                pendingAction: null,
+                completed: false,
+              },
+            );
+
+          continue;
         }
 
-        if (next.length > 1) {
-          throw new Error(
-            `node ${node.id} has multiple outgoing edges; branching runtime is not implemented`,
+        case "message":
+        case "action_link":
+        case "human_handoff": {
+          const action = buildAction(node);
+
+          const nodeExecutionResult =
+            await client.query<{ id: string }>(
+              `select id
+                 from journey_node_executions
+                where execution_id = $1
+                  and node_id = $2
+                order by started_at desc
+                limit 1`,
+              [execution.id, node.id],
+            );
+
+          const nodeExecutionId =
+            nodeExecutionResult.rows[0]?.id;
+
+          if (!nodeExecutionId) {
+            throw new Error(
+              `node execution was not created: ${node.id}`,
+            );
+          }
+
+          await recordNodeExecution(
+            client,
+            execution.id,
+            node,
+            "waiting",
+            null,
+            action.payload,
           );
-        }
 
-        current = await updateJourneyExecution(
-          client,
-          current.id,
-          {
-            status: "running",
-            currentNodeId: next[0]!.id,
-            context,
-            pendingAction: null,
-            completed: false,
-          },
-        );
+          await createJourneyAction(
+            client,
+            {
+              executionId: execution.id,
+              nodeExecutionId,
+              action,
+            },
+          );
 
-        continue;
-      }
+          const status =
+            node.type === "human_handoff"
+              ? "handoff"
+              : "waiting";
 
-      if (
-        node.type === "message" ||
-        node.type === "action_link" ||
-        node.type === "human_handoff"
-      ) {
-        const action = buildAction(node);
+          execution =
+            await updateJourneyExecution(
+              client,
+              execution.id,
+              {
+                status,
+                currentNodeId: node.id,
+                context: execution.context,
+                pendingAction: action,
+                completed: false,
+              },
+            );
 
-        await recordNodeExecution(
-          client,
-          current.id,
-          node,
-          "waiting",
-          context,
-          {
+          return {
+            execution,
             action,
-          },
-        );
+          };
+        }
 
-        const status =
-          node.type === "human_handoff"
-            ? "handoff"
-            : "waiting";
-
-        current = await updateJourneyExecution(
-          client,
-          current.id,
-          {
-            status,
-            currentNodeId: node.id,
-            context,
-            pendingAction: action,
-            completed: false,
-          },
-        );
-
-        return {
-          execution: current,
-          action,
-        };
+        default:
+          throw new Error(
+            `unsupported runtime node type: ${node.type}`,
+          );
       }
-
-      throw new Error(
-        `unsupported runtime node type: ${node.type}`,
-      );
     }
 
     throw new Error(
-      "journey runtime exceeded maximum traversal depth",
+      "journey runtime exceeded 100 traversal steps",
     );
   }
 }
 
 async function getExecutionForUpdate(
-  client: import("pg").PoolClient,
+  client: PoolClient,
   tenantId: string,
   executionId: string,
 ): Promise<JourneyExecution | null> {
-  const result = await client.query<{
-    id: string;
-    tenant_id: string;
-    campaign_id: string;
-    published_journey_version_id: string;
-    published_version: number;
-    subject_key: string;
-    status: JourneyExecution["status"];
-    current_node_id: string | null;
-    context: Record<string, unknown>;
-    pending_action: JourneyPendingAction | null;
-    started_at: string;
-    updated_at: string;
-    completed_at: string | null;
-  }>(
+  const result = await client.query<any>(
     `select *
        from journey_executions
       where tenant_id = $1
@@ -497,9 +656,11 @@ async function getExecutionForUpdate(
     [tenantId, executionId],
   );
 
-  const row = result.rows[0];
+  if (!result.rows[0]) {
+    return null;
+  }
 
-  if (!row) return null;
+  const row = result.rows[0];
 
   return {
     id: row.id,
@@ -517,4 +678,33 @@ async function getExecutionForUpdate(
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
   };
+}
+
+function isUniqueViolation(
+  error: unknown,
+  constraint: string,
+): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as {
+    code?: string;
+    constraint?: string;
+  };
+
+  return (
+    candidate.code === "23505" &&
+    candidate.constraint === constraint
+  );
+}
+
+async function safeRollback(
+  client: PoolClient,
+): Promise<void> {
+  try {
+    await client.query("rollback");
+  } catch {
+    // Ignore rollback errors because the original error is more useful.
+  }
 }
