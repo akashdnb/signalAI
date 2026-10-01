@@ -12,6 +12,9 @@ import {
 import { listMilestones, listMilestonesWithClient, setCampaignMilestonesWithClient } from "../db/milestones.js";
 import { getBuilderGraph, getBuilderGraphWithClient, saveBuilderGraph, saveBuilderGraphWithClient, synchronizeMilestoneGraph, type JourneyNode, type JourneyEdge } from "../db/journeyGraph.js";
 import { listKnownMediaForTenant, upsertMediaMetadata } from "../db/mediaMetadata.js";
+import { validateJourneyGraph } from "../domain/journey/validateJourney.js";
+import { createPublishedJourneyWithClient, getLatestPublishedJourneyWithClient } from "../db/journeyVersions.js";
+
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { fetchMediaMetadata, findMediaByPermalink } from "../lib/instagramMedia.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
@@ -159,6 +162,148 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/milestones", async
     client.release();
   }
 });
+
+
+/**
+ * Publish the current editable journey as an immutable snapshot.
+ *
+ * The draft is still represented by journey_nodes/journey_edges.
+ * Publishing copies the complete graph into campaign_journey_versions.
+ *
+ * expectedBuilderVersion protects against publishing a graph that the
+ * caller loaded before another editor changed it.
+ */
+campaignsRouter.post(
+  "/tenants/:tenantId/campaigns/:campaignId/journey/publish",
+  async (req, res) => {
+    const { tenantId, campaignId } = req.params;
+    const { expectedBuilderVersion } = req.body ?? {};
+
+    if (
+      typeof expectedBuilderVersion !== "number" ||
+      !Number.isInteger(expectedBuilderVersion)
+    ) {
+      return res.status(400).json({
+        error: "expectedBuilderVersion must be an integer",
+      });
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      /*
+       * Lock the campaign row first. This serializes publication against
+       * builder saves, because saveBuilderGraphWithClient also locks this
+       * same campaign row before checking builder_version.
+       */
+      const campaignResult = await client.query<{
+        builder_version: number;
+      }>(
+        `select builder_version
+           from campaigns
+          where id = $1
+            and tenant_id = $2
+          for update`,
+        [campaignId, tenantId],
+      );
+
+      const campaign = campaignResult.rows[0];
+
+      if (!campaign) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          error: "campaign not found for this tenant",
+        });
+      }
+
+      if (campaign.builder_version !== expectedBuilderVersion) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error: "this journey changed elsewhere — reload before publishing",
+          currentBuilderVersion: campaign.builder_version,
+        });
+      }
+
+      const graph = await getBuilderGraphWithClient(
+        client,
+        tenantId,
+        campaignId,
+      );
+
+      if (!graph) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          error: "campaign not found for this tenant",
+        });
+      }
+
+      const milestones = await listMilestonesWithClient(
+        client,
+        tenantId,
+        campaignId,
+      );
+
+      const validation = validateJourneyGraph(graph, milestones);
+
+      if (!validation.valid) {
+        await client.query("ROLLBACK");
+
+        return res.status(400).json({
+          error: "journey validation failed",
+          details: validation.errors,
+        });
+      }
+
+      const published = await createPublishedJourneyWithClient(
+        client,
+        tenantId,
+        campaignId,
+        graph,
+      );
+
+      await client.query("COMMIT");
+
+      return res.status(200).json(published);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  },
+);
+
+/**
+ * Read the latest immutable published journey.
+ *
+ * This endpoint is intentionally separate from /builder:
+ *
+ * /builder            -> mutable draft
+ * /journey/published  -> immutable runtime snapshot
+ */
+campaignsRouter.get(
+  "/tenants/:tenantId/campaigns/:campaignId/journey/published",
+  async (req, res) => {
+    const { tenantId, campaignId } = req.params;
+
+    const client = await getPool().connect();
+
+    try {
+      const published = await getLatestPublishedJourneyWithClient(
+        client,
+        tenantId,
+        campaignId,
+      );
+
+      return res.status(200).json(published);
+    } finally {
+      client.release();
+    }
+  },
+);
 
 campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/milestones", async (req, res) => {
   const { tenantId, campaignId } = req.params;
