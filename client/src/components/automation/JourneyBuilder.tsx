@@ -203,12 +203,12 @@ export function JourneyBuilder({
   return (
     <>
       <div className="automation-builder flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-card">
-        <div className="border-b border-line px-4 pt-3.5 md:px-5">
+        <div className="border-b border-line px-4 pt-2.5 md:px-5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                className="flex h-8 shrink-0 items-center text-sm font-medium text-ink hover:text-accent"
+                className="flex h-7 shrink-0 items-center text-[13px] font-medium text-ink hover:text-accent"
                 onClick={onBack}
               >
                 ← Back to journeys
@@ -218,7 +218,7 @@ export function JourneyBuilder({
 
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <h1 className="m-0 truncate text-[19px] font-semibold tracking-[-0.01em] text-ink">
+                  <h1 className="m-0 truncate text-[18px] font-semibold tracking-[-0.01em] text-ink">
                     {campaign.name}
                   </h1>
 
@@ -234,7 +234,7 @@ export function JourneyBuilder({
                   </span>
                 </div>
 
-                <p className="muted m-0 mt-0.5 truncate text-[12px]">
+                <p className="muted m-0 mt-0.5 truncate text-[11px]">
                   {describeCampaign(campaign)} · Updated{" "}
                   {new Date(campaign.updatedAt).toLocaleDateString()}
                 </p>
@@ -344,13 +344,13 @@ export function JourneyBuilder({
             </div>
           </div>
 
-          <div className="mt-3 flex gap-7 overflow-x-auto">
+          <div className="mt-2 flex gap-7 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => requestSubTabChange(tab.key)}
-                className={`-mb-px shrink-0 border-b-2 px-0 pb-2.5 text-[13px] transition-colors ${
+                className={`-mb-px shrink-0 border-b-2 px-0 pb-2 text-[13px] transition-colors ${
                   subTab === tab.key
                     ? "border-accent font-semibold text-accent"
                     : "border-transparent text-subtle hover:text-ink"
@@ -366,7 +366,7 @@ export function JourneyBuilder({
           <div className="banner banner-error mx-4 mt-3 md:mx-5">{publishError}</div>
         )}
 
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {subTab === "builder" && (
             <BuilderCanvas
               tenantId={tenantId}

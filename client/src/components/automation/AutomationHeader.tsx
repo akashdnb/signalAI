@@ -11,10 +11,10 @@ export function AutomationHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="m-0 text-[29px] font-bold leading-[1.15] tracking-[-0.025em] text-ink">
+        <h1 className="m-0 text-[26px] font-bold leading-[1.12] tracking-[-0.025em] text-ink">
           Automation
         </h1>
-        <p className="muted m-0 mt-1 text-sm leading-5 md:text-[15px]">
+        <p className="muted m-0 mt-1 text-[14px] leading-5">
           Create AI-powered conversations that turn Instagram comments and DMs into qualified leads.
         </p>
       </div>
@@ -31,7 +31,7 @@ export function AutomationHeader({
           </button>
 
           {showDocsNote && (
-            <div className="absolute right-0 top-11 z-30 w-56 rounded-xl border border-line bg-card p-3 text-xs text-subtle shadow-lg">
+            <div className="absolute right-0 top-10 z-30 w-56 rounded-xl border border-line bg-card p-3 text-xs text-subtle shadow-lg">
               Documentation is coming soon.
             </div>
           )}
@@ -50,19 +50,20 @@ export function AutomationHeader({
       <div className="flex shrink-0 items-center gap-2 md:hidden">
         <button
           type="button"
-          className="btn-primary flex h-11 items-center gap-2 px-4 text-sm"
+          className="btn-primary flex h-10 items-center gap-2 px-4 text-sm"
           onClick={onNewJourney}
         >
           <PlusIcon className="h-4 w-4" />
           New Journey
         </button>
+
         <button
           type="button"
           aria-label="Documentation"
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-card text-ink"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-card text-ink"
           onClick={() => setShowDocsNote((value) => !value)}
         >
-          <FileTextIcon className="h-5 w-5" />
+          <FileTextIcon className="h-4.5 w-4.5" />
         </button>
       </div>
 

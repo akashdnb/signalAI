@@ -55,7 +55,7 @@ export function AutomationPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="flex flex-col px-4 py-5 md:min-h-[calc(100vh-56px)] md:px-6 md:py-5">
+    <div className="flex flex-col px-4 py-4 md:min-h-[calc(100vh-56px)] md:px-6 md:py-4">
       <AutomationHeader onNewJourney={() => setShowNewJourney(true)} />
 
       <div className="hidden md:block">

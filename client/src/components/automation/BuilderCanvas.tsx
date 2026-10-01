@@ -13,7 +13,6 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 
 import {
   api,
@@ -680,6 +679,12 @@ export function BuilderCanvas({
     ],
   );
 
+  useEffect(() => {
+    if (decoratedNodes.length > 0) {
+      scheduleInitialFit();
+    }
+  }, [decoratedNodes.length, scheduleInitialFit]);
+
   const palette = (
     <div className="absolute left-4 top-4 z-20 hidden w-[178px] overflow-hidden rounded-xl border border-line bg-card shadow-lg md:block">
       <div className="flex h-11 items-center gap-2 border-b border-line px-4 text-[13px] font-semibold text-ink">
@@ -770,7 +775,7 @@ export function BuilderCanvas({
   }
 
   return (
-    <div className="relative min-h-[420px] flex-1 overflow-hidden bg-canvas">
+    <div className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-canvas">
       {palette}
 
       {loadError && (
@@ -786,43 +791,46 @@ export function BuilderCanvas({
         </div>
       )}
 
-      <ReactFlow
-        nodes={decoratedNodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onInit={(instance) => {
-          flowInstanceRef.current = instance;
-          scheduleInitialFit();
-        }}
-        onNodesChange={locked ? undefined : onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={(_event, node) => selectForNode(node)}
-        onNodeDragStop={handleNodeDragStop}
-        nodesDraggable={!locked}
-        nodesConnectable={false}
-        elementsSelectable={!locked}
-        minZoom={0.35}
-        maxZoom={1.5}
-        defaultEdgeOptions={{
-          type: "smoothstep",
-          animated: false,
-        }}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={18} size={1} color="var(--border)" />
+      <div className="absolute inset-0 min-h-0 min-w-0">
+        <ReactFlow
+          style={{ width: "100%", height: "100%" }}
+          nodes={decoratedNodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onInit={(instance) => {
+            flowInstanceRef.current = instance;
+            scheduleInitialFit();
+          }}
+          onNodesChange={locked ? undefined : onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={(_event, node) => selectForNode(node)}
+          onNodeDragStop={handleNodeDragStop}
+          nodesDraggable={!locked}
+          nodesConnectable={false}
+          elementsSelectable={!locked}
+          minZoom={0.35}
+          maxZoom={1.5}
+          defaultEdgeOptions={{
+            type: "smoothstep",
+            animated: false,
+          }}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={18} size={1} color="var(--border)" />
 
-        <Controls
-          showInteractive={false}
-          className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card !shadow-sm"
-        />
+          <Controls
+            showInteractive={false}
+            className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card !shadow-sm"
+          />
 
-        <MiniMap
-          nodeStrokeWidth={2}
-          pannable
-          zoomable
-          className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card"
-        />
-      </ReactFlow>
+          <MiniMap
+            nodeStrokeWidth={2}
+            pannable
+            zoomable
+            className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card"
+          />
+        </ReactFlow>
+      </div>
 
       <button
         type="button"
