@@ -8,6 +8,7 @@
 import "express-async-errors";
 import express from "express";
 import { config } from "./config.js";
+import { getPool } from "./db/pool.js";
 import { Sentry } from "./lib/sentry.js";
 import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
@@ -16,6 +17,7 @@ import { webhooksRouter } from "./routes/webhooks.js";
 import { authRouter } from "./routes/auth.js";
 import { authEmailRouter } from "./routes/authEmail.js";
 import { campaignsRouter } from "./routes/campaigns.js";
+import { journeyRuntimeRouter } from "./routes/journeyRuntime.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
@@ -23,6 +25,7 @@ import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
 import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
 import { fieldDefinitionsRouter } from "./routes/fieldDefinitions.js";
 import { onboardingRouter } from "./routes/onboarding.js";
+import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
 
@@ -84,9 +87,29 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(legalRouter);
   app.use(dataDeletionRouter);
   app.use(webhooksRouter);
+
+  // Instagram webhook uses req.rawBody captured by the global JSON middleware
+  // above so Meta's HMAC signature is verified against the exact request bytes.
+  const instagramWebhookVerifyToken =
+    config.metaWebhookVerifyToken;
+
+  const instagramAppSecret =
+    config.metaAppSecret;
+
+  if (
+    instagramWebhookVerifyToken &&
+    instagramAppSecret
+  ) {
+    app.use(
+      createProductionInstagramWebhookRouter(
+        getPool(),
+      ),
+    );
+  }
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(campaignsRouter);
+  app.use(journeyRuntimeRouter);
   app.use(billingRouter);
   app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
   app.use(leadsRouter);

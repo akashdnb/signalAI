@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: signalai-server
+    name: signalai-api
     env: node
-    plan: free
+    plan: starter
     rootDir: server
     buildCommand: npm ci --include=dev && npm run build && npm run migrate:up
     # --include=dev is required: NODE_ENV=production (below) makes npm omit
@@ -42,8 +42,10 @@ services:
 
       # Render Free deployment:
       # run the JourneyActionWorker inside the API web process.
+      # Render Paid deployment:
+      # JourneyActionWorker runs in a separate Background Worker.
       - key: JOURNEY_WORKER_ENABLED
-        value: "true"
+        value: "false"
       - key: JOURNEY_WORKER_CONCURRENCY
         value: "1"
       - key: JOURNEY_WORKER_POLL_INTERVAL_MS
@@ -154,3 +156,30 @@ services:
       # viewer's own machine. Set it to the signalai-server URL.
       - key: VITE_API_BASE_URL
         sync: false
+
+  # Paid deployment only:
+  #
+  # This process is the dedicated JourneyActionWorker.
+  # It consumes durable actions from PostgreSQL and sends provider
+  # requests independently from the HTTP/API process.
+  - type: worker
+    name: signalai-journey-worker
+    runtime: node
+    plan: starter
+    rootDir: server
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run worker:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEYS
+        sync: false
+      - key: JOURNEY_WORKER_CONCURRENCY
+        value: "2"
+      - key: JOURNEY_WORKER_POLL_INTERVAL_MS
+        value: "250"
+      - key: JOURNEY_WORKER_MAX_POLL_INTERVAL_MS
+        value: "5000"
+

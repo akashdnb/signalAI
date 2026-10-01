@@ -11,6 +11,9 @@ import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs
 import { createLLMProviderFromEnv, createEmbeddingProviderFromEnv } from "./llm/factory.js";
 import type { LLMProvider } from "./llm/provider.js";
 import { createLeadEventReplyHandler } from "./services/leadEventReplyHandler.js";
+import {
+  createProductionJourneyWorker,
+} from "./domain/journey/actions/createProductionWorker.js";
 import { pruneExpiredNonces } from "./db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "./db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "./db/emailOtpCodes.js";
@@ -18,6 +21,8 @@ import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintena
 import { ensureUsageRollupQueue, startUsageRollupWorker } from "./queue/usageRollupQueue.js";
 import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
 import { ensureUsernameResolutionQueue, startUsernameResolutionWorker } from "./queue/usernameResolutionQueue.js";
+import { ensureInstagramInboundQueue } from "./queue/instagramInboundQueue.js";
+import { startInstagramInboundWorker } from "./queue/instagramInboundWorker.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
 
 /**
@@ -72,6 +77,14 @@ async function main() {
   await startAlertsWorker(boss, pool);
   await ensureUsernameResolutionQueue(boss);
   await startUsernameResolutionWorker(boss, pool, config.tokenKeyring);
+
+  // 5F: inbound Instagram webhooks are persisted + queued before HTTP
+  // acknowledgement; this worker performs the durable journey processing.
+  await ensureInstagramInboundQueue(boss);
+  await startInstagramInboundWorker(
+    boss,
+    pool,
+  );
 
   await startLeadEventsWorker(
     boss,
@@ -146,6 +159,41 @@ async function main() {
       await sendTelegramAlert(`⚠️ Token refresh failure(s) — Account Health Monitoring:\n${JSON.stringify(failures)}`);
     }
   });
+
+  /*
+   * Render Free:
+   *
+   *   The API process also owns the JourneyActionWorker.
+   *
+   * Render Paid:
+   *
+   *   Set JOURNEY_WORKER_ENABLED=false on the API service and run
+   *   npm run worker:prod in a separate Background Worker.
+   *
+   * The worker's durable queue is PostgreSQL-backed, so a process restart
+   * does not lose pending actions.
+   */
+  if (config.journeyWorkerEnabled) {
+    const journeyWorkerProcess =
+      createProductionJourneyWorker({
+        pool,
+      });
+
+    console.info(
+      "Journey action worker enabled in API process",
+    );
+
+    void journeyWorkerProcess.loop.start().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error(
+        "Embedded journey worker stopped unexpectedly",
+        error,
+      );
+
+      Sentry.captureException(error);
+      process.exit(1);
+    });
+  }
 
   const app = createApp({ llmProvider, embeddingProvider });
   app.listen(config.port, () => {

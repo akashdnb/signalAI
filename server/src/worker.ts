@@ -1,0 +1,62 @@
+import { config } from "./config.js";
+import {
+  createProductionJourneyWorker,
+} from "./domain/journey/actions/createProductionWorker.js";
+
+function assertWorkerConfig(): void {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is required for the journey worker",
+    );
+  }
+
+  if (config.tokenKeyring.size === 0) {
+    throw new Error(
+      "TOKEN_ENCRYPTION_KEYS is required for the journey worker",
+    );
+  }
+}
+
+async function main(): Promise<void> {
+  assertWorkerConfig();
+
+  const workerProcess =
+    createProductionJourneyWorker();
+
+  let shuttingDown = false;
+
+  const shutdown = async (
+    signal: string,
+  ): Promise<void> => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+
+    console.info(
+      `Received ${signal}; shutting down journey worker`,
+    );
+
+    await workerProcess.stop();
+  };
+
+  process.once("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+
+  process.once("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
+
+  await workerProcess.loop.start();
+}
+
+void main().catch((error) => {
+  console.error(
+    "Journey worker failed to start",
+    error,
+  );
+
+  process.exit(1);
+});
