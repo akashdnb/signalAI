@@ -73,6 +73,66 @@ describe("generateReply", () => {
     expect(result.text).toBe("Sure, here's the info you asked about!");
   });
 
+  // SLICE A: qualification extraction must work for AI replies even when
+  // no milestone is configured, reusing the SAME provider call — no second
+  // LLM call, no separate request.
+  describe("qualification extraction (SLICE A)", () => {
+    it("extracts qualification from a structured {reply, qualification} envelope, same call as the reply", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({
+            reply: "Great, let me get you pricing for that.",
+            qualification: { intent: "ready_to_buy", need: "3BHK apartment", budget: "₹1.5 crore", location: "Bangalore" },
+          }),
+        }),
+      );
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider);
+
+      expect(result.text).toBe("Great, let me get you pricing for that.");
+      expect(result.qualification).toEqual({
+        intent: "ready_to_buy",
+        need: "3BHK apartment",
+        budget: "₹1.5 crore",
+        location: "Bangalore",
+      });
+    });
+
+    it("requests json_object response format from the provider", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      await generateReply(ctx, provider);
+
+      expect(generateReplyMock.mock.calls[0]![0].responseFormat).toBe("json_object");
+    });
+
+    it("treats plain prose (no JSON envelope) as the whole reply, with no qualification — pre-existing contract unchanged", async () => {
+      const provider = mockProvider(vi.fn().mockResolvedValue({ text: "Sure, here's the info you asked about!" }));
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider);
+
+      expect(result.text).toBe("Sure, here's the info you asked about!");
+      expect(result.qualification).toBeUndefined();
+    });
+
+    it("does not surface qualification fields that are missing/ambiguous", async () => {
+      const provider = mockProvider(
+        vi.fn().mockResolvedValue({
+          text: JSON.stringify({ reply: "Noted!", qualification: { intent: null, need: null, budget: null, location: "Mumbai" } }),
+        }),
+      );
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }) });
+
+      const result = await generateReply(ctx, provider);
+
+      expect(result.qualification).toEqual({ location: "Mumbai" });
+    });
+  });
+
   it("passes systemPrompt and userMessage as separate fields — never concatenates untrusted text into the system prompt", async () => {
     const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
     const provider = mockProvider(generateReplyMock);
@@ -210,6 +270,37 @@ describe("generateReply", () => {
     const call = generateReplyMock.mock.calls[0]![0];
     expect(call.systemPrompt).toContain("private direct message");
     expect(call.systemPrompt).not.toContain("PUBLIC comment reply");
+  });
+
+  // Comment Reply vs DM Reply tier audit: the opening line used to
+  // unconditionally describe every reply as being "to a comment", even for
+  // a DM-triggered one — actively wrong, not just vague, for the dm tier.
+  describe("tier-explicit role description (Comment Reply vs DM Reply audit)", () => {
+    it("the comment tier's prompt explicitly describes a public comment, never DM/private wording", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }), tier: "comment" });
+
+      await generateReply(ctx, provider);
+      const systemPrompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+
+      expect(systemPrompt).toContain("PUBLIC INSTAGRAM COMMENT");
+      expect(systemPrompt).not.toContain("PRIVATE INSTAGRAM DIRECT MESSAGE");
+      expect(systemPrompt).not.toContain("private direct message conversation");
+    });
+
+    it("the dm tier's prompt explicitly describes a private DM, never public-comment wording", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: "ok" });
+      const provider = mockProvider(generateReplyMock);
+      const ctx = makeContext({ campaign: makeCampaign({ replyMode: "ai_generated" }), tier: "dm" });
+
+      await generateReply(ctx, provider);
+      const systemPrompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+
+      expect(systemPrompt).toContain("PRIVATE INSTAGRAM DIRECT MESSAGE");
+      expect(systemPrompt).not.toContain("PUBLIC INSTAGRAM COMMENT");
+      expect(systemPrompt).not.toMatch(/to a (public )?comment containing the keyword/i);
+    });
   });
 
   // B10: the cap is checked immediately before the provider call, inside

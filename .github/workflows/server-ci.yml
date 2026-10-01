@@ -17,7 +17,13 @@ jobs:
         working-directory: server
     services:
       postgres:
-        image: postgres:16
+        # Plain postgres:16 doesn't ship the `vector` extension that the
+        # knowledge-base migration (1758240000038_create-knowledge-base)
+        # requires — `create extension if not exists vector` fails with
+        # "extension \"vector\" is not available" and every migration
+        # after it never runs. pgvector/pgvector:pg16 is the same Postgres
+        # 16 with pgvector pre-built in, nothing else different.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: signalai
           POSTGRES_PASSWORD: signalai
@@ -46,4 +52,11 @@ jobs:
       # and its absence is why a broken build reached the deploy.
       - run: npm run build
       - run: npx node-pg-migrate up --migration-file-language sql
-      - run: npm test
+      # --no-file-parallelism: CI runners have far fewer CPU cores than a
+      # typical dev machine, and several queue test files (leadEventsQueue,
+      # dlqUnblocks, deadLetterEvidence, ...) share the same pgboss.job
+      # table — observed failing here with mismatched job counts/ids under
+      # default parallelism, never reproducing when any one of those files
+      # is run in isolation. Serializing test files removes the
+      # cross-file race rather than chasing it as a "flaky" production bug.
+      - run: npm test -- --run --no-file-parallelism

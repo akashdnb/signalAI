@@ -6,13 +6,15 @@ import {
   type Deal,
   type FieldDefinition,
   type LeadDetail,
+  type LeadIntelligence,
+  type LeadIntelligenceHistoryEntry,
   type LeadNote,
   type LeadTag,
   type PipelineStage,
   type TenantMember,
 } from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatDate, handoffLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, handoffLabel, scoreBandLabel } from "../lib/leadFormatting";
 
 export function LeadDetailPage() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
@@ -26,6 +28,10 @@ export function LeadDetailPage() {
   const [members, setMembers] = useState<TenantMember[] | null>(null);
   const [capturedFacts, setCapturedFacts] = useState<Record<string, string> | null>(null);
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[] | null>(null);
+  const [intelligence, setIntelligence] = useState<LeadIntelligence | null | undefined>(undefined);
+  const [intelligenceHistory, setIntelligenceHistory] = useState<LeadIntelligenceHistoryEntry[] | null>(null);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "conversation" | "activities" | "notes">("overview");
 
@@ -57,6 +63,41 @@ export function LeadDetailPage() {
     setFieldDefinitions(fd);
   }
 
+  // Loaded separately from loadAll: a failure fetching intelligence (a
+  // transient error, a tenant that's never had scoring run) shouldn't take
+  // down the whole Overview tab — it only disables this one card.
+  async function loadIntelligence() {
+    if (!tenantId || !leadId) return;
+    setIntelligenceError(null);
+    try {
+      const [current, history] = await Promise.all([
+        api.getLeadIntelligence(tenantId, leadId),
+        api.getLeadIntelligenceHistory(tenantId, leadId),
+      ]);
+      setIntelligence(current);
+      setIntelligenceHistory(history);
+    } catch (err) {
+      setIntelligence(null);
+      setIntelligenceHistory(null);
+      setIntelligenceError(err instanceof Error ? err.message : "Failed to load lead intelligence");
+    }
+  }
+
+  async function handleRecalculateIntelligence() {
+    if (!tenantId || !leadId) return;
+    setRecalculating(true);
+    setIntelligenceError(null);
+    try {
+      const refreshed = await api.recalculateLeadIntelligence(tenantId, leadId);
+      setIntelligence(refreshed);
+      setIntelligenceHistory(await api.getLeadIntelligenceHistory(tenantId, leadId));
+    } catch (err) {
+      setIntelligenceError(err instanceof Error ? err.message : "Failed to recalculate lead intelligence");
+    } finally {
+      setRecalculating(false);
+    }
+  }
+
   useEffect(() => {
     // AppShell already guards the session before this page ever mounts —
     // this effect only needs to load the lead's own data.
@@ -70,6 +111,7 @@ export function LeadDetailPage() {
       }
       setError(err instanceof Error ? err.message : "Failed to load lead");
     });
+    loadIntelligence();
     api.markLeadRead(tenantId, leadId).catch(() => {
       // Best-effort — an unread badge staying on somewhere else isn't worth
       // surfacing an error banner over.
@@ -319,6 +361,82 @@ export function LeadDetailPage() {
                   </Fragment>
                 ))}
               </dl>
+            )}
+          </section>
+
+          <section className="card">
+            <div className="button-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ margin: 0 }}>Lead Intelligence</h2>
+              <button className="btn-secondary btn-small" disabled={recalculating} onClick={handleRecalculateIntelligence}>
+                {recalculating ? "Recalculating…" : "Recalculate"}
+              </button>
+            </div>
+
+            {intelligenceError && <div className="banner banner-error">{intelligenceError}</div>}
+
+            {intelligence === undefined ? (
+              <p className="muted">Loading…</p>
+            ) : intelligence === null ? (
+              <p className="muted">No intelligence yet — the AI hasn't learned enough about this lead to score it.</p>
+            ) : (
+              <>
+                <div className="field-group">
+                  <div>
+                    <div className="muted" style={{ fontSize: "0.85rem" }}>
+                      Lead Score
+                    </div>
+                    <div style={{ fontSize: "1.8rem", fontWeight: 600 }}>
+                      {intelligence.score}
+                      <span className={scoreBandLabel(intelligence.scoreBand).className}>{scoreBandLabel(intelligence.scoreBand).text}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <dl className="kv">
+                  <dt>Intent</dt>
+                  <dd>{intelligence.intent ? formatIntentLabel(intelligence.intent) : "—"}</dd>
+                  <dt>Need</dt>
+                  <dd>{intelligence.need ?? "—"}</dd>
+                  <dt>Budget</dt>
+                  <dd>{intelligence.budgetValue !== null ? formatBudgetValue(intelligence.budgetValue) : (intelligence.budgetText ?? "—")}</dd>
+                  <dt>Location</dt>
+                  <dd>{intelligence.location ?? "—"}</dd>
+                </dl>
+
+                {intelligence.scoreReasons.length > 0 && (
+                  <>
+                    <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}>
+                      Score Reasons
+                    </div>
+                    <ul className="list">
+                      {intelligence.scoreReasons.map((reason, i) => (
+                        <li className="list-item" key={i} style={{ display: "block" }}>
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {intelligenceHistory !== null && intelligenceHistory.length > 1 && (
+                  <>
+                    <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}>
+                      History
+                    </div>
+                    <ul className="list">
+                      {intelligenceHistory.slice(0, 10).map((entry) => (
+                        <li className="list-item" key={entry.id} style={{ display: "block" }}>
+                          <div>
+                            {entry.score} · {scoreBandLabel(entry.scoreBand).text}
+                            {entry.intent && <span className="muted"> — Intent: {formatIntentLabel(entry.intent)}</span>}
+                          </div>
+                          <div className="timeline-meta">{formatDate(entry.createdAt)}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
             )}
           </section>
 

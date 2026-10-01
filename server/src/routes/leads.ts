@@ -12,6 +12,8 @@ import {
 } from "../db/leads.js";
 import { getLeadTimelinePage } from "../db/leadTimeline.js";
 import { getCapturedFacts } from "../db/capturedFacts.js";
+import { getLeadIntelligence, listLeadIntelligenceHistory } from "../db/leadIntelligence.js";
+import { recalculateLeadIntelligence } from "../services/leadScoring.js";
 import { addLeadNote, listLeadNotes } from "../db/leadNotes.js";
 import { findOrCreateTag, listTagsForTenant, listTagsForLead, addTagToLead, removeTagFromLead } from "../db/tags.js";
 import { createDeal, listDealsForLead, updateDealStage, type DealStage } from "../db/deals.js";
@@ -135,6 +137,34 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) =>
   });
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   return res.status(200).json(lead);
+});
+
+// Phase 2C Lead Intelligence: current qualification projection and score.
+leadsRouter.get("/tenants/:tenantId/leads/:leadId/intelligence", async (req, res) => {
+  const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+
+  const intelligence = await getLeadIntelligence(getPool(), tenantId, leadId);
+  return res.status(200).json(intelligence);
+});
+
+leadsRouter.get("/tenants/:tenantId/leads/:leadId/intelligence/history", async (req, res) => {
+  const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+
+  const history = await listLeadIntelligenceHistory(getPool(), tenantId, leadId);
+  return res.status(200).json(history);
+});
+
+leadsRouter.post("/tenants/:tenantId/leads/:leadId/intelligence/recalculate", async (req, res) => {
+  const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+
+  const intelligence = await recalculateLeadIntelligence(getPool(), tenantId, leadId);
+  return res.status(200).json(intelligence);
 });
 
 // Captured Facts panel (UI revamp R3): what the Milestone Engine has

@@ -23,6 +23,7 @@ import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
 import { ensureUsernameResolutionQueue, startUsernameResolutionWorker } from "./queue/usernameResolutionQueue.js";
 import { ensureInstagramInboundQueue } from "./queue/instagramInboundQueue.js";
 import { startInstagramInboundWorker } from "./queue/instagramInboundWorker.js";
+import { ensureTenantScoringRefreshQueue, startTenantScoringRefreshWorker } from "./queue/tenantScoringRefreshQueue.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
 
 /**
@@ -77,6 +78,8 @@ async function main() {
   await startAlertsWorker(boss, pool);
   await ensureUsernameResolutionQueue(boss);
   await startUsernameResolutionWorker(boss, pool, config.tokenKeyring);
+  await ensureTenantScoringRefreshQueue(boss);
+  await startTenantScoringRefreshWorker(boss, pool);
 
   // 5F: inbound Instagram webhooks are persisted + queued before HTTP
   // acknowledgement; this worker performs the durable journey processing.

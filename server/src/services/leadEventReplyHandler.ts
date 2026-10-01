@@ -22,6 +22,8 @@ import {
   recordMilestoneAdvancement,
 } from "../db/milestones.js";
 import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
+import { qualificationToCapturedFacts } from "./leadQualification.js";
+import { recalculateLeadIntelligence } from "./leadScoring.js";
 import { getFieldDefinitionValueTypes } from "../db/fieldDefinitions.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
@@ -159,22 +161,30 @@ export function createLeadEventReplyHandler(
 
     const milestones = await listMilestones(pool, job.tenantId, campaign.id);
     const sourceText = (isCommentTrigger ? event.commentText : event.dmText) ?? "";
-    // Conversation memory: prior turns for this lead, fed into the LLM
-    // alongside sourceText so "what's my name?" right after "my name is
-    // akash" can actually be answered — see conversationHistory.ts. Skipped
-    // entirely for a rule_based campaign, which never calls the provider
-    // and so never reads ctx.history.
-    const history =
-      campaign.replyMode === "rule_based"
-        ? []
-        : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns);
-    // Governs prompt length/strictness (guardrails.ts), not delivery — a
+    // Governs prompt length/strictness (guardrails.ts) AND, below, which
+    // conversation history is even fetched — not delivery. A
     // message-triggered event is inherently private-origin, so it gets the
     // fuller "dm" prompt even if the campaign's reply_channel also tries a
     // public comment reply (which, for a DM-triggered event, never has a
     // comment id to attach to and so never actually fires — see
     // commentReady above).
     const tier = isCommentTrigger ? "comment" : "dm";
+    // Conversation memory: prior turns for this lead, fed into the LLM
+    // alongside sourceText so "what's my name?" right after "my name is
+    // akash" can actually be answered — see conversationHistory.ts. Skipped
+    // entirely for a rule_based campaign, which never calls the provider
+    // and so never reads ctx.history.
+    //
+    // Comment Reply vs DM Reply privacy boundary: `tier` here is what makes
+    // a comment-triggered reply's history PUBLIC-ONLY — passing it through
+    // restricts the query itself to same-channel rows, so a lead's private
+    // DM history is never fetched for a public reply at all, not merely
+    // withheld after the fact. The dm tier's existing mixed-channel history
+    // is unchanged.
+    const history =
+      campaign.replyMode === "rule_based"
+        ? []
+        : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns, tier);
     // B10: one guard per event, shared by whichever path below actually
     // calls the provider — rule-based replies never reach it, so they
     // never count against the cap.
@@ -212,6 +222,7 @@ export function createLeadEventReplyHandler(
     // R6-01: milestone progress (captured facts and/or advancement) is
     // computed here but only committed after a confirmed send, below.
     let commitMilestoneProgress: (() => Promise<void>) | null = null;
+    let commitQualification: (() => Promise<void>) | undefined;
 
     if (milestones.length === 0 || campaign.replyMode === "rule_based") {
       // No Milestone Engine configured, or the campaign opted out of AI
@@ -236,6 +247,21 @@ export function createLeadEventReplyHandler(
       requiresHumanHandoff = reply.requiresHumanHandoff ?? false;
       fellBackReason = reply.fellBackReason;
       usage = reply.usage;
+
+      // SLICE A: an AI-generated reply with no milestone configured still
+      // extracts qualification from the same provider call (replyEngine.ts)
+      // — no second LLM call. A rule_based campaign never reaches
+      // generateReply's AI branch, so reply.qualification is always absent
+      // for it and this is a no-op, same deferred-commit pattern as the
+      // milestone branch below.
+      if (reply.qualification) {
+        const qualificationFacts = qualificationToCapturedFacts(reply.qualification);
+        if (Object.keys(qualificationFacts).length > 0) {
+          commitQualification = async () => {
+            await mergeCapturedFacts(pool, job.tenantId, job.leadId, qualificationFacts);
+          };
+        }
+      }
     } else {
       let activeMilestone = lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
@@ -289,6 +315,25 @@ export function createLeadEventReplyHandler(
         effectiveSpendGuard,
         rag,
       );
+
+      // Qualification comes from the same structured model response as the
+      // normal milestone decision. Defer persistence until delivery succeeds,
+      // so a reply that never reaches Instagram cannot mutate lead state.
+  
+      if (result.qualification) {
+        const qualificationFacts = qualificationToCapturedFacts(result.qualification);
+
+        if (Object.keys(qualificationFacts).length > 0) {
+          commitQualification = async () => {
+            await mergeCapturedFacts(
+              pool,
+              job.tenantId,
+              job.leadId,
+              qualificationFacts,
+            );
+          };
+        }
+      }
 
       // Multi-field capture, partial-across-turns: a field answered this
       // turn must be persisted even when the milestone isn't fully
@@ -429,12 +474,27 @@ export function createLeadEventReplyHandler(
       });
     }
 
-    // R6-01: only commit milestone advancement once at least one channel
+    // R6-01: only commit lead-state mutations once at least one channel
     // actually delivered — a throw above propagates out of this handler
     // and the job retries with nothing committed yet, so the retry redoes
-    // the LLM/milestone work cleanly instead of skipping ahead.
-    if (commitMilestoneProgress && delivered) {
-      await commitMilestoneProgress();
+    // the LLM work cleanly instead of persisting state for an undelivered reply.
+    if (delivered) {
+      if (commitQualification) {
+        await commitQualification();
+      }
+
+      if (commitMilestoneProgress) {
+        await commitMilestoneProgress();
+      }
+
+      // Qualification and engagement are now reflected in the durable lead
+      // intelligence projection. This is deterministic and does not make
+      // another LLM request.
+      await recalculateLeadIntelligence(
+        pool,
+        job.tenantId,
+        job.leadId,
+      );
     }
 
     return { advance: true };

@@ -32,6 +32,40 @@ function mockProvider(impl: LLMProvider["generateReply"]): LLMProvider {
 }
 
 describe("runMilestoneCheck", () => {
+  it("extracts qualification from the same structured response", async () => {
+    const provider = mockProvider(
+      vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          reply: "Perfect.",
+          milestone_satisfied: false,
+          qualification: {
+            intent: "ready_to_buy",
+            need: "3BHK apartment",
+            budget: "₹1.5 crore",
+            location: "Bangalore",
+          },
+        }),
+      }),
+    );
+
+    const result = await runMilestoneCheck(
+      {
+        milestone: makeMilestone({ captureFields: [] }),
+        capturedFactsSoFar: {},
+        sourceText: "I want a 3BHK in Bangalore around ₹1.5 crore",
+        tier: "dm",
+      },
+      provider,
+    );
+
+    expect(result.qualification).toEqual({
+      intent: "ready_to_buy",
+      need: "3BHK apartment",
+      budget: "₹1.5 crore",
+      location: "Bangalore",
+    });
+  });
+
   it("parses structured output and reports satisfaction with the captured value", async () => {
     const provider = mockProvider(
       vi.fn().mockResolvedValue({ text:
@@ -767,6 +801,39 @@ describe("runMilestoneCheck", () => {
       // phrase, so it's accepted exactly like the no-registry behavior.
       expect(result.satisfied).toBe(true);
       expect(result.capturedValues).toEqual({ budget: "not a number" });
+    });
+  });
+
+  // Comment Reply vs DM Reply tier audit: same distinction required of
+  // replyEngine.ts's prompt — explicit public-comment wording for the
+  // comment tier, explicit private-DM wording for the dm tier, never both.
+  describe("tier-explicit prompt wording (Comment Reply vs DM Reply audit)", () => {
+    it("the comment tier's prompt explicitly describes a public comment reply, never private-DM wording", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
+      const provider = mockProvider(generateReplyMock);
+
+      await runMilestoneCheck(
+        { milestone: makeMilestone({ captureFields: [] }), capturedFactsSoFar: {}, sourceText: "hi", tier: "comment" },
+        provider,
+      );
+
+      const systemPrompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+      expect(systemPrompt).toContain("PUBLIC comment reply");
+      expect(systemPrompt).not.toContain("private direct message");
+    });
+
+    it("the dm tier's prompt explicitly describes a private direct message, never public-comment wording", async () => {
+      const generateReplyMock = vi.fn().mockResolvedValue({ text: JSON.stringify({ reply: "ok", milestone_satisfied: false }) });
+      const provider = mockProvider(generateReplyMock);
+
+      await runMilestoneCheck(
+        { milestone: makeMilestone({ captureFields: [] }), capturedFactsSoFar: {}, sourceText: "hi", tier: "dm" },
+        provider,
+      );
+
+      const systemPrompt = generateReplyMock.mock.calls[0]![0].systemPrompt as string;
+      expect(systemPrompt).toContain("private direct message");
+      expect(systemPrompt).not.toContain("PUBLIC comment reply");
     });
   });
 });
