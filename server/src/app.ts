@@ -23,6 +23,7 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
 import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
 import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
+import { leadScoringRulesRouter } from "./routes/leadScoringRules.js";
 import { fieldDefinitionsRouter } from "./routes/fieldDefinitions.js";
 import { onboardingRouter } from "./routes/onboarding.js";
 import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
@@ -115,6 +116,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(leadsRouter);
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);
+  app.use(leadScoringRulesRouter);
   app.use(fieldDefinitionsRouter);
   app.use(onboardingRouter);
 

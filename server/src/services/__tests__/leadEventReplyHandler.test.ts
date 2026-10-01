@@ -979,6 +979,81 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
         await getLeadIntelligence(pool, tenant.id, lead.id),
       ).toBeNull();
     });
+
+    // SLICE A: an ai_generated campaign with NO milestones configured must
+    // still extract qualification, reusing the same provider call that
+    // produced the reply — not a second LLM request.
+    it("extracts and persists qualification for an ai_generated campaign with no milestones", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "No milestones", ["BUY"], { replyMode: "ai_generated" });
+      // Deliberately no setCampaignMilestones call — milestones.length === 0.
+
+      const provider = mockProvider([
+        JSON.stringify({
+          reply: "Got it, let me help with that.",
+          qualification: { intent: "ready_to_buy", need: "3BHK apartment", budget: "₹1.5 crore", location: "Bangalore" },
+        }),
+      ]);
+
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "BUY", "I want a 3BHK in Bangalore around ₹1.5 crore");
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(provider.generateReply).toHaveBeenCalledTimes(1); // one call for both the reply and the qualification
+      expect(await getCapturedFacts(pool, tenant.id, lead.id)).toMatchObject({
+        intent: "ready_to_buy",
+        need: "3BHK apartment",
+        budget: "₹1.5 crore",
+        location: "Bangalore",
+      });
+
+      const intelligence = await getLeadIntelligence(pool, tenant.id, lead.id);
+      expect(intelligence).not.toBeNull();
+      expect(intelligence!.intent).toBe("ready_to_buy");
+      expect(intelligence!.score).toBe(75);
+    });
+
+    it("does not persist qualification extracted from a no-milestone AI reply when Instagram delivery fails", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "No milestones delivery failure", ["BUY"], { replyMode: "ai_generated" });
+
+      const provider = mockProvider([
+        JSON.stringify({
+          reply: "Got it, let me help with that.",
+          qualification: { intent: "ready_to_buy", need: "3BHK apartment", budget: "₹1.5 crore", location: "Bangalore" },
+        }),
+      ]);
+
+      vi.mocked(sendInstagramMessage).mockRejectedValueOnce(new Error("Instagram unavailable"));
+
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "BUY", "I want a 3BHK in Bangalore around ₹1.5 crore");
+
+      await expect(
+        handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 }),
+      ).rejects.toThrow("Instagram unavailable");
+
+      expect(await getCapturedFacts(pool, tenant.id, lead.id)).toEqual({});
+      expect(await getLeadIntelligence(pool, tenant.id, lead.id)).toBeNull();
+    });
+
+    it("never calls the provider for a rule_based campaign just to extract qualification", async () => {
+      const pool = getPool();
+      const tenant = await createTenant(pool, "creator-a");
+      const campaign = await createCampaign(pool, tenant.id, "Rule based", ["BUY"], { replyMode: "rule_based" });
+
+      const provider = mockProvider(["should never be used"]);
+      const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "BUY", "I want a 3BHK in Bangalore around ₹1.5 crore");
+
+      await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+      expect(provider.generateReply).not.toHaveBeenCalled();
+      expect(await getCapturedFacts(pool, tenant.id, lead.id)).toEqual({});
+    });
   });
 
   describe("Phase 2C RAG + Client Guardrails integration", () => {

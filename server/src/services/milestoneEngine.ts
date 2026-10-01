@@ -10,6 +10,7 @@ import type { RagDependencies } from "./replyEngine.js";
 import { toneInstruction, languageInstruction } from "../lib/campaignPromptText.js";
 import type { CampaignLanguage, CampaignTone } from "../db/campaigns.js";
 import { normalizeQualification, type QualificationExtraction } from "./leadQualification.js";
+import { parseFirstMatchingJsonObject } from "./structuredOutput.js";
 
 export interface MilestoneCheckContext {
   milestone: Milestone;
@@ -148,58 +149,35 @@ function buildSystemPrompt(ctx: MilestoneCheckContext, retrievedChunks: Retrieve
 
 /**
  * R3-09 fix: the previous /\{[\s\S]*\}/ was greedy end-to-end, spanning to
- * the LAST `}` in the response. Trying only the FIRST `{` (a single
- * brace-depth scan) isn't enough either — prose containing an earlier,
- * textually-unrelated brace (e.g. a quoted `{fitness}` in the user's bio)
- * would be picked as a balanced-but-wrong span, never reaching the real
- * JSON further on. This tries every `{`-starting balanced span in order
- * and returns the text of the first one that both parses and has the
- * right shape — a candidate that merely balances but isn't valid JSON
- * (or valid JSON of the wrong shape) is skipped, not treated as failure.
+ * the LAST `}` in the response. extractJsonObjectCandidates (structuredOutput.ts)
+ * tries every `{`-starting balanced span in order instead — a candidate that
+ * merely balances but isn't valid JSON (or valid JSON of the wrong shape) is
+ * skipped, not treated as failure.
  */
-function extractJsonObjectCandidates(raw: string): string[] {
-  const candidates: string[] = [];
-  for (let start = 0; start < raw.length; start++) {
-    if (raw[start] !== "{") continue;
-    let depth = 0;
-    for (let i = start; i < raw.length; i++) {
-      if (raw[i] === "{") depth++;
-      else if (raw[i] === "}") {
-        depth--;
-        if (depth === 0) {
-          candidates.push(raw.slice(start, i + 1));
-          break;
-        }
-      }
-    }
-  }
-  return candidates;
-}
-
 function parseStructuredOutput(raw: string): StructuredModelOutput | null {
-  for (const candidate of extractJsonObjectCandidates(raw)) {
-    try {
-      const parsed = JSON.parse(candidate) as Partial<StructuredModelOutput>;
-      if (typeof parsed.reply === "string" && typeof parsed.milestone_satisfied === "boolean") {
-        const capturedValues =
-          parsed.captured_values && typeof parsed.captured_values === "object"
-            ? Object.fromEntries(
-                Object.entries(parsed.captured_values).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
-              )
-            : undefined;
+  const parsed = parseFirstMatchingJsonObject(
+    raw,
+    (value): value is Partial<StructuredModelOutput> =>
+      !!value &&
+      typeof value === "object" &&
+      typeof (value as Partial<StructuredModelOutput>).reply === "string" &&
+      typeof (value as Partial<StructuredModelOutput>).milestone_satisfied === "boolean",
+  );
+  if (!parsed) return null;
 
-        return {
-          reply: parsed.reply,
-          milestone_satisfied: parsed.milestone_satisfied,
-          captured_values: capturedValues && Object.keys(capturedValues).length > 0 ? capturedValues : undefined,
-          qualification: normalizeQualification(parsed.qualification),
-        };
-      }
-    } catch {
-      // not valid JSON — try the next candidate
-    }
-  }
-  return null;
+  const capturedValues =
+    parsed.captured_values && typeof parsed.captured_values === "object"
+      ? Object.fromEntries(
+          Object.entries(parsed.captured_values).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+        )
+      : undefined;
+
+  return {
+    reply: parsed.reply!,
+    milestone_satisfied: parsed.milestone_satisfied!,
+    captured_values: capturedValues && Object.keys(capturedValues).length > 0 ? capturedValues : undefined,
+    qualification: normalizeQualification(parsed.qualification),
+  };
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

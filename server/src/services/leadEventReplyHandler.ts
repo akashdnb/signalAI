@@ -239,6 +239,21 @@ export function createLeadEventReplyHandler(
       requiresHumanHandoff = reply.requiresHumanHandoff ?? false;
       fellBackReason = reply.fellBackReason;
       usage = reply.usage;
+
+      // SLICE A: an AI-generated reply with no milestone configured still
+      // extracts qualification from the same provider call (replyEngine.ts)
+      // — no second LLM call. A rule_based campaign never reaches
+      // generateReply's AI branch, so reply.qualification is always absent
+      // for it and this is a no-op, same deferred-commit pattern as the
+      // milestone branch below.
+      if (reply.qualification) {
+        const qualificationFacts = qualificationToCapturedFacts(reply.qualification);
+        if (Object.keys(qualificationFacts).length > 0) {
+          commitQualification = async () => {
+            await mergeCapturedFacts(pool, job.tenantId, job.leadId, qualificationFacts);
+          };
+        }
+      }
     } else {
       let activeMilestone = lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
