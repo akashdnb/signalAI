@@ -1,28 +1,40 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  addEdge,
   Background,
+  ConnectionMode,
+  ConnectionLineType,
   Controls,
   Handle,
   MiniMap,
+  MarkerType,
   Position,
   ReactFlow,
   useEdgesState,
   useNodesState,
+  type Connection,
   type Edge,
   type Node,
   type NodeProps,
+  type ReactFlowInstance,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 
-import { api, type Campaign, type JourneyEdge, type JourneyNode, type Milestone } from "../../api";
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
+  api,
+  type BuilderGraph,
+  type Campaign,
+  type JourneyEdge,
+  type JourneyNode,
+  type Milestone,
+} from "../../api";
+import {
   BotIcon,
+  ChevronDownIcon,
+  DotsVerticalIcon,
   HandshakeIcon,
   InstagramMarkIcon,
   ListChecksIcon,
-  LockIcon,
+  PlusIcon,
   SendIcon,
   TrashIcon,
 } from "../icons";
@@ -39,6 +51,7 @@ type FlowNodeData = {
   milestone?: Milestone;
   milestoneId?: string;
   milestoneIndex?: number;
+  ordinal?: number;
   selected?: boolean;
   locked?: boolean;
   onSelect?: () => void;
@@ -50,33 +63,166 @@ type FlowNode = Node<FlowNodeData>;
 
 function triggerSubtitle(campaign: Campaign): string {
   if (campaign.triggerSource === "message") return "Direct message";
-  if (campaign.triggerSource === "both") return "Comment on post or Reel, or DM";
+  if (campaign.triggerSource === "both") return "Comment + direct message";
   return "Comment on post or Reel";
+}
+
+const HANDLE_CLASS =
+  "!h-2 !w-2 !border-2 !border-card !bg-accent !cursor-crosshair";
+
+function FlowHandles({
+  source,
+  target,
+  selected,
+}: {
+  source?: boolean;
+  target?: boolean;
+  selected?: boolean;
+}) {
+  const positions = [
+    [Position.Top, "top"],
+    [Position.Right, "right"],
+    [Position.Bottom, "bottom"],
+    [Position.Left, "left"],
+  ] as const;
+
+  const className = `${HANDLE_CLASS} flow-handle ${
+    selected ? "!opacity-100" : "!opacity-0"
+  }`;
+
+  return (
+    <>
+      {target &&
+        positions.map(([position, id]) => (
+          <Handle
+            key={`target-${id}`}
+            type="target"
+            id={`target-${id}`}
+            position={position}
+            className={className}
+          />
+        ))}
+      {source &&
+        positions.map(([position, id]) => (
+          <Handle
+            key={`source-${id}`}
+            type="source"
+            id={`source-${id}`}
+            position={position}
+            className={className}
+          />
+        ))}
+    </>
+  );
+}
+
+function DotsMenu() {
+  return (
+    <button
+      type="button"
+      aria-label="Node actions"
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-subtle hover:bg-chip hover:text-ink"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <DotsVerticalIcon className="h-4 w-4" />
+    </button>
+  );
+}
+
+function MilestoneMenu({
+  locked,
+  onMove,
+  onRemove,
+}: {
+  locked: boolean;
+  onMove: (direction: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Goal actions"
+        className="flex h-6 w-6 items-center justify-center rounded-md text-subtle hover:bg-chip hover:text-ink"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        <DotsVerticalIcon className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close goal actions"
+            className="fixed inset-0 z-20 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 top-7 z-30 w-36 rounded-xl border border-line bg-card p-1.5 shadow-xl">
+            <button
+              type="button"
+              disabled={locked}
+              className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-ink hover:bg-chip disabled:opacity-40"
+              onClick={() => {
+                setOpen(false);
+                onMove(-1);
+              }}
+            >
+              Move up
+            </button>
+            <button
+              type="button"
+              disabled={locked}
+              className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-ink hover:bg-chip disabled:opacity-40"
+              onClick={() => {
+                setOpen(false);
+                onMove(1);
+              }}
+            >
+              Move down
+            </button>
+            <button
+              type="button"
+              disabled={locked}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-ink hover:bg-chip disabled:opacity-40"
+              onClick={() => {
+                setOpen(false);
+                onRemove();
+              }}
+            >
+              <TrashIcon className="h-3.5 w-3.5" />
+              Remove
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
   const campaign = data.campaign;
-
   if (!campaign) return null;
 
   return (
     <>
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
-
+      <FlowHandles source selected={Boolean(data.selected)} />
       <BuilderNode
         icon={InstagramMarkIcon}
         accent="pink"
+        eyebrow="Trigger"
         title="Trigger"
         subtitle={triggerSubtitle(campaign)}
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
+        menu={<DotsMenu />}
       >
-        Keywords: {campaign.keywords.slice(0, 9).join(", ")}
-        {campaign.keywords.length > 9 ? "…" : ""}
+        Keywords: {campaign.keywords.slice(0, 5).join(", ")}
+        {campaign.keywords.length > 5 ? "…" : ""}
       </BuilderNode>
     </>
   );
@@ -84,31 +230,21 @@ function TriggerFlowNode({ data }: NodeProps<FlowNode>) {
 
 function MessageFlowNode({ data }: NodeProps<FlowNode>) {
   const campaign = data.campaign;
-
   if (!campaign) return null;
 
   return (
     <>
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
-
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
-
+      <FlowHandles source target selected={Boolean(data.selected)} />
       <BuilderNode
         icon={BotIcon}
         accent="blue"
-        title={campaign.replyMode === "ai_generated" ? "AI Message" : "Reply Message"}
+        eyebrow={campaign.replyMode === "ai_generated" ? "AI Reply" : "Message"}
+        title={campaign.replyMode === "ai_generated" ? "AI Reply" : "Reply Message"}
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
+        menu={<DotsMenu />}
       >
-        {campaign.defaultReplyTemplate || "No reply template set yet."}
+        {campaign.defaultReplyTemplate || "No reply message configured yet."}
       </BuilderNode>
     </>
   );
@@ -117,75 +253,30 @@ function MessageFlowNode({ data }: NodeProps<FlowNode>) {
 function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
   const milestone = data.milestone;
   const index = data.milestoneIndex ?? 0;
-
   if (!milestone) return null;
 
   return (
     <>
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
-
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
+      <FlowHandles source target selected={Boolean(data.selected)} />
 
       <BuilderNode
         icon={ListChecksIcon}
         accent="green"
-        title={`${index + 1}. ${milestone.goalDescription}`}
+        eyebrow="Goal"
+        title={`${String(index + 1).padStart(2, "0")}. ${milestone.goalDescription}`}
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
         menu={
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              type="button"
-              aria-label="Move up"
-              disabled={index === 0 || data.locked}
-              className="flex h-6 w-6 items-center justify-center rounded text-subtle hover:bg-chip disabled:opacity-30"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onMove?.(-1);
-              }}
-            >
-              <ArrowUpIcon className="h-3.5 w-3.5" />
-            </button>
-
-            <button
-              type="button"
-              aria-label="Move down"
-              disabled={data.locked}
-              className="flex h-6 w-6 items-center justify-center rounded text-subtle hover:bg-chip disabled:opacity-30"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onMove?.(1);
-              }}
-            >
-              <ArrowDownIcon className="h-3.5 w-3.5" />
-            </button>
-
-            <button
-              type="button"
-              aria-label="Remove milestone"
-              disabled={data.locked}
-              className="flex h-6 w-6 items-center justify-center rounded text-subtle hover:bg-chip disabled:opacity-30"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onRemove?.();
-              }}
-            >
-              <TrashIcon className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <MilestoneMenu
+            locked={Boolean(data.locked)}
+            onMove={(direction) => data.onMove?.(direction)}
+            onRemove={() => data.onRemove?.()}
+          />
         }
       >
         {milestone.captureFields.length > 0
-          ? `Captures: ${milestone.captureFields.join(", ")}`
-          : "No fields captured yet."}
+          ? `Capture ${milestone.captureFields.join(", ")}`
+          : "Capture product interest"}
       </BuilderNode>
     </>
   );
@@ -194,21 +285,18 @@ function MilestoneFlowNode({ data }: NodeProps<FlowNode>) {
 function HandoffFlowNode({ data }: NodeProps<FlowNode>) {
   return (
     <>
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
-
+      <FlowHandles target selected={Boolean(data.selected)} />
       <BuilderNode
         icon={HandshakeIcon}
         accent="neutral"
+        eyebrow="Handoff"
         title="Handoff to Human"
-        subtitle="Pauses automation for this lead"
+        subtitle="Escalate to team when needed"
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
+        menu={<DotsMenu />}
       >
-        Triggered automatically when the AI can't confidently continue.
+        Pauses automation for this lead.
       </BuilderNode>
     </>
   );
@@ -216,24 +304,20 @@ function HandoffFlowNode({ data }: NodeProps<FlowNode>) {
 
 function LinkFlowNode({ data }: NodeProps<FlowNode>) {
   const campaign = data.campaign;
-
   if (!campaign) return null;
 
   return (
     <>
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!h-2 !w-2 !border-2 !border-card !bg-accent"
-      />
-
+      <FlowHandles target />
       <BuilderNode
         icon={SendIcon}
         accent="blue"
+        eyebrow="Action"
         title="Send Link"
         subtitle="Sends the CTA link"
         selected={Boolean(data.selected)}
         onClick={() => data.onSelect?.()}
+        menu={<DotsMenu />}
       >
         {campaign.ctaLink}
       </BuilderNode>
@@ -249,32 +333,19 @@ const nodeTypes = {
   action_link: LinkFlowNode,
 };
 
-function getMilestoneIndexFromNode(
-  node: JourneyNode,
+function getMilestoneIndex(
+  milestoneId: string | undefined,
+  ordinal: number | undefined,
   milestones: Milestone[],
 ): number {
-  const milestoneId =
-    typeof node.data?.milestoneId === "string"
-      ? node.data.milestoneId
-      : null;
-
   if (milestoneId) {
-    const index = milestones.findIndex(
-      (milestone) => milestone.id === milestoneId,
-    );
-
-    if (index >= 0) {
-      return index;
-    }
+    const byId = milestones.findIndex((milestone) => milestone.id === milestoneId);
+    if (byId >= 0) return byId;
   }
 
-  const ordinal =
-    typeof node.data?.ordinal === "number"
-      ? node.data.ordinal
-      : null;
-
   if (
-    ordinal !== null &&
+    typeof ordinal === "number" &&
+    Number.isInteger(ordinal) &&
     ordinal >= 0 &&
     ordinal < milestones.length
   ) {
@@ -282,6 +353,148 @@ function getMilestoneIndexFromNode(
   }
 
   return 0;
+}
+
+function looksLikeLegacyDefaultGraph(graph: BuilderGraph): boolean {
+  if (graph.nodes.length < 2) return false;
+
+  const xValues = graph.nodes.map((node) => node.position.x);
+  return Math.max(...xValues) - Math.min(...xValues) < 2;
+}
+
+/**
+ * Old synthesized graphs have all nodes on x=0. Reposition them into the
+ * finalized diagonal composition on first presentation. Once the user moves
+ * a node, the updated coordinates are saved normally.
+ */
+function applyPresentationLayout(graph: BuilderGraph): BuilderGraph {
+  if (!looksLikeLegacyDefaultGraph(graph)) return graph;
+
+  const milestoneNodes = graph.nodes.filter((node) => node.type === "milestone_group");
+  const handoffY = 110 + milestoneNodes.length * 150;
+
+  return {
+    ...graph,
+    nodes: graph.nodes.map((node) => {
+      if (node.type === "trigger") {
+        return { ...node, position: { x: 215, y: 80 } };
+      }
+
+      if (node.type === "message") {
+        return { ...node, position: { x: 470, y: 110 } };
+      }
+
+      if (node.type === "milestone_group") {
+        const index =
+          typeof node.data?.ordinal === "number"
+            ? node.data.ordinal
+            : milestoneNodes.findIndex((candidate) => candidate.id === node.id);
+
+        return {
+          ...node,
+          position: {
+            x: 710 + Math.min(index, 2) * 55,
+            y: 150 + index * 150,
+          },
+        };
+      }
+
+      if (node.type === "human_handoff") {
+        return { ...node, position: { x: 770, y: handoffY } };
+      }
+
+      if (node.type === "action_link") {
+        return { ...node, position: { x: 1040, y: handoffY - 12 } };
+      }
+
+      return node;
+    }),
+  };
+}
+
+function toFlowNodes(graph: BuilderGraph): FlowNode[] {
+  return graph.nodes.map((node) => ({
+    id: node.id,
+    type: node.type === "milestone_group" ? "milestone" : node.type,
+    position: node.position,
+    data: {
+      ...node.data,
+      milestoneId:
+        typeof node.data?.milestoneId === "string"
+          ? node.data.milestoneId
+          : undefined,
+      ordinal:
+        typeof node.data?.ordinal === "number"
+          ? node.data.ordinal
+          : undefined,
+    },
+  }));
+}
+
+function inferHandlePair(
+  source: JourneyNode | undefined,
+  target: JourneyNode | undefined,
+): { sourceHandle: string; targetHandle: string } {
+  if (!source || !target) {
+    return {
+      sourceHandle: "source-bottom",
+      targetHandle: "target-top",
+    };
+  }
+
+  const dx = target.position.x - source.position.x;
+  const dy = target.position.y - source.position.y;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx >= 0
+      ? { sourceHandle: "source-right", targetHandle: "target-left" }
+      : { sourceHandle: "source-left", targetHandle: "target-right" };
+  }
+
+  return dy >= 0
+    ? { sourceHandle: "source-bottom", targetHandle: "target-top" }
+    : { sourceHandle: "source-top", targetHandle: "target-bottom" };
+}
+
+function toFlowEdges(graph: BuilderGraph): Edge[] {
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+
+  return graph.edges.map((edge) => {
+    const handles = inferHandlePair(
+      nodeById.get(edge.sourceNodeId),
+      nodeById.get(edge.targetNodeId),
+    );
+
+    return {
+      id: edge.id,
+      source: edge.sourceNodeId,
+      target: edge.targetNodeId,
+      sourceHandle: handles.sourceHandle,
+      targetHandle: handles.targetHandle,
+      label: edge.label ?? undefined,
+      type: "smoothstep",
+      selectable: false,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 14,
+        height: 14,
+      },
+      style: {
+        stroke: "var(--text-muted)",
+        strokeWidth: 1.6,
+      },
+    };
+  });
+}
+
+function toJourneyEdges(edges: Edge[]): JourneyEdge[] {
+  return edges.map((edge) => ({
+    id: edge.id,
+    sourceNodeId: edge.source,
+    targetNodeId: edge.target,
+    label: typeof edge.label === "string" ? edge.label : null,
+    condition: null,
+  }));
 }
 
 export function BuilderCanvas({
@@ -293,6 +506,9 @@ export function BuilderCanvas({
   onAddMilestone,
   onRemoveMilestone,
   onReorderMilestone,
+  reloadSignal = 0,
+  onBuilderVersionChange,
+  onSaveStateChange,
 }: {
   tenantId: string;
   campaign: Campaign;
@@ -302,16 +518,66 @@ export function BuilderCanvas({
   onAddMilestone: () => void;
   onRemoveMilestone: (index: number) => void;
   onReorderMilestone: (index: number, direction: -1 | 1) => void;
+  reloadSignal?: number;
+  onBuilderVersionChange?: (version: number) => void;
+  onSaveStateChange?: (state: "saved" | "saving" | "unsaved") => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [backendNodes, setBackendNodes] = useState<JourneyNode[]>([]);
-  const [backendEdges, setBackendEdges] = useState<JourneyEdge[]>([]);
-  const [builderVersion, setBuilderVersion] = useState<number | null>(null);
+
+  const backendNodesRef = useRef<JourneyNode[]>([]);
+  const backendEdgesRef = useRef<JourneyEdge[]>([]);
+  const builderVersionRef = useRef<number | null>(null);
+  const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null);
+  const initializedRef = useRef(false);
+  const initialFitDoneRef = useRef(false);
+
   const [locked, setLocked] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const setVersion = useCallback(
+    (version: number) => {
+      builderVersionRef.current = version;
+      onBuilderVersionChange?.(version);
+    },
+    [onBuilderVersionChange],
+  );
+
+  const scheduleInitialFit = useCallback(() => {
+    if (
+      initialFitDoneRef.current ||
+      !initializedRef.current ||
+      !flowInstanceRef.current
+    ) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const instance = flowInstanceRef.current;
+
+        if (
+          initialFitDoneRef.current ||
+          !instance ||
+          instance.getNodes().length === 0
+        ) {
+          return;
+        }
+
+        initialFitDoneRef.current = true;
+
+        instance.fitView({
+          padding: 0.12,
+          minZoom: 0.55,
+          maxZoom: 1.12,
+          duration: 0,
+        });
+      });
+    });
+  }, []);
 
   const selectForNode = useCallback(
     (node: FlowNode) => {
@@ -328,41 +594,29 @@ export function BuilderCanvas({
       }
 
       if (node.type === "milestone") {
-        const index = node.data.milestoneIndex ?? 0;
         onSelectNode({
           type: "milestone",
-          milestoneIndex: index,
+          milestoneIndex: node.data.milestoneIndex ?? 0,
         });
         return;
       }
 
       if (node.type === "action_link") {
-        onSelectNode({
-          type: "action",
-          action: "link",
-        });
+        onSelectNode({ type: "action", action: "link" });
         return;
       }
 
       if (node.type === "human_handoff") {
-        onSelectNode({
-          type: "action",
-          action: "handoff",
-        });
+        onSelectNode({ type: "action", action: "handoff" });
       }
     },
     [locked, onSelectNode],
   );
 
   const isSelected = useCallback(
-    (node: FlowNode): boolean => {
-      if (node.type === "trigger") {
-        return selectedNode.type === "trigger";
-      }
-
-      if (node.type === "message") {
-        return selectedNode.type === "message";
-      }
+    (node: FlowNode) => {
+      if (node.type === "trigger") return selectedNode.type === "trigger";
+      if (node.type === "message") return selectedNode.type === "message";
 
       if (node.type === "milestone") {
         return (
@@ -372,17 +626,11 @@ export function BuilderCanvas({
       }
 
       if (node.type === "action_link") {
-        return (
-          selectedNode.type === "action" &&
-          selectedNode.action === "link"
-        );
+        return selectedNode.type === "action" && selectedNode.action === "link";
       }
 
       if (node.type === "human_handoff") {
-        return (
-          selectedNode.type === "action" &&
-          selectedNode.action === "handoff"
-        );
+        return selectedNode.type === "action" && selectedNode.action === "handoff";
       }
 
       return false;
@@ -390,312 +638,432 @@ export function BuilderCanvas({
     [selectedNode],
   );
 
-  const loadGraph = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  const loadGraph = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setLoadError(null);
 
-    try {
-      const graph = await api.getBuilderGraph(
-        tenantId,
-        campaign.id,
-      );
+      try {
+        const rawGraph = await api.getBuilderGraph(tenantId, campaign.id);
+        const graph = applyPresentationLayout(rawGraph);
 
-      setBuilderVersion(graph.version);
-      setBackendNodes(graph.nodes);
-      setBackendEdges(graph.edges);
+        backendNodesRef.current = graph.nodes;
+        backendEdgesRef.current = graph.edges;
+        setVersion(graph.version);
+        onSaveStateChange?.("saved");
 
-      const flowNodes: FlowNode[] = [];
-
-      for (const node of graph.nodes) {
-        if (node.type === "milestone_group") {
-          const index = getMilestoneIndexFromNode(
-            node,
-            milestones,
-          );
-
-          const milestone = milestones[index];
-
-          if (!milestone) {
-            continue;
-          }
-
-          flowNodes.push({
-            id: node.id,
-            type: "milestone",
-            position: node.position,
-            data: {
-              ...node.data,
-              milestoneId: milestone.id,
-              milestone,
-              milestoneIndex: index,
-              selected: false,
-              locked,
-              onSelect: () => {
-                if (!locked) {
-                  onSelectNode({
-                    type: "milestone",
-                    milestoneIndex: index,
-                  });
-                }
-              },
-              onRemove: () => onRemoveMilestone(index),
-              onMove: (direction: -1 | 1) =>
-                onReorderMilestone(index, direction),
-            },
-          });
-
-          continue;
-        }
-
-        flowNodes.push({
-          id: node.id,
-          type: node.type,
-          position: node.position,
-          data: {
-            campaign,
-            selected: false,
-            locked,
-            onSelect: () => {
-              if (!locked) {
-                selectForNode({
-                  id: node.id,
-                  type: node.type,
-                  position: node.position,
-                  data: {
-                    campaign,
-                  },
-                });
-              }
-            },
-          },
-        });
+        setNodes(toFlowNodes(graph));
+        setEdges(toFlowEdges(graph));
+        initializedRef.current = true;
+        scheduleInitialFit();
+      } catch (error) {
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to load journey flow",
+        );
+      } finally {
+        if (!silent) setLoading(false);
       }
-
-      const flowEdges: Edge[] = graph.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.sourceNodeId,
-        target: edge.targetNodeId,
-        label: edge.label ?? undefined,
-        type: "smoothstep",
-        selectable: false,
-      }));
-
-      setNodes(flowNodes);
-      setEdges(flowEdges);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to load journey";
-
-      setLoadError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    campaign,
-    locked,
-    milestones,
-    onRemoveMilestone,
-    onReorderMilestone,
-    onSelectNode,
-    selectForNode,
-    setEdges,
-    setNodes,
-    tenantId,
-  ]);
-
-  useEffect(() => {
-    void loadGraph();
-  }, [loadGraph]);
-
-  const handleNodeDragStop = useCallback(
-    (_event: MouseEvent | TouchEvent, draggedNode: FlowNode) => {
-      if (locked || builderVersion === null) {
-        return;
-      }
-
-      setSaving(true);
-
-      const save = async () => {
-        try {
-          const updatedNodes = backendNodes.map((node) =>
-            node.id === draggedNode.id
-              ? {
-                  ...node,
-                  position: {
-                    x: draggedNode.position.x,
-                    y: draggedNode.position.y,
-                  },
-                }
-              : node,
-          );
-
-          const saved = await api.saveBuilderGraph(
-            tenantId,
-            campaign.id,
-            {
-              expectedVersion: builderVersion,
-              nodes: updatedNodes,
-              edges: backendEdges,
-            },
-          );
-
-          setBackendNodes(updatedNodes);
-          setBuilderVersion(saved.version);
-        } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Failed to save journey";
-
-          setLoadError(message);
-
-          if (
-            error &&
-            typeof error === "object" &&
-            "status" in error
-          ) {
-            const status = (error as { status?: number }).status;
-
-            if (status === 409) {
-              await loadGraph();
-            }
-          }
-        } finally {
-          setSaving(false);
-        }
-      };
-
-      void save();
     },
     [
-      builderVersion,
       campaign.id,
-      backendEdges,
-      backendNodes,
-      loadGraph,
-      locked,
+      scheduleInitialFit,
+      setEdges,
+      setNodes,
+      setVersion,
       tenantId,
     ],
   );
 
-  const handlePaneClick = useCallback(() => {
-    // Keep the existing Inspector selection intact.
-    // The current Inspector expects a non-null SelectedNode.
-  }, []);
+  useEffect(() => {
+    initializedRef.current = false;
+    initialFitDoneRef.current = false;
+    void loadGraph(false);
+  }, [loadGraph]);
+
+  useEffect(() => {
+    if (reloadSignal <= 0 || !initializedRef.current) return;
+    void loadGraph(true);
+  }, [loadGraph, reloadSignal]);
+
+  const persistGraph = useCallback(
+    async (nextNodes: JourneyNode[], nextEdges: JourneyEdge[]) => {
+      if (locked) return;
+
+      const version = builderVersionRef.current;
+      if (version === null) return;
+
+      setSaving(true);
+      onSaveStateChange?.("saving");
+
+      try {
+        const saved = await api.saveBuilderGraph(
+          tenantId,
+          campaign.id,
+          {
+            expectedVersion: version,
+            nodes: nextNodes,
+            edges: nextEdges,
+          },
+        );
+
+        backendNodesRef.current = saved.nodes;
+        backendEdgesRef.current = saved.edges;
+        setVersion(saved.version);
+        onSaveStateChange?.("saved");
+      } catch (error) {
+        onSaveStateChange?.("unsaved");
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to save journey",
+        );
+
+        if (
+          error &&
+          typeof error === "object" &&
+          "status" in error &&
+          (error as { status?: number }).status === 409
+        ) {
+          await loadGraph(true);
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [campaign.id, loadGraph, locked, onSaveStateChange, setVersion, tenantId],
+  );
+
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      if (
+        locked ||
+        !connection.source ||
+        !connection.target ||
+        connection.source === connection.target
+      ) {
+        return;
+      }
+
+      const nextEdge: Edge = {
+        id: crypto.randomUUID(),
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: connection.sourceHandle ?? undefined,
+        targetHandle: connection.targetHandle ?? undefined,
+        type: "smoothstep",
+        selectable: false,
+      };
+
+      const nextEdges = addEdge(nextEdge, edges);
+      setEdges(nextEdges);
+
+      const nextBackendEdges = toJourneyEdges(nextEdges);
+      backendEdgesRef.current = nextBackendEdges;
+      void persistGraph(backendNodesRef.current, nextBackendEdges);
+    },
+    [edges, locked, persistGraph, setEdges],
+  );
+
+  const handleNodeDragStop = useCallback(
+    (_event: MouseEvent | TouchEvent, draggedNode: FlowNode) => {
+      if (locked) return;
+
+      const version = builderVersionRef.current;
+      if (version === null) return;
+
+      const updatedNodes = backendNodesRef.current.map((node) =>
+        node.id === draggedNode.id
+          ? {
+              ...node,
+              position: {
+                x: Math.round(draggedNode.position.x),
+                y: Math.round(draggedNode.position.y),
+              },
+            }
+          : node,
+      );
+
+      backendNodesRef.current = updatedNodes;
+      void persistGraph(updatedNodes, backendEdgesRef.current);
+    },
+    [campaign.id, locked, persistGraph],
+  );
 
   const decoratedNodes = useMemo<FlowNode[]>(
     () =>
-      nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
+      nodes.map((node) => {
+        if (node.type === "milestone") {
+          const index = getMilestoneIndex(
+            node.data.milestoneId,
+            node.data.ordinal,
+            milestones,
+          );
+          const milestone = milestones[index];
+
+          return {
+            ...node,
+            selected: isSelected(node),
+            data: {
+              ...node.data,
+              milestone,
+              milestoneIndex: index,
+              selected: isSelected(node),
+              locked,
+              onSelect: () => selectForNode(node),
+              onRemove: () => onRemoveMilestone(index),
+              onMove: (direction: -1 | 1) =>
+                onReorderMilestone(index, direction),
+            },
+          };
+        }
+
+        return {
+          ...node,
           selected: isSelected(node),
-          locked,
-        },
-      })),
-    [isSelected, locked, nodes],
+          data: {
+            ...node.data,
+            campaign,
+            selected: isSelected(node),
+            locked,
+            onSelect: () => selectForNode(node),
+          },
+        };
+      }),
+    [
+      campaign,
+      isSelected,
+      locked,
+      milestones,
+      nodes,
+      onRemoveMilestone,
+      onReorderMilestone,
+      selectForNode,
+    ],
+  );
+
+  useEffect(() => {
+    if (decoratedNodes.length > 0) {
+      scheduleInitialFit();
+    }
+  }, [decoratedNodes.length, scheduleInitialFit]);
+
+  const palette = (
+    <div
+      className={`absolute left-4 top-4 z-20 hidden overflow-hidden rounded-xl border border-line bg-card shadow-lg md:block ${
+        paletteOpen ? "w-[190px]" : "w-[154px]"
+      }`}
+    >
+      <button
+        type="button"
+        aria-expanded={paletteOpen}
+        aria-controls="journey-builder-node-palette"
+        className="builder-palette-toggle flex h-12 w-full items-center gap-2 border-b border-line px-3.5 text-left text-[13px] font-semibold text-ink hover:bg-chip"
+        onClick={() => setPaletteOpen((value) => !value)}
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-chip text-accent">
+          <PlusIcon className="h-4 w-4" />
+        </span>
+        <span className="flex-1">Add node</span>
+        <span className="flex h-7 w-7 items-center justify-center rounded-md text-subtle">
+          <ChevronDownIcon
+            className={`h-4 w-4 transition-transform ${
+              paletteOpen ? "rotate-180" : ""
+            }`}
+          />
+        </span>
+      </button>
+
+      {paletteOpen && <div id="journey-builder-node-palette" className="p-2.5">
+        <button
+          type="button"
+          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
+          onClick={() => onSelectNode({ type: "trigger" })}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FCE7F3] text-[#DB2777]">
+            <InstagramMarkIcon className="h-4 w-4" />
+          </span>
+          Trigger
+        </button>
+
+        <div className="px-2.5 pb-1 pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+          Actions
+        </div>
+
+        <button
+          type="button"
+          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
+          onClick={() => onSelectNode({ type: "message" })}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DBEAFE] text-[#2563EB]">
+            <BotIcon className="h-4 w-4" />
+          </span>
+          AI Reply
+        </button>
+
+        <button
+          type="button"
+          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
+          onClick={() => onSelectNode({ type: "message" })}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DBEAFE] text-[#2563EB]">
+            <SendIcon className="h-4 w-4" />
+          </span>
+          Send Message
+        </button>
+
+        <button
+          type="button"
+          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
+          onClick={onAddMilestone}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DCFCE7] text-[#16A34A]">
+            <ListChecksIcon className="h-4 w-4" />
+          </span>
+          New Goal
+        </button>
+
+        <div className="px-2.5 pb-1 pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+          Flow
+        </div>
+
+        {[
+          ["Condition", "Condition coming soon"],
+          ["Delay", "Delay coming soon"],
+          ["Handoff", "Handoff node coming soon"],
+        ].map(([label, title]) => (
+          <button
+            key={label}
+            type="button"
+            disabled
+            title={title}
+            className="flex min-h-10 w-full cursor-not-allowed items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-subtle opacity-70"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-chip">
+              {label === "Handoff" ? (
+                <HandshakeIcon className="h-4 w-4" />
+              ) : (
+                <span className="text-xs">◉</span>
+              )}
+            </span>
+            <span className="min-w-0 flex-1">{label}</span>
+            <span className="rounded-full bg-chip px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
+              Soon
+            </span>
+          </button>
+        ))}
+      </div>}
+    </div>
   );
 
   if (loading) {
     return (
       <div className="relative flex min-h-[420px] flex-1 items-center justify-center bg-canvas">
-        <div className="text-sm text-subtle">
-          Loading journey…
-        </div>
+        <span className="text-sm text-subtle">Loading flow…</span>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-[420px] flex-1 overflow-hidden bg-canvas md:min-h-0">
+    <div
+      className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-canvas"
+      data-canvas-locked={locked}
+    >
+      {palette}
+
+      <div className="pointer-events-none absolute left-[195px] top-4 z-10 hidden rounded-lg bg-card/85 px-2.5 py-1.5 text-[10px] text-subtle backdrop-blur md:block">
+        Drag between handles to connect
+      </div>
+
       {loadError && (
-        <div className="absolute left-4 right-4 top-4 z-20 rounded-lg border border-line bg-card px-3 py-2 text-xs text-subtle shadow-sm">
-          {loadError}
+        <div className="absolute left-4 right-4 top-4 z-30 flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-subtle shadow-sm md:left-[205px]">
+          <span>{loadError}</span>
+          <button
+            type="button"
+            className="font-semibold text-accent hover:text-accent-hover"
+            onClick={() => void loadGraph(false)}
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      <ReactFlow
-        nodes={decoratedNodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={locked ? undefined : onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={(_event, node) => selectForNode(node)}
-        onPaneClick={handlePaneClick}
-        onNodeDragStop={handleNodeDragStop}
-        nodesDraggable={!locked}
-        nodesConnectable={false}
-        elementsSelectable={!locked}
-        fitView
-        fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.5,
-          maxZoom: 1.2,
-        }}
-        minZoom={0.35}
-        maxZoom={1.5}
-        defaultEdgeOptions={{
-          type: "smoothstep",
-          animated: false,
-        }}
-        proOptions={{
-          hideAttribution: true,
-        }}
-      >
-        <Background
-          gap={18}
-          size={1}
-          color="var(--border)"
-        />
-
-        <Controls
-          showInteractive={false}
-          className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card !shadow-sm"
-        />
-
-        <MiniMap
-          nodeStrokeWidth={3}
-          className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card"
-        />
-      </ReactFlow>
-
-      <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs shadow-sm">
-        <button
-          type="button"
-          aria-label={
-            locked ? "Unlock canvas" : "Lock canvas"
+      <div className="absolute inset-0 min-h-0 min-w-0">
+        <ReactFlow
+          style={{ width: "100%", height: "100%" }}
+          nodes={decoratedNodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onInit={(instance) => {
+            flowInstanceRef.current = instance;
+            scheduleInitialFit();
+          }}
+          onNodesChange={locked ? undefined : onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={handleConnect}
+          onNodeClick={(_event, node) => selectForNode(node)}
+          onNodeDragStop={handleNodeDragStop}
+          nodesDraggable={!locked}
+          nodesConnectable={!locked}
+          connectionMode={ConnectionMode.Loose}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          isValidConnection={(connection) =>
+            Boolean(
+              connection.source &&
+                connection.target &&
+                connection.source !== connection.target &&
+                !edges.some(
+                  (edge) =>
+                    edge.source === connection.source &&
+                    edge.target === connection.target,
+                ),
+            )
           }
-          aria-pressed={locked}
-          className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-            locked
-              ? "text-accent hover:bg-chip"
-              : "text-subtle hover:bg-chip hover:text-ink"
-          }`}
-          onClick={() => setLocked((value) => !value)}
+          elementsSelectable={!locked}
+          minZoom={0.35}
+          maxZoom={1.5}
+          defaultEdgeOptions={{
+            type: "smoothstep",
+            animated: false,
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 14,
+              height: 14,
+            },
+            style: {
+              stroke: "var(--text-muted)",
+              strokeWidth: 1.6,
+            },
+          }}
+          proOptions={{ hideAttribution: true }}
         >
-          <LockIcon className="h-4 w-4" />
-        </button>
+          <Background gap={18} size={1} color="var(--border)" />
 
-        <div className="h-4 w-px bg-line" />
+          <Controls
+            orientation="horizontal"
+            showInteractive
+            onInteractiveChange={(interactive) => setLocked(!interactive)}
+            aria-label="Canvas controls"
+            className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card !shadow-sm md:!m-0 md:!bottom-5 md:!left-[258px]"
+          />
 
-        <button
-          type="button"
-          disabled={locked}
-          onClick={onAddMilestone}
-          className="rounded-lg px-2.5 py-1.5 font-medium text-subtle hover:bg-chip hover:text-ink disabled:opacity-40"
-        >
-          + Add milestone
-        </button>
-
-        {saving && (
-          <>
-            <div className="h-4 w-px bg-line" />
-            <span className="text-subtle">Saving…</span>
-          </>
-        )}
+          <MiniMap
+            nodeStrokeWidth={2}
+            pannable
+            zoomable
+            className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card"
+          />
+        </ReactFlow>
       </div>
+
+      <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-20 flex justify-start md:hidden">
+        <div className="rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
+          Tap a node to edit it
+        </div>
+      </div>
+
+      {saving && (
+        <div className="absolute bottom-4 right-4 z-20 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[11px] text-subtle shadow-sm">
+          Saving…
+        </div>
+      )}
     </div>
   );
 }

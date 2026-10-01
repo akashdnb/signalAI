@@ -1,4 +1,10 @@
-export type AutomationTab = "journeys" | "templates" | "keywords" | "quickReplies" | "handoffRules" | "settings";
+export type AutomationTab =
+  | "journeys"
+  | "templates"
+  | "keywords"
+  | "quickReplies"
+  | "handoffRules"
+  | "settings";
 
 const TABS: { key: AutomationTab; label: string }[] = [
   { key: "journeys", label: "Journeys" },
@@ -9,23 +15,41 @@ const TABS: { key: AutomationTab; label: string }[] = [
   { key: "settings", label: "Settings" },
 ];
 
-export function AutomationTabs({ active, onChange }: { active: AutomationTab; onChange: (tab: AutomationTab) => void }) {
+export function AutomationTabs({
+  active,
+  onChange,
+}: {
+  active: AutomationTab;
+  onChange: (tab: AutomationTab) => void;
+}) {
   return (
-    <div className="mt-1.5 flex gap-6 border-b border-line">
-      {TABS.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          onClick={() => onChange(tab.key)}
-          className={`-mb-px border-b-2 px-0.5 pb-1 text-xs transition-colors ${
-            active === tab.key
-              ? "border-accent font-semibold text-accent"
-              : "border-transparent text-subtle hover:text-ink"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <nav
+      aria-label="Automation sections"
+      className="mt-3 flex gap-7 overflow-x-auto border-b border-line"
+    >
+      {TABS.map((tab) => {
+        const selected = active === tab.key;
+
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            aria-current={selected ? "page" : undefined}
+            onClick={() => onChange(tab.key)}
+            className={`relative shrink-0 px-0 pb-2.5 pt-1 text-[15px] leading-5 transition-colors ${
+              selected ? "font-semibold text-ink" : "text-subtle hover:text-ink"
+            }`}
+          >
+            {tab.label}
+            <span
+              aria-hidden="true"
+              className={`absolute bottom-[-1px] left-1/2 h-[3px] -translate-x-1/2 rounded-full transition-opacity ${
+                selected ? "w-full bg-[#7C3AED] opacity-100" : "w-0 opacity-0"
+              }`}
+            />
+          </button>
+        );
+      })}
+    </nav>
   );
 }

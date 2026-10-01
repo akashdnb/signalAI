@@ -581,6 +581,8 @@ export const api = {
     request<CampaignAnalytics>(`/tenants/${tenantId}/campaigns/${campaignId}/analytics`),
 
   listCampaigns: (tenantId: string) => request<Campaign[]>(`/tenants/${tenantId}/campaigns`),
+  getCampaign: (tenantId: string, campaignId: string) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}`),
   createCampaign: (tenantId: string, name: string, keywords: string[]) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns`, {
       method: "POST",

@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import {
   createCampaign,
+  getCampaign,
   listCampaigns,
   setCampaignEnabled,
   setCampaignTargetMediaIds,
@@ -45,6 +46,17 @@ campaignsRouter.post("/tenants/:tenantId/campaigns", async (req, res) => {
 campaignsRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
   const campaigns = await listCampaigns(getPool(), req.params.tenantId);
   return res.status(200).json(campaigns);
+});
+
+campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const campaign = await getCampaign(getPool(), tenantId, campaignId);
+
+  if (!campaign) {
+    return res.status(404).json({ error: "campaign not found for this tenant" });
+  }
+
+  return res.status(200).json(campaign);
 });
 
 campaignsRouter.patch("/tenants/:tenantId/campaigns/:campaignId/enabled", async (req, res) => {
