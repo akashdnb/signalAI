@@ -17,7 +17,13 @@ jobs:
         working-directory: server
     services:
       postgres:
-        image: postgres:16
+        # Plain postgres:16 doesn't ship the `vector` extension that the
+        # knowledge-base migration (1758240000038_create-knowledge-base)
+        # requires — `create extension if not exists vector` fails with
+        # "extension \"vector\" is not available" and every migration
+        # after it never runs. pgvector/pgvector:pg16 is the same Postgres
+        # 16 with pgvector pre-built in, nothing else different.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: signalai
           POSTGRES_PASSWORD: signalai
