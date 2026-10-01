@@ -205,6 +205,28 @@ export async function upsertLeadIntelligence(
   }
 }
 
+/**
+ * Keyset-paginated lead ids for a tenant that already have an intelligence
+ * projection — the bounded-batch source for the tenant scoring-rule
+ * refresh worker (queue/tenantScoringRefreshQueue.ts). Ordered by lead_id
+ * so paging is stable across calls even as rows are concurrently updated
+ * (an update never changes lead_id, so no row can be skipped or repeated
+ * mid-page the way an updated_at-ordered cursor could).
+ */
+export async function listLeadIdsWithIntelligence(
+  pool: Pool,
+  tenantId: string,
+  options: { afterLeadId?: string | null; limit: number },
+): Promise<string[]> {
+  const result = await pool.query<{ lead_id: string }>(
+    options.afterLeadId
+      ? `select lead_id from lead_intelligence where tenant_id = $1 and lead_id > $2 order by lead_id limit $3`
+      : `select lead_id from lead_intelligence where tenant_id = $1 order by lead_id limit $2`,
+    options.afterLeadId ? [tenantId, options.afterLeadId, options.limit] : [tenantId, options.limit],
+  );
+  return result.rows.map((row) => row.lead_id);
+}
+
 export async function listLeadIntelligenceHistory(
   pool: Pool,
   tenantId: string,

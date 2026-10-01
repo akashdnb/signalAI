@@ -10,6 +10,8 @@ import {
   validateScoringRulePoints,
 } from "../db/leadScoringRules.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
+import { getBoss } from "../queue/boss.js";
+import { enqueueTenantScoringRefresh } from "../queue/tenantScoringRefreshQueue.js";
 
 /**
  * SLICE C: tenant-configurable custom lead-scoring rules — a clean
@@ -34,6 +36,10 @@ leadScoringRulesRouter.post("/tenants/:tenantId/scoring-rules", async (req, res)
     const enabled = req.body?.enabled === undefined ? true : !!req.body.enabled;
 
     const rule = await createScoringRule(getPool(), req.params.tenantId!, { name, definition, points, enabled });
+    // Objective B: existing leads' intelligence must not go silently stale
+    // once a new rule can affect their score — refreshed asynchronously,
+    // never synchronously inside this request.
+    await enqueueTenantScoringRefresh(await getBoss(), req.params.tenantId!);
     return res.status(201).json({ rule });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -50,6 +56,7 @@ leadScoringRulesRouter.patch("/tenants/:tenantId/scoring-rules/:id", async (req,
 
     const rule = await updateScoringRule(getPool(), req.params.tenantId!, req.params.id!, { name, definition, points, enabled });
     if (!rule) return res.status(404).json({ error: "scoring rule not found for this tenant" });
+    await enqueueTenantScoringRefresh(await getBoss(), req.params.tenantId!);
     return res.status(200).json({ rule });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -60,5 +67,8 @@ leadScoringRulesRouter.patch("/tenants/:tenantId/scoring-rules/:id", async (req,
 leadScoringRulesRouter.delete("/tenants/:tenantId/scoring-rules/:id", async (req, res) => {
   const deleted = await deleteScoringRule(getPool(), req.params.tenantId!, req.params.id!);
   if (!deleted) return res.status(404).json({ error: "scoring rule not found for this tenant" });
+  // A deleted rule's points must stop applying — same staleness concern as
+  // create/update.
+  await enqueueTenantScoringRefresh(await getBoss(), req.params.tenantId!);
   return res.status(204).send();
 });
