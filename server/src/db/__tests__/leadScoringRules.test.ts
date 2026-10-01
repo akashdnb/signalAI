@@ -65,6 +65,71 @@ describe("lead scoring rules", () => {
       expect(() => validateScoringRuleDefinition("eval('1+1')")).toThrow();
       expect(() => validateScoringRuleDefinition(null)).toThrow();
     });
+
+    // Required validation matrix (follow-up spec Objective A): only
+    // budget_value has numeric/ordering semantics; intent/need/location are
+    // text-only and may only be compared with eq/exists.
+    describe("validation matrix", () => {
+      it("accepts budget_value with exists, eq, gte, lte against a number", () => {
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "exists" })).toBeTruthy();
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "eq", value: 500000 })).toBeTruthy();
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "gte", value: 10000000 })).toBeTruthy();
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "lte", value: 10000000 })).toBeTruthy();
+      });
+
+      it("rejects a string value for budget_value under any operator", () => {
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "gte", value: "₹1Cr" })).toThrow();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "eq", value: "500000" })).toThrow();
+      });
+
+      it("accepts intent with exists and eq against a string, rejects gte/lte and numeric value", () => {
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "intent", operator: "exists" })).toBeTruthy();
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "intent", operator: "eq", value: "ready_to_buy" })).toBeTruthy();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "intent", operator: "gte", value: "ready_to_buy" })).toThrow();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "intent", operator: "lte", value: "ready_to_buy" })).toThrow();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "intent", operator: "eq", value: 10 })).toThrow();
+      });
+
+      it("accepts need with exists and eq against a string, rejects gte/lte and numeric value", () => {
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "need", operator: "exists" })).toBeTruthy();
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "need", operator: "eq", value: "3BHK apartment" })).toBeTruthy();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "need", operator: "gte", value: "x" })).toThrow();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "need", operator: "eq", value: 5 })).toThrow();
+      });
+
+      it("accepts location with exists and eq against a string, rejects gte/lte and numeric value", () => {
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "location", operator: "exists" })).toBeTruthy();
+        expect(validateScoringRuleDefinition({ kind: "field_compare", field: "location", operator: "eq", value: "Bangalore" })).toBeTruthy();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "location", operator: "gte", value: "Bangalore" })).toThrow();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "location", operator: "eq", value: 1 })).toThrow();
+      });
+
+      it("rejects exists with a value supplied, rather than silently discarding it", () => {
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "budget_value", operator: "exists", value: 1 })).toThrow();
+        expect(() => validateScoringRuleDefinition({ kind: "field_compare", field: "intent", operator: "exists", value: "ready_to_buy" })).toThrow();
+      });
+
+      it("rejects unexpected properties on a field_compare definition", () => {
+        expect(() =>
+          validateScoringRuleDefinition({
+            kind: "field_compare",
+            field: "budget_value",
+            operator: "gte",
+            value: 1,
+            script: "require('fs')",
+          }),
+        ).toThrow();
+      });
+
+      it("rejects unexpected properties on a milestone_completed definition", () => {
+        const milestoneId = "123e4567-e89b-12d3-a456-426614174000";
+        expect(() => validateScoringRuleDefinition({ kind: "milestone_completed", milestoneId, points: 999 })).toThrow();
+      });
+
+      it("rejects an unexpected rule kind", () => {
+        expect(() => validateScoringRuleDefinition({ kind: "expression", code: "lead.score * 2" })).toThrow();
+      });
+    });
   });
 
   describe("validateScoringRulePoints", () => {

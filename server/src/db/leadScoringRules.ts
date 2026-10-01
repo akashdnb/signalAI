@@ -42,6 +42,26 @@ const MAX_NAME_LENGTH = 100;
 const MAX_STRING_VALUE_LENGTH = 200;
 const MILESTONE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Only budget_value has numeric semantics — intent/need/location are
+ * free/canonical text with no meaningful ordering, so gte/lte on them would
+ * silently never match (every lead would just fail the rule forever). This
+ * is the validation matrix the route/tests enforce: a field only accepts
+ * the operators whose comparison actually makes sense for its value type.
+ */
+const NUMERIC_FIELDS: ReadonlySet<ScoringRuleField> = new Set(["budget_value"]);
+const STRING_ONLY_OPERATORS: ReadonlySet<ScoringRuleOperator> = new Set(["eq", "exists"]);
+
+const FIELD_COMPARE_ALLOWED_KEYS = new Set(["kind", "field", "operator", "value"]);
+const MILESTONE_COMPLETED_ALLOWED_KEYS = new Set(["kind", "milestoneId"]);
+
+function assertNoUnexpectedKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): void {
+  const unexpected = Object.keys(value).filter((key) => !allowed.has(key));
+  if (unexpected.length > 0) {
+    throw new Error(`definition has unexpected propert${unexpected.length === 1 ? "y" : "ies"}: ${unexpected.join(", ")}`);
+  }
+}
+
 function toRule(row: LeadScoringRuleRow): LeadScoringRule {
   return {
     id: row.id,
@@ -69,32 +89,55 @@ export function validateScoringRuleDefinition(raw: unknown): ScoringRuleDefiniti
   const value = raw as Record<string, unknown>;
 
   if (value.kind === "field_compare") {
+    assertNoUnexpectedKeys(value, FIELD_COMPARE_ALLOWED_KEYS);
+
     if (!SCORING_RULE_FIELDS.includes(value.field as ScoringRuleField)) {
       throw new Error(`definition.field must be one of: ${SCORING_RULE_FIELDS.join(", ")}`);
     }
     if (!SCORING_RULE_OPERATORS.includes(value.operator as ScoringRuleOperator)) {
       throw new Error(`definition.operator must be one of: ${SCORING_RULE_OPERATORS.join(", ")}`);
     }
+    const field = value.field as ScoringRuleField;
     const operator = value.operator as ScoringRuleOperator;
+    const isNumericField = NUMERIC_FIELDS.has(field);
+
     if (operator === "exists") {
-      return { kind: "field_compare", field: value.field as ScoringRuleField, operator };
-    }
-    const fieldValue = value.value;
-    if (typeof fieldValue === "number") {
-      if (!Number.isFinite(fieldValue)) throw new Error("definition.value must be a finite number");
-      return { kind: "field_compare", field: value.field as ScoringRuleField, operator, value: fieldValue };
-    }
-    if (typeof fieldValue === "string") {
-      const trimmed = fieldValue.trim();
-      if (!trimmed || trimmed.length > MAX_STRING_VALUE_LENGTH) {
-        throw new Error(`definition.value must be a non-empty string of at most ${MAX_STRING_VALUE_LENGTH} characters`);
+      if (value.value !== undefined) {
+        throw new Error('definition.value must not be supplied when operator is "exists"');
       }
-      return { kind: "field_compare", field: value.field as ScoringRuleField, operator, value: trimmed };
+      return { kind: "field_compare", field, operator };
     }
-    throw new Error("definition.value must be a number or string for this operator");
+
+    // Only a numeric field has meaningful gte/lte ordering — intent/need/
+    // location are text-only, so gte/lte on them is rejected outright
+    // rather than silently stored as a rule that can never match.
+    if (!isNumericField && !STRING_ONLY_OPERATORS.has(operator)) {
+      throw new Error(`definition.operator "${operator}" is not valid for field "${field}" — text fields only support "eq" and "exists"`);
+    }
+
+    const fieldValue = value.value;
+    if (isNumericField) {
+      if (typeof fieldValue !== "number" || !Number.isFinite(fieldValue)) {
+        throw new Error(`definition.value must be a finite number for field "${field}"`);
+      }
+      return { kind: "field_compare", field, operator, value: fieldValue };
+    }
+
+    // A text field (intent/need/location) never accepts a numeric value —
+    // "intent eq 10" can never match a lead's normalized text intent.
+    if (typeof fieldValue !== "string") {
+      throw new Error(`definition.value must be a string for field "${field}"`);
+    }
+    const trimmed = fieldValue.trim();
+    if (!trimmed || trimmed.length > MAX_STRING_VALUE_LENGTH) {
+      throw new Error(`definition.value must be a non-empty string of at most ${MAX_STRING_VALUE_LENGTH} characters`);
+    }
+    return { kind: "field_compare", field, operator, value: trimmed };
   }
 
   if (value.kind === "milestone_completed") {
+    assertNoUnexpectedKeys(value, MILESTONE_COMPLETED_ALLOWED_KEYS);
+
     if (typeof value.milestoneId !== "string" || !MILESTONE_ID_PATTERN.test(value.milestoneId)) {
       throw new Error("definition.milestoneId must be a valid uuid");
     }
