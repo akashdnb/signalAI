@@ -21,3 +21,11 @@ workers polling Neon every 2s (default) + journey worker idle backoff at 5s.
 - `vitest.config.ts`: 1s polls in tests (tests build their own PgBoss w/o listener).
 - Caveat: LISTEN needs a DIRECT Neon connection string (not the `-pooler` host).
   On a pooled URL pg-boss warns `listen_notify_unavailable` and falls back to base polling.
+
+## Crash fix: unhandled pg 'error' events
+
+Render logs showed `Error: Connection terminated unexpectedly` / `pg-boss db.js disconnect`
+killing the process (also pre-dates this work). Neon drops idle connections; neither the shared
+`pg` Pool nor PgBoss had an `error` listener, so Node exited on the unhandled event.
+- `server/src/db/pool.ts`: `pool.on("error", log)`.
+- `server/src/queue/boss.ts`: `boss.on("error", log)` before `start()`.

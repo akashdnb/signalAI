@@ -48,6 +48,9 @@ export async function getBoss(): Promise<PgBoss> {
       monitorIntervalSeconds: 300,
       queueCacheIntervalSeconds: 300,
     });
+    // pg-boss re-emits connection drops (incl. the LISTEN connection) as
+    // 'error'; unhandled, Node exits. It reconnects on its own.
+    boss.on("error", (err) => console.error("pg-boss error:", err.message));
     await boss.start();
   }
   return boss;
