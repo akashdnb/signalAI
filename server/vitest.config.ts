@@ -9,5 +9,13 @@ export default defineConfig({
     // instead of building per-file DB isolation — simplest fix for this
     // suite's size.
     fileParallelism: false,
+    // Production polls slowly and relies on LISTEN/NOTIFY to wake workers;
+    // tests build their own PgBoss without the listener, so poll quickly.
+    env: {
+      QUEUE_FAST_POLL_SECONDS: "1",
+      QUEUE_FAST_NOTIFY_POLL_SECONDS: "1",
+      QUEUE_BACKGROUND_POLL_SECONDS: "1",
+      QUEUE_BACKGROUND_NOTIFY_POLL_SECONDS: "1",
+    },
   },
 });

@@ -1,5 +1,6 @@
 import type { PgBoss, Db } from "pg-boss";
 import type { PoolClient } from "pg";
+import { ensureNotifyQueue } from "./boss.js";
 
 export const INSTAGRAM_INBOUND_QUEUE =
   "instagram-inbound";
@@ -20,8 +21,7 @@ export interface InstagramInboundJob {
 export async function ensureInstagramInboundQueue(
   boss: PgBoss,
 ): Promise<void> {
-  await boss.createQueue(
-    INSTAGRAM_INBOUND_QUEUE,
+  await ensureNotifyQueue(boss, INSTAGRAM_INBOUND_QUEUE,
     {
       policy: "key_strict_fifo",
       retryLimit: 5,

@@ -1,12 +1,12 @@
 import type { PgBoss, Job } from "pg-boss";
 import type { Pool } from "pg";
 import { runTokenRefreshSweep } from "../services/tokenRefreshJob.js";
-import { BACKGROUND_POLL } from "./boss.js";
+import { BACKGROUND_POLL, ensureNotifyQueue } from "./boss.js";
 
 export const TOKEN_REFRESH_QUEUE = "token-refresh";
 
 export async function ensureTokenRefreshQueue(boss: PgBoss): Promise<void> {
-  await boss.createQueue(TOKEN_REFRESH_QUEUE);
+  await ensureNotifyQueue(boss, TOKEN_REFRESH_QUEUE);
   // Every 6 hours is frequent enough that a token sitting in the 5-day
   // refresh window never waits long, without polling constantly for what
   // is, day to day, an empty result.

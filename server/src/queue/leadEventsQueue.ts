@@ -1,5 +1,6 @@
 import type { PgBoss, Db } from "pg-boss";
 import type { PoolClient } from "pg";
+import { ensureNotifyQueue } from "./boss.js";
 
 export const LEAD_EVENTS_QUEUE = "lead-events";
 export const LEAD_EVENTS_DLQ = "lead-events-dlq";
@@ -18,8 +19,8 @@ export interface LeadEventJob {
  * policy — that's exactly what the DLQ + worker below exists to catch.
  */
 export async function ensureQueues(boss: PgBoss): Promise<void> {
-  await boss.createQueue(LEAD_EVENTS_DLQ);
-  await boss.createQueue(LEAD_EVENTS_QUEUE, {
+  await ensureNotifyQueue(boss, LEAD_EVENTS_DLQ);
+  await ensureNotifyQueue(boss, LEAD_EVENTS_QUEUE, {
     policy: "key_strict_fifo",
     deadLetter: LEAD_EVENTS_DLQ,
     retryLimit: 3,

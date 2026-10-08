@@ -6,7 +6,7 @@ import { sendAlertEmail } from "../lib/resend.js";
 import { getTenant } from "../db/tenants.js";
 import { getUserById } from "../db/users.js";
 import { asPgBossDb } from "./leadEventsQueue.js";
-import { FAST_POLL } from "./boss.js";
+import { FAST_POLL, ensureNotifyQueue } from "./boss.js";
 
 export const ALERTS_QUEUE = "alerts";
 
@@ -17,7 +17,7 @@ export interface NewLeadAlertJob {
 }
 
 export async function ensureAlertsQueue(boss: PgBoss): Promise<void> {
-  await boss.createQueue(ALERTS_QUEUE);
+  await ensureNotifyQueue(boss, ALERTS_QUEUE);
 }
 
 /**
