@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { recalculateLeadIntelligence } from "../services/leadScoring.js";
 import { listLeadIdsWithIntelligence } from "../db/leadIntelligence.js";
 import { asPgBossDb } from "./leadEventsQueue.js";
-import { BACKGROUND_POLL } from "./boss.js";
+import { BACKGROUND_POLL, ensureNotifyQueue } from "./boss.js";
 
 export const TENANT_SCORING_REFRESH_QUEUE = "tenant-scoring-refresh";
 
@@ -23,7 +23,7 @@ export interface TenantScoringRefreshJob {
 }
 
 export async function ensureTenantScoringRefreshQueue(boss: PgBoss): Promise<void> {
-  await boss.createQueue(TENANT_SCORING_REFRESH_QUEUE, { retryLimit: 3, retryBackoff: true });
+  await ensureNotifyQueue(boss, TENANT_SCORING_REFRESH_QUEUE, { retryLimit: 3, retryBackoff: true });
 }
 
 /**

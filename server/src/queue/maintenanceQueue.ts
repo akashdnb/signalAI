@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { pruneExpiredNonces } from "../db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "../db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "../db/emailOtpCodes.js";
-import { BACKGROUND_POLL } from "./boss.js";
+import { BACKGROUND_POLL, ensureNotifyQueue } from "./boss.js";
 
 export const MAINTENANCE_QUEUE = "maintenance";
 // Off the :00 mark on purpose — every deploy that defaults to an hourly
@@ -26,7 +26,7 @@ const MAINTENANCE_CRON = "17 * * * *";
  * `pruneOldSends` docstring for why it's now a durable analytics source.
  */
 export async function ensureMaintenanceQueue(boss: PgBoss): Promise<void> {
-  await boss.createQueue(MAINTENANCE_QUEUE);
+  await ensureNotifyQueue(boss, MAINTENANCE_QUEUE);
   await boss.schedule(MAINTENANCE_QUEUE, MAINTENANCE_CRON, {}, { tz: "UTC" });
 }
 

@@ -2,7 +2,7 @@ import type { PgBoss, Job } from "pg-boss";
 import type { Pool } from "pg";
 import { findLeadsByInstagramUserIdAcrossTenants, hardScrubLead } from "../db/pii.js";
 import { markDeletionComplete } from "../db/deletionRequests.js";
-import { BACKGROUND_POLL } from "./boss.js";
+import { BACKGROUND_POLL, ensureNotifyQueue } from "./boss.js";
 
 export const DATA_DELETION_QUEUE = "data-deletion";
 
@@ -12,7 +12,7 @@ export interface DataDeletionJob {
 }
 
 export async function ensureDataDeletionQueue(boss: PgBoss): Promise<void> {
-  await boss.createQueue(DATA_DELETION_QUEUE, { retryLimit: 3, retryBackoff: true });
+  await ensureNotifyQueue(boss, DATA_DELETION_QUEUE, { retryLimit: 3, retryBackoff: true });
 }
 
 export async function enqueueDataDeletion(boss: PgBoss, job: DataDeletionJob): Promise<void> {

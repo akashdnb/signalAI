@@ -5,7 +5,7 @@ import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { hasKnownUsername, backfillLeadPiiUsername } from "../db/pii.js";
 import { fetchInstagramUsername } from "../lib/instagramProfile.js";
 import { Sentry } from "../lib/sentry.js";
-import { FAST_POLL } from "./boss.js";
+import { FAST_POLL, ensureNotifyQueue } from "./boss.js";
 
 export const USERNAME_RESOLUTION_QUEUE = "username-resolution";
 
@@ -17,7 +17,7 @@ export interface ResolveUsernameJob {
 }
 
 export async function ensureUsernameResolutionQueue(boss: PgBoss): Promise<void> {
-  await boss.createQueue(USERNAME_RESOLUTION_QUEUE);
+  await ensureNotifyQueue(boss, USERNAME_RESOLUTION_QUEUE);
 }
 
 /**
