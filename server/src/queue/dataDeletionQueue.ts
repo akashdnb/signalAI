@@ -2,6 +2,7 @@ import type { PgBoss, Job } from "pg-boss";
 import type { Pool } from "pg";
 import { findLeadsByInstagramUserIdAcrossTenants, hardScrubLead } from "../db/pii.js";
 import { markDeletionComplete } from "../db/deletionRequests.js";
+import { BACKGROUND_POLL } from "./boss.js";
 
 export const DATA_DELETION_QUEUE = "data-deletion";
 
@@ -25,7 +26,7 @@ export async function enqueueDataDeletion(boss: PgBoss, job: DataDeletionJob): P
  * instead; the route only ever returns 'pending'.
  */
 export function startDataDeletionWorker(boss: PgBoss, pool: Pool): Promise<string> {
-  return boss.work(DATA_DELETION_QUEUE, async (jobs: Job<DataDeletionJob>[]) => {
+  return boss.work(DATA_DELETION_QUEUE, BACKGROUND_POLL, async (jobs: Job<DataDeletionJob>[]) => {
     for (const job of jobs) {
       const matches = await findLeadsByInstagramUserIdAcrossTenants(pool, job.data.metaUserId);
       for (const match of matches) {

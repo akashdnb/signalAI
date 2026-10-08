@@ -2,6 +2,7 @@ import type { PgBoss } from "pg-boss";
 import type { Pool } from "pg";
 import { runDailyUsageRollup, syncUsageRollupsToStripe } from "../services/usageRollupService.js";
 import { Sentry } from "../lib/sentry.js";
+import { BACKGROUND_POLL } from "./boss.js";
 
 export const USAGE_ROLLUP_QUEUE = "usage-rollup";
 // Once a day, well after midnight UTC — gives every timezone's "yesterday"
@@ -22,7 +23,7 @@ export async function ensureUsageRollupQueue(boss: PgBoss): Promise<void> {
  * failed a previous sync attempt, not just yesterday's).
  */
 export function startUsageRollupWorker(boss: PgBoss, pool: Pool): Promise<string> {
-  return boss.work(USAGE_ROLLUP_QUEUE, async () => {
+  return boss.work(USAGE_ROLLUP_QUEUE, BACKGROUND_POLL, async () => {
     try {
       await runDailyUsageRollup(pool);
       await syncUsageRollupsToStripe(pool);

@@ -49,7 +49,7 @@ services:
       - key: JOURNEY_WORKER_POLL_INTERVAL_MS
         value: "250"
       - key: JOURNEY_WORKER_MAX_POLL_INTERVAL_MS
-        value: "5000"
+        value: "15000"
       # Optional — leave unset to run without billing/alerts.
       - key: STRIPE_SECRET_KEY
         sync: false

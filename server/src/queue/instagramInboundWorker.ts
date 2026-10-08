@@ -20,6 +20,7 @@ import {
   INSTAGRAM_INBOUND_QUEUE,
   type InstagramInboundJob,
 } from "./instagramInboundQueue.js";
+import { FAST_POLL } from "./boss.js";
 
 export function startInstagramInboundWorker(
   boss: PgBoss,
@@ -33,6 +34,7 @@ export function startInstagramInboundWorker(
     {
       batchSize: 1,
       localConcurrency: 1,
+      ...FAST_POLL,
     },
     async (
       jobs: Job<InstagramInboundJob>[],

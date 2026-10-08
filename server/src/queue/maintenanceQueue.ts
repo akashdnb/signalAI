@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { pruneExpiredNonces } from "../db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "../db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "../db/emailOtpCodes.js";
+import { BACKGROUND_POLL } from "./boss.js";
 
 export const MAINTENANCE_QUEUE = "maintenance";
 // Off the :00 mark on purpose — every deploy that defaults to an hourly
@@ -30,7 +31,7 @@ export async function ensureMaintenanceQueue(boss: PgBoss): Promise<void> {
 }
 
 export function startMaintenanceWorker(boss: PgBoss, pool: Pool): Promise<string> {
-  return boss.work(MAINTENANCE_QUEUE, async () => {
+  return boss.work(MAINTENANCE_QUEUE, BACKGROUND_POLL, async () => {
     await pruneExpiredNonces(pool);
     await pruneOldAiCallUsage(pool);
     await pruneExpiredOtpCodes(pool);

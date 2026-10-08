@@ -1,6 +1,7 @@
 import type { PgBoss, Job } from "pg-boss";
 import type { Pool } from "pg";
 import { runTokenRefreshSweep } from "../services/tokenRefreshJob.js";
+import { BACKGROUND_POLL } from "./boss.js";
 
 export const TOKEN_REFRESH_QUEUE = "token-refresh";
 
@@ -18,7 +19,7 @@ export function startTokenRefreshWorker(
   keyring: Map<string, Buffer>,
   onResults?: (results: Awaited<ReturnType<typeof runTokenRefreshSweep>>) => Promise<void>,
 ): Promise<string> {
-  return boss.work(TOKEN_REFRESH_QUEUE, async (jobs: Job[]) => {
+  return boss.work(TOKEN_REFRESH_QUEUE, BACKGROUND_POLL, async (jobs: Job[]) => {
     for (const _job of jobs) {
       const results = await runTokenRefreshSweep(pool, keyring);
       if (onResults && results.length > 0) {
