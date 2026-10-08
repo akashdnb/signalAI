@@ -6,6 +6,7 @@ import { sendAlertEmail } from "../lib/resend.js";
 import { getTenant } from "../db/tenants.js";
 import { getUserById } from "../db/users.js";
 import { asPgBossDb } from "./leadEventsQueue.js";
+import { FAST_POLL } from "./boss.js";
 
 export const ALERTS_QUEUE = "alerts";
 
@@ -66,7 +67,7 @@ export async function enqueueNewLeadAlert(
  * which throws).
  */
 export function startAlertsWorker(boss: PgBoss, pool: Pool): Promise<string> {
-  return boss.work<NewLeadAlertJob>(ALERTS_QUEUE, async (jobs) => {
+  return boss.work<NewLeadAlertJob>(ALERTS_QUEUE, FAST_POLL, async (jobs) => {
     for (const job of jobs) {
       if (job.data.type === "new_lead") {
         const link = `${config.appBaseUrl}/tenants/${job.data.tenantId}/leads/${job.data.leadId}`;

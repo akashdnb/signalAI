@@ -5,6 +5,7 @@ import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { hasKnownUsername, backfillLeadPiiUsername } from "../db/pii.js";
 import { fetchInstagramUsername } from "../lib/instagramProfile.js";
 import { Sentry } from "../lib/sentry.js";
+import { FAST_POLL } from "./boss.js";
 
 export const USERNAME_RESOLUTION_QUEUE = "username-resolution";
 
@@ -43,7 +44,7 @@ export async function enqueueUsernameResolution(
  * of silently giving up on that lead's username forever.
  */
 export function startUsernameResolutionWorker(boss: PgBoss, pool: Pool, keyring: Map<string, Buffer>): Promise<string> {
-  return boss.work<ResolveUsernameJob>(USERNAME_RESOLUTION_QUEUE, async (jobs) => {
+  return boss.work<ResolveUsernameJob>(USERNAME_RESOLUTION_QUEUE, FAST_POLL, async (jobs) => {
     for (const job of jobs) {
       const { tenantId, leadId, leadEventId, instagramUserId } = job.data;
 

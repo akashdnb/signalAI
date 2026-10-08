@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { recalculateLeadIntelligence } from "../services/leadScoring.js";
 import { listLeadIdsWithIntelligence } from "../db/leadIntelligence.js";
 import { asPgBossDb } from "./leadEventsQueue.js";
+import { BACKGROUND_POLL } from "./boss.js";
 
 export const TENANT_SCORING_REFRESH_QUEUE = "tenant-scoring-refresh";
 
@@ -79,7 +80,7 @@ export async function enqueueTenantScoringRefresh(
  * produces zero extra history rows, not just cheap extra work.
  */
 export function startTenantScoringRefreshWorker(boss: PgBoss, pool: Pool): Promise<string> {
-  return boss.work<TenantScoringRefreshJob>(TENANT_SCORING_REFRESH_QUEUE, async (jobs: Job<TenantScoringRefreshJob>[]) => {
+  return boss.work<TenantScoringRefreshJob>(TENANT_SCORING_REFRESH_QUEUE, BACKGROUND_POLL, async (jobs: Job<TenantScoringRefreshJob>[]) => {
     for (const job of jobs) {
       const { tenantId } = job.data;
       let afterLeadId: string | null = null;
