@@ -5,6 +5,7 @@ import {
   exchangeForLongLivedToken,
   fetchInstagramProfile,
   refreshLongLivedToken,
+  subscribeToWebhooks,
 } from "../instagramOAuth.js";
 
 const config = {
@@ -137,5 +138,32 @@ describe("instagramOAuth", () => {
     });
 
     await expect(fetchInstagramProfile("token")).rejects.toThrow(/user_id/);
+  });
+
+  // subscribeToWebhooks is the step that actually turns on delivery — a
+  // valid token and a saved account alone get a connected-looking account
+  // that never receives a single webhook, which is exactly what happened
+  // when this call was missing from the OAuth callback entirely.
+  it("subscribeToWebhooks posts to /me/subscribed_apps with comments and messages", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
+
+    await subscribeToWebhooks("long-lived-token");
+
+    const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const parsed = new URL(url as string);
+    expect(parsed.pathname).toContain("subscribed_apps");
+    expect(parsed.searchParams.get("subscribed_fields")).toBe("comments,messages");
+    expect(parsed.searchParams.get("access_token")).toBe("long-lived-token");
+    expect((options as RequestInit).method).toBe("POST");
+  });
+
+  it("subscribeToWebhooks throws with the response body on failure", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => "insufficient permissions",
+    });
+
+    await expect(subscribeToWebhooks("token")).rejects.toThrow(/insufficient permissions/);
   });
 });

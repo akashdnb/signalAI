@@ -17,6 +17,7 @@ vi.mock("../../lib/instagramOAuth.js", async () => {
     exchangeCodeForShortLivedToken: vi.fn(),
     exchangeForLongLivedToken: vi.fn(),
     fetchInstagramProfile: vi.fn(),
+    subscribeToWebhooks: vi.fn(),
   };
 });
 
@@ -24,6 +25,7 @@ import {
   exchangeCodeForShortLivedToken,
   exchangeForLongLivedToken,
   fetchInstagramProfile,
+  subscribeToWebhooks,
 } from "../../lib/instagramOAuth.js";
 import { createApp } from "../../app.js";
 
@@ -40,6 +42,7 @@ function mockSuccessfulExchange(igAccountId = "acct-1") {
   vi.mocked(exchangeCodeForShortLivedToken).mockResolvedValue({ access_token: "short", user_id: "u1" });
   vi.mocked(exchangeForLongLivedToken).mockResolvedValue({ access_token: "long-lived-token", expires_in: 5184000 });
   vi.mocked(fetchInstagramProfile).mockResolvedValue({ id: igAccountId, username: "real_handle" });
+  vi.mocked(subscribeToWebhooks).mockResolvedValue(undefined);
 }
 
 /**
@@ -79,6 +82,7 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     vi.mocked(exchangeCodeForShortLivedToken).mockReset();
     vi.mocked(exchangeForLongLivedToken).mockReset();
     vi.mocked(fetchInstagramProfile).mockReset();
+    vi.mocked(subscribeToWebhooks).mockReset();
   });
 
   afterAll(async () => {
@@ -202,6 +206,50 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     expect(tokenRow.rows[0].tenant_id).toBe(tenant.id);
     expect(tokenRow.rows[0].encrypted_token.toString("utf8")).not.toContain("long-lived-token");
     expect(tokenRow.rows[0].status).toBe("healthy");
+  });
+
+  // Granting OAuth permissions alone gets Meta nowhere — without this call
+  // the account is saved and looks healthy but never receives a webhook.
+  it("callback subscribes the newly connected account to webhooks with its own long-lived token", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    mockSuccessfulExchange();
+
+    const app = createApp();
+    const agent = request.agent(app);
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const start = await agent.get(startUrl);
+    const state = extractState(start.headers.location);
+
+    await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
+
+    expect(subscribeToWebhooks).toHaveBeenCalledWith("long-lived-token");
+  });
+
+  it("callback still connects the account when the webhook subscription call fails, but marks it 'error' so it surfaces as Needs attention", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    mockSuccessfulExchange();
+    vi.mocked(subscribeToWebhooks).mockRejectedValue(new Error("Subscribing to webhooks failed: 400 insufficient permissions"));
+
+    const app = createApp();
+    const agent = request.agent(app);
+    const startUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const start = await agent.get(startUrl);
+    const state = extractState(start.headers.location);
+
+    const res = await agent.get("/auth/instagram/callback").query({ code: "auth-code", state });
+
+    // Still a successful connect from the creator's point of view — the
+    // token is valid and kept, not discarded over a subscription failure.
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`${APP_BASE_URL}/dashboard/${tenant.id}?connected=1`);
+
+    const tokenRow = await pool.query(
+      "select status, last_error from meta_tokens where instagram_account_id = 'acct-1'",
+    );
+    expect(tokenRow.rows[0].status).toBe("error");
+    expect(tokenRow.rows[0].last_error).toMatch(/reconnecting/i);
   });
 
   it("callback rejects a forged or expired state before ever calling Instagram, redirecting to the retry screen", async () => {

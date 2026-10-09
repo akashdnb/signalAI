@@ -131,3 +131,24 @@ export async function fetchInstagramProfile(accessToken: string): Promise<Instag
   // Returned as a number by some API versions; entry.id arrives as a string.
   return { id: String(body.user_id), username: body.username };
 }
+
+/**
+ * A connected account receives NO webhook notifications until this is
+ * called — OAuth granting the permission is necessary but not sufficient.
+ * Per Meta's Instagram Platform webhooks docs, the app itself subscribes
+ * to a webhook topic in the App Dashboard, but each individual professional
+ * account must separately opt in via this call before Meta will deliver
+ * comments/messages for THAT account. Missing this step looks identical to
+ * a healthy connection — token valid, profile fetched, row saved — right
+ * up until the inbox simply never receives anything.
+ */
+export async function subscribeToWebhooks(accessToken: string): Promise<void> {
+  const url = new URL(`${GRAPH_BASE_URL}/me/subscribed_apps`);
+  url.searchParams.set("subscribed_fields", "comments,messages");
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Subscribing to webhooks failed: ${res.status} ${await res.text()}`);
+  }
+}

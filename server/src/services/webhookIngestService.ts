@@ -38,7 +38,14 @@ export async function ingestWebhookEvents(
       tenantId = await findTenantByInstagramAccountId(pool, event.instagramAccountId);
       tenantIdByAccount.set(event.instagramAccountId, tenantId);
     }
-    if (!tenantId) continue; // not one of ours (or not yet connected)
+    if (!tenantId) {
+      // Was silent before — indistinguishable in logs from "no event sent
+      // at all", which made a subscribed-but-unresolvable account (or an
+      // account connected to a different system) invisible to diagnose.
+      // eslint-disable-next-line no-console
+      console.warn(`Instagram webhook for unrecognized account ${event.instagramAccountId} — dropping (not connected to any tenant)`);
+      continue;
+    }
 
     let campaigns = campaignsByTenant.get(tenantId);
     if (!campaigns) {

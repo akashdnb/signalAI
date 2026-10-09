@@ -2,7 +2,7 @@ import { Router, type Response } from "express";
 import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
-import { upsertToken } from "../db/tokens.js";
+import { markTokenError, upsertToken } from "../db/tokens.js";
 import { registerInstagramTrialUse } from "../db/instagramTrialHistory.js";
 import { endTrialImmediately } from "../db/tenants.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
@@ -13,6 +13,7 @@ import {
   exchangeCodeForShortLivedToken,
   exchangeForLongLivedToken,
   fetchInstagramProfile,
+  subscribeToWebhooks,
 } from "../lib/instagramOAuth.js";
 import { Sentry } from "../lib/sentry.js";
 
@@ -174,6 +175,24 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
       accessToken: longLived.access_token,
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),
     });
+
+    // OAuth granting the permission is not enough — Meta won't deliver a
+    // single webhook for this account until it's individually subscribed
+    // (see subscribeToWebhooks's docstring). upsertToken above already
+    // reset status to 'healthy' on conflict, so this must run after it: a
+    // failure here marks the account 'error' rather than failing the whole
+    // connect, since the token itself is still valid and worth keeping —
+    // the creator sees "Needs attention" on the Integrations page (the
+    // same status/lastError surface Account Health Monitoring already
+    // renders) instead of a silent, permanently-empty inbox.
+    try {
+      await subscribeToWebhooks(longLived.access_token);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("Instagram webhook subscription failed:", err);
+      Sentry.captureException(err);
+      await markTokenError(pool, tenantId, profile.id, "Couldn't subscribe to Instagram notifications — try reconnecting.");
+    }
 
     // Phase 2B Trial-Abuse Guardrail: trial eligibility is tied to this
     // Instagram account, not the email/signup that created the tenant.
