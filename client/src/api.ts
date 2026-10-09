@@ -559,6 +559,9 @@ export const api = {
   startInstagramConnect: (tenantId: string) =>
     request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, { method: "POST" }),
   getAccountHealth: (tenantId: string) => request<AccountHealth>(`/tenants/${tenantId}/account`),
+  /** Drops the stored Instagram token — replies stop immediately; leads and their history are kept. */
+  disconnectInstagram: (tenantId: string) =>
+    request<AccountHealth>(`/tenants/${tenantId}/account`, { method: "DELETE" }),
   getLeads: (
     tenantId: string,
     filters?: { stage?: PipelineStage; ownerUserId?: string; q?: string; tagId?: string; handoffStatus?: HandoffStatus; unreadOnly?: boolean },

@@ -157,3 +157,20 @@ export async function getDecryptedToken(
 
   return decryptToken(row.encrypted_token, key);
 }
+
+/**
+ * Disconnect: drops the tenant's stored token(s). The token is the whole
+ * connection — inbound webhooks resolve their tenant through meta_tokens
+ * (db/accounts.ts) and the send path reads it through
+ * getSoleConnectedAccount, so removing the row stops both directions at
+ * once. Leads and their history are deliberately left intact; this is a
+ * channel disconnect, not a data deletion (that's lib/deletionService.ts).
+ * Meta exposes no server-side revoke for Instagram Login tokens, so the
+ * creator also removes the app from their Instagram settings if they want
+ * the grant itself gone. Returns how many rows went away so the caller can
+ * tell "disconnected" from "wasn't connected".
+ */
+export async function deleteTokensForTenant(pool: Pool, tenantId: string): Promise<number> {
+  const result = await pool.query(`delete from meta_tokens where tenant_id = $1`, [tenantId]);
+  return result.rowCount ?? 0;
+}

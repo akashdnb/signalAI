@@ -15,6 +15,8 @@ export function IntegrationsPage() {
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -47,6 +49,21 @@ export function IntegrationsPage() {
     } catch (err) {
       setConnecting(false);
       setError(err instanceof Error ? err.message : "Couldn't start the Instagram connection");
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!tenantId) return;
+    setDisconnecting(true);
+    setError(null);
+    try {
+      const next = await api.disconnectInstagram(tenantId);
+      setAccount(next);
+      setConfirmingDisconnect(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't disconnect Instagram");
+    } finally {
+      setDisconnecting(false);
     }
   }
 
@@ -88,10 +105,31 @@ export function IntegrationsPage() {
             )}
           </div>
         </div>
-        {!account?.connected && (
+        {account?.connected ? (
+          <button className="btn-secondary btn-small shrink-0" onClick={() => setConfirmingDisconnect(true)} disabled={confirmingDisconnect}>
+            Disconnect
+          </button>
+        ) : (
           <button className="btn-primary btn-small shrink-0" onClick={handleConnect} disabled={connecting || account === null}>
             {connecting ? "Redirecting…" : "Connect"}
           </button>
+        )}
+
+        {confirmingDisconnect && (
+          <div className="banner w-full">
+            <p className="m-0">
+              Disconnect Instagram? signalAI will stop replying to comments and DMs straight away. Your leads and their
+              conversation history are kept, and you can reconnect any time.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button className="btn-primary btn-small" onClick={handleDisconnect} disabled={disconnecting}>
+                {disconnecting ? "Disconnecting…" : "Yes, disconnect"}
+              </button>
+              <button className="btn-secondary btn-small" onClick={() => setConfirmingDisconnect(false)} disabled={disconnecting}>
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
       </section>
 

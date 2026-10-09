@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
-import { getAccountHealth } from "../db/tokens.js";
+import { deleteTokensForTenant, getAccountHealth } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
 import {
   getCampaignAnalytics,
@@ -60,6 +60,15 @@ export function dashboardRouter(
     const health = await getAccountHealth(getPool(), req.params.tenantId);
     if (!health) return res.status(200).json({ connected: false });
     return res.status(200).json({ connected: true, ...health });
+  });
+
+  // Disconnect: the inverse of the OAuth connect flow in routes/auth.ts.
+  // Idempotent — disconnecting an already-disconnected tenant is a 200,
+  // not a 404, since the caller's intent ("be disconnected") is satisfied
+  // either way and the UI only needs the resulting state.
+  router.delete("/tenants/:tenantId/account", async (req, res) => {
+    await deleteTokensForTenant(getPool(), req.params.tenantId);
+    return res.status(200).json({ connected: false });
   });
 
   const VALID_PIPELINE_STAGES: PipelineStage[] = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"];

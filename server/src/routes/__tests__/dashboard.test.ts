@@ -86,6 +86,42 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(errored.body).toMatchObject({ connected: true, status: "error", lastError: "refresh failed" });
   });
 
+  it("DELETE /tenants/:id/account disconnects Instagram and is idempotent", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const keyring = new Map([["v1", randomBytes(32)]]);
+    const app = createApp();
+
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "t" });
+
+    const disconnected = await request(app).delete(`/tenants/${tenant.id}/account`).set(authHeader);
+    expect(disconnected.status).toBe(200);
+    expect(disconnected.body).toEqual({ connected: false });
+
+    const after = await request(app).get(`/tenants/${tenant.id}/account`).set(authHeader);
+    expect(after.body).toEqual({ connected: false });
+
+    // Disconnecting twice is not an error — the caller's intent is already satisfied.
+    const again = await request(app).delete(`/tenants/${tenant.id}/account`).set(authHeader);
+    expect(again.status).toBe(200);
+  });
+
+  it("DELETE /tenants/:id/account rejects a session for another tenant", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { authHeader: otherAuthHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
+    const keyring = new Map([["v1", randomBytes(32)]]);
+    const app = createApp();
+
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "t" });
+
+    const res = await request(app).delete(`/tenants/${tenant.id}/account`).set(otherAuthHeader);
+    expect(res.status).toBe(403);
+
+    const still = await request(app).get(`/tenants/${tenant.id}/account`).set(authHeader);
+    expect(still.body).toMatchObject({ connected: true });
+  });
+
   it("GET /tenants/:id/leads lists leads with their latest username, most recent first", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
