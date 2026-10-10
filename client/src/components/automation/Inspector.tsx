@@ -300,7 +300,7 @@ function TriggerEditor({
       <div
         id="inspector-tabpanel"
         role="tabpanel"
-        aria-labelledby={`inspector-tab-${active}`}
+        aria-labelledby={`inspector-tab-${tab}`}
         tabIndex={0}
         className="min-w-0 flex-1"
       >
@@ -537,7 +537,7 @@ function MessageEditor({
       <div
         id="inspector-tabpanel"
         role="tabpanel"
-        aria-labelledby={`inspector-tab-${active}`}
+        aria-labelledby={`inspector-tab-${tab}`}
         tabIndex={0}
         className="min-w-0 flex-1"
       >
@@ -764,7 +764,7 @@ function GoalEditor({
       <div
         id="inspector-tabpanel"
         role="tabpanel"
-        aria-labelledby={`inspector-tab-${active}`}
+        aria-labelledby={`inspector-tab-${tab}`}
         tabIndex={0}
         className="min-w-0 flex-1"
       >
