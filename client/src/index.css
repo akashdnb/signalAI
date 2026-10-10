@@ -214,6 +214,7 @@ body {
 h1 {
   font-size: 1.6rem;
   margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
 }
 
 h2 {
