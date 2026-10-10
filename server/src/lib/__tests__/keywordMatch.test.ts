@@ -57,9 +57,9 @@ describe("findMatchingCampaign", () => {
 
 describe("resolveDmCampaignTrigger", () => {
   const campaigns = [
-    { id: "dm-1", keywords: ["link"], targetMediaIds: [], triggerSource: "message" as const },
-    { id: "both-1", keywords: ["price"], targetMediaIds: [], triggerSource: "both" as const },
-    { id: "comment-1", keywords: ["hello"], targetMediaIds: [], triggerSource: "comment" as const },
+    { id: "dm-1", keywords: ["link"], targetMediaIds: [], triggerSource: "message" as const, replyChannel: "dm" as const },
+    { id: "both-1", keywords: ["price"], targetMediaIds: [], triggerSource: "both" as const, replyChannel: "both" as const },
+    { id: "comment-1", keywords: ["hello"], targetMediaIds: [], triggerSource: "comment" as const, replyChannel: "comment" as const },
   ];
 
   it("continues the active DM automation when the previous 24-hour window is open", () => {
@@ -90,7 +90,56 @@ describe("resolveDmCampaignTrigger", () => {
     });
   });
 
-  it("does not continue a disabled or comment-only campaign as a DM", () => {
-    expect(resolveDmCampaignTrigger("just checking in", campaigns, "comment-1", false)).toBeNull();
+  it("continues a comment-started DM journey on the customer's first DM", () => {
+    const commentCampaign = {
+      id: "comment-dm-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "dm" as const,
+    };
+
+    expect(resolveDmCampaignTrigger("thanks", [commentCampaign], "comment-dm-1", false, undefined, false)).toEqual({
+      campaignId: "comment-dm-1", keyword: CONTINUATION_KEYWORD, restartCampaign: false,
+    });
+  });
+
+  it("restarts a comment-started DM journey after a later 24-hour gap", () => {
+    const commentCampaign = {
+      id: "comment-dm-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "dm" as const,
+    };
+
+    expect(resolveDmCampaignTrigger("back again", [commentCampaign], "comment-dm-1", false, undefined, true)).toEqual({
+      campaignId: "comment-dm-1", keyword: RESTART_KEYWORD, restartCampaign: true,
+    });
+  });
+
+  it("does not continue a campaign that cannot send DMs", () => {
+    const commentOnly = {
+      id: "comment-only-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "comment" as const,
+    };
+
+    expect(resolveDmCampaignTrigger("just checking in", [commentOnly], "comment-only-1", true)).toBeNull();
+  });
+
+  it("does not continue a disabled DM-capable campaign", () => {
+    const disabled = {
+      id: "disabled-dm-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "dm" as const,
+      enabled: false,
+    };
+
+    expect(resolveDmCampaignTrigger("just checking in", [disabled], "disabled-dm-1", true)).toBeNull();
   });
 });
