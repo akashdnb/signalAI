@@ -19,6 +19,7 @@ export function LeadsPage() {
   const [handoffFilter, setHandoffFilter] = useState<HandoffStatus | "">("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -32,6 +33,7 @@ export function LeadsPage() {
         });
         if (cancelled) return;
         setLeads(l);
+        setError(null);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -46,7 +48,7 @@ export function LeadsPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, stageFilter, handoffFilter, search]);
+  }, [tenantId, stageFilter, handoffFilter, search, reloadCount]);
 
   if (!tenantId) return null;
 
@@ -54,7 +56,14 @@ export function LeadsPage() {
     <div className="page page-wide">
       <h1>Leads</h1>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <section className="card">
         <div className="filter-row">
@@ -87,7 +96,7 @@ export function LeadsPage() {
         </div>
 
         {leads === null ? (
-          <p className="muted">Loading…</p>
+          <p className="muted" role="status">{error ? "Leads could not be loaded. Use Retry above." : "Loading…"}</p>
         ) : leads.length === 0 ? (
           <p className="muted">No leads match this view yet.</p>
         ) : (
