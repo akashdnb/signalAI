@@ -218,6 +218,7 @@ function TemplateDetailsDialog({
       title={`Use ${template.name}`}
       onClose={() => { if (!creating) onClose(); }}
       maxWidth={560}
+      zIndex={60}
     >
       <div className="flex items-start gap-3">
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${TONE_CLASS[template.tone]}`}>
