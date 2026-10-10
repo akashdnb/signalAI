@@ -622,10 +622,11 @@ export function BuilderCanvas({
             parentGroupId: null,
             collapsed: false,
           }),
-          position: {
-            x: existing?.position.x ?? 0,
-            y: 320 + index * 160,
-          },
+          // Preserve hand-adjusted positions for existing goals. Only
+          // brand-new goals receive a predictable default placement.
+          position: existing
+            ? { ...existing.position }
+            : { x: 0, y: 320 + index * 160 },
           data: {
             ...(existing?.data ?? {}),
             milestoneId: milestone.id,
