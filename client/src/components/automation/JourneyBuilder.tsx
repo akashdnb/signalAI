@@ -264,6 +264,16 @@ export function JourneyBuilder({
     index: number,
     updates: { goalDescription: string; captureFields: string[] },
   ) {
+    // The inspector has its own explicit Save action. If canvas edits are also
+    // pending, persist them first so the milestone endpoint cannot advance the
+    // server version underneath an unsaved local graph draft.
+    if (canvasDirty) {
+      const savedCanvas = await saveCanvasDraft();
+      if (!savedCanvas) {
+        throw new Error("Save the pending canvas changes before saving this goal.");
+      }
+    }
+
     await persistMilestones(
       milestones.map((milestone, milestoneIndex) =>
         milestoneIndex === index ? { ...milestone, ...updates } : milestone,
@@ -551,10 +561,12 @@ export function JourneyBuilder({
               milestones={milestones}
               selectedNode={selectedNode}
               onSelectNode={selectNode}
-              onAddMilestone={() => void handleAddMilestone()}
-              onRemoveMilestone={(index) => void handleRemoveMilestone(index)}
+              onAddMilestone={() => requestNavigation(handleAddMilestone)}
+              onRemoveMilestone={(index) =>
+                requestNavigation(() => handleRemoveMilestone(index))
+              }
               onReorderMilestone={(index, direction) =>
-                void handleReorderMilestone(index, direction)
+                requestNavigation(() => handleReorderMilestone(index, direction))
               }
               reloadSignal={graphReloadSignal}
               onBuilderVersionChange={setBuilderVersion}
@@ -666,7 +678,7 @@ export function JourneyBuilder({
           onClose={keepEditing}
         >
           <p className="m-0 text-sm text-ink">
-            You have unsaved changes to this journey. If you leave now, those changes will be discarded.
+            You have unsaved canvas changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
           </p>
           {unsavedDialogError && (
             <div className="banner banner-error mt-3">{unsavedDialogError}</div>
