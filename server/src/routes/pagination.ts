@@ -115,7 +115,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
      limit $${dataParams.length - 1} offset $${dataParams.length}`,
     dataParams,
   );
-  const items = result.rows.map((row) => ({ id: row.id, instagramUserId: row.instagram_user_id, username: row.username, lastEventType: row.last_event_type, lastMessagePreview: row.last_message_preview, unread: row.unread, activeMilestoneId: row.active_milestone_id, lastInboundAt: row.last_dm_at, windowOpenUntil: row.last_dm_at ? new Date(row.last_dm_at.getTime() + 24 * 60 * 60 * 1000).toISOString() : null, humanAgentWindowUntil: config.instagramHumanAgentEnabled && row.last_dm_at ? new Date(row.last_dm_at.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() : null, createdAt: row.created_at, pipelineStage: row.pipeline_stage, ownerUserId: row.owner_user_id, handoffStatus: row.handoff_status }));
+  const items = result.rows.map((row) => ({ id: row.id, instagramUserId: row.instagram_user_id, username: row.username, lastEventType: row.last_event_type, lastMessagePreview: row.last_message_preview, unread: row.unread, activeMilestoneId: row.active_milestone_id, lastInboundAt: row.last_inbound_at, windowOpenUntil: row.last_dm_at ? new Date(row.last_dm_at.getTime() + 24 * 60 * 60 * 1000).toISOString() : null, humanAgentWindowUntil: config.instagramHumanAgentEnabled && row.last_dm_at ? new Date(row.last_dm_at.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() : null, createdAt: row.created_at, pipelineStage: row.pipeline_stage, ownerUserId: row.owner_user_id, handoffStatus: row.handoff_status }));
   return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
 
