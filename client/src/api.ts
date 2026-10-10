@@ -194,6 +194,8 @@ export interface Campaign {
   description: string | null;
   keywords: string[];
   enabled: boolean;
+  /** True when at least one immutable journey snapshot has been published. */
+  published?: boolean;
   replyMode: "rule_based" | "ai_generated";
   replyTemplates: string[];
   defaultReplyTemplate: string;
