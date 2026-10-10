@@ -59,7 +59,7 @@ button {
 :root {
   /* Brand guide (docs/signalai-brand-assets/BRAND-GUIDE.txt): Primary
      Purple #7C3AED, Primary Blue #2563EB, Accent Cyan #22D3EE, Dark
-     #0F172A, Background #F1F5F9, Muted Text #6B7280. Surface/Border from
+     #0F172A, Background #F1F5F9, Muted Text #596273 (adjusted for contrast). Surface/Border from
      the guide (#1F2937/#374151) are the dark-mode pair, applied below. */
   --bg: #f1f5f9;
   --card-bg: #ffffff;
