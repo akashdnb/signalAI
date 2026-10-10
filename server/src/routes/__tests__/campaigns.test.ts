@@ -431,15 +431,43 @@ describe("campaigns routes", () => {
     expect(save.body.nodes.find((node: { id: string }) => node.id === goalNodeId).data)
       .toMatchObject({ milestoneId: persistedGoal.id, ordinal: 0 });
 
+    // Moving a node with an unchanged semantic goal list must increment the
+    // graph version without replacing the milestone IDs used by analytics.
+    const movedNodes = save.body.nodes.map((node: { id: string; position: { x: number; y: number } }) =>
+      node.id === message.id
+        ? { ...node, position: { ...node.position, x: node.position.x + 24 } }
+        : node,
+    );
+    const graphOnlySave = await request(app)
+      .put(builderUrl)
+      .set(authHeader)
+      .send({
+        expectedVersion: save.body.version,
+        nodes: movedNodes,
+        edges: save.body.edges,
+        milestones: save.body.milestones.map((milestone: {
+          id: string;
+          goalDescription: string;
+          captureFields: string[];
+        }) => ({
+          id: milestone.id,
+          goalDescription: milestone.goalDescription,
+          captureFields: milestone.captureFields,
+        })),
+      });
+    expect(graphOnlySave.status).toBe(200);
+    expect(graphOnlySave.body.version).toBe(save.body.version + 1);
+    expect(graphOnlySave.body.milestones[0].id).toBe(persistedGoal.id);
+
     // A malformed combined draft must roll back goal changes and must not
     // increment the graph version even if the milestone rows were staged first.
     const invalid = await request(app)
       .put(builderUrl)
       .set(authHeader)
       .send({
-        expectedVersion: save.body.version,
-        nodes: save.body.nodes.filter((node: { id: string }) => node.id !== goalNodeId),
-        edges: save.body.edges,
+        expectedVersion: graphOnlySave.body.version,
+        nodes: graphOnlySave.body.nodes.filter((node: { id: string }) => node.id !== goalNodeId),
+        edges: graphOnlySave.body.edges,
         milestones: [{
           id: persistedGoal.id,
           goalDescription: "This must not persist",
@@ -450,7 +478,7 @@ describe("campaigns routes", () => {
 
     const reloadedGraph = await request(app).get(builderUrl).set(authHeader);
     expect(reloadedGraph.status).toBe(200);
-    expect(reloadedGraph.body.version).toBe(save.body.version);
+    expect(reloadedGraph.body.version).toBe(graphOnlySave.body.version);
     const reloadedMilestones = await request(app)
       .get(`/tenants/${tenant.id}/campaigns/${create.body.id}/milestones`)
       .set(authHeader);
