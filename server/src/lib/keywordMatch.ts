@@ -44,9 +44,10 @@ export function resolveDmCampaignTrigger(
   campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: "comment" | "message" | "both" }>,
   activeDmCampaignId: string | null,
   previousWindowOpen: boolean,
+  mediaId?: string,
 ): DmCampaignTrigger | null {
   const eligible = campaigns.filter((campaign) => campaign.triggerSource === "message" || campaign.triggerSource === "both");
-  const match = findMatchingCampaign(sourceText, undefined, eligible);
+  const match = findMatchingCampaign(sourceText, mediaId, eligible);
   if (match) {
     return { ...match, restartCampaign: !!activeDmCampaignId && !previousWindowOpen };
   }
