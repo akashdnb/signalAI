@@ -107,11 +107,25 @@ function SectionTabs({
   onChange: (key: string) => void;
 }) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [orientation, setOrientation] = useState<"horizontal" | "vertical">(
+    () => window.matchMedia("(max-width: 767px)").matches ? "horizontal" : "vertical",
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncOrientation = (event: MediaQueryList | MediaQueryListEvent) =>
+      setOrientation(event.matches ? "horizontal" : "vertical");
+    syncOrientation(media);
+    media.addEventListener("change", syncOrientation);
+    return () => media.removeEventListener("change", syncOrientation);
+  }, []);
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number | null = null;
-    if (event.key === "ArrowDown") nextIndex = (index + 1) % items.length;
-    if (event.key === "ArrowUp") nextIndex = (index - 1 + items.length) % items.length;
+    if (orientation === "vertical" && event.key === "ArrowDown") nextIndex = (index + 1) % items.length;
+    if (orientation === "vertical" && event.key === "ArrowUp") nextIndex = (index - 1 + items.length) % items.length;
+    if (orientation === "horizontal" && event.key === "ArrowRight") nextIndex = (index + 1) % items.length;
+    if (orientation === "horizontal" && event.key === "ArrowLeft") nextIndex = (index - 1 + items.length) % items.length;
     if (event.key === "Home") nextIndex = 0;
     if (event.key === "End") nextIndex = items.length - 1;
 
@@ -125,10 +139,14 @@ function SectionTabs({
     <div
       role="tablist"
       aria-label="Editor sections"
-      aria-orientation="vertical"
-      className="w-[128px] shrink-0 border-r border-line pr-3"
+      aria-orientation={orientation}
+      className={
+        orientation === "vertical"
+          ? "w-[128px] shrink-0 border-r border-line pr-3"
+          : "w-full shrink-0 overflow-x-auto border-b border-line pb-2"
+      }
     >
-      <div className="space-y-1">
+      <div className={orientation === "vertical" ? "space-y-1" : "flex gap-1"}>
         {items.map((item, index) => {
           const selected = active === item.key;
 
@@ -144,7 +162,9 @@ function SectionTabs({
               tabIndex={selected ? 0 : -1}
               onKeyDown={(event) => handleKeyDown(event, index)}
               onClick={() => onChange(item.key)}
-              className={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
+              className={`flex min-h-10 items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
+                orientation === "vertical" ? "w-full" : "w-auto shrink-0"
+              } ${
                 selected
                   ? "bg-chip font-semibold text-accent"
                   : "text-subtle hover:bg-chip hover:text-ink"
@@ -263,7 +283,7 @@ function TriggerEditor({
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -501,7 +521,7 @@ function MessageEditor({
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -726,7 +746,7 @@ function GoalEditor({
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
