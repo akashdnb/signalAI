@@ -28,6 +28,10 @@ function parseString(query: Record<string, unknown>, key: string): string | unde
   return typeof query[key] === "string" && query[key] ? query[key] as string : undefined;
 }
 
+function hasExplicitPagination(query: Record<string, unknown>): boolean {
+  return query.page !== undefined || query.pageSize !== undefined;
+}
+
 const VALID_PIPELINE_STAGES: PipelineStage[] = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"];
 const VALID_HANDOFF_STATUSES: HandoffStatus[] = ["ai", "requested", "human"];
 const VALID_CAMPAIGN_TRIGGERS: TriggerSource[] = ["comment", "message", "both"];
@@ -110,7 +114,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
     dataParams,
   );
   const items = result.rows.map((row) => ({ id: row.id, instagramUserId: row.instagram_user_id, username: row.username, lastEventType: row.last_event_type, lastMessagePreview: row.last_message_preview, unread: row.unread, activeMilestoneId: row.active_milestone_id, lastInboundAt: row.last_inbound_at, windowOpenUntil: row.window_open_until, createdAt: row.created_at, pipelineStage: row.pipeline_stage, ownerUserId: row.owner_user_id, handoffStatus: row.handoff_status }));
-  return res.status(200).json(toPage(items, page, pageSize, total));
+  return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
 
 paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
@@ -143,7 +147,8 @@ paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
     reply_templates: string[]; default_reply_template: string; cta_link: string | null; target_media_ids: string[]; reply_channel: ReplyChannel;
     trigger_source: TriggerSource; tone: CampaignTone; language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
   }>(`select * from campaigns where ${where} order by ${orderBy} limit $${params.length + 1} offset $${params.length + 2}`, [...params, pageSize, offset]);
-  return res.status(200).json(toPage(result.rows.map(mapCampaign), page, pageSize, total));
+  const items = result.rows.map(mapCampaign);
+  return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
 
 paginationRouter.get("/tenants/:tenantId/knowledge-base", async (req, res) => {
@@ -161,5 +166,6 @@ paginationRouter.get("/tenants/:tenantId/knowledge-base", async (req, res) => {
     id: string; tenant_id: string; filename: string; content_type: string; storage_key: string; version: number;
     status: KnowledgeBaseDocumentStatus; error_reason: string | null; superseded_at: Date | null; created_at: Date;
   }>(`select * from knowledge_base_documents where tenant_id = $1 order by filename asc, version desc, id asc limit $2 offset $3`, [tenantId, pageSize, offset]);
-  return res.status(200).json(toPage(result.rows.map(mapDocument), page, pageSize, total));
+  const items = result.rows.map(mapDocument);
+  return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : { documents: items });
 });

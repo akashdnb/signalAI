@@ -1,17 +1,23 @@
 import type { Queryable } from "./types.js";
 
 export type LeadActivityType =
+  | "note"
+  | "handoff"
+  | "assignment"
+  | "stage_change"
+  | "tag_change"
+  | "deal_created"
   | "note_added"
-  | "pipeline_stage_changed"
   | "owner_assigned"
   | "handoff_changed"
   | "tag_added"
   | "tag_removed"
-  | "deal_created"
-  | "deal_stage_changed";
+  | "deal_stage_changed"
+  | "pipeline_stage_changed";
 
 export interface LeadActivity {
   id: string;
+  tenantId: string;
   leadId: string;
   actorUserId: string | null;
   type: LeadActivityType;
@@ -21,6 +27,7 @@ export interface LeadActivity {
 
 interface LeadActivityRow {
   id: string;
+  tenant_id: string;
   lead_id: string;
   actor_user_id: string | null;
   type: LeadActivityType;
@@ -31,6 +38,7 @@ interface LeadActivityRow {
 function toLeadActivity(row: LeadActivityRow): LeadActivity {
   return {
     id: row.id,
+    tenantId: row.tenant_id,
     leadId: row.lead_id,
     actorUserId: row.actor_user_id,
     type: row.type,
@@ -39,14 +47,7 @@ function toLeadActivity(row: LeadActivityRow): LeadActivity {
   };
 }
 
-/**
- * The CRM-originated half of the Lead Timeline (see the migration's own
- * comment for why this is separate from lead_events). Called alongside
- * whatever mutation it's describing — never on its own — so pass the same
- * Queryable the caller is already using if that call happens inside a
- * transaction, so the activity row commits or rolls back with it.
- */
-export async function recordLeadActivity(
+export async function createLeadActivity(
   pool: Queryable,
   params: {
     tenantId: string;
@@ -65,28 +66,32 @@ export async function recordLeadActivity(
   return toLeadActivity(result.rows[0]!);
 }
 
+export const recordLeadActivity = createLeadActivity;
+
 export async function listLeadActivity(pool: Queryable, tenantId: string, leadId: string): Promise<LeadActivity[]> {
   const result = await pool.query<LeadActivityRow>(
-    `select * from lead_activity where tenant_id = $1 and lead_id = $2 order by created_at`,
+    `select * from lead_activity where tenant_id = $1 and lead_id = $2 order by created_at, id`,
     [tenantId, leadId],
   );
   return result.rows.map(toLeadActivity);
 }
 
-/** Bounded, cursor-paginated companion to listLeadActivity — see listEventsForLeadPage in db/events.ts for the pagination contract this and leadTimeline.ts's getLeadTimelinePage share. */
 export async function listLeadActivityPage(
   pool: Queryable,
   tenantId: string,
   leadId: string,
   limit: number,
-  before?: Date,
+  cursor?: { occurredAt: Date; sourceRank: number; id: string },
+  sourceRank = 1,
 ): Promise<LeadActivity[]> {
   const result = await pool.query<LeadActivityRow>(
     `select * from lead_activity
-     where tenant_id = $1 and lead_id = $2 and ($4::timestamptz is null or created_at < $4)
-     order by created_at desc
+     where tenant_id = $1 and lead_id = $2
+       and ($4::timestamptz is null or created_at < $4::timestamptz
+            or (created_at = $4::timestamptz and ($5::int < $7::int or ($5::int = $7::int and id::text < $6::text))))
+     order by created_at desc, id desc
      limit $3`,
-    [tenantId, leadId, limit, before ?? null],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? "", cursor?.sourceRank ?? sourceRank],
   );
   return result.rows.map(toLeadActivity);
 }

@@ -46,7 +46,7 @@ const TIMELINE_DEFAULT_PAGE_SIZE = 50;
 const TIMELINE_MAX_PAGE_SIZE = 200;
 
 // Phase 2A Lead Timeline / Lead Activity History. Cursor-paginated
-// (`before`, an ISO timestamp) rather than returning the whole
+// (`before`, an opaque cursor) rather than returning the whole
 // conversation: a long-running lead's full history was slow to fetch and
 // render on every load. Omit `before` for the most recent page.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/timeline", async (req, res) => {
@@ -57,15 +57,16 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId/timeline", async (req, res) =>
   const rawLimit = Number(req.query.limit);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, TIMELINE_MAX_PAGE_SIZE) : TIMELINE_DEFAULT_PAGE_SIZE;
 
-  let before: Date | undefined;
-  if (typeof req.query.before === "string") {
-    const parsed = new Date(req.query.before);
-    if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: "before must be a valid ISO timestamp" });
-    before = parsed;
+  const beforeCursor = typeof req.query.before === "string" ? req.query.before : undefined;
+  try {
+    const page = await getLeadTimelinePage(getPool(), tenantId, leadId, limit, beforeCursor);
+    return res.status(200).json(page);
+  } catch (error) {
+    if (error instanceof Error && error.message === "invalid timeline cursor") {
+      return res.status(400).json({ error: "before must be a valid timeline cursor" });
+    }
+    throw error;
   }
-
-  const page = await getLeadTimelinePage(getPool(), tenantId, leadId, limit, before);
-  return res.status(200).json(page);
 });
 
 const VALID_PIPELINE_STAGES: PipelineStage[] = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"];
@@ -95,9 +96,6 @@ leadsRouter.patch("/tenants/:tenantId/leads/:leadId", async (req, res) => {
     lead = await updatePipelineStage(getPool(), { tenantId, leadId, stage: pipelineStage, actorUserId });
   }
   if (ownerUserId !== undefined) {
-    // Assignment is restricted to actual tenant members — an arbitrary
-    // userId would otherwise silently create an unresolvable "owner" no
-    // dropdown anywhere could ever have offered.
     let ownerEmail: string | null = null;
     if (ownerUserId !== null) {
       const members = await listTenantMembers(getPool(), tenantId);
@@ -114,14 +112,11 @@ leadsRouter.patch("/tenants/:tenantId/leads/:leadId", async (req, res) => {
 const VALID_HANDOFF_ACTIONS = ["request", "takeover", "release"] as const;
 type HandoffAction = (typeof VALID_HANDOFF_ACTIONS)[number];
 const HANDOFF_ACTION_TO_STATUS: Record<HandoffAction, HandoffStatus> = {
-  request: "requested", // Agent Escalation, triggered manually from the dashboard
-  takeover: "human", // Live Agent Takeover — pauses the Reply Engine for this lead
-  release: "ai", // Conversation Transfer back to the bot
+  request: "requested",
+  takeover: "human",
+  release: "ai",
 };
 
-// Phase 2A Human Handoff: Agent Escalation / Live Agent Takeover /
-// Conversation Transfer, all as one action-based endpoint rather than
-// three, since they're really three values of the same field.
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const { action } = req.body ?? {};
@@ -139,7 +134,6 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) =>
   return res.status(200).json(lead);
 });
 
-// Phase 2C Lead Intelligence: current qualification projection and score.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/intelligence", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
@@ -167,10 +161,6 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/intelligence/recalculate", as
   return res.status(200).json(intelligence);
 });
 
-// Captured Facts panel (UI revamp R3): what the Milestone Engine has
-// learned about this lead so far (budget, location, etc., keyed by
-// tenant-registered field keys) — previously server-internal only, no
-// route exposed lead_captured_facts to the client at all.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/captured-facts", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
@@ -180,8 +170,6 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId/captured-facts", async (req, r
   return res.status(200).json({ facts });
 });
 
-// Inbox "Unread": marks a conversation read. Called when a human opens it
-// (Inbox row click, LeadDetailPage mount) — no body, idempotent.
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/read", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
@@ -191,14 +179,6 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/read", async (req, res) => {
   return res.status(204).send();
 });
 
-// Inbox compose box: a human sending their own DM reply, distinct from the
-// automated Reply Engine (leadEventReplyHandler.ts) — the only other caller
-// of sendInstagramMessage. Gated on handoffStatus === 'human' (Live Agent
-// Takeover) so a human reply can never race the bot for the same lead; DM
-// only, matching the messaging-window / Meta Send API constraints the
-// automated path already respects (comment replies stay automation-only —
-// there's no single "current comment" a conversation-thread UI reply
-// targets).
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const { text } = req.body ?? {};
@@ -242,7 +222,6 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
   return res.status(201).json({ ok: true });
 });
 
-// Phase 2A Lead Notes / Internal Comments.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const notes = await listLeadNotes(getPool(), tenantId, leadId);
@@ -268,7 +247,6 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   return res.status(201).json(note);
 });
 
-// Phase 2A Tagging System.
 leadsRouter.get("/tenants/:tenantId/tags", async (req, res) => {
   const tags = await listTagsForTenant(getPool(), req.params.tenantId);
   return res.status(200).json(tags);
@@ -311,9 +289,6 @@ leadsRouter.delete("/tenants/:tenantId/leads/:leadId/tags/:tagId", async (req, r
   return res.status(204).send();
 });
 
-// Phase 2A Data Model Amendment: deals, schema now / UI later — a minimal
-// CRUD surface so the schema isn't entirely dark before Phase 4 builds
-// real revenue reporting on it.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/deals", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const deals = await listDealsForLead(getPool(), tenantId, leadId);
@@ -329,13 +304,7 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/deals", async (req, res) => {
 
   const lead = await getLead(getPool(), tenantId, leadId);
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
-  if (!lead.customerId) {
-    // Can't happen for any lead created after the Phase 1 migration's
-    // backfill — guarded anyway since this is the first place customerId
-    // being null would actually break something, rather than silently
-    // going unused.
-    return res.status(409).json({ error: "lead has no customer record yet" });
-  }
+  if (!lead.customerId) return res.status(409).json({ error: "lead has no customer record yet" });
 
   const deal = await createDeal(getPool(), {
     tenantId,
@@ -363,13 +332,11 @@ leadsRouter.patch("/tenants/:tenantId/deals/:dealId", async (req, res) => {
   return res.status(200).json(deal);
 });
 
-// Backs the Lead Ownership assignment dropdown.
 leadsRouter.get("/tenants/:tenantId/members", async (req, res) => {
   const members = await listTenantMembers(getPool(), req.params.tenantId);
   return res.status(200).json(members);
 });
 
-// Phase 2A "Carried from Phase 1": Top Performing Posts / Top Trigger Keywords.
 leadsRouter.get("/tenants/:tenantId/analytics/top-posts", async (req, res) => {
   const posts = await getTopPosts(getPool(), req.params.tenantId);
   return res.status(200).json(posts);

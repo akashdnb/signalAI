@@ -1,20 +1,17 @@
 import type { Queryable } from "./types.js";
 
 export type SentReplyChannel = "dm" | "comment";
-/** 'human': a reply sent by an agent directly in Instagram, not through this system — see webhookIngestService.ts's echo-ingestion handling. */
 export type SentReplyEngine = "rule_based" | "ai_generated" | "human";
 
 export interface SentReply {
   id: string;
   tenantId: string;
   leadId: string;
-  /** Null for a 'human' reply recorded from an echo — it isn't a reply to any one triggering lead_event in our own pipeline. Always set for 'rule_based'/'ai_generated'. */
   leadEventId: string | null;
   channel: SentReplyChannel;
   engine: SentReplyEngine;
   text: string;
   sentAt: Date;
-  /** Meta's own message id for a 'dm' send — the correlation key echo-ingestion uses to tell "this echo is just confirming our own send" from "a human sent this directly." Null for a comment reply and for any row recorded before this existed. */
   metaMessageId: string | null;
 }
 
@@ -44,15 +41,6 @@ function toSentReply(row: SentReplyRow): SentReply {
   };
 }
 
-/**
- * One row per actual channel send — a 'both'-channel campaign calls this
- * twice for one triggering lead_event (see leadEventReplyHandler.ts),
- * matching the two real Instagram API calls actually made, not once per
- * inbound event. Nothing else in this codebase previously persisted what
- * the bot sent back — sendInstagramMessage/sendInstagramCommentReply call
- * Meta's API directly, so the dashboard timeline showed only half of every
- * conversation.
- */
 export async function recordSentReply(
   pool: Queryable,
   params: {
@@ -63,7 +51,6 @@ export async function recordSentReply(
     engine: SentReplyEngine;
     text: string;
     metaMessageId?: string | null;
-    /** Defaults to now() — pass Meta's own timestamp when recording a human reply from an echo, so it sorts correctly against other messages instead of by ingestion time. */
     sentAt?: Date;
   },
 ): Promise<void> {
@@ -85,26 +72,28 @@ export async function recordSentReply(
 
 export async function listSentRepliesForLead(pool: Queryable, tenantId: string, leadId: string): Promise<SentReply[]> {
   const result = await pool.query<SentReplyRow>(
-    `select * from sent_replies where tenant_id = $1 and lead_id = $2 order by sent_at asc`,
+    `select * from sent_replies where tenant_id = $1 and lead_id = $2 order by sent_at asc, id asc`,
     [tenantId, leadId],
   );
   return result.rows.map(toSentReply);
 }
 
-/** Bounded, cursor-paginated companion to listSentRepliesForLead — see listEventsForLeadPage in db/events.ts for the pagination contract this and leadTimeline.ts's getLeadTimelinePage share. */
 export async function listSentRepliesForLeadPage(
   pool: Queryable,
   tenantId: string,
   leadId: string,
   limit: number,
-  before?: Date,
+  cursor?: { occurredAt: Date; sourceRank: number; id: string },
+  sourceRank = 2,
 ): Promise<SentReply[]> {
   const result = await pool.query<SentReplyRow>(
     `select * from sent_replies
-     where tenant_id = $1 and lead_id = $2 and ($4::timestamptz is null or sent_at < $4)
-     order by sent_at desc
+     where tenant_id = $1 and lead_id = $2
+       and ($4::timestamptz is null or sent_at < $4::timestamptz
+            or (sent_at = $4::timestamptz and ($5::int < $7::int or ($5::int = $7::int and id::text < $6::text))))
+     order by sent_at desc, id desc
      limit $3`,
-    [tenantId, leadId, limit, before ?? null],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? "", cursor?.sourceRank ?? sourceRank],
   );
   return result.rows.map(toSentReply);
 }
@@ -114,17 +103,6 @@ export interface SentReplyForHistory {
   sentAt: Date;
 }
 
-/**
- * Bounded companion to listSentRepliesForLead, for LLM conversation history
- * — see listRecentEventsForLead in db/events.ts for why this is capped
- * rather than fetching the whole lead history.
- *
- * `channel`, when given, restricts to that send channel — same Comment
- * Reply vs DM Reply privacy boundary as listRecentEventsForLead: the
- * comment tier must never even fetch a bot/human reply that was actually
- * sent as a private DM. Omitted (the default) preserves the original
- * mixed-channel query, unchanged, for the DM tier's existing behavior.
- */
 export async function listRecentSentRepliesForLead(
   pool: Queryable,
   tenantId: string,
@@ -141,13 +119,6 @@ export async function listRecentSentRepliesForLead(
   return result.rows.map((row) => ({ text: row.text, sentAt: row.sent_at }));
 }
 
-/**
- * The correlation check echo-ingestion runs before recording anything: a
- * match means Meta is just echoing back a send this system already made
- * (bot or a future dashboard-originated human send) — see
- * webhookIngestService.ts. Scoped to tenant only (not lead) since that's
- * all echo-ingestion knows for certain before resolving the lead itself.
- */
 export async function sentReplyExistsForMetaMessageId(
   pool: Queryable,
   tenantId: string,

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type KnowledgeBaseDocument } from "../api";
+import { getKnowledgeBaseDocumentsPage, type PaginatedResponse } from "../api/pagination";
+import { Pagination } from "./Pagination";
 
 const STATUS_LABEL: Record<KnowledgeBaseDocument["status"], string> = {
   processing: "Processing…",
@@ -13,31 +15,24 @@ function statusPillClass(status: KnowledgeBaseDocument["status"]): string {
   return "pill";
 }
 
-/**
- * Phase 2C Per-Tenant Knowledge Base: upload a PDF/text/markdown document
- * (FAQ, pricing sheet, product catalog) that the RAG engine grounds
- * replies in. Re-uploading a file with the same name supersedes the prior
- * version — see server/src/db/knowledgeBase.ts.
- */
+const PAGE_SIZE = 20;
+
 export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
-  const [documents, setDocuments] = useState<KnowledgeBaseDocument[] | null>(null);
+  const [pageData, setPageData] = useState<PaginatedResponse<KnowledgeBaseDocument> | null>(null);
+  const [page, setPage] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  function loadDocuments() {
-    return api
-      .listKnowledgeBaseDocuments(tenantId)
-      .then(setDocuments)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load knowledge base"));
-  }
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .listKnowledgeBaseDocuments(tenantId)
-      .then((docs) => {
-        if (!cancelled) setDocuments(docs);
+    getKnowledgeBaseDocumentsPage(tenantId, page, PAGE_SIZE)
+      .then((result) => {
+        if (cancelled) return;
+        setPageData(result);
+        if (result.page !== page) setPage(result.page);
+        setError(null);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load knowledge base");
@@ -45,7 +40,7 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [tenantId]);
+  }, [tenantId, page, reloadToken]);
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -54,7 +49,8 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
     setError(null);
     try {
       await api.uploadKnowledgeBaseDocument(tenantId, file);
-      await loadDocuments();
+      setPage(1);
+      setReloadToken((value) => value + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload document");
     } finally {
@@ -67,11 +63,13 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
     setError(null);
     try {
       await api.deleteKnowledgeBaseDocument(tenantId, documentId);
-      await loadDocuments();
+      setReloadToken((value) => value + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete document");
     }
   }
+
+  const documents = pageData?.items ?? null;
 
   return (
     <section className="card">
@@ -92,39 +90,31 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
       {uploading && <p className="muted small">Uploading…</p>}
 
       {documents === null ? (
-        <p className="muted">Loading…</p>
+        <p className="muted" role="status">Loading…</p>
       ) : documents.length === 0 ? (
         <p className="muted">No documents uploaded yet.</p>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Version</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((doc) => (
-              <tr key={doc.id}>
-                <td>{doc.filename}</td>
-                <td>{doc.version}</td>
-                <td>
-                  <span className={statusPillClass(doc.status)}>{STATUS_LABEL[doc.status]}</span>
-                  {doc.status === "failed" && doc.errorReason && (
-                    <div className="muted small">{doc.errorReason}</div>
-                  )}
-                </td>
-                <td>
-                  <button className="btn-secondary btn-small" onClick={() => handleDelete(doc.id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <div className="overflow-x-auto">
+            <table className="table min-w-[620px]">
+              <thead><tr><th>File</th><th>Version</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {documents.map((doc) => (
+                  <tr key={doc.id}>
+                    <td>{doc.filename}</td>
+                    <td>{doc.version}</td>
+                    <td>
+                      <span className={statusPillClass(doc.status)}>{STATUS_LABEL[doc.status]}</span>
+                      {doc.status === "failed" && doc.errorReason && <div className="muted small">{doc.errorReason}</div>}
+                    </td>
+                    <td><button className="btn-secondary btn-small" onClick={() => void handleDelete(doc.id)}>Delete</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {pageData && <Pagination page={pageData.page} totalPages={pageData.totalPages} total={pageData.total} pageSize={pageData.pageSize} onPageChange={setPage} label="documents" />}
+        </>
       )}
     </section>
   );
