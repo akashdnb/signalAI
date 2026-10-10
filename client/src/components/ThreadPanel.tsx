@@ -12,7 +12,7 @@ export interface ThreadPanelProps {
   pendingEntries?: TimelineEntry[];
   /** Restricts which entries render (e.g. LeadDetailPage's Conversation vs Activities tabs) — fetch/pagination still cover the full merged history regardless, this only filters what's shown. */
   kindFilter?: TimelineEntry["kind"][];
-  /** Number of entries per page. Inbox passes 10; other callers keep the legacy server default. */
+  /** Number of entries per page. Defaults to 10 so conversations open on a small recent window. */
   pageSize?: number;
   onError?: (message: string | null) => void;
 }
@@ -29,7 +29,7 @@ export function ThreadPanel({
   refreshToken,
   pendingEntries,
   kindFilter,
-  pageSize,
+  pageSize = 10,
   onError,
 }: ThreadPanelProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
@@ -43,9 +43,7 @@ export function ThreadPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const fetchPage = (before?: string) =>
-    pageSize
-      ? getLeadTimelinePage(tenantId, leadId, { before, limit: pageSize })
-      : api.getLeadTimeline(tenantId, leadId, before ? { before } : undefined);
+    getLeadTimelinePage(tenantId, leadId, { before, limit: pageSize });
 
   useEffect(() => {
     let cancelled = false;
