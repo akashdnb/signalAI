@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
 } from "react";
 import {
   api,
@@ -105,16 +106,43 @@ function SectionTabs({
   active: string;
   onChange: (key: string) => void;
 }) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowDown") nextIndex = (index + 1) % items.length;
+    if (event.key === "ArrowUp") nextIndex = (index - 1 + items.length) % items.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = items.length - 1;
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      tabRefs.current[nextIndex]?.focus();
+    }
+  }
+
   return (
-    <nav className="w-[128px] shrink-0 border-r border-line pr-3">
+    <div
+      role="tablist"
+      aria-label="Editor sections"
+      aria-orientation="vertical"
+      className="w-[128px] shrink-0 border-r border-line pr-3"
+    >
       <div className="space-y-1">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const selected = active === item.key;
 
           return (
             <button
               key={item.key}
+              ref={(element) => { tabRefs.current[index] = element; }}
+              id={`inspector-tab-${item.key}`}
               type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="inspector-tabpanel"
+              tabIndex={selected ? 0 : -1}
+              onKeyDown={(event) => handleKeyDown(event, index)}
               onClick={() => onChange(item.key)}
               className={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
                 selected
@@ -127,7 +155,7 @@ function SectionTabs({
           );
         })}
       </div>
-    </nav>
+    </div>
   );
 }
 
@@ -246,7 +274,13 @@ function TriggerEditor({
         onChange={setTab}
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        id="inspector-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${active}`}
+        tabIndex={0}
+        className="min-w-0 flex-1"
+      >
         {tab === "basic" ? (
           <>
             <PanelHeader
@@ -477,7 +511,13 @@ function MessageEditor({
         onChange={setTab}
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        id="inspector-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${active}`}
+        tabIndex={0}
+        className="min-w-0 flex-1"
+      >
         {tab === "basic" ? (
           <>
             <PanelHeader
@@ -698,7 +738,13 @@ function GoalEditor({
         onChange={setTab}
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        id="inspector-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${active}`}
+        tabIndex={0}
+        className="min-w-0 flex-1"
+      >
         {tab === "basic" && (
           <div className="max-w-[590px]">
             <div className="space-y-5">
