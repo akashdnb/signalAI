@@ -3,136 +3,118 @@ import { listEventsForLead, listEventsForLeadPage } from "./events.js";
 import { listLeadActivity, listLeadActivityPage } from "./leadActivity.js";
 import { listSentRepliesForLead, listSentRepliesForLeadPage, type SentReplyChannel, type SentReplyEngine } from "./sentReplies.js";
 
-export type TimelineEntry =
-  | { kind: "event"; occurredAt: Date; eventType: string; text: string | null; username: string | null; matchedKeyword: string | null }
-  | { kind: "activity"; occurredAt: Date; type: string; summary: string; actorUserId: string | null }
-  | { kind: "reply"; occurredAt: Date; channel: SentReplyChannel; engine: SentReplyEngine; text: string };
+export type TimelineSource = "event" | "activity" | "reply";
 
-/**
- * Phase 2A Lead Timeline: the union of lead_events (Meta-webhook-driven),
- * lead_activity (CRM-driven), and sent_replies (what the bot actually sent
- * back — previously absent entirely, so this timeline only ever showed
- * half of every conversation), sorted by timestamp at read time — same
- * approach the roadmap already uses for display/attribution ordering
- * elsewhere, so no shared ordering machinery is needed between tables
- * built for very different write patterns.
- */
+// Source rank is part of the cursor contract. Higher rank sorts first when
+// timestamps are equal, making the merged timeline a total order.
+const SOURCE_RANK: Record<TimelineSource, number> = {
+  event: 3,
+  reply: 2,
+  activity: 1,
+};
+
+export type TimelineEntry =
+  | { kind: "event"; source: "event"; id: string; occurredAt: Date; eventType: string; text: string | null; username: string | null; matchedKeyword: string | null }
+  | { kind: "activity"; source: "activity"; id: string; occurredAt: Date; type: string; summary: string; actorUserId: string | null }
+  | { kind: "reply"; source: "reply"; id: string; occurredAt: Date; channel: SentReplyChannel; engine: SentReplyEngine; text: string };
+
+function compareNewestFirst(a: TimelineEntry, b: TimelineEntry): number {
+  const timeDiff = b.occurredAt.getTime() - a.occurredAt.getTime();
+  if (timeDiff !== 0) return timeDiff;
+  const rankDiff = SOURCE_RANK[b.source] - SOURCE_RANK[a.source];
+  if (rankDiff !== 0) return rankDiff;
+  return b.id.localeCompare(a.id);
+}
+
+function encodeCursor(entry: TimelineEntry): string {
+  const payload = JSON.stringify({
+    occurredAt: entry.occurredAt.toISOString(),
+    source: entry.source,
+    id: entry.id,
+  });
+  return Buffer.from(payload, "utf8").toString("base64url");
+}
+
+function decodeCursor(value: string): { occurredAt: Date; source: TimelineSource; sourceRank: number; id: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+  } catch {
+    throw new Error("invalid timeline cursor");
+  }
+  if (!parsed || typeof parsed !== "object") throw new Error("invalid timeline cursor");
+  const candidate = parsed as Record<string, unknown>;
+  const source = candidate.source;
+  const id = candidate.id;
+  const occurredAt = candidate.occurredAt;
+  if ((source !== "event" && source !== "activity" && source !== "reply") || typeof id !== "string" || !id || typeof occurredAt !== "string") {
+    throw new Error("invalid timeline cursor");
+  }
+  const date = new Date(occurredAt);
+  if (Number.isNaN(date.getTime())) throw new Error("invalid timeline cursor");
+  return { occurredAt: date, source, sourceRank: SOURCE_RANK[source], id };
+}
+
+function toTimelineEntries(
+  events: Awaited<ReturnType<typeof listEventsForLead>>,
+  activity: Awaited<ReturnType<typeof listLeadActivity>>,
+  replies: Awaited<ReturnType<typeof listSentRepliesForLead>>,
+): TimelineEntry[] {
+  return [
+    ...events.map((e): TimelineEntry => ({ source: "event", kind: "event", id: e.id, occurredAt: e.occurredAt, eventType: e.eventType, text: e.eventType === "comment" ? e.commentText : e.dmText, username: e.username, matchedKeyword: e.matchedKeyword })),
+    ...activity.map((a): TimelineEntry => ({ source: "activity", kind: "activity", id: a.id, occurredAt: a.createdAt, type: a.type, summary: a.summary, actorUserId: a.actorUserId })),
+    ...replies.map((r): TimelineEntry => ({ source: "reply", kind: "reply", id: r.id, occurredAt: r.sentAt, channel: r.channel, engine: r.engine, text: r.text })),
+  ];
+}
+
 export async function getLeadTimeline(pool: Pool, tenantId: string, leadId: string): Promise<TimelineEntry[]> {
   const [events, activity, replies] = await Promise.all([
     listEventsForLead(pool, tenantId, leadId),
     listLeadActivity(pool, tenantId, leadId),
     listSentRepliesForLead(pool, tenantId, leadId),
   ]);
-
-  const entries: TimelineEntry[] = [
-    ...events.map(
-      (e): TimelineEntry => ({
-        kind: "event",
-        occurredAt: e.occurredAt,
-        eventType: e.eventType,
-        text: e.eventType === "comment" ? e.commentText : e.dmText,
-        username: e.username,
-        matchedKeyword: e.matchedKeyword,
-      }),
-    ),
-    ...activity.map(
-      (a): TimelineEntry => ({
-        kind: "activity",
-        occurredAt: a.createdAt,
-        type: a.type,
-        summary: a.summary,
-        actorUserId: a.actorUserId,
-      }),
-    ),
-    ...replies.map(
-      (r): TimelineEntry => ({
-        kind: "reply",
-        occurredAt: r.sentAt,
-        channel: r.channel,
-        engine: r.engine,
-        text: r.text,
-      }),
-    ),
-  ];
-
-  return entries.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+  return toTimelineEntries(events, activity, replies).sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime() || SOURCE_RANK[a.source] - SOURCE_RANK[b.source] || a.id.localeCompare(b.id));
 }
 
 export interface TimelinePage {
-  /** Oldest-first, same order getLeadTimeline returns — a long conversation renders top-to-bottom the same way whether paginated or not. */
+  /** Oldest-first, same display order as getLeadTimeline. */
   entries: TimelineEntry[];
   hasMore: boolean;
-  /** Pass as `before` on the next call to load the next (older) page. Null once hasMore is false. */
+  /** Opaque base64url cursor containing occurredAt + source + unique id. */
   nextCursor: string | null;
 }
 
-/**
- * Cursor-paginated companion to getLeadTimeline: the unbounded version
- * fetches a lead's ENTIRE history — every event, activity row, and reply —
- * on every dashboard load (and reload after every single mutation), which
- * is slow for a long-running conversation. Each source is independently
- * fetched `limit + 1` rows deep (not just `limit`): by the standard k-way
- * top-K merge argument, fetching the top-K of each of the 3 sources is
- * exactly what's needed to correctly compute the true top-K of their
- * union — so taking K = limit + 1 per source means the first `limit + 1`
- * rows of the merged, sorted result are the TRUE global top `limit + 1`,
- * which is what makes `hasMore` (merged length > limit) trustworthy rather
- * than an assumption based on any single source alone.
- */
 export async function getLeadTimelinePage(
   pool: Pool,
   tenantId: string,
   leadId: string,
   limit: number,
-  before?: Date,
+  beforeCursor?: string,
 ): Promise<TimelinePage> {
+  const cursor = beforeCursor ? decodeCursor(beforeCursor) : undefined;
   const fetchLimit = limit + 1;
   const [events, activity, replies] = await Promise.all([
-    listEventsForLeadPage(pool, tenantId, leadId, fetchLimit, before),
-    listLeadActivityPage(pool, tenantId, leadId, fetchLimit, before),
-    listSentRepliesForLeadPage(pool, tenantId, leadId, fetchLimit, before),
+    listEventsForLeadPage(pool, tenantId, leadId, fetchLimit, cursor, SOURCE_RANK.event),
+    listLeadActivityPage(pool, tenantId, leadId, fetchLimit, cursor, SOURCE_RANK.activity),
+    listSentRepliesForLeadPage(pool, tenantId, leadId, fetchLimit, cursor, SOURCE_RANK.reply),
   ]);
 
   const merged: TimelineEntry[] = [
-    ...events.map(
-      (e): TimelineEntry => ({
-        kind: "event",
-        occurredAt: e.occurredAt,
-        eventType: e.eventType,
-        text: e.eventType === "comment" ? e.commentText : e.dmText,
-        username: e.username,
-        matchedKeyword: e.matchedKeyword,
-      }),
-    ),
-    ...activity.map(
-      (a): TimelineEntry => ({
-        kind: "activity",
-        occurredAt: a.createdAt,
-        type: a.type,
-        summary: a.summary,
-        actorUserId: a.actorUserId,
-      }),
-    ),
-    ...replies.map(
-      (r): TimelineEntry => ({
-        kind: "reply",
-        occurredAt: r.sentAt,
-        channel: r.channel,
-        engine: r.engine,
-        text: r.text,
-      }),
-    ),
+    ...events.map((e): TimelineEntry => ({ source: "event", kind: "event", id: e.id, occurredAt: e.occurredAt, eventType: e.eventType, text: e.eventType === "comment" ? e.commentText : e.dmText, username: e.username, matchedKeyword: e.matchedKeyword })),
+    ...activity.map((a): TimelineEntry => ({ source: "activity", kind: "activity", id: a.id, occurredAt: a.createdAt, type: a.type, summary: a.summary, actorUserId: a.actorUserId })),
+    ...replies.map((r): TimelineEntry => ({ source: "reply", kind: "reply", id: r.id, occurredAt: r.sentAt, channel: r.channel, engine: r.engine, text: r.text })),
   ];
 
-  merged.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()); // newest first
-
+  merged.sort(compareNewestFirst);
   const hasMore = merged.length > limit;
-  const page = merged.slice(0, limit);
-  const oldest = page[page.length - 1];
+  const pageNewestFirst = merged.slice(0, limit);
+  const oldest = pageNewestFirst[pageNewestFirst.length - 1];
 
   return {
-    entries: page.reverse(), // back to oldest-first for display
+    entries: pageNewestFirst.reverse(),
     hasMore,
-    nextCursor: hasMore && oldest ? oldest.occurredAt.toISOString() : null,
+    nextCursor: hasMore && oldest ? encodeCursor(oldest) : null,
   };
 }
+
+export { decodeCursor as decodeTimelineCursor, encodeCursor as encodeTimelineCursor };
