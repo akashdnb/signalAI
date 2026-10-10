@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export interface InstagramInteraction {
   type: "quick_reply" | "postback";
   payload: string;
@@ -93,7 +95,9 @@ export function parseInstagramWebhook(payload: unknown): InstagramInboundMessage
       // rather than dropping a valid user interaction.
       const providerEventId = messageId ?? (
         interaction?.type === "postback"
-          ? `postback:${senderId}:${recipientId}:${timestampValue ?? "unknown"}:${interaction.payload}`
+          ? \`postback:\${createHash("sha256").update(
+              \`\${senderId}:\${recipientId}:\${timestampValue ?? "unknown"}:\${interaction.payload}\`,
+            ).digest("hex")}\`
           : null
       );
       if (!providerEventId) continue;
@@ -105,7 +109,7 @@ export function parseInstagramWebhook(payload: unknown): InstagramInboundMessage
 
       events.push({
         providerEventId,
-        instagramAccountId: recipientId || entryAccountId,
+        instagramAccountId: entryAccountId,
         instagramUserId: senderId,
         eventType: "message",
         messageText,
