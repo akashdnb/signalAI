@@ -1,6 +1,6 @@
 # SignalAI UI Revamp Plan
 
-**Status:** Proposed — design and implementation plan only; source-reviewed against `main` on 2026-10-10  
+**Status:** Implementation in progress — Phase 1 shared foundations; source-reviewed against `main` on 2026-10-10  
 **Repository:** `akashdnb/signalAI`  
 **Primary branch reviewed:** `main`  
 **Scope:** Frontend visual system and UX consistency across the authenticated SaaS product, with special care for the automation/journey builder. This plan includes a verified current-code delta section; it does not claim runtime/browser QA.
@@ -56,6 +56,15 @@ The repository already has substantial UI foundations, so the revamp should be i
 - The screenshots show sparse sample data. Empty/loading/low-data states need designed treatment; do not fill them with invented activity or misleading percentages.
 
 These are code-level observations from the files inspected, combined with the UI screenshots shared in the discussion.
+
+### Implementation kickoff
+
+**Active branch:** `feat/ui-revamp-phase-1`
+
+The first implementation slice now covers shared focus-visible styling and contrast tokens, modal/dialog focus management, toast live announcements, accessible Leads/Inbox search labels, semantic keyboard-operable Automation/Journey tabs, clearer unavailable-state copy, and several truthful AppShell affordances. Client CI now includes lint before build.
+
+This is a starter slice, not a completion claim. Local build/lint and browser interaction checks have not yet been run in this environment. The P0 journey-wide draft/save boundary remains outstanding and must be handled as a dedicated behavior change before the builder revamp is considered safe.
+
 
 ---
 
