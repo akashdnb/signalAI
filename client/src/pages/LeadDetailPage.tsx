@@ -291,7 +291,7 @@ export function LeadDetailPage() {
             <>
           <section className="card">
             <h2>Overview</h2>
-            <div className="field-group">
+            <div className="field-group grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label>
                 Pipeline stage
                 <select value={lead.pipelineStage} disabled={busy} onChange={(e) => handleStageChange(e.target.value as PipelineStage)}>
