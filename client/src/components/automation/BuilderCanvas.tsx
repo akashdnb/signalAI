@@ -1274,10 +1274,18 @@ export function BuilderCanvas({
         </ReactFlow>
       </div>
 
-      <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-20 flex justify-start md:hidden">
-        <div className="rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
+      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between gap-3 md:hidden">
+        <div className="pointer-events-none rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
           Tap a node to edit it
         </div>
+        <button
+          type="button"
+          onClick={onAddMilestone}
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-white shadow-lg"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Add goal
+        </button>
       </div>
 
       {saving && (
