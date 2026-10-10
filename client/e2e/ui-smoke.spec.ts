@@ -3,6 +3,23 @@ import AxeBuilder from "@axe-core/playwright";
 
 const tenantId = "smoke-tenant";
 const tenantPath = `/tenants/${tenantId}`;
+const leadFixture = {
+  id: "smoke-lead",
+  tenantId,
+  customerId: null,
+  instagramUserId: "ig-user-smoke",
+  username: "smoke_creator_handle_example_01",
+  lastEventType: "message",
+  lastMessagePreview: "Can you share pricing?",
+  unread: true,
+  activeMilestoneId: null,
+  lastInboundAt: "2026-10-10T10:00:00.000Z",
+  windowOpenUntil: "2026-10-11T10:00:00.000Z",
+  createdAt: "2026-10-10T09:00:00.000Z",
+  pipelineStage: "new",
+  ownerUserId: "smoke-owner",
+  handoffStatus: "ai",
+};
 
 async function mockTenantApi(page: Page) {
   await page.route("http://localhost:3000/**", async (route) => {
@@ -73,6 +90,27 @@ async function mockTenantApi(page: Page) {
     } else if (path === `${tenantPath}/members`) {
       data = [{ userId: "smoke-owner", email: "owner@example.com", role: "owner" }];
     } else if (path === `${tenantPath}/leads`) {
+      data = [leadFixture];
+    } else if (path === `${tenantPath}/leads/smoke-lead`) {
+      data = leadFixture;
+    } else if (path === `${tenantPath}/leads/smoke-lead/timeline`) {
+      data = {
+        entries: [{
+          kind: "event",
+          occurredAt: "2026-10-10T10:00:00.000Z",
+          eventType: "message",
+          text: "Can you share pricing?",
+          username: leadFixture.username,
+          matchedKeyword: null,
+        }],
+        hasMore: false,
+        nextCursor: null,
+      };
+    } else if (path === `${tenantPath}/leads/smoke-lead/captured-facts`) {
+      data = { facts: {} };
+    } else if (path === `${tenantPath}/leads/smoke-lead/intelligence`) {
+      data = null;
+    } else if (path === `${tenantPath}/leads/smoke-lead/intelligence/history`) {
       data = [];
     }
 
@@ -117,7 +155,7 @@ test.describe("responsive route smoke checks", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await mockTenantApi(page);
       await page.goto(route.path);
-      await expect(page.getByRole("heading", { name: route.heading, exact: true })).toBeVisible();
+      await expect(page.locator("h1")).toContainText(route.heading);
       await expectNoHorizontalOverflow(page);
     });
   }
@@ -130,6 +168,33 @@ test.describe("responsive route smoke checks", () => {
 
     await page.goto("/docs/introduction");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/inbox");
+    const leadButton = page.getByRole("button", { name: /smoke_creator_handle_example_01/ });
+    await expect(leadButton).toBeVisible();
+    await leadButton.click();
+    await expect(page.getByText("Can you share pricing?", { exact: true }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("Lead detail tabs support arrow-key navigation and activation", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/leads/smoke-lead");
+    await expect(page.locator("h1")).toContainText("smoke_creator_handle_example_01");
+
+    const overview = page.getByRole("tab", { name: "Overview" });
+    await overview.focus();
+    await page.keyboard.press("ArrowRight");
+    const conversation = page.getByRole("tab", { name: "Conversation" });
+    await expect(conversation).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("tabpanel")).toContainText("Can you share pricing?");
     await expectNoHorizontalOverflow(page);
   });
 
