@@ -89,10 +89,11 @@ export async function listSentRepliesForLeadPage(
   const result = await pool.query<SentReplyRow>(
     `select * from sent_replies
      where tenant_id = $1 and lead_id = $2
-       and ($4::timestamptz is null or (sent_at, $5::int, id::text) < ($4::timestamptz, $5::int, $6::text))
+       and ($4::timestamptz is null or sent_at < $4::timestamptz
+            or (sent_at = $4::timestamptz and ($5::int < $7::int or ($5::int = $7::int and id::text < $6::text))))
      order by sent_at desc, id desc
      limit $3`,
-    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? ""],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? "", cursor?.sourceRank ?? sourceRank],
   );
   return result.rows.map(toSentReply);
 }

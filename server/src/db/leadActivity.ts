@@ -1,17 +1,10 @@
 import type { Queryable } from "./types.js";
 
-export type LeadActivityType =
-  | "note_added"
-  | "pipeline_stage_changed"
-  | "owner_assigned"
-  | "handoff_changed"
-  | "tag_added"
-  | "tag_removed"
-  | "deal_created"
-  | "deal_stage_changed";
+export type LeadActivityType = "note" | "handoff" | "assignment" | "stage_change" | "tag_change";
 
 export interface LeadActivity {
   id: string;
+  tenantId: string;
   leadId: string;
   actorUserId: string | null;
   type: LeadActivityType;
@@ -21,6 +14,7 @@ export interface LeadActivity {
 
 interface LeadActivityRow {
   id: string;
+  tenant_id: string;
   lead_id: string;
   actor_user_id: string | null;
   type: LeadActivityType;
@@ -31,6 +25,7 @@ interface LeadActivityRow {
 function toLeadActivity(row: LeadActivityRow): LeadActivity {
   return {
     id: row.id,
+    tenantId: row.tenant_id,
     leadId: row.lead_id,
     actorUserId: row.actor_user_id,
     type: row.type,
@@ -39,7 +34,7 @@ function toLeadActivity(row: LeadActivityRow): LeadActivity {
   };
 }
 
-export async function recordLeadActivity(
+export async function createLeadActivity(
   pool: Queryable,
   params: {
     tenantId: string;
@@ -77,10 +72,11 @@ export async function listLeadActivityPage(
   const result = await pool.query<LeadActivityRow>(
     `select * from lead_activity
      where tenant_id = $1 and lead_id = $2
-       and ($4::timestamptz is null or (created_at, $5::int, id::text) < ($4::timestamptz, $5::int, $6::text))
+       and ($4::timestamptz is null or created_at < $4::timestamptz
+            or (created_at = $4::timestamptz and ($5::int < $7::int or ($5::int = $7::int and id::text < $6::text))))
      order by created_at desc, id desc
      limit $3`,
-    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? ""],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? "", cursor?.sourceRank ?? sourceRank],
   );
   return result.rows.map(toLeadActivity);
 }
