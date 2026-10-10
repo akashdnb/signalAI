@@ -160,19 +160,19 @@ export class InstagramMessageSender
           request.tenantId,
           request.executionId,
         );
+    const richMessage = mergePresentation(
+      explicitRichMessage,
+      campaignPresentation,
+    );
 
-    await this.client.sendMessage({
-      accessToken:
-        this.config.accessToken,
-      recipientId:
-        request.subjectKey,
+    const sendRequest = {
+      accessToken: this.config.accessToken,
+      recipientId: request.subjectKey,
       text: text.trim(),
-      idempotencyKey:
-        request.idempotencyKey,
-      richMessage: mergePresentation(
-        explicitRichMessage,
-        campaignPresentation,
-      ),
-    });
+      idempotencyKey: request.idempotencyKey,
+      ...(richMessage ? { richMessage } : {}),
+    };
+
+    await this.client.sendMessage(sendRequest);
   }
 }
