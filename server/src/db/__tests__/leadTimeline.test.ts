@@ -171,12 +171,12 @@ describe("getLeadTimelinePage: cursor pagination across all three sources", () =
     expect(full).toHaveLength(10); // 5 events + 5 replies
 
     const collected: typeof full = [];
-    let cursor: Date | undefined;
+    let cursor: string | undefined;
     for (let guard = 0; guard < 20; guard++) {
       const page = await getLeadTimelinePage(pool, tenant.id, lead.id, 3, cursor);
       collected.unshift(...page.entries); // pages arrive newest-first; prepend to rebuild oldest-first overall
       if (!page.hasMore) break;
-      cursor = new Date(page.nextCursor!);
+      cursor = page.nextCursor!;
     }
 
     expect(collected).toHaveLength(10);
