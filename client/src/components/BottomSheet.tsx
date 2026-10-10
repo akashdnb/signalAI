@@ -18,6 +18,7 @@ export function BottomSheet({
   bodyClassName = "",
   height,
   zIndex = 50,
+  closeDisabled = false,
 }: {
   title: string;
   onClose: () => void;
@@ -28,6 +29,7 @@ export function BottomSheet({
   bodyClassName?: string;
   height?: number | string;
   zIndex?: number;
+  closeDisabled?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -68,7 +70,7 @@ export function BottomSheet({
 
       if (event.key === "Escape") {
         event.preventDefault();
-        onCloseRef.current();
+        if (!closeDisabled) onCloseRef.current();
         return;
       }
 
@@ -109,7 +111,7 @@ export function BottomSheet({
         aria-hidden="true"
         className="fixed inset-0 bg-black/40"
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onCloseRef.current();
+          if (event.target === event.currentTarget && !closeDisabled) onCloseRef.current();
         }}
       />
 
@@ -140,7 +142,8 @@ export function BottomSheet({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+            disabled={closeDisabled}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
