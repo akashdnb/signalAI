@@ -111,6 +111,17 @@ export async function getLead(pool: Queryable, tenantId: string, leadId: string)
   return result.rows[0] ? toLead(result.rows[0]) : null;
 }
 
+/** Latest customer-originated DM for messaging-policy windows. Business echoes are not lead_events, so they cannot extend this timestamp. */
+export async function getLastInboundDmAt(pool: Queryable, tenantId: string, leadId: string): Promise<Date | null> {
+  const result = await pool.query<{ occurred_at: Date }>(
+    `select occurred_at from lead_events
+     where tenant_id = $1 and lead_id = $2 and event_type = 'message'
+     order by occurred_at desc, id desc limit 1`,
+    [tenantId, leadId],
+  );
+  return result.rows[0]?.occurred_at ?? null;
+}
+
 /**
  * `Lead`/`getLead` above carry no username — it lives in `lead_pii`, not
  * `leads`, and every OTHER caller of `getLead` (pipeline/handoff updates,
