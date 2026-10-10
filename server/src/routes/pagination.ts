@@ -79,9 +79,6 @@ function mapDocument(row: {
 export const paginationRouter = Router();
 paginationRouter.use("/tenants/:tenantId", requireTenantSession);
 
-// Cursor-paginated timeline is mounted here because paginationRouter is
-// registered before the legacy leads router. The old route remains as a
-// compatibility fallback, while this route owns the opaque cursor contract.
 paginationRouter.get("/tenants/:tenantId/leads/:leadId/timeline", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const leadResult = await getPool().query("select 1 from leads where id = $1 and tenant_id = $2", [leadId, tenantId]);
@@ -181,7 +178,7 @@ paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
        from campaigns
        where ${where}
        order by ${orderBy}
-       limit ${params.length + 1} offset ${params.length + 2}`,
+       limit $${params.length + 1} offset $${params.length + 2}`,
     [...params, pageSize, offset],
   );
   const items = result.rows.map(mapCampaign);
@@ -193,7 +190,6 @@ paginationRouter.get("/tenants/:tenantId/knowledge-base", async (req, res) => {
   const query = req.query as Record<string, unknown>;
   const { page: requestedPage, pageSize } = parsePagination(query);
   const pool = getPool();
-  // Preserve listDocumentsForTenant semantics exactly: all versions, including superseded versions.
   const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from knowledge_base_documents where tenant_id = $1`, [tenantId]);
   const total = Number(countResult.rows[0]?.count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
