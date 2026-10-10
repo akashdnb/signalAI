@@ -460,12 +460,14 @@ export function createLeadEventReplyHandler(
     let delivered = false;
     if (dmReady) {
       const preparedReply = prepareInstagramDmReply(replyText, campaign.ctaLink);
-      const sendResult = await sendInstagramMessage(
-        token,
-        lead.instagramUserId,
-        preparedReply.text,
-        preparedReply.richMessage,
-      );
+      const sendResult = preparedReply.richMessage
+        ? await sendInstagramMessage(
+            token,
+            lead.instagramUserId,
+            preparedReply.text,
+            preparedReply.richMessage,
+          )
+        : await sendInstagramMessage(token, lead.instagramUserId, preparedReply.text);
       delivered = true;
       // Recorded per actual channel send, not per event — a 'both'-channel
       // campaign makes two real Instagram API calls below and now produces
