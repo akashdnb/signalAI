@@ -62,5 +62,6 @@ export async function createInstagramMessageSender(
     {
       accessToken: account.accessToken,
     },
+    dependencies.pool,
   );
 }
