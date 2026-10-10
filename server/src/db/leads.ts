@@ -295,6 +295,15 @@ export async function setActiveDmCampaignId(
   ]);
 }
 
+/** Record an inbound interaction such as a comment for Inbox unread state without treating it as an inbound DM for Meta's 24-hour window. */
+export async function updateLastInboundAt(pool: Queryable, tenantId: string, leadId: string, occurredAt: Date): Promise<void> {
+  await pool.query(
+    `update leads set last_inbound_at = greatest(coalesce(last_inbound_at, $3), $3)
+     where id = $1 and tenant_id = $2`,
+    [leadId, tenantId, occurredAt],
+  );
+}
+
 export async function updateMessagingWindow(
   pool: Queryable,
   tenantId: string,
