@@ -263,7 +263,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
   it("restarts a DM campaign at its first milestone when a customer returns after the window expires", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
-    const campaign = await createCampaign(pool, tenant.id, "DM Restart", ["LINK"], { replyMode: "ai_generated", triggerSource: "message" });
+    const campaign = await createCampaign(pool, tenant.id, "DM Restart", ["LINK"], { replyMode: "ai_generated", triggerSource: "message", replyChannel: "dm" });
     const milestones = await setCampaignMilestones(pool, tenant.id, campaign.id, [
       { goalDescription: "first step", captureFields: ["email"] },
       { goalDescription: "second step" },
