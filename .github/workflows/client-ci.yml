@@ -32,3 +32,7 @@ jobs:
         run: npm ci
       - name: Typecheck and build
         run: npm run build
+        env:
+          # A reserved placeholder is enough for static build validation; this
+          # workflow does not deploy the resulting bundle.
+          VITE_API_BASE_URL: https://signalai-ci.invalid
