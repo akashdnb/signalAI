@@ -216,7 +216,8 @@ function TemplateDetailsDialog({
   return (
     <BottomSheet
       title={`Use ${template.name}`}
-      onClose={() => { if (!creating) onClose(); }}
+      onClose={onClose}
+      closeDisabled={creating}
       maxWidth={560}
       zIndex={60}
     >
