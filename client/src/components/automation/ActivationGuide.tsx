@@ -1,10 +1,7 @@
-import { CheckIcon, ChevronRightIcon, InstagramMarkIcon, SparklesIcon } from "../icons";
+import { Link } from "react-router-dom";
+import { CheckCircleIcon, InstagramMarkIcon, SparkleIcon } from "../icons";
 
-export function ActivationGuide({
-  onTemplates,
-}: {
-  onTemplates: () => void;
-}) {
+export function ActivationGuide({ onTemplates }: { onTemplates: () => void }) {
   const steps = [
     { title: "Connect Instagram", body: "Connect the professional account you want SignalAI to automate.", action: "Open Integrations", href: "../integrations" },
     { title: "Choose a preset", body: "Start with a proven comment-to-DM or lead qualification flow.", action: "Browse presets", onClick: onTemplates },
@@ -17,7 +14,7 @@ export function ActivationGuide({
       <div className="activation-guide__hero">
         <div className="activation-guide__icon"><InstagramMarkIcon className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1">
-          <div className="activation-guide__eyebrow"><SparklesIcon className="h-3.5 w-3.5" /> FIRST AUTOMATION</div>
+          <div className="activation-guide__eyebrow"><SparkleIcon className="h-3.5 w-3.5" /> FIRST AUTOMATION</div>
           <h2 id="activation-guide-title">Go from connected account to live automation in minutes.</h2>
           <p>Pick a preset, make it yours, publish it, then watch SignalAI handle the conversation.</p>
         </div>
@@ -30,11 +27,11 @@ export function ActivationGuide({
               <strong>{step.title}</strong>
               <p>{step.body}</p>
               {step.onClick ? (
-                <button type="button" onClick={step.onClick} className="activation-guide__action">{step.action}<ChevronRightIcon className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={step.onClick} className="activation-guide__action">{step.action} →</button>
               ) : step.href ? (
-                <a href={step.href} className="activation-guide__action">{step.action}<ChevronRightIcon className="h-3.5 w-3.5" /></a>
+                <Link to={step.href} className="activation-guide__action">{step.action} →</Link>
               ) : (
-                <span className="activation-guide__done"><CheckIcon className="h-3.5 w-3.5" /> {step.action}</span>
+                <span className="activation-guide__done"><CheckCircleIcon className="h-3.5 w-3.5" /> {step.action}</span>
               )}
             </div>
           </li>
