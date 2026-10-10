@@ -97,6 +97,7 @@ export function AnalyticsPage() {
   const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
   const [topKeywords, setTopKeywords] = useState<TopKeyword[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -114,6 +115,7 @@ export function AnalyticsPage() {
         setRevenue(r);
         setTopPosts(posts);
         setTopKeywords(keywords);
+        setError(null);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -127,19 +129,28 @@ export function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate]);
+  }, [tenantId, navigate, reloadCount]);
 
   if (!tenantId) return null;
 
   return (
     <div className="page page-wide">
       <h1>Analytics</h1>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {funnel === null && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       <section className="card">
         <h2>Conversion Funnel</h2>
         {funnel === null ? (
-          <p className="muted">Loading…</p>
+          <p className="muted" role="status">{error ? "Analytics could not be loaded." : "Loading analytics…"}</p>
         ) : (
           <>
             <FunnelChart funnel={funnel} />
@@ -185,7 +196,8 @@ export function AnalyticsPage() {
         ) : topPosts.length === 0 ? (
           <p className="muted">No comments yet.</p>
         ) : (
-          <table className="table">
+          <div className="-mx-2 overflow-x-auto sm:mx-0">
+          <table className="table min-w-[420px]">
             <thead>
               <tr>
                 <th>Post</th>
@@ -209,6 +221,7 @@ export function AnalyticsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
         {topKeywords && topKeywords.length > 0 && (
           <>
