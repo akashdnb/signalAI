@@ -46,6 +46,11 @@ export type SelectedNode =
   | { type: "milestone"; milestoneIndex: number }
   | { type: "action"; action: "handoff" | "link" };
 
+export type BuilderCanvasActions = {
+  saveDraft: () => Promise<boolean>;
+  discardDraft: () => void;
+};
+
 type FlowNodeData = {
   campaign?: Campaign;
   milestone?: Milestone;
@@ -417,6 +422,7 @@ function toFlowNodes(graph: BuilderGraph): FlowNode[] {
     id: node.id,
     type: node.type === "milestone_group" ? "milestone" : node.type,
     position: node.position,
+    deletable: false,
     data: {
       ...node.data,
       milestoneId:
@@ -469,6 +475,7 @@ function toFlowEdges(graph: BuilderGraph): Edge[] {
       id: edge.id,
       source: edge.sourceNodeId,
       target: edge.targetNodeId,
+      deletable: false,
       sourceHandle: handles.sourceHandle,
       targetHandle: handles.targetHandle,
       label: edge.label ?? undefined,
@@ -509,6 +516,8 @@ export function BuilderCanvas({
   reloadSignal = 0,
   onBuilderVersionChange,
   onSaveStateChange,
+  onCanvasDirtyChange,
+  onCanvasActionsChange,
 }: {
   tenantId: string;
   campaign: Campaign;
@@ -521,12 +530,19 @@ export function BuilderCanvas({
   reloadSignal?: number;
   onBuilderVersionChange?: (version: number) => void;
   onSaveStateChange?: (state: "saved" | "saving" | "unsaved") => void;
+  onCanvasDirtyChange?: (dirty: boolean) => void;
+  onCanvasActionsChange?: (actions: BuilderCanvasActions | null) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  // The backend refs are the last saved snapshot. Draft refs only change locally
+  // until the user explicitly saves the journey.
   const backendNodesRef = useRef<JourneyNode[]>([]);
   const backendEdgesRef = useRef<JourneyEdge[]>([]);
+  const draftNodesRef = useRef<JourneyNode[]>([]);
+  const draftEdgesRef = useRef<JourneyEdge[]>([]);
+  const isDirtyRef = useRef(false);
   const builderVersionRef = useRef<number | null>(null);
   const flowInstanceRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null);
   const initializedRef = useRef(false);
@@ -545,6 +561,40 @@ export function BuilderCanvas({
     },
     [onBuilderVersionChange],
   );
+
+  const updateDraft = useCallback(
+    (nextNodes: JourneyNode[], nextEdges: JourneyEdge[]) => {
+      draftNodesRef.current = nextNodes;
+      draftEdgesRef.current = nextEdges;
+
+      const dirty =
+        JSON.stringify(nextNodes) !== JSON.stringify(backendNodesRef.current) ||
+        JSON.stringify(nextEdges) !== JSON.stringify(backendEdgesRef.current);
+      isDirtyRef.current = dirty;
+      onCanvasDirtyChange?.(dirty);
+      onSaveStateChange?.(dirty ? "unsaved" : "saved");
+    },
+    [onCanvasDirtyChange, onSaveStateChange],
+  );
+
+  const discardDraft = useCallback(() => {
+    draftNodesRef.current = backendNodesRef.current;
+    draftEdgesRef.current = backendEdgesRef.current;
+    isDirtyRef.current = false;
+    setNodes(toFlowNodes({
+      nodes: backendNodesRef.current,
+      edges: backendEdgesRef.current,
+      version: builderVersionRef.current ?? 0,
+    }));
+    setEdges(toFlowEdges({
+      nodes: backendNodesRef.current,
+      edges: backendEdgesRef.current,
+      version: builderVersionRef.current ?? 0,
+    }));
+    setLoadError(null);
+    onCanvasDirtyChange?.(false);
+    onSaveStateChange?.("saved");
+  }, [onCanvasDirtyChange, onSaveStateChange, setEdges, setNodes]);
 
   const scheduleInitialFit = useCallback(() => {
     if (
@@ -644,11 +694,22 @@ export function BuilderCanvas({
       setLoadError(null);
 
       try {
+        if (silent && isDirtyRef.current) {
+          setLoadError(
+            "This journey has unsaved canvas changes. Save or discard them before refreshing the flow.",
+          );
+          return;
+        }
+
         const rawGraph = await api.getBuilderGraph(tenantId, campaign.id);
         const graph = applyPresentationLayout(rawGraph);
 
         backendNodesRef.current = graph.nodes;
         backendEdgesRef.current = graph.edges;
+        draftNodesRef.current = graph.nodes;
+        draftEdgesRef.current = graph.edges;
+        isDirtyRef.current = false;
+        onCanvasDirtyChange?.(false);
         setVersion(graph.version);
         onSaveStateChange?.("saved");
 
@@ -671,6 +732,8 @@ export function BuilderCanvas({
       setNodes,
       setVersion,
       tenantId,
+      onCanvasDirtyChange,
+      onSaveStateChange,
     ],
   );
 
@@ -686,14 +749,27 @@ export function BuilderCanvas({
   }, [loadGraph, reloadSignal]);
 
   const persistGraph = useCallback(
-    async (nextNodes: JourneyNode[], nextEdges: JourneyEdge[]) => {
-      if (locked) return;
+    async (): Promise<boolean> => {
+      if (!isDirtyRef.current) return true;
 
       const version = builderVersionRef.current;
-      if (version === null) return;
+      if (version === null) {
+        setLoadError("The journey is still loading. Try saving again in a moment.");
+        return false;
+      }
+
+      const nodesToSave = draftNodesRef.current.map((node) => ({
+        ...node,
+        position: {
+          x: Math.round(node.position.x),
+          y: Math.round(node.position.y),
+        },
+      }));
+      const edgesToSave = draftEdgesRef.current;
 
       setSaving(true);
       onSaveStateChange?.("saving");
+      setLoadError(null);
 
       try {
         const saved = await api.saveBuilderGraph(
@@ -701,35 +777,49 @@ export function BuilderCanvas({
           campaign.id,
           {
             expectedVersion: version,
-            nodes: nextNodes,
-            edges: nextEdges,
+            nodes: nodesToSave,
+            edges: edgesToSave,
           },
         );
 
         backendNodesRef.current = saved.nodes;
         backendEdgesRef.current = saved.edges;
+        draftNodesRef.current = saved.nodes;
+        draftEdgesRef.current = saved.edges;
+        isDirtyRef.current = false;
+        setNodes(toFlowNodes(saved));
+        setEdges(toFlowEdges(saved));
         setVersion(saved.version);
+        onCanvasDirtyChange?.(false);
         onSaveStateChange?.("saved");
+        return true;
       } catch (error) {
         onSaveStateChange?.("unsaved");
         setLoadError(
           error instanceof Error ? error.message : "Failed to save journey",
         );
-
-        if (
-          error &&
-          typeof error === "object" &&
-          "status" in error &&
-          (error as { status?: number }).status === 409
-        ) {
-          await loadGraph(true);
-        }
+        // Keep the local draft intact on conflicts or failures so nothing the
+        // user has changed is silently discarded.
+        return false;
       } finally {
         setSaving(false);
       }
     },
-    [campaign.id, loadGraph, locked, onSaveStateChange, setVersion, tenantId],
+    [
+      campaign.id,
+      onCanvasDirtyChange,
+      onSaveStateChange,
+      setEdges,
+      setNodes,
+      setVersion,
+      tenantId,
+    ],
   );
+
+  useEffect(() => {
+    onCanvasActionsChange?.({ saveDraft: persistGraph, discardDraft });
+    return () => onCanvasActionsChange?.(null);
+  }, [discardDraft, onCanvasActionsChange, persistGraph]);
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -756,20 +846,16 @@ export function BuilderCanvas({
       setEdges(nextEdges);
 
       const nextBackendEdges = toJourneyEdges(nextEdges);
-      backendEdgesRef.current = nextBackendEdges;
-      void persistGraph(backendNodesRef.current, nextBackendEdges);
+      updateDraft(draftNodesRef.current, nextBackendEdges);
     },
-    [edges, locked, persistGraph, setEdges],
+    [edges, locked, setEdges, updateDraft],
   );
 
   const handleNodeDragStop = useCallback(
     (_event: MouseEvent | TouchEvent, draggedNode: FlowNode) => {
       if (locked) return;
 
-      const version = builderVersionRef.current;
-      if (version === null) return;
-
-      const updatedNodes = backendNodesRef.current.map((node) =>
+      const updatedNodes = draftNodesRef.current.map((node) =>
         node.id === draggedNode.id
           ? {
               ...node,
@@ -781,10 +867,9 @@ export function BuilderCanvas({
           : node,
       );
 
-      backendNodesRef.current = updatedNodes;
-      void persistGraph(updatedNodes, backendEdgesRef.current);
+      updateDraft(updatedNodes, draftEdgesRef.current);
     },
-    [campaign.id, locked, persistGraph],
+    [locked, updateDraft],
   );
 
   const decoratedNodes = useMemo<FlowNode[]>(
