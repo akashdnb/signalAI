@@ -44,6 +44,9 @@ export function InboxPage() {
   const [error, setError] = useState<string | null>(null);
 
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
+  // Keep the Inbox composer aligned with Meta's 24-hour reply window. The server
+  // enforces this too; the UI should explain the restriction before an attempted send.
+  const messagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
 
   async function reloadLeads() {
     if (!tenantId) return;
@@ -266,24 +269,36 @@ export function InboxPage() {
                     Take over to reply
                   </button>
                 ) : (
-                  <div className="inline-form" style={{ marginBottom: 0 }}>
-                    <textarea
-                      rows={2}
-                      placeholder="Type a message…"
-                      value={composeText}
-                      onChange={(e) => setComposeText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                      disabled={sending}
-                    />
-                    <button className="btn-primary btn-small" disabled={sending || !composeText.trim()} onClick={handleSend}>
-                      {sending ? "Sending…" : "Send"}
-                    </button>
-                  </div>
+                  <>
+                    {!messagingWindowOpen && (
+                      <p className="muted small" role="status">
+                        Instagram&apos;s 24-hour messaging window is closed. A new inbound DM is required before you can send a reply.
+                      </p>
+                    )}
+                    <div className="inline-form" style={{ marginBottom: 0 }}>
+                      <textarea
+                        rows={2}
+                        placeholder="Type a message…"
+                        aria-label="Message reply"
+                        value={composeText}
+                        onChange={(e) => setComposeText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
+                        disabled={sending || !messagingWindowOpen}
+                      />
+                      <button
+                        className="btn-primary btn-small"
+                        disabled={sending || !composeText.trim() || !messagingWindowOpen}
+                        onClick={handleSend}
+                      >
+                        {sending ? "Sending…" : "Send"}
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
