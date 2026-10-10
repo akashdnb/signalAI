@@ -77,16 +77,16 @@ export function BottomSheet({
       const focusable = getFocusableElements();
       if (focusable.length === 0) {
         event.preventDefault();
-        dialog.focus();
+        dialog!.focus();
         return;
       }
 
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
-      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+      if (event.shiftKey && (document.activeElement === first || !dialog!.contains(document.activeElement))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog!.contains(document.activeElement))) {
         event.preventDefault();
         first.focus();
       }
