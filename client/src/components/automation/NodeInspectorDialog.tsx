@@ -66,6 +66,7 @@ export function NodeInspectorDialog({
   onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
 }) {
   const inspectorRef = useRef<InspectorHandle>(null);
+  const discardDialogRef = useRef<HTMLDivElement>(null);
   const [actions, setActions] = useState<InspectorHandle>({
     save: async () => true,
     discard: () => undefined,
@@ -92,6 +93,58 @@ export function NodeInspectorDialog({
       });
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!confirmDiscard) return;
+
+    const dialog = discardDialogRef.current;
+    if (!dialog) return;
+
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const getFocusableElements = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+
+    (getFocusableElements()[0] ?? dialog).focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setConfirmDiscard(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [confirmDiscard]);
 
   const requestClose = () => {
     if (actions.dirty) {
@@ -180,6 +233,8 @@ export function NodeInspectorDialog({
       {confirmDiscard && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 px-4 pb-4 md:items-center md:pb-0">
           <div
+            ref={discardDialogRef}
+            tabIndex={-1}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="discard-dialog-title"
