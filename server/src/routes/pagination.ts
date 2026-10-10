@@ -167,7 +167,7 @@ paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
   const orderBy = { updated_desc: "updated_at desc, id desc", updated_asc: "updated_at asc, id asc", name_asc: "name asc, id asc", name_desc: "name desc, id desc" }[sortValue as CampaignSort];
   const result = await pool.query<{
     id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean;
-    has_published_version: boolean; reply_mode: ReplyMode;
+    has_published_version?: boolean; reply_mode: ReplyMode;
     reply_templates: string[]; default_reply_template: string; cta_link: string | null; target_media_ids: string[]; reply_channel: ReplyChannel;
     trigger_source: TriggerSource; tone: CampaignTone; language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
   }>(
