@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -35,6 +35,7 @@ export function LeadDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [activeTab, setActiveTab] = useState<"overview" | "conversation" | "activities" | "notes">("overview");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const [noteBody, setNoteBody] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -274,12 +275,29 @@ export function LeadDetailPage() {
         <p className="muted" role="status">{error ? "Lead details could not be loaded." : "Loading lead…"}</p>
       ) : (
         <>
-          <div className="button-row">
-            {TABS.map((t) => (
+          <div className="button-row" role="tablist" aria-label="Lead details">
+            {TABS.map((t, index) => (
               <button
                 key={t.value}
+                ref={(element) => { tabRefs.current[index] = element; }}
+                id={`lead-tab-${t.value}`}
                 type="button"
+                role="tab"
+                aria-selected={activeTab === t.value}
+                aria-controls="lead-tabpanel"
+                tabIndex={activeTab === t.value ? 0 : -1}
                 className={activeTab === t.value ? "btn-primary btn-small" : "btn-secondary btn-small"}
+                onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
+                  let nextIndex: number | null = null;
+                  if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
+                  if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
+                  if (event.key === "Home") nextIndex = 0;
+                  if (event.key === "End") nextIndex = TABS.length - 1;
+                  if (nextIndex !== null) {
+                    event.preventDefault();
+                    tabRefs.current[nextIndex]?.focus();
+                  }
+                }}
                 onClick={() => setActiveTab(t.value)}
               >
                 {t.label}
@@ -287,6 +305,12 @@ export function LeadDetailPage() {
             ))}
           </div>
 
+          <div
+            id="lead-tabpanel"
+            role="tabpanel"
+            aria-labelledby={`lead-tab-${activeTab}`}
+            tabIndex={0}
+          >
           {activeTab === "overview" && (
             <>
           <section className="card">
@@ -555,6 +579,7 @@ export function LeadDetailPage() {
               </div>
             </section>
           )}
+          </div>
         </>
       )}
     </div>
