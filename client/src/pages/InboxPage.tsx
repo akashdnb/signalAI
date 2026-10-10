@@ -190,7 +190,7 @@ export function InboxPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page" style={{ maxWidth: "none" }}>
+    <div className="page page-workspace">
       <h1>Inbox</h1>
       {error && <div className="banner banner-error">{error}</div>}
 
