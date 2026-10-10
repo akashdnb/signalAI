@@ -1,22 +1,16 @@
-:root {
-  --signal-purple: #7c3aed;
-  --signal-purple-strong: #6d28d9;
-  --signal-purple-soft: #f5f3ff;
-}
-
-/* Automation is the product hero: stronger hierarchy without changing the existing token system. */
+/* Automation is the product hero: stronger hierarchy while staying on the shared theme tokens. */
 .page-automation {
-  background: radial-gradient(circle at 80% 0%, rgba(124, 58, 237, 0.055), transparent 32%), var(--canvas, #fff);
+  background: radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--accent, #7c3aed) 7%, transparent), transparent 32%), var(--canvas, #fff);
 }
 
 .automation-hero {
   position: relative;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--line, #e5e7eb) 85%, #7c3aed 15%);
+  border: 1px solid color-mix(in srgb, var(--line, #e5e7eb) 85%, var(--accent, #7c3aed) 15%);
   border-radius: 20px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--card, #fff) 92%, #ede9fe 8%), var(--card, #fff));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--card, #fff) 92%, var(--accent-soft, #f5f3ff) 8%), var(--card, #fff));
   padding: 20px 22px;
-  box-shadow: 0 12px 35px rgba(76, 29, 149, 0.06);
+  box-shadow: 0 12px 35px color-mix(in srgb, var(--ink, #111827) 7%, transparent);
 }
 
 .automation-hero::after {
@@ -27,7 +21,7 @@
   right: -70px;
   top: -80px;
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.09);
+  background: color-mix(in srgb, var(--accent, #7c3aed) 9%, transparent);
   pointer-events: none;
 }
 
@@ -36,7 +30,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--signal-purple-strong);
+  color: var(--accent-strong, var(--accent, #7c3aed));
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .09em;
@@ -45,7 +39,7 @@
 
 .automation-hero h1 { position: relative; z-index: 1; margin: 7px 0 0; font-size: clamp(25px, 3vw, 34px); line-height: 1.08; letter-spacing: -.035em; }
 .automation-hero p { position: relative; z-index: 1; max-width: 720px; margin: 7px 0 0; color: var(--subtle, #6b7280); font-size: 14px; line-height: 1.55; }
-.automation-hero__pill { display: inline-flex; align-items: center; border-radius: 999px; background: var(--signal-purple-soft); padding: 5px 9px; color: var(--signal-purple-strong); font-size: 11px; font-weight: 700; }
+.automation-hero__pill { display: inline-flex; align-items: center; border-radius: 999px; background: var(--accent-soft, #f5f3ff); padding: 5px 9px; color: var(--accent-strong, var(--accent, #7c3aed)); font-size: 11px; font-weight: 700; }
 
 .activation-guide {
   margin-top: 18px;
@@ -53,42 +47,49 @@
   border: 1px solid var(--line, #e5e7eb);
   border-radius: 18px;
   background: var(--card, #fff);
-  box-shadow: 0 8px 24px rgba(17, 24, 39, .04);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink, #111827) 5%, transparent);
 }
 
-.activation-guide__hero { display: flex; gap: 13px; padding: 18px 18px 15px; background: linear-gradient(135deg, var(--card, #fff), var(--signal-purple-soft)); }
-.activation-guide__icon { display: flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border-radius: 12px; background: #7c3aed; color: white; box-shadow: 0 7px 16px rgba(124,58,237,.2); }
+.activation-guide__hero { display: flex; gap: 13px; padding: 18px 18px 15px; background: linear-gradient(135deg, var(--card, #fff), var(--accent-soft, #f5f3ff)); }
+.activation-guide__icon { display: flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border-radius: 12px; background: var(--accent, #7c3aed); color: var(--accent-contrast, #fff); box-shadow: 0 7px 16px color-mix(in srgb, var(--accent, #7c3aed) 20%, transparent); }
 .activation-guide__hero h2 { margin: 5px 0 0; color: var(--ink, #111827); font-size: 17px; letter-spacing: -.015em; }
 .activation-guide__hero p { margin: 4px 0 0; color: var(--subtle, #6b7280); font-size: 12px; line-height: 1.5; }
 .activation-guide__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
 .activation-guide__step { position: relative; display: flex; gap: 10px; min-width: 0; padding: 16px 15px 18px; border-top: 1px solid var(--line, #e5e7eb); border-right: 1px solid var(--line, #e5e7eb); }
 .activation-guide__step:last-child { border-right: 0; }
-.activation-guide__number { display: flex; width: 25px; height: 25px; flex: 0 0 25px; align-items: center; justify-content: center; border: 1px solid #ddd6fe; border-radius: 50%; background: #faf5ff; color: #6d28d9; font-size: 11px; font-weight: 800; }
+.activation-guide__number { display: flex; width: 25px; height: 25px; flex: 0 0 25px; align-items: center; justify-content: center; border: 1px solid var(--accent-soft-border, var(--line, #e5e7eb)); border-radius: 50%; background: var(--accent-soft, #f5f3ff); color: var(--accent-strong, var(--accent, #7c3aed)); font-size: 11px; font-weight: 800; }
+.activation-guide__number--complete { color: var(--success-ink, var(--success, #15803d)); background: var(--success-soft, transparent); }
 .activation-guide__step strong { display: block; color: var(--ink, #111827); font-size: 12px; }
 .activation-guide__step p { margin: 4px 0 7px; color: var(--subtle, #6b7280); font-size: 11px; line-height: 1.45; }
-.activation-guide__action, .activation-guide__done { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; padding: 0; color: #6d28d9; font-size: 11px; font-weight: 700; text-decoration: none; }
+.activation-guide__action, .activation-guide__done, .activation-guide__upcoming { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; padding: 0; color: var(--accent-strong, var(--accent, #7c3aed)); font-size: 11px; font-weight: 700; text-decoration: none; }
 .activation-guide__action { cursor: pointer; }
-.activation-guide__action:hover { color: #5b21b6; text-decoration: underline; }
-.activation-guide__done { color: #15803d; }
+.activation-guide__action:hover { color: var(--accent, #7c3aed); text-decoration: underline; }
+.activation-guide__done { color: var(--success-ink, var(--success, #15803d)); }
+.activation-guide__upcoming { color: var(--subtle, #6b7280); font-weight: 600; }
 
-/* Intentional motion: feedback should feel immediate, not decorative. */
-.btn-primary, .btn-secondary, button, [role="button"] { transition: transform 120ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
-.btn-primary:active:not(:disabled), .btn-secondary:active:not(:disabled), button:active:not(:disabled) { transform: translateY(1px); }
+/* Final-pass motion is scoped to the product surfaces changed by this branch. */
+.page-automation .btn-primary,
+.page-automation .btn-secondary,
+.page-automation button,
+.page-automation [role="button"] {
+  transition: transform 120ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.page-automation .btn-primary:active:not(:disabled),
+.page-automation .btn-secondary:active:not(:disabled),
+.page-automation button:active:not(:disabled) { transform: translateY(1px); }
 
 /* Builder polish: make the working surface feel deliberate and interactive. */
 .react-flow__node { transition: filter 140ms ease, transform 140ms ease; }
-.react-flow__node:hover { filter: drop-shadow(0 7px 13px rgba(17, 24, 39, .10)); }
-.react-flow__node.selected { filter: drop-shadow(0 0 0.5px rgba(124, 58, 237, .8)) drop-shadow(0 8px 18px rgba(124, 58, 237, .12)); }
+.react-flow__node:hover { filter: drop-shadow(0 7px 13px color-mix(in srgb, var(--ink, #111827) 10%, transparent)); }
+.react-flow__node.selected { filter: drop-shadow(0 0 0.5px color-mix(in srgb, var(--accent, #7c3aed) 80%, transparent)) drop-shadow(0 8px 18px color-mix(in srgb, var(--accent, #7c3aed) 12%, transparent)); }
 .react-flow__edge-path { transition: stroke-width 120ms ease, opacity 120ms ease; }
 .react-flow__edge:hover .react-flow__edge-path { stroke-width: 3; }
 .react-flow__handle { transition: transform 120ms ease, box-shadow 120ms ease; }
-.react-flow__handle:hover { transform: scale(1.22); box-shadow: 0 0 0 4px rgba(124, 58, 237, .12); }
+.react-flow__handle:hover { transform: scale(1.22); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #7c3aed) 12%, transparent); }
 
-/* Toasts become visible confirmation rather than transient plain text. */
 .toast-stack-final { animation: signal-toast-in 180ms ease-out both; }
 @keyframes signal-toast-in { from { opacity: 0; transform: translateY(7px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-/* Final responsive QA guardrails. */
 @media (max-width: 900px) {
   .activation-guide__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .activation-guide__step:nth-child(2) { border-right: 0; }
@@ -104,5 +105,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-primary, .btn-secondary, button, [role="button"], .react-flow__node, .react-flow__edge-path, .react-flow__handle, .toast-stack-final { transition: none !important; animation: none !important; }
+  .page-automation .btn-primary,
+  .page-automation .btn-secondary,
+  .page-automation button,
+  .page-automation [role="button"],
+  .react-flow__node,
+  .react-flow__edge-path,
+  .react-flow__handle,
+  .toast-stack-final { transition: none !important; animation: none !important; }
 }
