@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type TimelineEntry } from "../api";
 import { formatDate } from "../lib/leadFormatting";
 
@@ -11,7 +11,7 @@ export interface ThreadPanelProps {
   pendingEntries?: TimelineEntry[];
   /** Restricts which entries render (e.g. LeadDetailPage's Conversation vs Activities tabs) — fetch/pagination still cover the full merged history regardless, this only filters what's shown. */
   kindFilter?: TimelineEntry["kind"][];
-  onError?: (message: string) => void;
+  onError?: (message: string | null) => void;
 }
 
 /**
@@ -28,6 +28,7 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, ki
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadRetryCount, setLoadRetryCount] = useState(0);
   const [olderError, setOlderError] = useState<string | null>(null);
+  const initialLoadFailedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,10 +44,15 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, ki
         setTimeline(page.entries);
         setHasMore(page.hasMore);
         setCursor(page.nextCursor);
+        if (initialLoadFailedRef.current) {
+          initialLoadFailedRef.current = false;
+          onError?.(null);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "Failed to load conversation";
+        initialLoadFailedRef.current = true;
         setLoadError(message);
         onError?.(message);
       });
@@ -65,6 +71,7 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, ki
       setTimeline((prev) => [...page.entries, ...(prev ?? [])]);
       setHasMore(page.hasMore);
       setCursor(page.nextCursor);
+      if (olderError) onError?.(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load older messages";
       setOlderError(message);
