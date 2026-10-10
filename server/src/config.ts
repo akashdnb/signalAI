@@ -49,9 +49,9 @@ export const config = {
       "https://graph.facebook.com/v24.0"
     );
   },
-  // Instagram Login user-profile lookups use graph.instagram.com. Keep this
-  // separate from the send API base URL so the correct host/version can be
-  // selected without changing the messaging implementation.
+  // Instagram Login profile lookups use graph.instagram.com. Keep this
+  // separate from the general messaging API base URL so the profile call
+  // uses the correct host and version for the connected token.
   get instagramProfileGraphApiBaseUrl() {
     return (
       process.env.INSTAGRAM_PROFILE_GRAPH_API_BASE_URL ??
@@ -140,8 +140,9 @@ export const config = {
   // Phase 2C Grounded-Answer-Only Fallback: cosine similarity below which
   // the best retrieval match is treated as "not actually grounded." 0.6 is
   // a starting point, not a measured value — real embedding models (and
-  // Matryoshka-truncated ones especially, see EMBEDDING_DIMENSIONS) can have
-  // different similarity distributions, so this is exposed as a tunable.
+  // Matryoshka-truncated ones especially, see EMBEDDING_DIMENSIONS) can
+  // have different similarity distributions, so this is exposed as a
+  // tunable rather than hardcoded.
   get ragMinSimilarityThreshold() {
     const raw = process.env.RAG_MIN_SIMILARITY_THRESHOLD;
     return raw ? Number(raw) : 0.6;
@@ -149,7 +150,12 @@ export const config = {
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },
-  // Identity Refactor U2: the API server's OWN public base URL.
+  // Identity Refactor U2: the API server's OWN public base URL. Used to
+  // build the Instagram connect-link redirect target (routes/auth.ts) —
+  // distinct from appBaseUrl (BUI's URL) because the two are different
+  // hosts in every real deployment of this project. No longer used by
+  // sign-in itself: the email-OTP flow (routes/authEmail.ts) is a plain
+  // JSON POST from the SPA, not a server-built redirect URL.
   get apiBaseUrl() {
     return stripTrailingSlashes(process.env.API_BASE_URL ?? "http://localhost:3000");
   },
@@ -165,30 +171,58 @@ export const config = {
   get journeyWorkerEnabled() {
     return process.env.JOURNEY_WORKER_ENABLED === "true";
   },
+  // Identity Refactor U2: optional, unlike every other setting below this
+  // point being "genuinely optional" — see lib/resend.ts's docstring for
+  // why an unconfigured Resend still has a real (not silent) fallback.
   get resendApiKey() {
     return process.env.RESEND_API_KEY ?? "";
   },
   get resendFromAddress() {
     return process.env.RESEND_FROM_ADDRESS ?? "signalAI <onboarding@resend.dev>";
   },
+  // R9-03: routed through config like every other setting, rather than
+  // read directly from process.env in telegram.ts — a typo'd env var name
+  // is then at least consistent with how every other misconfiguration in
+  // this file surfaces (nothing validates these at boot either, same as
+  // the Sentry DSN; only the token keyring gets a hard boot-time check).
   get telegramBotToken() {
     return process.env.TELEGRAM_BOT_TOKEN ?? "";
   },
   get telegramChatId() {
     return process.env.TELEGRAM_CHAT_ID ?? "";
   },
+  // R10-01, superseded by the Identity Refactor: signs the bearer session
+  // token issued at the end of email-OTP verification (see lib/session.ts
+  // and routes/authEmail.ts) — gates every dashboard/campaigns/billing
+  // route, so this is validated at boot the
+  // same way the token keyring is.
   get sessionSecret() {
     return process.env.SESSION_SECRET ?? "";
   },
+  // R12-01/R12-02: the exact origin BUI is served from, echoed as
+  // Access-Control-Allow-Origin (see app.ts). Routed through config like
+  // every other setting; validated at boot via assertWebAppOriginConfigured
+  // below rather than falling back to a silently permissive "*".
   get webAppOrigin() {
     return stripTrailingSlashes(process.env.WEB_APP_ORIGIN ?? "");
   },
+  // B10: hard per-account daily cap on AI-generated calls. Default chosen
+  // to comfortably cover a real pilot conversation volume while still
+  // bounding a viral-Reel worst case to a fixed cost (max_tokens is
+  // already capped per call — see openAICompatibleProvider.ts).
   get aiDailyCallCap() {
     return Number(process.env.AI_DAILY_CALL_CAP ?? 300);
   },
+  // Conversation memory: how many prior turns (customer + bot, combined) are
+  // fed back into the prompt alongside the current message. Raw turns, not a
+  // summary or embedding retrieval — recall failures like "what's my name?"
+  // right after "my name is akash" need recency, not semantic similarity,
+  // and a value this small never meaningfully touches LLM_MAX_TOKENS.
   get chatHistoryMaxTurns() {
     return Number(process.env.CHAT_HISTORY_MAX_TURNS ?? 10);
   },
+  // Token vault keyring (see lib/tokenVault.ts) — re-parsed on every access
+  // rather than cached, matching the live-read pattern above.
   get tokenKeyring() {
     return loadKeyring(process.env.TOKEN_ENCRYPTION_KEYS);
   },
@@ -198,12 +232,31 @@ export function isProduction(): boolean {
   return config.nodeEnv === "production";
 }
 
+/** R12-01: an unset WEB_APP_ORIGIN used to silently fall back to "*" in app.ts's CORS middleware — fail at boot instead, same treatment SESSION_SECRET and the token keyring already get. */
 export function assertWebAppOriginConfigured(origin: string): void {
   if (!origin) {
     throw new Error("No WEB_APP_ORIGIN configured — refusing to fall back to a wildcard CORS origin");
   }
 }
 
+/**
+ * Every externally-facing setting the server cannot function without, checked
+ * in ONE place at boot.
+ *
+ * Added after the same failure recurred seven times across different
+ * settings, each found from a downstream symptom rather than from the
+ * server: an unset WEB_APP_ORIGIN silently became a wildcard CORS origin, an
+ * unset INSTAGRAM_CLIENT_ID produced an authorize URL Instagram answered with
+ * "this page isn't available", and an unset META_WEBHOOK_VERIFY_TOKEN made
+ * the subscription handshake return 403, which Meta reports as "the callback
+ * URL or verify token couldn't be validated". In all three the deploy
+ * succeeded and the health check stayed green.
+ *
+ * Adding a getter above without adding it here (when it is required) is the
+ * way this recurs, so the list is deliberately exhaustive rather than
+ * per-feature. Genuinely optional settings — Stripe, Telegram, Sentry — are
+ * excluded on purpose: those degrade gracefully by design.
+ */
 export function assertRequiredConfig(): void {
   const missing = [
     ["DATABASE_URL", process.env.DATABASE_URL ?? ""],
@@ -230,6 +283,16 @@ export function assertRequiredConfig(): void {
   }
 }
 
+/**
+ * Both default to "" and were the only externally-facing settings without a
+ * boot check. Unset, the server started normally and built an authorize URL
+ * reading `?client_id=&redirect_uri=&scope=...`, which Instagram answers with
+ * "Sorry, this page isn't available" — a dead end that looks like a Meta
+ * problem, not a missing env var, because nothing anywhere said otherwise.
+ * Same fail-at-boot rule the keyring, session secret, and CORS origin follow:
+ * a missing externally-facing setting stops the process rather than producing
+ * a broken artifact.
+ */
 export function assertInstagramOAuthConfigured(clientId: string, redirectUri: string): void {
   if (!clientId) {
     throw new Error("No INSTAGRAM_CLIENT_ID configured — the OAuth authorize URL would be built with an empty client_id");
