@@ -72,7 +72,6 @@ export function JourneyBuilder({
   const [showTestJourney, setShowTestJourney] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<BuilderTab | null>(null);
-  const [graphReloadSignal, setGraphReloadSignal] = useState(0);
   const [builderVersion, setBuilderVersion] = useState<number | null>(null);
   const [builderSaveState, setBuilderSaveState] = useState<
     "saved" | "saving" | "unsaved"
@@ -315,7 +314,6 @@ export function JourneyBuilder({
     setInspectorOpen(false);
     setMenuOpen(false);
     setBuilderVersion(null);
-    setGraphReloadSignal(0);
     setPublishError(null);
 
     return () => {
@@ -683,7 +681,6 @@ export function JourneyBuilder({
               onReorderMilestone={(index, direction) =>
                 void handleReorderMilestone(index, direction)
               }
-              reloadSignal={graphReloadSignal}
               onBuilderVersionChange={setBuilderVersion}
               onSaveStateChange={setBuilderSaveState}
               onCanvasDirtyChange={setCanvasDirty}
