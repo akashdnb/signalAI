@@ -62,7 +62,7 @@ export function ContentPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page" style={{ maxWidth: 1080 }}>
+    <div className="page page-wide">
       <h1>Content</h1>
       <p className="muted">Posts and Reels people have commented on, sorted by most recently active.</p>
 
