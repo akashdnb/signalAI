@@ -58,7 +58,8 @@ export function LeadsPage() {
 
       <section className="card">
         <div className="filter-row">
-          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
+          <label className="sr-only" htmlFor="leads-stage-filter">Pipeline stage</label>
+          <select id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
             <option value="">All stages</option>
             {PIPELINE_STAGES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -66,15 +67,19 @@ export function LeadsPage() {
               </option>
             ))}
           </select>
-          <select value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
+          <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
+          <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
             {HANDOFF_FILTERS.map((h) => (
               <option key={h.value} value={h.value}>
                 {h.label}
               </option>
             ))}
           </select>
+          <label className="sr-only" htmlFor="leads-search">Search leads by username</label>
           <input
+            id="leads-search"
             type="text"
+            aria-label="Search leads by username"
             placeholder="Search by username…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
