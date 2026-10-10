@@ -26,6 +26,7 @@ export function ContentPage() {
   const [media, setMedia] = useState<ObservedMedia[] | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -33,7 +34,10 @@ export function ContentPage() {
     api
       .listObservedMedia(tenantId)
       .then((m) => {
-        if (!cancelled) setMedia(m);
+        if (!cancelled) {
+          setMedia(m);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -46,7 +50,7 @@ export function ContentPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate]);
+  }, [tenantId, navigate, reloadCount]);
 
   const availableTypes = useMemo(() => {
     if (!media) return [];
@@ -66,7 +70,16 @@ export function ContentPage() {
       <h1>Content</h1>
       <p className="muted">Posts and Reels people have commented on, sorted by most recently active.</p>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {media === null && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       {availableTypes.length > 0 && (
         <div className="filter-row">
@@ -91,7 +104,7 @@ export function ContentPage() {
       )}
 
       {sorted === null ? (
-        <p className="muted">Loading…</p>
+        <p className="muted" role="status">{error ? "Content could not be loaded." : "Loading content…"}</p>
       ) : sorted.length === 0 ? (
         <div className="card">
           <p className="muted" style={{ margin: 0 }}>
