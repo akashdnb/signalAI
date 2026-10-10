@@ -28,11 +28,12 @@ function toEvent(row: LeadEventRow): LeadEvent {
 export interface EventForReply {
   leadId: string; eventType: string; matchedCampaignId: string | null; matchedKeyword: string | null;
   commentText: string | null; dmText: string | null; username: string | null; commentId: string | null;
+  restartCampaign: boolean;
 }
 
 export async function getEventForReply(pool: Queryable, tenantId: string, leadEventId: string): Promise<EventForReply | null> {
   const result = await pool.query<{
-    lead_id: string; event_type: string; attributes: { matchedCampaignId?: string; matchedKeyword?: string; commentId?: string };
+    lead_id: string; event_type: string; attributes: { matchedCampaignId?: string; matchedKeyword?: string; commentId?: string; restartCampaign?: boolean };
     comment_text: string | null; dm_text: string | null; username: string | null;
   }>(
     `select e.lead_id, e.event_type, e.attributes, p.comment_text, p.dm_text, p.username
@@ -46,6 +47,7 @@ export async function getEventForReply(pool: Queryable, tenantId: string, leadEv
     leadId: row.lead_id, eventType: row.event_type, matchedCampaignId: row.attributes.matchedCampaignId ?? null,
     matchedKeyword: row.attributes.matchedKeyword ?? null, commentText: row.comment_text, dmText: row.dm_text,
     username: row.username, commentId: row.attributes.commentId ?? null,
+    restartCampaign: row.attributes.restartCampaign === true,
   };
 }
 
