@@ -22,6 +22,8 @@ export interface Campaign {
   description: string | null;
   keywords: string[];
   enabled: boolean;
+  /** Whether an immutable journey snapshot has been published. */
+  published?: boolean;
   replyMode: ReplyMode;
   replyTemplates: string[];
   defaultReplyTemplate: string;
