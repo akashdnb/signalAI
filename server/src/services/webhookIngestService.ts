@@ -162,7 +162,7 @@ async function ingestOneEvent(
     const sourceText = event.eventType === "comment" ? event.commentText : event.dmText;
     if (sourceText) {
       if (event.eventType === "message") {
-        const match = resolveDmCampaignTrigger(sourceText, campaigns, lead.activeDmCampaignId, previousWindowOpen);
+        const match = resolveDmCampaignTrigger(sourceText, campaigns, lead.activeDmCampaignId, previousWindowOpen, event.mediaId);
         if (match) {
           attributes.matchedCampaignId = match.campaignId;
           attributes.matchedKeyword = match.keyword;
