@@ -173,8 +173,6 @@ export function AutomationTemplates({
           );
         })}
       </div>
-    </section>
-  );
       {selectedTemplate && (
         <TemplateDetailsDialog
           template={selectedTemplate}
@@ -182,7 +180,8 @@ export function AutomationTemplates({
           onCreate={confirmUse}
         />
       )}
-
+    </section>
+  );
 }
 
 
