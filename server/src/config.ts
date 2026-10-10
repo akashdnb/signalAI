@@ -40,6 +40,12 @@ export const config = {
   get instagramClientId() {
     return process.env.INSTAGRAM_CLIENT_ID ?? "";
   },
+  // Enable only after Meta has approved HUMAN_AGENT messaging for this app.
+  // Disabled by default so ordinary deployments never send a policy tag they
+  // are not approved to use.
+  get instagramHumanAgentEnabled() {
+    return process.env.INSTAGRAM_HUMAN_AGENT_ENABLED === "true";
+  },
   get instagramRedirectUri() {
     return process.env.INSTAGRAM_REDIRECT_URI ?? "";
   },
