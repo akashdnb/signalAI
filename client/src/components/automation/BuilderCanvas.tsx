@@ -1081,6 +1081,8 @@ export function BuilderCanvas({
           onNodeDragStop={handleNodeDragStop}
           nodesDraggable={!locked}
           nodesConnectable={!locked}
+          nodesDeletable={false}
+          edgesDeletable={false}
           connectionMode={ConnectionMode.Loose}
           connectionLineType={ConnectionLineType.SmoothStep}
           isValidConnection={(connection) =>

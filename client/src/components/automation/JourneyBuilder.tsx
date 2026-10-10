@@ -76,6 +76,7 @@ export function JourneyBuilder({
   const navigate = useNavigate();
   const canvasActionsRef = useRef<BuilderCanvasActions | null>(null);
   const pendingActionRef = useRef<(() => void | Promise<void>) | null>(null);
+  const restoringHistoryRef = useRef(false);
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -145,6 +146,28 @@ export function JourneyBuilder({
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [canvasDirty]);
+
+  // Guard browser back/forward within the SPA. Restore the current history
+  // entry before opening the dialog; if the user confirms, navigate to the
+  // destination captured from the blocked popstate instead.
+  useEffect(() => {
+    if (!canvasDirty) return;
+
+    const interceptPopState = () => {
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false;
+        return;
+      }
+
+      const targetUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      restoringHistoryRef.current = true;
+      window.history.forward();
+      requestNavigation(() => navigate(targetUrl));
+    };
+
+    window.addEventListener("popstate", interceptPopState, true);
+    return () => window.removeEventListener("popstate", interceptPopState, true);
+  }, [canvasDirty, navigate, requestNavigation]);
 
   // BrowserRouter does not block SPA navigation by itself. Intercept ordinary
   // same-origin links while a canvas draft exists and resume navigation only
