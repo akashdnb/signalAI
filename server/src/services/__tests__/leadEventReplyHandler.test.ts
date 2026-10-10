@@ -65,11 +65,24 @@ async function seedMatchedEvent(
   keyword: string,
   text: string,
   attributesOverrides: Record<string, unknown> = {},
+  priorInboundDmAt: Date | null = new Date(Date.now() - 5 * 60 * 1000),
 ) {
   const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1");
-  // Send preconditions (B9): an open messaging window and a connected
-  // account are required before the handler will attempt any send at all.
-  await updateMessagingWindow(pool, tenantId, lead.id, new Date(), new Date(Date.now() + 60 * 60 * 1000));
+  // Most handler tests exercise an event inside an already-open DM window.
+  // Seed a real inbound DM event rather than relying on a manually-set window
+  // projection, which is intentionally not the policy source of truth.
+  if (priorInboundDmAt) {
+    await insertEventIdempotent(pool, {
+      tenantId,
+      leadId: lead.id,
+      metaEventId: `evt-prior-dm-${Math.random()}`,
+      eventType: "message",
+      occurredAt: priorInboundDmAt,
+      sequence: 1,
+      attributes: {},
+    });
+    await updateMessagingWindow(pool, tenantId, lead.id, priorInboundDmAt, new Date(priorInboundDmAt.getTime() + 60 * 60 * 1000));
+  }
   await upsertToken(pool, keyring, { tenantId, instagramAccountId: "acct-1", accessToken: "token-1" });
 
   const event = await insertEventIdempotent(pool, {
@@ -78,7 +91,7 @@ async function seedMatchedEvent(
     metaEventId: `evt-${Math.random()}`,
     eventType: "comment",
     occurredAt: new Date(),
-    sequence: 1,
+    sequence: priorInboundDmAt ? 2 : 1,
     attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
   });
   await insertPii(pool, {
@@ -358,7 +371,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { replyMode: "rule_based", triggerSource: "comment", replyChannel: "dm" });
     const handler = createLeadEventReplyHandler(pool, fakeBoss, mockProvider(["unused"]), keyring, DEFAULT_AI_CAP);
 
-    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send me the link", { commentId: "comment-private-reply-1" });
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send me the link", { commentId: "comment-private-reply-1" }, null);
     await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
     expect(sendInstagramPrivateReply).toHaveBeenCalledWith("token-1", "comment-private-reply-1", expect.any(String));
@@ -376,9 +389,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     const provider = mockProvider(["unused"]);
     const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
 
-    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
-    // Slam the window shut after seedMatchedEvent opened it.
-    await updateMessagingWindow(pool, tenant.id, lead.id, new Date(0), new Date(0));
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {}, new Date(Date.now() - 25 * 60 * 60 * 1000));
 
     const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
@@ -665,8 +676,8 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
 
       const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send the link", {
         commentId: "comment-1",
-      });
-      await updateMessagingWindow(pool, tenant.id, lead.id, new Date(0), new Date(0)); // slam the DM window shut
+      }, new Date(Date.now() - 25 * 60 * 60 * 1000));
+      await pool.query("update lead_events set occurred_at = now() - interval '8 days' where id = $1", [event.id]);
 
       const result = await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
