@@ -43,7 +43,7 @@
 .phase4-top-item{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem;border:1px solid var(--border);border-radius:10px;background:var(--card);}
 .phase4-top-item-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem;}
 .phase4-top-item-value{font-weight:700;font-size:.82rem;white-space:nowrap;}
-/* Apply the Phase 4 treatment to the existing page architecture without changing its data/API contracts. */
+/* Existing Leads / Analytics architecture */
 .page.page-wide:has(> h1:first-child + .banner-error + .card){padding-top:.25rem;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > h1{margin:0 0 1.15rem;font-size:1.65rem;letter-spacing:-.025em;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);overflow:hidden;}
@@ -54,29 +54,30 @@
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > .card .table tbody tr:hover{background:var(--chip);}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) .filter-row{gap:.65rem;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) .filter-row input,.page.page-wide:has(> h1:first-child + .banner-error + .card) .filter-row select{min-height:40px;}
-.page.page-wide:has(> h1:first-child + .banner-error + .card) > h1 + .card{margin-top:.25rem;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) .pill{font-weight:650;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > h1{margin:0;font-size:1.65rem;letter-spacing:-.025em;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > h1 + p{max-width:720px;margin:.4rem 0 1rem;line-height:1.55;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card{border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);padding:1.2rem;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card h2{margin-top:0;font-size:1rem;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card input[type=file]{max-width:100%;padding:.55rem;border:1px dashed var(--border);border-radius:10px;background:var(--chip);}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card .table{margin-top:1rem;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card .table th{background:var(--chip);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;}
-.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card .table td,.page.page-wide:has(> h1:first-child + p.muted + section.card) > section.card .table th{padding:.8rem 1rem;}
-.page.page-wide:has(> h1:first-child + .banner-error + .card) > h1{margin-bottom:1rem;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid{gap:.8rem;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid .stat{border:1px solid var(--border);border-radius:14px;background:var(--card);padding:1rem;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid .stat-value{font-size:1.45rem;letter-spacing:-.025em;}
 .page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid .stat-label{color:var(--muted);font-size:.76rem;}
-.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card + .stat-grid{margin-top:1rem;}
-.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid + .card{margin-top:1rem;}
-.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid + .card{border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);}
-.page.page-workspace:has(> h1:first-child + .banner-error + div) > h1{margin:0 0 1rem;font-size:1.65rem;letter-spacing:-.025em;}
-.page.page-workspace:has(> h1:first-child + .banner-error + div) > div:last-child{border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);}
-.page.page-workspace:has(> h1:first-child + .banner-error + div) .list-item-button{min-height:68px;transition:background .12s ease;}
-.page.page-workspace:has(> h1:first-child + .banner-error + div) .list-item-button:hover{background:var(--chip);}
-.page.page-workspace:has(> h1:first-child + .banner-error + div) textarea{border-radius:10px;min-height:74px;}
-.page.page-workspace:has(> h1:first-child + .banner-error + div) .tag-chip{display:inline-flex;margin:.2rem .2rem 0 0;}
-@media(max-width:760px){.page.page-wide:has(> h1:first-child + .banner-error + .card) > h1,.page.page-wide:has(> h1:first-child + p.muted + section.card) > h1,.page.page-workspace:has(> h1:first-child + .banner-error + div) > h1{font-size:1.4rem;}.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card{border-radius:12px;}.page.page-workspace:has(> h1:first-child + .banner-error + div) > div:last-child{border-radius:12px;}}
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid + .card{margin-top:1rem;border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+/* Existing Knowledge Base architecture */
+.page:has(> h1:first-child + p.muted + section.card) > h1{margin:0;font-size:1.65rem;letter-spacing:-.025em;}
+.page:has(> h1:first-child + p.muted + section.card) > h1 + p{max-width:720px;margin:.4rem 0 1rem;line-height:1.55;}
+.page:has(> h1:first-child + p.muted + section.card) > section.card{border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);padding:1.2rem;}
+.page:has(> h1:first-child + p.muted + section.card) > section.card h2{margin-top:0;font-size:1rem;}
+.page:has(> h1:first-child + p.muted + section.card) > section.card input[type=file]{max-width:100%;padding:.55rem;border:1px dashed var(--border);border-radius:10px;background:var(--chip);}
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table{margin-top:1rem;}
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table th{background:var(--chip);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;}
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table td,.page:has(> h1:first-child + p.muted + section.card) > section.card .table th{padding:.8rem 1rem;}
+/* Existing Inbox architecture */
+.page.page-workspace > h1{margin:0 0 1rem;font-size:1.65rem;letter-spacing:-.025em;}
+.page.page-workspace > div:last-child{border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.page.page-workspace .list-item-button{min-height:68px;transition:background .12s ease;}
+.page.page-workspace .list-item-button:hover{background:var(--chip);}
+.page.page-workspace textarea{border-radius:10px;min-height:74px;}
+.page.page-workspace .tag-chip{display:inline-flex;margin:.2rem .2rem 0 0;}
+@media(max-width:760px){.page.page-wide:has(> h1:first-child + .banner-error + .card) > h1,.page:has(> h1:first-child + p.muted + section.card) > h1,.page.page-workspace > h1{font-size:1.4rem;}.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card,.page:has(> h1:first-child + p.muted + section.card) > section.card{border-radius:12px;}.page.page-workspace > div:last-child{border-radius:12px;}}
+@media(max-width:1050px){.phase4-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.phase4-inbox{grid-template-columns:280px minmax(0,1fr);}.phase4-lead-panel{display:none;}.phase4-analytics-grid{grid-template-columns:1fr;}}
+@media(max-width:760px){.phase4-page .page-header-row{flex-direction:column;}.phase4-kpi-grid{grid-template-columns:1fr 1fr;}.phase4-inbox{display:block;height:calc(100vh - 145px);min-height:500px;border-radius:12px;}.phase4-inbox-list,.phase4-thread{height:100%;}.phase4-table{min-width:760px;}.phase4-surface{border-radius:12px;}.phase4-doc-hero{align-items:flex-start;flex-direction:column;}.phase4-kpi-value{font-size:1.25rem;}}
+@media(max-width:480px){.phase4-kpi-grid{grid-template-columns:1fr;}.phase4-toolbar{align-items:stretch;}.phase4-toolbar>*{width:100%;}.phase4-page .page-header-copy h1{font-size:1.4rem;}}
 @media(prefers-reduced-motion:reduce){.phase4-page *{scroll-behavior:auto!important;transition:none!important;}}
