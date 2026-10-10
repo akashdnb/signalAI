@@ -124,14 +124,12 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
         instagramUserId: "user-1",
         metaEventId: "evt-1",
         eventType: "message",
-        occurredAt: new Date(),
+        occurredAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
         dmText: "product",
       },
     ]);
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "user-1");
     expect(lead.activeDmCampaignId).toBe(campaign.id);
-    // Slam the window shut, simulating it having closed since the last message.
-    await pool.query("update leads set window_open_until = $2 where id = $1", [lead.id, new Date(0)]);
 
     await ingestWebhookEvents(pool, boss, [
       {
