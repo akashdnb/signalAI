@@ -3,21 +3,36 @@ import { getPool } from "../pool.js";
 import { createTenantForUser } from "../tenants.js";
 import { findOrCreateUserByEmail } from "../users.js";
 import { findOrCreateLeadByInstagramUserId } from "../leads.js";
+import { insertEventIdempotent } from "../events.js";
+import { recordSentReply } from "../sentReplies.js";
 import { getLeadTimeline, getLeadTimelinePage } from "../leadTimeline.js";
 
 async function seedConversation(tenantId: string, leadId: string) {
   const pool = getPool();
+  const baseTime = Date.now();
+
   for (let i = 1; i <= 5; i += 1) {
-    await pool.query(
-      `INSERT INTO lead_events (tenant_id, lead_id, event_type, text, occurred_at)
-       VALUES ($1, $2, 'message', $3, NOW() - ($4 || ' minutes')::interval)`,
-      [tenantId, leadId, `msg ${i}`, String(10 - i)],
-    );
-    await pool.query(
-      `INSERT INTO sent_replies (tenant_id, lead_id, channel, engine, text, sent_at)
-       VALUES ($1, $2, 'dm', 'ai', $3, NOW() - ($4 || ' minutes')::interval)`,
-      [tenantId, leadId, `reply ${i}`, String(10 - i)],
-    );
+    const occurredAt = new Date(baseTime - (10 - i) * 60_000);
+    const event = await insertEventIdempotent(pool, {
+      tenantId,
+      leadId,
+      metaEventId: `timeline-${leadId}-${i}`,
+      eventType: "message",
+      occurredAt,
+      sequence: i,
+    });
+
+    if (!event) throw new Error(`failed to seed event ${i}`);
+
+    await recordSentReply(pool, {
+      tenantId,
+      leadId,
+      leadEventId: event.id,
+      channel: "dm",
+      engine: "ai_generated",
+      text: `reply ${i}`,
+      sentAt: occurredAt,
+    });
   }
 }
 
@@ -57,7 +72,7 @@ describe("lead timeline pagination", () => {
 
     const collected: typeof full = [];
     let cursor: string | undefined;
-    for (let guard = 0; guard < 20; guard++) {
+    for (let guard = 0; guard < 20; guard += 1) {
       const page = await getLeadTimelinePage(pool, tenant.id, lead.id, 3, cursor);
       collected.unshift(...page.entries);
       if (!page.hasMore) break;
@@ -65,7 +80,10 @@ describe("lead timeline pagination", () => {
     }
 
     expect(collected).toHaveLength(10);
-    expect(collected.map((e) => e.occurredAt.getTime())).toEqual(full.map((e) => e.occurredAt.getTime()));
+    expect(new Set(collected.map((entry) => `${entry.source}:${entry.id}`)).size).toBe(10);
+    expect(collected.map((entry) => `${entry.source}:${entry.id}`)).toEqual(
+      full.map((entry) => `${entry.source}:${entry.id}`),
+    );
   });
 
   it("rejects malformed opaque cursors", async () => {
