@@ -45,7 +45,7 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId", async (req, res) => {
   const humanAgentWindowUntil = config.instagramHumanAgentEnabled && lastInboundDmAt
     ? new Date(lastInboundDmAt.getTime() + 7 * 24 * 60 * 60 * 1000)
     : null;
-  return res.status(200).json({ ...lead, username, lastInboundAt: lastInboundDmAt, windowOpenUntil, humanAgentWindowUntil });
+  return res.status(200).json({ ...lead, username, windowOpenUntil, humanAgentWindowUntil });
 });
 
 const TIMELINE_DEFAULT_PAGE_SIZE = 50;
