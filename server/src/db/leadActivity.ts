@@ -1,6 +1,17 @@
 import type { Queryable } from "./types.js";
 
-export type LeadActivityType = "note" | "handoff" | "assignment" | "stage_change" | "tag_change";
+export type LeadActivityType =
+  | "note"
+  | "handoff"
+  | "assignment"
+  | "stage_change"
+  | "tag_change"
+  | "deal_created"
+  | "note_added"
+  | "owner_assigned"
+  | "handoff_changed"
+  | "tag_added"
+  | "tag_removed";
 
 export interface LeadActivity {
   id: string;
@@ -52,6 +63,8 @@ export async function createLeadActivity(
   );
   return toLeadActivity(result.rows[0]!);
 }
+
+export const recordLeadActivity = createLeadActivity;
 
 export async function listLeadActivity(pool: Queryable, tenantId: string, leadId: string): Promise<LeadActivity[]> {
   const result = await pool.query<LeadActivityRow>(
