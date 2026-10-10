@@ -19,12 +19,13 @@ import type { EmbeddingProvider } from "../../llm/embeddingProvider.js";
 import { createProcessingDocument, insertChunks, markDocumentReady } from "../../db/knowledgeBase.js";
 import { upsertGuardrailsConfig } from "../../db/guardrailsConfig.js";
 import { listSentRepliesForLead, recordSentReply } from "../../db/sentReplies.js";
-import { sendInstagramCommentReply, sendInstagramMessage } from "../../lib/instagramSend.js";
+import { sendInstagramCommentReply, sendInstagramMessage, sendInstagramPrivateReply } from "../../lib/instagramSend.js";
 import { enqueueLeadEvent } from "../../queue/leadEventsQueue.js";
 import { createLeadEventReplyHandler } from "../leadEventReplyHandler.js";
 
 vi.mock("../../lib/instagramSend.js", () => ({
   sendInstagramMessage: vi.fn(async () => ({ metaMessageId: null })),
+  sendInstagramPrivateReply: vi.fn(async () => ({ metaMessageId: "private-reply-id" })),
   sendInstagramCommentReply: vi.fn(async () => {}),
 }));
 
@@ -349,6 +350,22 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       "Here's our pricing.",
       { ctaUrl: "https://example.com/offer" },
     );
+  });
+
+  it("uses the one-time private-reply endpoint for a comment-triggered DM before the standard window opens", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { replyMode: "rule_based", triggerSource: "comment", replyChannel: "dm" });
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, mockProvider(["unused"]), keyring, DEFAULT_AI_CAP);
+
+    const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "LINK", "send me the link", { commentId: "comment-private-reply-1" });
+    await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
+
+    expect(sendInstagramPrivateReply).toHaveBeenCalledWith("token-1", "comment-private-reply-1", expect.any(String));
+    expect(sendInstagramMessage).not.toHaveBeenCalled();
+    const replies = await listSentRepliesForLead(pool, tenant.id, lead.id);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ channel: "dm", engine: "rule_based" });
   });
 
   it("closed messaging window: advances without attempting a send", async () => {
