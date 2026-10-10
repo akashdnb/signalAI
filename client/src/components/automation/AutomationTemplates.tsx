@@ -112,53 +112,39 @@ const TONE_CLASS: Record<AutomationTemplate["tone"], string> = {
 
 export function AutomationTemplates({
   onUse,
+  disabled = false,
 }: {
   onUse: (template: AutomationTemplate) => void;
+  disabled?: boolean;
 }) {
   return (
-    <section className="mt-5" aria-labelledby="automation-templates-title">
+    <section className="mt-5" aria-labelledby="automation-templates-title" aria-busy={disabled}>
       <div className="mb-3 flex items-end justify-between gap-4">
         <div>
-          <h2 id="automation-templates-title" className="m-0 text-[18px] font-semibold tracking-[-0.01em] text-ink">
-            Start from a preset
-          </h2>
-          <p className="muted m-0 mt-1 text-[12px]">
-            Pre-configured journey starting points. Customize them in Builder before publishing.
-          </p>
+          <h2 id="automation-templates-title" className="m-0 text-xl font-semibold text-ink">Start with a preset</h2>
+          <p className="muted mb-0 mt-1 text-sm">Create a configured draft, then customize it in the Builder before publishing.</p>
         </div>
       </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {TEMPLATES.map((template) => {
           const Icon = template.icon;
           return (
-            <article
-              key={template.id}
-              className="group rounded-2xl border border-line bg-card p-4 transition-shadow hover:shadow-md"
-            >
+            <article key={template.id} className="rounded-2xl border border-line bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${TONE_CLASS[template.tone]}`}>
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="rounded-full bg-canvas px-2 py-1 text-[10px] font-semibold text-subtle">
-                  {template.trigger}
-                </span>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${TONE_CLASS[template.tone]}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-chip px-2 py-1 text-[10px] font-bold text-subtle">{template.trigger}</span>
               </div>
-              <h3 className="m-0 mt-4 text-[14px] font-semibold text-ink">{template.name}</h3>
-              <p className="muted m-0 mt-1.5 min-h-[56px] text-[11px] leading-4">{template.description}</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {template.keywords.map((keyword) => (
-                  <span key={keyword} className="rounded-md bg-chip px-2 py-1 text-[10px] font-medium text-subtle">
-                    {keyword}
-                  </span>
-                ))}
-              </div>
+              <h3 className="mt-4 mb-0 text-sm font-semibold text-ink">{template.name}</h3>
+              <p className="muted mb-0 mt-1 min-h-[52px] text-xs leading-5">{template.description}</p>
               <button
                 type="button"
-                className="btn-secondary mt-4 min-h-9 w-full text-xs font-semibold group-hover:border-accent/40 group-hover:text-accent"
+                disabled={disabled}
+                className="btn-primary mt-4 w-full justify-center disabled:cursor-wait disabled:opacity-60"
                 onClick={() => onUse(template)}
               >
-                Use preset
+                {disabled ? "Creating…" : "Use preset"}
               </button>
             </article>
           );
