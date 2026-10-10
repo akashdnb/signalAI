@@ -49,9 +49,9 @@ export const config = {
       "https://graph.facebook.com/v24.0"
     );
   },
-  // Instagram Login messaging uses graph.instagram.com for profile lookups.
-  // Keep this separate from the general send API base URL so a deployment can
-  // use the correct host for the token flow it actually uses.
+  // Instagram Login user-profile lookups use graph.instagram.com. Keep this
+  // separate from the send API base URL so the correct host/version can be
+  // selected without changing the messaging implementation.
   get instagramProfileGraphApiBaseUrl() {
     return (
       process.env.INSTAGRAM_PROFILE_GRAPH_API_BASE_URL ??
@@ -120,16 +120,28 @@ export const config = {
     return process.env.EMBEDDING_MODEL ?? "";
   },
   // Matryoshka-style truncation request (see embeddingProvider.ts) —
-  // optional, unlike the three above: a model whose natural output width
-  // already matches knowledge_base_chunks.embedding's fixed vector(768)
-  // column (e.g. OpenAI's text-embedding-3-small) needs this unset.
+  // genuinely optional, unlike the three above: a model whose natural
+  // output width already matches knowledge_base_chunks.embedding's fixed
+  // vector(768) column (e.g. OpenAI's text-embedding-3-small) needs this
+  // unset. gemini-embedding-001 (this project's actual configured model,
+  // confirmed live) natively returns 3072 dims and needs it set to 768.
   get embeddingDimensions() {
     const raw = process.env.EMBEDDING_DIMENSIONS;
     return raw ? Number(raw) : undefined;
   },
+  // Phase 2C Knowledge Base: the S3-compatible bucket for uploaded source
+  // documents. Endpoint/region/credentials are read by the AWS SDK itself
+  // from its own standard env vars (AWS_ENDPOINT_URL_S3, AWS_REGION,
+  // AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) — only the bucket name isn't
+  // one of those, so it's the one setting routed through config here.
   get kbS3Bucket() {
     return process.env.KB_S3_BUCKET ?? "";
   },
+  // Phase 2C Grounded-Answer-Only Fallback: cosine similarity below which
+  // the best retrieval match is treated as "not actually grounded." 0.6 is
+  // a starting point, not a measured value — real embedding models (and
+  // Matryoshka-truncated ones especially, see EMBEDDING_DIMENSIONS) can have
+  // different similarity distributions, so this is exposed as a tunable.
   get ragMinSimilarityThreshold() {
     const raw = process.env.RAG_MIN_SIMILARITY_THRESHOLD;
     return raw ? Number(raw) : 0.6;
@@ -137,9 +149,19 @@ export const config = {
   get appBaseUrl() {
     return stripTrailingSlashes(process.env.APP_BASE_URL ?? "http://localhost:3000");
   },
+  // Identity Refactor U2: the API server's OWN public base URL.
   get apiBaseUrl() {
     return stripTrailingSlashes(process.env.API_BASE_URL ?? "http://localhost:3000");
   },
+
+  /*
+   * Free Render mode:
+   *   true  -> API embeds the JourneyActionWorker.
+   *
+   * Paid Render mode:
+   *   false -> API does not run the JourneyActionWorker.
+   *            A separate Background Worker runs src/worker.ts.
+   */
   get journeyWorkerEnabled() {
     return process.env.JOURNEY_WORKER_ENABLED === "true";
   },
@@ -202,7 +224,8 @@ export function assertRequiredConfig(): void {
   if (missing.length > 0) {
     throw new Error(
       `Missing required configuration: ${missing.join(", ")}. ` +
-        "The server refuses to start rather than run with a setting that would fail later, in someone else's browser, as an unrelated-looking error.",
+        "The server refuses to start rather than run with a setting that would " +
+        "fail later, in someone else's browser, as an unrelated-looking error.",
     );
   }
 }
