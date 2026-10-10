@@ -41,12 +41,12 @@ type CampaignSort = (typeof VALID_CAMPAIGN_SORTS)[number];
 
 function mapCampaign(row: {
   id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean;
-  has_published_version: boolean;
+  has_published_version?: boolean;
   reply_mode: ReplyMode; reply_templates: string[]; default_reply_template: string; cta_link: string | null;
   target_media_ids: string[]; reply_channel: ReplyChannel; trigger_source: TriggerSource; tone: CampaignTone;
   language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
 }): Campaign {
-  return { id: row.id, tenantId: row.tenant_id, name: row.name, description: row.description, keywords: row.keywords, enabled: row.enabled, published: row.has_published_version, replyMode: row.reply_mode, replyTemplates: row.reply_templates, defaultReplyTemplate: row.default_reply_template, ctaLink: row.cta_link, targetMediaIds: row.target_media_ids, replyChannel: row.reply_channel, triggerSource: row.trigger_source, tone: row.tone, language: row.language, useKnowledgeBase: row.use_knowledge_base, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, tenantId: row.tenant_id, name: row.name, description: row.description, keywords: row.keywords, enabled: row.enabled, published: row.has_published_version ?? false, replyMode: row.reply_mode, replyTemplates: row.reply_templates, defaultReplyTemplate: row.default_reply_template, ctaLink: row.cta_link, targetMediaIds: row.target_media_ids, replyChannel: row.reply_channel, triggerSource: row.trigger_source, tone: row.tone, language: row.language, useKnowledgeBase: row.use_knowledge_base, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function mapDocument(row: {
