@@ -33,6 +33,7 @@ export function LeadDetailPage() {
   const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [activeTab, setActiveTab] = useState<"overview" | "conversation" | "activities" | "notes">("overview");
 
   const [noteBody, setNoteBody] = useState("");
@@ -61,6 +62,7 @@ export function LeadDetailPage() {
     setMembers(m);
     setCapturedFacts(cf);
     setFieldDefinitions(fd);
+    setError(null);
   }
 
   // Loaded separately from loadAll: a failure fetching intelligence (a
@@ -120,7 +122,7 @@ export function LeadDetailPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, leadId]);
+  }, [tenantId, leadId, reloadCount]);
 
   async function handleStageChange(stage: PipelineStage) {
     if (!tenantId || !leadId) return;
@@ -249,7 +251,7 @@ export function LeadDetailPage() {
   ];
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>
         {lead?.username ?? "Lead"}
         {lead && (
@@ -257,10 +259,19 @@ export function LeadDetailPage() {
         )}
       </h1>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {!lead && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry loading lead
+            </button>
+          )}
+        </div>
+      )}
 
       {!lead ? (
-        <p className="muted">Loading…</p>
+        <p className="muted" role="status">{error ? "Lead details could not be loaded." : "Loading lead…"}</p>
       ) : (
         <>
           <div className="button-row">
@@ -335,6 +346,7 @@ export function LeadDetailPage() {
             <div className="inline-form">
               <input
                 type="text"
+                aria-label="Tag name"
                 placeholder="Add a tag…"
                 value={tagName}
                 onChange={(e) => setTagName(e.target.value)}
@@ -372,7 +384,7 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            {intelligenceError && <div className="banner banner-error">{intelligenceError}</div>}
+            {intelligenceError && <div className="banner banner-error" role="alert">{intelligenceError}</div>}
 
             {intelligence === undefined ? (
               <p className="muted">Loading…</p>
@@ -473,6 +485,7 @@ export function LeadDetailPage() {
             <div className="inline-form">
               <input
                 type="text"
+                aria-label="Deal value (optional)"
                 placeholder="Deal value (optional)"
                 value={dealValue}
                 onChange={(e) => setDealValue(e.target.value)}
@@ -530,6 +543,7 @@ export function LeadDetailPage() {
               )}
               <div className="inline-form">
                 <textarea
+                  aria-label="Internal note"
                   placeholder="Add an internal note…"
                   value={noteBody}
                   onChange={(e) => setNoteBody(e.target.value)}
