@@ -182,7 +182,7 @@ async function ingestOneEvent(
           // DM continue this run, but only an actual inbound DM opens the
           // standard 24-hour window.
           if (
-            matchedCampaign &&
+            matchedCampaign && event.commentId &&
             (matchedCampaign.replyChannel === "dm" || matchedCampaign.replyChannel === "both") &&
             commentAgeMs >= 0 && commentAgeMs < 7 * 24 * 60 * 60 * 1000
           ) {
