@@ -124,7 +124,7 @@ export async function insertEventIdempotent(
   const result = await pool.query<LeadEventRow>(
     `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
      values ($1, $2, $3, $4, $5, $6, $7)
-     on conflict (tenant_id, meta_event_id) do nothing returning *`,
+     on conflict (meta_event_id) do nothing returning *`,
     [params.tenantId, params.leadId, params.metaEventId, params.eventType, params.occurredAt, params.sequence, params.attributes ?? {}],
   );
   return result.rows[0] ? toEvent(result.rows[0]) : null;
