@@ -93,6 +93,7 @@ export function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, tab, search, page, reloadCount]);
 
+  const selectedLastInboundAtRef = useRef<string | null>(null);
   const reloadLeadsRef = useRef(reloadLeads);
   reloadLeadsRef.current = reloadLeads;
   useEffect(() => {
@@ -106,6 +107,10 @@ export function InboxPage() {
       }
       if (!tenantId) return;
       api.getLead(tenantId, selectedLeadId).then((fresh) => {
+        if (fresh.lastInboundAt !== selectedLastInboundAtRef.current) {
+          selectedLastInboundAtRef.current = fresh.lastInboundAt;
+          setThreadRefreshToken((token) => token + 1);
+        }
         setPageData((prev) => prev
           ? { ...prev, items: prev.items.map((lead) => lead.id === fresh.id ? { ...lead, ...fresh } : lead) }
           : prev);
@@ -138,6 +143,7 @@ export function InboxPage() {
   function handleSelectLead(lead: LeadListItem) {
     if (!tenantId) return;
     setSelectedLeadId(lead.id);
+    selectedLastInboundAtRef.current = lead.lastInboundAt;
     setComposeText("");
     setPendingEntries([]);
     setError(null);
