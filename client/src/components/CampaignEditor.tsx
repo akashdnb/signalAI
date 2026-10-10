@@ -52,10 +52,9 @@ function draftFromCampaign(campaign: Campaign): SettingsDraft {
   };
 }
 
-function isValidUrl(value: string): boolean {
+function isValidHttpsUrl(value: string): boolean {
   try {
-    new URL(value);
-    return true;
+    return new URL(value).protocol === "https:";
   } catch {
     return false;
   }
@@ -69,7 +68,9 @@ function validateDraft(draft: SettingsDraft): string[] {
     errors.push("A fallback reply template is required so AI mode can fail closed.");
   }
   if (!draft.defaultReplyTemplate.trim()) errors.push("Default reply template can't be blank.");
-  if (draft.ctaLink.trim() && !isValidUrl(draft.ctaLink.trim())) errors.push("CTA link must be a valid URL.");
+  if (draft.ctaLink.trim() && !isValidHttpsUrl(draft.ctaLink.trim())) {
+    errors.push("CTA link must be a valid HTTPS URL to render as an Instagram button or card.");
+  }
   return errors;
 }
 
@@ -245,6 +246,27 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
       setTargetMediaIds(campaign.targetMediaIds);
       setTargetAllPosts(campaign.targetMediaIds.length === 0);
     }, [campaign]);
+
+    // Instagram can render a card when a selected target has a usable
+    // thumbnail and both the journey title and sample copy fit Meta's
+    // 80-character limits. Otherwise a valid HTTPS CTA becomes a button,
+    // with very long copy falling back to plain text.
+    const previewMedia = !targetAllPosts
+      ? targetMediaIds
+          .map((id) => observedMedia.find((media) => media.mediaId === id))
+          .find((media) => Boolean(media?.thumbnailUrl))
+      : undefined;
+    const previewTitle = draft.name.trim() || "Your journey";
+    const previewBody = draft.defaultReplyTemplate.trim() || "Here's the information you asked for.";
+    const previewCtaUrl = draft.ctaLink.trim();
+    const previewCtaReady = Boolean(previewCtaUrl) && isValidHttpsUrl(previewCtaUrl);
+    const previewMode: "card" | "button" | "text" = !previewCtaReady
+      ? "text"
+      : previewMedia?.thumbnailUrl && previewTitle.length <= 80 && previewBody.length <= 80
+        ? "card"
+        : previewBody.length <= 640
+          ? "button"
+          : "text";
 
     useEffect(() => {
       let cancelled = false;
@@ -537,9 +559,76 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
 
           <label>
             CTA Link (optional)
-            <input type="text" value={draft.ctaLink} onChange={(e) => setDraft({ ...draft, ctaLink: e.target.value })} placeholder="https://example.com/brochure" />
-            <span className="muted small">Used when the journey includes a CTA.</span>
+            <input
+              type="url"
+              aria-label="CTA link (HTTPS URL)"
+              value={draft.ctaLink}
+              onChange={(e) => setDraft({ ...draft, ctaLink: e.target.value })}
+              placeholder="https://example.com/brochure"
+            />
+            <span className="muted small">
+              An HTTPS link becomes an Instagram button. If a selected post has a thumbnail and the message fits the card limits, Instagram can show an image card instead.
+            </span>
           </label>
+
+          <div className="mt-4 rounded-xl border border-line bg-canvas/40 p-3.5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-ink">Instagram message preview</div>
+                <p className="muted m-0 mt-0.5 text-xs">Sample uses the default reply; individual journey message steps can change the copy.</p>
+              </div>
+              <span className="pill" style={{ marginLeft: 0 }}>
+                {previewMode === "card" ? "Image card" : previewMode === "button" ? "Button" : "Text only"}
+              </span>
+            </div>
+
+            <div className="max-w-[340px] overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
+              {previewMode === "card" && previewMedia?.thumbnailUrl && (
+                <img
+                  src={previewMedia.thumbnailUrl}
+                  alt=""
+                  className="aspect-[1.6/1] w-full object-cover"
+                />
+              )}
+              <div className="p-3.5">
+                {previewMode === "card" && (
+                  <div className="mb-1.5 text-sm font-semibold text-ink">{previewTitle}</div>
+                )}
+                <p className="m-0 whitespace-pre-wrap break-words text-sm leading-5 text-ink">{previewBody}</p>
+                {(previewMode === "card" || previewMode === "button") && (
+                  <a
+                    href={previewCtaUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 flex min-h-10 items-center justify-center rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white no-underline"
+                  >
+                    View details ↗
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {previewCtaUrl && !previewCtaReady && (
+              <p className="muted m-0 mt-2 text-xs" role="status">
+                Interactive Instagram CTAs require a valid HTTPS URL. This value will not render as a button or card.
+              </p>
+            )}
+            {previewCtaReady && previewMode === "text" && (
+              <p className="muted m-0 mt-2 text-xs" role="status">
+                This sample is too long for an Instagram CTA template, so it will be sent as plain text.
+              </p>
+            )}
+            {previewCtaReady && previewMode === "button" && previewMedia?.thumbnailUrl && (
+              <p className="muted m-0 mt-2 text-xs" role="status">
+                The title and sample copy must each be 80 characters or fewer for the image-card layout. The current sample uses a button instead.
+              </p>
+            )}
+            {!targetAllPosts && !previewMedia?.thumbnailUrl && (
+              <p className="muted m-0 mt-2 text-xs">
+                Choose a selected post with a thumbnail to preview the image-card layout.
+              </p>
+            )}
+          </div>
         </Card>
 
         <Card title="AI Behaviour" defaultOpen={false}>
