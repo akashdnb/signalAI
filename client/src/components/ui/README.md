@@ -5,11 +5,14 @@ These primitives are the preferred starting point for **new UI** and when an exi
 ## Components
 
 - `Button`: primary, secondary, ghost, and danger actions; small, medium, and large sizes; optional leading/trailing icons.
-- `Field`, `TextInput`, `SelectInput`, `TextareaInput`: labelled form layout and controls with shared dimensions, focus state, and hint/error text.
+- `Field`, `TextInput`, `SelectInput`, `TextareaInput`: labelled form layout and controls with shared dimensions, focus state, and hint/error text. `Field` associates hint/error content with the wrapped control via `aria-describedby` and exposes `aria-invalid` during validation errors.
 - `StatusBadge`: consistent neutral, success, warning, danger, information, and accent status tones.
 - `PageHeader`: responsive page title, description and action placement.
 - `Section`: section heading, supporting description, action slot, and optional divider-based grouping.
 - `EmptyState`: reusable icon/title/description/action composition.
+- `LoadingState`: accessible async loading presentation.
+- `ErrorState`: accessible recoverable error presentation.
+- `Skeleton`: lightweight progressive loading placeholder.
 - Barrel exports live in `index.ts`.
 
 ## Conventions
@@ -21,6 +24,7 @@ These primitives are the preferred starting point for **new UI** and when an exi
 5. Use the shared CSS variables for custom CSS. For Tailwind utilities, use the mapped colors such as `bg-canvas`, `bg-card`, `text-ink`, `text-subtle`, `border-line`, `bg-accent`, `bg-ok`, and `bg-err`.
 6. The current app deliberately supports both legacy CSS and Tailwind while screens are migrated. Do not import Tailwind Preflight or remove legacy selectors as part of an individual page change; migrate screen-by-screen and verify both light and dark themes.
 7. Existing `.btn-primary`, `.btn-secondary`, `.card`, `.pill`, and form selectors remain supported for backward compatibility. Avoid mixing those classes with the new primitive's classes on the same element.
+8. Scope responsive overflow to the component that owns scrolling; avoid global table minimum widths and avoid enlarging inline links merely to satisfy touch-target guidance.
 
 ## Example
 
