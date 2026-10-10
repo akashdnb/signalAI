@@ -148,7 +148,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { triggerSource: "comment", replyChannel: "dm" });
+    const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { triggerSource: "both", replyChannel: "dm" });
 
     await ingestWebhookEvents(pool, boss, [{
       instagramAccountId: "acct-1",
