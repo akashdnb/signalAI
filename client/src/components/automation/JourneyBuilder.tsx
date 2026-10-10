@@ -58,6 +58,8 @@ export function JourneyBuilder({
   const [subTab, setSubTab] = useState<BuilderTab>("builder");
   const subTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
+  const savedMilestonesRef = useRef<Milestone[]>([]);
+  const [milestonesDirty, setMilestonesDirty] = useState(false);
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([]);
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -86,6 +88,7 @@ export function JourneyBuilder({
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
+  const journeyDirty = canvasDirty || milestonesDirty;
 
   const registerCanvasActions = useCallback((actions: BuilderCanvasActions | null) => {
     canvasActionsRef.current = actions;
@@ -93,7 +96,7 @@ export function JourneyBuilder({
 
   const requestNavigation = useCallback(
     (action: () => void | Promise<void>) => {
-      if (!canvasDirty) {
+      if (!journeyDirty) {
         void action();
         return;
       }
@@ -102,13 +105,32 @@ export function JourneyBuilder({
       setUnsavedDialogError(null);
       setShowUnsavedDialog(true);
     },
-    [canvasDirty],
+    [journeyDirty],
   );
 
   async function saveCanvasDraft(): Promise<boolean> {
-    const saved = await canvasActionsRef.current?.saveDraft();
+    const saved = await canvasActionsRef.current?.saveDraft(milestones);
     return saved === true;
   }
+
+  function updateMilestoneDraft(next: Milestone[]) {
+    setMilestonesState(next);
+    const snapshot = (items: Milestone[]) =>
+      items.map(({ id, goalDescription, captureFields }) => ({
+        id,
+        goalDescription,
+        captureFields,
+      }));
+    setMilestonesDirty(
+      JSON.stringify(snapshot(next)) !== JSON.stringify(snapshot(savedMilestonesRef.current)),
+    );
+  }
+
+  const acceptSavedMilestones = useCallback((saved: Milestone[]) => {
+    savedMilestonesRef.current = saved;
+    setMilestonesState(saved);
+    setMilestonesDirty(false);
+  }, []);
 
   function keepEditing() {
     pendingActionRef.current = null;
@@ -132,6 +154,8 @@ export function JourneyBuilder({
 
   async function discardAndContinue() {
     canvasActionsRef.current?.discardDraft();
+    setMilestonesState(savedMilestonesRef.current);
+    setMilestonesDirty(false);
     const action = pendingActionRef.current;
     pendingActionRef.current = null;
     setUnsavedDialogError(null);
@@ -140,7 +164,7 @@ export function JourneyBuilder({
   }
 
   useEffect(() => {
-    if (!canvasDirty) return;
+    if (!journeyDirty) return;
 
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -149,13 +173,13 @@ export function JourneyBuilder({
 
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [canvasDirty]);
+  }, [journeyDirty]);
 
   // Guard browser back/forward within the SPA. Restore the current history
   // entry before opening the dialog; if the user confirms, navigate to the
   // destination captured from the blocked popstate instead.
   useEffect(() => {
-    if (!canvasDirty) return;
+    if (!journeyDirty) return;
 
     const interceptPopState = (event: PopStateEvent) => {
       const targetIndex =
@@ -188,13 +212,13 @@ export function JourneyBuilder({
 
     window.addEventListener("popstate", interceptPopState, true);
     return () => window.removeEventListener("popstate", interceptPopState, true);
-  }, [canvasDirty, navigate, requestNavigation]);
+  }, [journeyDirty, navigate, requestNavigation]);
 
   // BrowserRouter does not block SPA navigation by itself. Intercept ordinary
   // same-origin links while a canvas draft exists and resume navigation only
   // after the user explicitly saves or discards it.
   useEffect(() => {
-    if (!canvasDirty) return;
+    if (!journeyDirty) return;
 
     const interceptInternalLink = (event: MouseEvent) => {
       if (
@@ -239,7 +263,7 @@ export function JourneyBuilder({
 
     document.addEventListener("click", interceptInternalLink, true);
     return () => document.removeEventListener("click", interceptInternalLink, true);
-  }, [canvasDirty, navigate, requestNavigation]);
+  }, [journeyDirty, navigate, requestNavigation]);
 
   async function loadMilestones() {
     const [ms, defs] = await Promise.all([
@@ -247,7 +271,9 @@ export function JourneyBuilder({
       api.listFieldDefinitions(tenantId),
     ]);
 
+    savedMilestonesRef.current = ms;
     setMilestonesState(ms);
+    setMilestonesDirty(false);
     setFieldDefinitions(defs);
   }
 
@@ -308,17 +334,7 @@ export function JourneyBuilder({
     index: number,
     updates: { goalDescription: string; captureFields: string[] },
   ) {
-    // The inspector has its own explicit Save action. If canvas edits are also
-    // pending, persist them first so the milestone endpoint cannot advance the
-    // server version underneath an unsaved local graph draft.
-    if (canvasDirty) {
-      const savedCanvas = await saveCanvasDraft();
-      if (!savedCanvas) {
-        throw new Error("Save the pending canvas changes before saving this goal.");
-      }
-    }
-
-    await persistMilestones(
+    updateMilestoneDraft(
       milestones.map((milestone, milestoneIndex) =>
         milestoneIndex === index ? { ...milestone, ...updates } : milestone,
       ),
@@ -329,7 +345,7 @@ export function JourneyBuilder({
     const next = [
       ...milestones,
       {
-        id: "",
+        id: `draft-${crypto.randomUUID()}`,
         campaignId: campaign.id,
         ordinal: milestones.length,
         goalDescription: "New goal",
@@ -337,15 +353,17 @@ export function JourneyBuilder({
       },
     ];
 
-    const saved = await persistMilestones(next);
-    selectNode({ type: "milestone", milestoneIndex: saved.length - 1 });
+    canvasActionsRef.current?.stageMilestones(milestones, next);
+    updateMilestoneDraft(next);
+    selectNode({ type: "milestone", milestoneIndex: next.length - 1 });
   }
 
   async function handleRemoveMilestone(index: number) {
     const next = milestones.filter((_, milestoneIndex) => milestoneIndex !== index);
     if (next.length === 0) return;
 
-    await persistMilestones(next);
+    canvasActionsRef.current?.stageMilestones(milestones, next);
+    updateMilestoneDraft(next);
     setInspectorOpen(false);
     setSelectedNode({ type: "trigger" });
   }
@@ -358,7 +376,8 @@ export function JourneyBuilder({
     const [moved] = next.splice(index, 1);
     next.splice(target, 0, moved!);
 
-    await persistMilestones(next);
+    canvasActionsRef.current?.stageMilestones(milestones, next);
+    updateMilestoneDraft(next);
     selectNode({ type: "milestone", milestoneIndex: target });
   }
 
@@ -421,14 +440,14 @@ export function JourneyBuilder({
                     className={
                       builderSaveState === "saving"
                         ? "font-medium text-subtle"
-                        : builderSaveState === "unsaved"
+                        : journeyDirty
                           ? "font-semibold text-[#B45309]"
-                          : "font-semibold text-[#059669]"
+                          : "font-semibold text-[#047857]"
                     }
                   >
                     {builderSaveState === "saving"
                       ? "Saving…"
-                      : builderSaveState === "unsaved"
+                      : journeyDirty
                         ? "Unsaved"
                         : "Saved"}
                   </span>
@@ -438,9 +457,9 @@ export function JourneyBuilder({
               {subTab === "builder" && (
                 <button
                   type="button"
-                  disabled={!canvasDirty || builderSaveState === "saving"}
+                  disabled={!journeyDirty || builderSaveState === "saving" || publishing}
                   className={`builder-toolbar-button flex h-9 items-center justify-center rounded-lg px-3 text-[13px] font-semibold transition-colors ${
-                    canvasDirty
+                    journeyDirty
                       ? "bg-accent text-white shadow-sm hover:bg-accent-hover"
                       : "bg-chip text-subtle"
                   } disabled:cursor-not-allowed disabled:opacity-50`}
@@ -629,18 +648,17 @@ export function JourneyBuilder({
               milestones={milestones}
               selectedNode={selectedNode}
               onSelectNode={selectNode}
-              onAddMilestone={() => requestNavigation(handleAddMilestone)}
-              onRemoveMilestone={(index) =>
-                requestNavigation(() => handleRemoveMilestone(index))
-              }
+              onAddMilestone={() => void handleAddMilestone()}
+              onRemoveMilestone={(index) => void handleRemoveMilestone(index)}
               onReorderMilestone={(index, direction) =>
-                requestNavigation(() => handleReorderMilestone(index, direction))
+                void handleReorderMilestone(index, direction)
               }
               reloadSignal={graphReloadSignal}
               onBuilderVersionChange={setBuilderVersion}
               onSaveStateChange={setBuilderSaveState}
               onCanvasDirtyChange={setCanvasDirty}
               onCanvasActionsChange={registerCanvasActions}
+              onMilestonesSaved={acceptSavedMilestones}
             />
           )}
 
@@ -746,7 +764,7 @@ export function JourneyBuilder({
           onClose={keepEditing}
         >
           <p className="m-0 text-sm text-ink">
-            You have unsaved canvas changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
+            You have unsaved journey changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
           </p>
           {unsavedDialogError && (
             <div className="banner banner-error mt-3">{unsavedDialogError}</div>
