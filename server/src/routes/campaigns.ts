@@ -490,15 +490,29 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
     }
 
     const previousMilestones = await listMilestonesWithClient(client, tenantId, campaignId);
-    const savedMilestones = await setCampaignMilestonesWithClient(
-      client,
-      tenantId,
-      campaignId,
-      draftMilestones.map(({ goalDescription, captureFields }) => ({
-        goalDescription,
-        captureFields,
-      })),
-    );
+    const milestonesUnchanged =
+      draftMilestones.length === previousMilestones.length &&
+      draftMilestones.every((milestone, index) => {
+        const previous = previousMilestones[index]!;
+        return (
+          milestone.id === previous.id &&
+          milestone.goalDescription === previous.goalDescription &&
+          JSON.stringify(milestone.captureFields ?? []) === JSON.stringify(previous.captureFields ?? [])
+        );
+      });
+    // Don't churn milestone IDs on a canvas-only save: analytics/history refer
+    // to those semantic IDs even when only node positions or edges changed.
+    const savedMilestones = milestonesUnchanged
+      ? previousMilestones
+      : await setCampaignMilestonesWithClient(
+          client,
+          tenantId,
+          campaignId,
+          draftMilestones.map(({ goalDescription, captureFields }) => ({
+            goalDescription,
+            captureFields,
+          })),
+        );
 
     const savedByDraftId = new Map(
       draftMilestones.map((milestone, index) => [milestone.id, savedMilestones[index]!]),
@@ -516,10 +530,12 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
         typeof node.data.milestoneId === "string" ? node.data.milestoneId : null;
       const draftIndex =
         draftId === null ? undefined : milestoneIndexByDraftId.get(draftId);
-      const resolvedId =
-        draftIndex === undefined && typeof node.data.ordinal === "number"
-          ? draftMilestones[node.data.ordinal]?.id
-          : draftId;
+      const resolvedId: string | undefined =
+        draftIndex !== undefined
+          ? draftId!
+          : typeof node.data.ordinal === "number"
+            ? draftMilestones[node.data.ordinal]?.id
+            : undefined;
       const index =
         resolvedId === undefined ? undefined : milestoneIndexByDraftId.get(resolvedId);
       const saved = resolvedId === undefined ? undefined : savedByDraftId.get(resolvedId);
