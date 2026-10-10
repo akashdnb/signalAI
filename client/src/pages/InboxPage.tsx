@@ -97,12 +97,24 @@ export function InboxPage() {
   reloadLeadsRef.current = reloadLeads;
   useEffect(() => {
     const interval = setInterval(() => {
-      // Don't let polling reorder the selected conversation out of the current
-      // page while a user is actively reading it.
-      if (!selectedLeadId) reloadLeadsRef.current();
+      // Don't let list polling reorder the selected conversation out of the
+      // current page while a user is actively reading it. Refresh the selected
+      // lead detail instead so new inbound DMs update the available reply window.
+      if (!selectedLeadId) {
+        reloadLeadsRef.current();
+        return;
+      }
+      if (!tenantId) return;
+      api.getLead(tenantId, selectedLeadId).then((fresh) => {
+        setPageData((prev) => prev
+          ? { ...prev, items: prev.items.map((lead) => lead.id === fresh.id ? { ...lead, ...fresh } : lead) }
+          : prev);
+      }).catch(() => {
+        // Best-effort polling; avoid replacing a readable conversation with an error.
+      });
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [selectedLeadId]);
+  }, [selectedLeadId, tenantId]);
 
   useEffect(() => {
     if (!tenantId) return;
