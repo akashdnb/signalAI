@@ -15,13 +15,26 @@ Phase 5 is the final UI consistency and resilience pass across the product. It i
 - Disabled controls communicate non-interactive state without changing existing APIs.
 - Loading state exposes `role="status"` and `aria-live="polite"`.
 - Error state exposes `role="alert"`.
-- Touch targets receive a mobile-safe minimum height.
+- Shared `Field` now connects hint/error text through `aria-describedby` and exposes `aria-invalid` when validation fails.
+- Mobile touch targets apply to controls without forcing inline links to grow.
 
 ### Responsive behavior
 - Narrow-screen form controls avoid iOS zoom by using a readable input size.
-- Tables can scroll horizontally instead of collapsing critical columns.
+- Table minimum widths are scoped to explicit horizontal-scroll containers; normal page tables no longer receive a global minimum width.
+- Analytics funnel data uses its own overflow wrapper so the accessible table cannot create page-level horizontal overflow.
 - Dialogs are constrained to the viewport on mobile and desktop.
 - App-shell content remains usable around fixed navigation/header regions.
+
+### Core-screen selectors
+- Leads and Analytics use explicit `.page-leads` and `.page-analytics` hooks.
+- Core-screen styling no longer depends on the optional error banner being present.
+
+### Automation presets
+- The former template cards are now explicitly described as **starter presets**.
+- Each preset applies its advertised campaign trigger/reply configuration after creation.
+- Lead Qualification also creates its qualification goals/capture fields.
+- Product Link clearly tells users to add their actual product URL before publishing.
+- Human Handoff is described as a qualification starting point rather than falsely claiming that a handoff rule is configured automatically.
 
 ### Motion and interaction polish
 - Reduced-motion users receive minimal animation/transition behavior.
@@ -37,15 +50,19 @@ Phase 5 is the final UI consistency and resilience pass across the product. It i
 4. Preserve existing API/data behavior and route structure.
 5. Keep builder editing dialog-based and explicit-save based.
 6. Respect `prefers-reduced-motion`.
-7. Test keyboard focus, mobile viewport behavior, empty/loading/error states, and long-table overflow before release.
+7. Keep responsive overflow scoped to the component that owns the scroll behavior.
+8. Test keyboard focus, mobile viewport behavior, empty/loading/error states, and long-table overflow before release.
 
 ## Validation checklist
 
 - Keyboard-tab through shell, forms, tables, dialogs and builder controls.
+- Verify Field hint/error text is announced and the invalid control exposes `aria-invalid`.
 - Verify focus remains visible on light/dark themes.
 - Verify loading, empty and error states do not cause layout jumps larger than the surrounding surface.
-- Verify tables remain horizontally usable on mobile.
+- Verify Leads and Analytics retain the same styling when the error banner is absent or present.
+- Verify tables remain horizontally usable on mobile without causing page-level overflow.
 - Verify dialogs remain within the viewport.
+- Verify each Automation starter preset creates the expected campaign trigger/reply configuration and qualification goals where applicable.
 - Verify React Flow dragging/connecting is unchanged.
 - Verify reduced-motion mode removes meaningful animation.
 - Verify no route/API behavior changed.
