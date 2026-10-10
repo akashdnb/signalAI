@@ -49,7 +49,9 @@ export function resolveDmCampaignTrigger(
   const eligible = campaigns.filter((campaign) => campaign.triggerSource === "message" || campaign.triggerSource === "both");
   const match = findMatchingCampaign(sourceText, mediaId, eligible);
   if (match) {
-    return { ...match, restartCampaign: !!activeDmCampaignId && !previousWindowOpen };
+    // A closed (or never-opened) customer DM window starts a new run even
+    // when this is the first message that can be associated with the campaign.
+    return { ...match, restartCampaign: !previousWindowOpen };
   }
 
   if (!activeDmCampaignId) return null;
