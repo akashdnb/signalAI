@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api, type Campaign } from "../api";
+import { ApiError, api, type AccountHealth, type Campaign } from "../api";
 import { ActivationGuide } from "../components/automation/ActivationGuide";
 import { AutomationHeader } from "../components/automation/AutomationHeader";
 import { AutomationTabs, type AutomationTab } from "../components/automation/AutomationTabs";
@@ -22,9 +22,11 @@ export function AutomationPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
+  const [accountHealth, setAccountHealth] = useState<AccountHealth | null>(null);
   const [activeTab, setActiveTab] = useState<AutomationTab>("journeys");
   const [error, setError] = useState<string | null>(null);
   const [showNewJourney, setShowNewJourney] = useState(false);
+  const [creatingPreset, setCreatingPreset] = useState(false);
   const { toasts, push } = useToasts();
 
   async function loadJourneys() {
@@ -39,7 +41,17 @@ export function AutomationPage() {
   }
 
   useEffect(() => {
-    void loadJourneys();
+    if (!tenantId) return;
+
+    void Promise.allSettled([
+      loadJourneys(),
+      api.getAccountHealth(tenantId).then(setAccountHealth),
+    ]).then((results) => {
+      const accountResult = results[1];
+      if (accountResult.status === "rejected") {
+        setAccountHealth(null);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
@@ -52,23 +64,52 @@ export function AutomationPage() {
   }
 
   async function handleUseTemplate(template: AutomationTemplate) {
-    if (!tenantId) return;
+    if (!tenantId || creatingPreset) return;
+
+    setCreatingPreset(true);
+    setError(null);
+    let created: Campaign | null = null;
+
     try {
-      const created = await api.createCampaign(tenantId, template.name, template.keywords);
+      created = await api.createCampaign(tenantId, template.name, template.keywords);
       const { milestones: presetMilestones, ...replyConfig } = template.preset;
-      await api.updateReplyConfig(tenantId, created.id, { ...replyConfig, keywords: template.keywords });
-      if (presetMilestones) await api.setMilestones(tenantId, created.id, presetMilestones);
+      await api.updateReplyConfig(tenantId, created.id, {
+        ...replyConfig,
+        keywords: template.keywords,
+      });
+      if (presetMilestones) {
+        await api.setMilestones(tenantId, created.id, presetMilestones);
+      }
+
+      await loadJourneys();
       push(`${template.name} preset created — customize it before publishing`);
       navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create journey from preset");
-      push(err instanceof ApiError ? err.message : "Failed to create journey from preset", "error");
+      const message = err instanceof ApiError
+        ? err.message
+        : "Failed to finish creating the journey from this preset";
+
+      // Campaign creation is currently separate from preset configuration on
+      // the API. If a later step fails, keep the created campaign available as
+      // a recoverable draft rather than silently creating a second one on retry.
+      if (created) {
+        await loadJourneys();
+        push("The journey was created but preset setup did not finish. Open the draft to complete it.", "error");
+        navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
+      } else {
+        setError(message);
+        push(message, "error");
+      }
+    } finally {
+      setCreatingPreset(false);
     }
   }
 
   if (!tenantId) return null;
 
-  const firstRun = activeTab === "journeys" && campaigns !== null && campaigns.length === 0;
+  // This is intentionally a first-journey guide, not a claim that onboarding
+  // is incomplete. Instagram connection is verified independently below.
+  const firstJourney = activeTab === "journeys" && campaigns !== null && campaigns.length === 0;
 
   return (
     <div className="page-automation flex flex-col px-4 py-3.5 md:min-h-[calc(100vh-56px)] md:px-6 md:py-4">
@@ -77,7 +118,10 @@ export function AutomationPage() {
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
 
       {activeTab === "templates" ? (
-        <AutomationTemplates onUse={(template) => void handleUseTemplate(template)} />
+        <AutomationTemplates
+          onUse={(template) => void handleUseTemplate(template)}
+          disabled={creatingPreset}
+        />
       ) : activeTab !== "journeys" ? (
         <div id="automation-tabpanel" role="tabpanel" aria-labelledby={`automation-tab-${activeTab}`} tabIndex={0} className="mt-6 flex min-h-[300px] flex-1 items-center justify-center rounded-2xl border border-dashed border-line px-5 md:min-h-[520px]">
           <div className="max-w-md text-center">
@@ -87,7 +131,13 @@ export function AutomationPage() {
         </div>
       ) : (
         <div id="automation-tabpanel" role="tabpanel" aria-labelledby="automation-tab-journeys" tabIndex={0} className="min-w-0 flex-1">
-          {firstRun && <ActivationGuide onTemplates={() => setActiveTab("templates")} />}
+          {firstJourney && (
+            <ActivationGuide
+              tenantId={tenantId}
+              instagramConnected={accountHealth?.connected === true}
+              onTemplates={() => setActiveTab("templates")}
+            />
+          )}
           {campaigns === null ? (
             <div className="mt-5 rounded-2xl border border-line bg-card p-5" aria-label="Loading journeys" role="status">
               <div className="h-5 w-32 animate-pulse rounded bg-chip" />
@@ -96,7 +146,12 @@ export function AutomationPage() {
               <span className="sr-only">Loading journeys…</span>
             </div>
           ) : (
-            <JourneyTable campaigns={campaigns} onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)} onNewJourney={() => setShowNewJourney(true)} onChanged={loadJourneys} />
+            <JourneyTable
+              campaigns={campaigns}
+              onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)}
+              onNewJourney={() => setShowNewJourney(true)}
+              onChanged={loadJourneys}
+            />
           )}
         </div>
       )}
