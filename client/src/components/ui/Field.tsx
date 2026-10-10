@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { cloneElement, isValidElement, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 export function Field({
   label,
@@ -15,17 +15,29 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
-  const messageId = error ? `${htmlFor ?? "field"}-error` : hint ? `${htmlFor ?? "field"}-hint` : undefined;
+  const generatedId = useId().replace(/:/g, "");
+  const controlId = htmlFor ?? (isValidElement<{ id?: string }>(children) ? children.props.id : undefined) ?? `field-${generatedId}`;
+  const hintId = hint ? `${controlId}-hint` : undefined;
+  const errorId = error ? `${controlId}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+
+  const control = isValidElement<Record<string, unknown>>(children)
+    ? cloneElement(children, {
+        id: controlId,
+        "aria-describedby": [children.props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined,
+        "aria-invalid": error ? true : children.props["aria-invalid"],
+      })
+    : children;
+
   return (
     <div className={["min-w-0", className].filter(Boolean).join(" ")}>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
-      {children}
+      <label htmlFor={controlId} className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
+      {control}
       {error ? (
-        <p id={`${htmlFor ?? "field"}-error`} role="alert" className="m-0 mt-1.5 text-xs leading-5 text-err-ink">{error}</p>
+        <p id={errorId} role="alert" className="m-0 mt-1.5 text-xs leading-5 text-err-ink">{error}</p>
       ) : hint ? (
-        <p id={`${htmlFor ?? "field"}-hint`} className="m-0 mt-1.5 text-xs leading-5 text-subtle">{hint}</p>
+        <p id={hintId} className="m-0 mt-1.5 text-xs leading-5 text-subtle">{hint}</p>
       ) : null}
-      {messageId && <span className="sr-only" aria-live="polite" />}
     </div>
   );
 }
