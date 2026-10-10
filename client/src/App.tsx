@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
+import "./styles/core-screens-phase4.css";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { AutomationPage } from "./pages/AutomationPage";
 import { JourneyBuilderPage } from "./pages/JourneyBuilderPage";
