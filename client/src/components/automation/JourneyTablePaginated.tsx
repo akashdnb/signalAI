@@ -32,10 +32,21 @@ function relativeUpdatedAt(value: string): { label: string; title: string } {
 }
 
 function JourneyStatusBadge({ campaign }: { campaign: Campaign }) {
+  const label = !campaign.published
+    ? "Draft"
+    : campaign.enabled
+      ? "Published · Active"
+      : "Published · Paused";
+  const styling = !campaign.published
+    ? "bg-[#E2E8F0] text-[#475569]"
+    : campaign.enabled
+      ? "bg-[#D1FAE5] text-[#047857]"
+      : "bg-[#FEF3C7] text-[#92400E]";
+
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${campaign.enabled ? "bg-[#D1FAE5] text-[#047857]" : "bg-[#E2E8F0] text-[#475569]"}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${styling}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {campaign.enabled ? "Active" : "Draft · Disabled"}
+      {label}
     </span>
   );
 }
