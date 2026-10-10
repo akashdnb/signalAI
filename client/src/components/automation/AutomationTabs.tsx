@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 export type AutomationTab =
   | "journeys"
   | "templates"
@@ -22,19 +24,41 @@ export function AutomationTabs({
   active: AutomationTab;
   onChange: (tab: AutomationTab) => void;
 }) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = TABS.length - 1;
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      tabRefs.current[nextIndex]?.focus();
+    }
+  }
+
   return (
-    <nav
+    <div
+      role="tablist"
       aria-label="Automation sections"
-      className="mt-3 flex gap-7 overflow-x-auto border-b border-line"
+      className="mt-3 flex gap-5 overflow-x-auto border-b border-line md:gap-7"
     >
-      {TABS.map((tab) => {
+      {TABS.map((tab, index) => {
         const selected = active === tab.key;
 
         return (
           <button
             key={tab.key}
+            ref={(element) => { tabRefs.current[index] = element; }}
+            id={`automation-tab-${tab.key}`}
             type="button"
-            aria-current={selected ? "page" : undefined}
+            role="tab"
+            aria-selected={selected}
+            aria-controls="automation-tabpanel"
+            tabIndex={selected ? 0 : -1}
+            onKeyDown={(event) => handleKeyDown(event, index)}
             onClick={() => onChange(tab.key)}
             className={`relative shrink-0 px-0 pb-2.5 pt-1 text-[15px] leading-5 transition-colors ${
               selected ? "font-semibold text-ink" : "text-subtle hover:text-ink"
@@ -50,6 +74,6 @@ export function AutomationTabs({
           </button>
         );
       })}
-    </nav>
+    </div>
   );
 }
