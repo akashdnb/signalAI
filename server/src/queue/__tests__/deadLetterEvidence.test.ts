@@ -3,8 +3,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { getPool, closePool } from "../../db/pool.js";
 import { createTenant } from "../../db/tenants.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
-import { resetDb } from "../../__tests__/helpers/db.js";
-import { ensureQueues, enqueueLeadEvent, LEAD_EVENTS_QUEUE } from "../leadEventsQueue.js";
+import { clearPgBossJobs, resetDb } from "../../__tests__/helpers/db.js";
+import {
+  ensureQueues,
+  enqueueLeadEvent,
+  LEAD_EVENTS_DLQ,
+  LEAD_EVENTS_QUEUE,
+} from "../leadEventsQueue.js";
 import { startDeadLetterWatcher, startLeadEventsWorker, sweepWedgedLeadEventJobs } from "../worker.js";
 
 function sleep(ms: number) {
@@ -28,6 +33,7 @@ describe("R3-08: dead-letter evidence persistence and the boot sweep", () => {
     boss = new PgBoss(process.env.DATABASE_URL!);
     await boss.start();
     await ensureQueues(boss);
+    await clearPgBossJobs(getPool(), [LEAD_EVENTS_QUEUE, LEAD_EVENTS_DLQ]);
   });
 
   afterEach(async () => {
