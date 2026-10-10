@@ -10,6 +10,8 @@ import {
   type TenantMember,
   type TimelineEntry,
 } from "../api";
+import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
+import { Pagination } from "../components/Pagination";
 import { ThreadPanel } from "../components/ThreadPanel";
 import { PIPELINE_STAGES, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
@@ -23,18 +25,19 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "attention", label: "Needs Attention" },
 ];
 
-/** Every 15s while the Inbox is open, refetch the conversation list only (counts/badges/new inbound messages) — the first polling in this codebase; deliberately simple (no push/websocket infra) rather than left permanently stale. */
 const POLL_INTERVAL_MS = 15000;
+const PAGE_SIZE = 20;
 
 export function InboxPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
 
-  const [leads, setLeads] = useState<LeadListItem[] | null>(null);
+  const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
   const [members, setMembers] = useState<TenantMember[] | null>(null);
   const [tags, setTags] = useState<LeadTag[] | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [threadRefreshToken, setThreadRefreshToken] = useState(0);
   const [pendingEntries, setPendingEntries] = useState<TimelineEntry[]>([]);
@@ -44,26 +47,30 @@ export function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
 
+  const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
-  // Keep the Inbox composer aligned with Meta's 24-hour reply window. The server
-  // enforces this too; the UI should explain the restriction before an attempted send.
   const messagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
+
+  const getFilters = () =>
+    tab === "unread"
+      ? { unreadOnly: true }
+      : tab === "ai"
+        ? { handoffStatus: "ai" as HandoffStatus }
+        : tab === "qualified"
+          ? { stage: "qualified" as PipelineStage }
+          : tab === "attention"
+            ? { handoffStatus: "requested" as HandoffStatus }
+            : {};
 
   async function reloadLeads() {
     if (!tenantId) return;
     try {
-      const filters =
-        tab === "unread"
-          ? { unreadOnly: true }
-          : tab === "ai"
-            ? { handoffStatus: "ai" as HandoffStatus }
-            : tab === "qualified"
-              ? { stage: "qualified" as PipelineStage }
-              : tab === "attention"
-                ? { handoffStatus: "requested" as HandoffStatus }
-                : {};
-      const l = await api.getLeads(tenantId, { ...filters, q: search.trim() || undefined });
-      setLeads(l);
+      const result = await getLeadsPage(tenantId, page, PAGE_SIZE, {
+        ...getFilters(),
+        q: search.trim() || undefined,
+      });
+      setPageData(result);
+      if (result.page !== page) setPage(result.page);
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -75,16 +82,24 @@ export function InboxPage() {
   }
 
   useEffect(() => {
+    setPage(1);
+  }, [tab, search]);
+
+  useEffect(() => {
     reloadLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, tab, search, reloadCount]);
+  }, [tenantId, tab, search, page, reloadCount]);
 
   const reloadLeadsRef = useRef(reloadLeads);
   reloadLeadsRef.current = reloadLeads;
   useEffect(() => {
-    const interval = setInterval(() => reloadLeadsRef.current(), POLL_INTERVAL_MS);
+    const interval = setInterval(() => {
+      // Don't let polling reorder the selected conversation out of the current
+      // page while a user is actively reading it.
+      if (!selectedLeadId) reloadLeadsRef.current();
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedLeadId]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -112,7 +127,7 @@ export function InboxPage() {
     setPendingEntries([]);
     setError(null);
     if (lead.unread) {
-      setLeads((prev) => prev?.map((l) => (l.id === lead.id ? { ...l, unread: false } : l)) ?? prev);
+      setPageData((prev) => prev ? { ...prev, items: prev.items.map((l) => (l.id === lead.id ? { ...l, unread: false } : l)) } : prev);
       api.markLeadRead(tenantId, lead.id).catch(() => {
         // Best-effort.
       });
@@ -120,7 +135,7 @@ export function InboxPage() {
   }
 
   function patchSelectedLead(updates: Partial<LeadListItem>) {
-    setLeads((prev) => prev?.map((l) => (l.id === selectedLeadId ? { ...l, ...updates } : l)) ?? prev);
+    setPageData((prev) => prev ? { ...prev, items: prev.items.map((l) => (l.id === selectedLeadId ? { ...l, ...updates } : l)) } : prev);
   }
 
   async function handleStageChange(stage: PipelineStage) {
@@ -197,7 +212,7 @@ export function InboxPage() {
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
           <span>{error}</span>
-          {leads === null && (
+          {pageData === null && (
             <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
               Retry
             </button>
@@ -230,46 +245,58 @@ export function InboxPage() {
           ) : leads.length === 0 ? (
             <p className="muted p-3">No conversations match this view.</p>
           ) : (
-            <ul className="list" style={{ margin: 0 }}>
-              {leads.map((lead) => (
-                <li key={lead.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectLead(lead)}
-                    className="list-item-button"
-                    style={{ display: "block", width: "100%", padding: "0.75rem 1rem" }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
-                      <strong className="truncate" title={lead.username ?? "Instagram username unavailable"}>{leadDisplayName(lead.username)}</strong>
-                      <span className="text-subtle ml-auto shrink-0 text-xs">{formatRelativeTime(lead.lastInboundAt)}</span>
-                    </div>
-                    <div className="muted small truncate">
-                      {!lead.username && <span>Username unavailable · </span>}
-                      {lead.lastMessagePreview ?? "No messages yet"}
-                    </div>
-                    <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>
-                      {handoffLabel(lead.handoffStatus).text}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="list" style={{ margin: 0 }}>
+                {leads.map((lead) => (
+                  <li key={lead.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectLead(lead)}
+                      className="list-item-button"
+                      style={{ display: "block", width: "100%", padding: "0.75rem 1rem" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
+                        <strong className="truncate" title={lead.username ?? "Instagram username unavailable"}>{leadDisplayName(lead.username)}</strong>
+                        <span className="text-subtle ml-auto shrink-0 text-xs">{formatRelativeTime(lead.lastInboundAt)}</span>
+                      </div>
+                      <div className="muted small truncate">
+                        {!lead.username && <span>Username unavailable · </span>}
+                        {lead.lastMessagePreview ?? "No messages yet"}
+                      </div>
+                      <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>
+                        {handoffLabel(lead.handoffStatus).text}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {pageData && (
+                <Pagination
+                  page={pageData.page}
+                  totalPages={pageData.totalPages}
+                  total={pageData.total}
+                  pageSize={pageData.pageSize}
+                  onPageChange={setPage}
+                  label="conversations"
+                />
+              )}
+            </>
           )}
         </div>
 
         {/* Thread + compose */}
-        <div className={`flex-1 md:flex md:flex-col md:overflow-y-auto md:border-r md:border-line ${selectedLeadId ? "block" : "hidden md:flex"}`}>
+        <div className={`flex-1 md:flex md:flex-col md:overflow-hidden md:border-r md:border-line ${selectedLeadId ? "block" : "hidden md:flex"}`}>
           {!selectedLead ? (
             <p className="muted p-4">Select a conversation to view it here.</p>
           ) : (
-            <div className="flex h-full flex-col">
+            <div className="flex h-full min-h-0 flex-col">
               <div className="flex items-center gap-2 border-b border-line p-3 md:hidden">
                 <button type="button" className="link-button" onClick={() => setSelectedLeadId(null)}>
                   ← Conversations
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3">
+              <div className="min-h-0 flex-1 overflow-hidden p-3">
                 <ThreadPanel
                   tenantId={tenantId}
                   leadId={selectedLead.id}
