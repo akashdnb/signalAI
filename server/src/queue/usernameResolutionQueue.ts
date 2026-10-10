@@ -2,7 +2,7 @@ import type { PgBoss } from "pg-boss";
 import type { Pool, PoolClient } from "pg";
 import { asPgBossDb } from "./leadEventsQueue.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
-import { hasKnownUsername, backfillLeadPiiUsername } from "../db/pii.js";
+import { hasKnownUsername, backfillLeadPiiUsername, listLeadsMissingInstagramUsername } from "../db/pii.js";
 import { fetchInstagramUsername } from "../lib/instagramProfile.js";
 import { Sentry } from "../lib/sentry.js";
 import { FAST_POLL, ensureNotifyQueue } from "./boss.js";
@@ -17,13 +17,15 @@ export interface ResolveUsernameJob {
 }
 
 export async function ensureUsernameResolutionQueue(boss: PgBoss): Promise<void> {
-  await ensureNotifyQueue(boss, USERNAME_RESOLUTION_QUEUE);
+  await ensureNotifyQueue(boss, USERNAME_RESOLUTION_QUEUE, {
+    retryLimit: 5,
+    retryBackoff: true,
+  });
 }
 
 /**
- * `client`, when passed, rides the caller's own ingest transaction (same
- * pattern as `enqueueNewLeadAlert`) — the resolution job commits or rolls
- * back atomically with the event it's resolving a username for.
+ * `client`, when passed, rides the caller's own ingest transaction — the
+ * username job is committed atomically with the event it enriches.
  */
 export async function enqueueUsernameResolution(
   boss: PgBoss,
@@ -31,32 +33,58 @@ export async function enqueueUsernameResolution(
   options?: { client?: PoolClient },
 ): Promise<void> {
   await boss.send(USERNAME_RESOLUTION_QUEUE, job, {
+    singletonKey: `${job.tenantId}:${job.instagramUserId}`,
     ...(options?.client ? { db: asPgBossDb(options.client) } : {}),
   });
 }
 
 /**
- * Best-effort enrichment, not the main lead pipeline: a failure here means
- * a lead keeps showing "(unknown)" in the dashboard, not a dropped event,
- * so each of the "nothing to do" outcomes below is a plain skip rather
- * than a retry-worthy failure. Only a genuine fetch/API error propagates,
- * which is what lets a transient Graph API hiccup actually retry instead
- * of silently giving up on that lead's username forever.
+ * Re-enqueues existing leads that were created before username resolution was
+ * reliable, or whose earlier lookup exhausted its retries. This is deliberately
+ * bounded and idempotent so it can run at boot and from hourly maintenance.
  */
-export function startUsernameResolutionWorker(boss: PgBoss, pool: Pool, keyring: Map<string, Buffer>): Promise<string> {
+export async function enqueueUnknownUsernameResolutionJobs(
+  pool: Pool,
+  boss: PgBoss,
+  limit = 100,
+): Promise<number> {
+  const candidates = await listLeadsMissingInstagramUsername(pool, limit);
+
+  for (const candidate of candidates) {
+    await enqueueUsernameResolution(boss, candidate);
+  }
+
+  return candidates.length;
+}
+
+/**
+ * Best-effort enrichment. Missing account/token is treated as a skip because
+ * the lead pipeline must not fail when a creator disconnects. Genuine Graph
+ * API/network failures are thrown so pg-boss retries them with backoff.
+ */
+export function startUsernameResolutionWorker(
+  boss: PgBoss,
+  pool: Pool,
+  keyring: Map<string, Buffer>,
+): Promise<string> {
   return boss.work<ResolveUsernameJob>(USERNAME_RESOLUTION_QUEUE, FAST_POLL, async (jobs) => {
     for (const job of jobs) {
       const { tenantId, leadId, leadEventId, instagramUserId } = job.data;
 
       // A comment (or an earlier resolution) may have supplied a username
-      // for this lead already, between enqueue and now — skip the Graph
-      // API call entirely rather than overwrite/duplicate work.
+      // for this lead already, between enqueue and now — skip the Graph API
+      // call entirely rather than overwrite/duplicate work.
       if (await hasKnownUsername(pool, tenantId, leadId)) continue;
 
       const account = await getSoleConnectedAccount(pool, tenantId);
-      if (!account) continue; // disconnected since the event was ingested
+      if (!account) continue;
 
-      const token = await getDecryptedToken(pool, keyring, tenantId, account.instagramAccountId);
+      const token = await getDecryptedToken(
+        pool,
+        keyring,
+        tenantId,
+        account.instagramAccountId,
+      );
       if (!token) continue;
 
       try {
@@ -68,7 +96,7 @@ export function startUsernameResolutionWorker(boss: PgBoss, pool: Pool, keyring:
         // eslint-disable-next-line no-console
         console.error("Username resolution failed:", err);
         Sentry.captureException(err);
-        throw err; // let pg-boss's retry policy handle a transient failure
+        throw err; // pg-boss applies retryLimit/retryBackoff from the queue.
       }
     }
   });

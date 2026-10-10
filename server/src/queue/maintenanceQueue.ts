@@ -4,6 +4,7 @@ import { pruneExpiredNonces } from "../db/oauthNonces.js";
 import { pruneOldAiCallUsage } from "../db/aiCallUsage.js";
 import { pruneExpiredOtpCodes } from "../db/emailOtpCodes.js";
 import { BACKGROUND_POLL, ensureNotifyQueue } from "./boss.js";
+import { enqueueUnknownUsernameResolutionJobs } from "./usernameResolutionQueue.js";
 
 export const MAINTENANCE_QUEUE = "maintenance";
 // Off the :00 mark on purpose — every deploy that defaults to an hourly
@@ -12,18 +13,14 @@ export const MAINTENANCE_QUEUE = "maintenance";
 const MAINTENANCE_CRON = "17 * * * *";
 
 /**
- * R8-01 fix: `pruneExpiredNonces`/`pruneOldAiCallUsage` previously ran only
- * once, at boot — fine for a process that restarts often, wrong for one
- * designed to stay up for weeks between deploys (a Render instance).
- * `ai_call_usage` in particular is read on every single AI-generated
- * reply, so it's the table that grows fastest between deploys. pg-boss
- * already has a scheduler; registering a recurring job here costs little
- * and makes the guarantee independent of deploy cadence. Boot-time pruning
- * (index.ts) stays too — belt and suspenders for a long gap between the
- * first schedule tick and the next deploy.
+ * R8-01 fix: pruning used to run only once, at boot — fine for a process that
+ * restarts often, wrong for one designed to stay up for weeks between deploys.
+ * pg-boss already has a scheduler; registering a recurring job here makes the
+ * guarantee independent of deploy cadence.
  *
- * account_sends is deliberately NOT pruned here — see accountSends.ts's
- * `pruneOldSends` docstring for why it's now a durable analytics source.
+ * Username repair is also scheduled here so a lead that remains unresolved
+ * after the initial queue attempts is retried without requiring a deploy or
+ * manual database intervention.
  */
 export async function ensureMaintenanceQueue(boss: PgBoss): Promise<void> {
   await ensureNotifyQueue(boss, MAINTENANCE_QUEUE);
@@ -35,5 +32,11 @@ export function startMaintenanceWorker(boss: PgBoss, pool: Pool): Promise<string
     await pruneExpiredNonces(pool);
     await pruneOldAiCallUsage(pool);
     await pruneExpiredOtpCodes(pool);
+
+    const repaired = await enqueueUnknownUsernameResolutionJobs(pool, boss, 100);
+    if (repaired > 0) {
+      // eslint-disable-next-line no-console
+      console.info(`Queued ${repaired} Instagram username backfill job(s)`);
+    }
   });
 }

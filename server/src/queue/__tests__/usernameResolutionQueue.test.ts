@@ -10,6 +10,7 @@ import { upsertToken } from "../../db/tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import {
   ensureUsernameResolutionQueue,
+  enqueueUnknownUsernameResolutionJobs,
   enqueueUsernameResolution,
   startUsernameResolutionWorker,
   USERNAME_RESOLUTION_QUEUE,
@@ -61,12 +62,6 @@ describe("usernameResolutionQueue worker", () => {
     boss = new PgBoss(process.env.DATABASE_URL!);
     await boss.start();
     await ensureUsernameResolutionQueue(boss);
-    // resetDb doesn't touch the pgboss schema, and other test files (e.g.
-    // webhookIngestService.usernameResolution.test.ts) enqueue jobs on this
-    // same queue without ever running a worker to consume them — without
-    // this, a growing backlog of stale jobs (referencing tenants/leads
-    // resetDb just truncated) sits ahead of this file's own job in the
-    // queue and can push a real job past this suite's poll timeouts.
     await getPool().query("delete from pgboss.job where name = $1", [USERNAME_RESOLUTION_QUEUE]);
   });
 
@@ -105,14 +100,36 @@ describe("usernameResolutionQueue worker", () => {
     expect(fetchInstagramUsername).toHaveBeenCalledWith("token-1", "ig-user-1");
   }, 15000);
 
+  it("backfills an existing unknown lead without a new webhook event", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const { lead, event } = await seedMessageEvent(pool, tenant.id);
+
+    await startUsernameResolutionWorker(boss, pool, keyring);
+    const queued = await enqueueUnknownUsernameResolutionJobs(pool, boss, 100);
+
+    expect(queued).toBe(1);
+
+    const deadline = Date.now() + 10000;
+    let username: string | null = null;
+    while (Date.now() < deadline) {
+      username = await usernameFor(pool, event.id);
+      if (username) break;
+      await sleep(250);
+    }
+
+    expect(username).toBe("resolved_handle");
+    expect(fetchInstagramUsername).toHaveBeenCalledWith("token-1", "ig-user-1");
+    expect(lead.id).toBeTruthy();
+  }, 15000);
+
   it("skips the Graph API call entirely when the lead already has a username", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
     const { lead, event } = await seedMessageEvent(pool, tenant.id);
 
-    // A comment on the same lead already supplied a username by the time
-    // the resolution job runs.
     const commentEvent = await insertEventIdempotent(pool, {
       tenantId: tenant.id,
       leadId: lead.id,
@@ -131,15 +148,15 @@ describe("usernameResolutionQueue worker", () => {
       instagramUserId: "ig-user-1",
     });
 
-    await sleep(2000); // give the worker a chance to (not) run
+    await sleep(2000);
 
     expect(fetchInstagramUsername).not.toHaveBeenCalled();
-    expect(await usernameFor(pool, event.id)).toBeNull(); // the DM event's own row is untouched
+    expect(await usernameFor(pool, event.id)).toBeNull();
   }, 15000);
 
   it("does not throw when no Instagram account is connected — just leaves the username unresolved", async () => {
     const pool = getPool();
-    const tenant = await createTenant(pool, "creator-a"); // no upsertToken — nothing connected
+    const tenant = await createTenant(pool, "creator-a");
     const { lead, event } = await seedMessageEvent(pool, tenant.id);
 
     await startUsernameResolutionWorker(boss, pool, keyring);

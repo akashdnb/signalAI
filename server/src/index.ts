@@ -20,7 +20,11 @@ import { pruneExpiredOtpCodes } from "./db/emailOtpCodes.js";
 import { ensureMaintenanceQueue, startMaintenanceWorker } from "./queue/maintenanceQueue.js";
 import { ensureUsageRollupQueue, startUsageRollupWorker } from "./queue/usageRollupQueue.js";
 import { ensureAlertsQueue, startAlertsWorker } from "./queue/alertsQueue.js";
-import { ensureUsernameResolutionQueue, startUsernameResolutionWorker } from "./queue/usernameResolutionQueue.js";
+import {
+  enqueueUnknownUsernameResolutionJobs,
+  ensureUsernameResolutionQueue,
+  startUsernameResolutionWorker,
+} from "./queue/usernameResolutionQueue.js";
 import { ensureInstagramInboundQueue } from "./queue/instagramInboundQueue.js";
 import { startInstagramInboundWorker } from "./queue/instagramInboundWorker.js";
 import { ensureTenantScoringRefreshQueue, startTenantScoringRefreshWorker } from "./queue/tenantScoringRefreshQueue.js";
@@ -78,6 +82,16 @@ async function main() {
   await startAlertsWorker(boss, pool);
   await ensureUsernameResolutionQueue(boss);
   await startUsernameResolutionWorker(boss, pool, config.tokenKeyring);
+
+  // Repair existing DM/comment leads that predate reliable username
+  // enrichment. This is bounded; the hourly maintenance worker continues
+  // the backfill after this first pass.
+  const usernameBackfillQueued = await enqueueUnknownUsernameResolutionJobs(pool, boss, 100);
+  if (usernameBackfillQueued > 0) {
+    // eslint-disable-next-line no-console
+    console.info(`Queued ${usernameBackfillQueued} Instagram username backfill job(s) on boot`);
+  }
+
   await ensureTenantScoringRefreshQueue(boss);
   await startTenantScoringRefreshWorker(boss, pool);
 

@@ -77,6 +77,72 @@ export async function backfillLeadPiiUsername(
 }
 
 /**
+ * Returns a bounded batch of existing Instagram leads that have an IGSID but
+ * no known username. The latest PII-bearing event is returned as the target
+ * row so the normal username resolver can update the existing record rather
+ * than creating another PII row. Leads that already have a username are
+ * excluded, so this is safe to run repeatedly from maintenance.
+ */
+export async function listLeadsMissingInstagramUsername(
+  pool: Queryable,
+  limit = 100,
+): Promise<Array<{
+  tenantId: string;
+  leadId: string;
+  leadEventId: string;
+  instagramUserId: string;
+}>> {
+  const result = await pool.query<{
+    tenant_id: string;
+    lead_id: string;
+    lead_event_id: string;
+    instagram_user_id: string;
+  }>(
+    `
+      select
+        l.tenant_id,
+        l.id as lead_id,
+        e.id as lead_event_id,
+        l.instagram_user_id
+      from leads l
+      join lateral (
+        select e.id
+        from lead_events e
+        join lead_pii p
+          on p.lead_event_id = e.id
+         and p.tenant_id = l.tenant_id
+         and p.lead_id = l.id
+         and p.deleted_at is null
+         and p.username is null
+        where e.tenant_id = l.tenant_id
+          and e.lead_id = l.id
+        order by e.occurred_at desc
+        limit 1
+      ) e on true
+      where l.instagram_user_id is not null
+        and not exists (
+          select 1
+          from lead_pii known
+          where known.tenant_id = l.tenant_id
+            and known.lead_id = l.id
+            and known.deleted_at is null
+            and known.username is not null
+        )
+      order by coalesce(l.last_inbound_at, l.created_at) desc
+      limit $1
+    `,
+    [Math.max(1, Math.min(limit, 500))],
+  );
+
+  return result.rows.map((row) => ({
+    tenantId: row.tenant_id,
+    leadId: row.lead_id,
+    leadEventId: row.lead_event_id,
+    instagramUserId: row.instagram_user_id,
+  }));
+}
+
+/**
  * The real implementation behind the Data Deletion Callback (see
  * src/lib/deletionService.ts, which still stubs this until it's wired in).
  * Soft-deletes: lead_id, timestamps, and foreign keys on leads/lead_events

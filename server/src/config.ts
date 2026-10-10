@@ -49,6 +49,15 @@ export const config = {
       "https://graph.facebook.com/v24.0"
     );
   },
+  // Instagram Login profile lookups use graph.instagram.com. Keep this
+  // separate from the general messaging API base URL so the profile call
+  // uses the correct host and version for the connected token.
+  get instagramProfileGraphApiBaseUrl() {
+    return (
+      process.env.INSTAGRAM_PROFILE_GRAPH_API_BASE_URL ??
+      "https://graph.instagram.com/v25.0"
+    );
+  },
   // B11: Single Flat Plan via Stripe Checkout. Unset in dev/test — the
   // billing route degrades to a clear 503 rather than crashing (same
   // graceful-degradation pattern as the LLM provider).
@@ -81,8 +90,8 @@ export const config = {
   get stripeMeterEventName() {
     return process.env.STRIPE_METER_EVENT_NAME ?? "";
   },
-  // Phase 2B Free Trial Period. Deliberately a plain number of days, not
-  // a token-budget-shaped setting — see trialTokenAllowance below for that
+  // Phase 2B Free Trial Period. Deliberately a plain number of days, not a
+  // token-budget-shaped setting — see trialTokenAllowance below for that
   // half.
   get trialDays() {
     return Number(process.env.TRIAL_DAYS ?? 14);
@@ -98,9 +107,9 @@ export const config = {
   },
   // Phase 2C Knowledge Base: a dedicated embeddings endpoint, independent
   // of whatever LLM_BASE_URL is configured for chat — not every chat host
-  // (Groq, DeepSeek) also serves embeddings, so this is never assumed to
-  // be the same provider. Genuinely optional: unset means KB upload
-  // degrades to a clear 503, same shape as Stripe/Resend below.
+  // (Groq, DeepSeek) also serves embeddings, so this is never assumed to be
+  // the same provider. Genuinely optional: unset means KB upload degrades
+  // to a clear 503, same shape as Stripe/Resend below.
   get embeddingBaseUrl() {
     return process.env.EMBEDDING_BASE_URL ?? "";
   },
