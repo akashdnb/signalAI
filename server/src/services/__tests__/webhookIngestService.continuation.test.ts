@@ -262,7 +262,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
         dmText: "product",
       },
     ]);
-    await pool.query("update campaigns set trigger_source = 'comment' where id = $1", [campaign.id]);
+    await pool.query("update campaigns set trigger_source = 'comment', reply_channel = 'comment' where id = $1", [campaign.id]);
 
     await ingestWebhookEvents(pool, boss, [
       {
