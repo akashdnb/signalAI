@@ -429,7 +429,12 @@ campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
  */
 campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (req, res) => {
   const { tenantId, campaignId } = req.params;
-  const { expectedVersion, nodes, edges, milestones: draftMilestones } = req.body ?? {};
+  const {
+    expectedVersion,
+    nodes,
+    edges,
+    milestones: rawDraftMilestones,
+  } = req.body ?? {};
 
   if (typeof expectedVersion !== "number" || !Number.isInteger(expectedVersion)) {
     return res.status(400).json({ error: "expectedVersion must be an integer" });
@@ -444,11 +449,18 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
       .status(400)
       .json({ error: "edges must be an array of { id, sourceNodeId, targetNodeId, label, condition }" });
   }
-  if (draftMilestones !== undefined && !isValidMilestoneDrafts(draftMilestones)) {
+  if (
+    rawDraftMilestones !== undefined &&
+    !isValidMilestoneDrafts(rawDraftMilestones)
+  ) {
     return res.status(400).json({
       error: "milestones must be an array of { id, goalDescription, captureFields?: string[] } with unique ids",
     });
   }
+  // Express body fields are untyped at the router boundary. Narrow the value
+  // explicitly after validating its runtime shape so strict TypeScript keeps
+  // the ordered draft and its callback parameters properly typed below.
+  const draftMilestones = rawDraftMilestones as MilestoneDraftInput[] | undefined;
 
   // Backward-compatible graph-only writes remain available for clients that
   // haven't adopted the combined Save contract yet.
