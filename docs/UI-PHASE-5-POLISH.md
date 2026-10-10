@@ -53,7 +53,7 @@ Phase 5 is the final UI consistency and resilience pass across the product. It i
 7. Keep responsive overflow scoped to the component that owns the scroll behavior.
 8. Test keyboard focus, mobile viewport behavior, empty/loading/error states, and long-table overflow before release.
 
-## Validation checklist
+## Review-fix validation checklist
 
 - Keyboard-tab through shell, forms, tables, dialogs and builder controls.
 - Verify Field hint/error text is announced and the invalid control exposes `aria-invalid`.
@@ -63,6 +63,11 @@ Phase 5 is the final UI consistency and resilience pass across the product. It i
 - Verify tables remain horizontally usable on mobile without causing page-level overflow.
 - Verify dialogs remain within the viewport.
 - Verify each Automation starter preset creates the expected campaign trigger/reply configuration and qualification goals where applicable.
+- Verify Product Link still requires an actual product URL to be added before publishing.
 - Verify React Flow dragging/connecting is unchanged.
 - Verify reduced-motion mode removes meaningful animation.
 - Verify no route/API behavior changed.
+
+## Current test-environment limitation
+
+The client package currently exposes build/lint/dev/preview scripts but no component-test runner. The review fixes therefore use existing typed API contracts and browser-smoke validation rather than adding a new test framework solely for these primitives. A focused component-test runner should be added when the client test stack is introduced.
