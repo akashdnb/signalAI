@@ -53,7 +53,7 @@ export function LeadsPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page page-wide">
+    <div className="page page-wide page-leads">
       <h1>Leads</h1>
 
       {error && (
@@ -71,17 +71,13 @@ export function LeadsPage() {
           <select id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
             <option value="">All stages</option>
             {PIPELINE_STAGES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
+              <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
           <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
           <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
             {HANDOFF_FILTERS.map((h) => (
-              <option key={h.value} value={h.value}>
-                {h.label}
-              </option>
+              <option key={h.value} value={h.value}>{h.label}</option>
             ))}
           </select>
           <label className="sr-only" htmlFor="leads-search">Search leads by username</label>
@@ -101,50 +97,30 @@ export function LeadsPage() {
           <p className="muted">No leads match this view yet.</p>
         ) : (
           <div className="-mx-2 overflow-x-auto sm:mx-0">
-          <table className="table min-w-[780px]">
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Stage</th>
-                <th>Handoff</th>
-                <th>Last contact</th>
-                <th>Via</th>
-                <th>Messaging window</th>
-                <th>First seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((lead) => (
-                <tr key={lead.id}>
-                  <td>
-                    <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
-                      {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
-                      <span className="inline-flex flex-col align-top">
-                        <span>{leadDisplayName(lead.username)}</span>
-                        {!lead.username && <span className="muted small">Username unavailable</span>}
-                      </span>
-                    </Link>
-                  </td>
-                  <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
-                  <td>
-                    <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>
-                      {handoffLabel(lead.handoffStatus).text}
-                    </span>
-                  </td>
-                  <td>{formatDate(lead.lastInboundAt)}</td>
-                  <td>{formatLastContactVia(lead.lastEventType)}</td>
-                  <td>
-                    {lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? (
-                      <span className="pill pill-ok">open</span>
-                    ) : (
-                      <span className="pill">closed</span>
-                    )}
-                  </td>
-                  <td>{formatDate(lead.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <table className="table min-w-[780px]">
+              <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
+              <tbody>
+                {leads.map((lead) => (
+                  <tr key={lead.id}>
+                    <td>
+                      <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
+                        {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
+                        <span className="inline-flex flex-col align-top">
+                          <span>{leadDisplayName(lead.username)}</span>
+                          {!lead.username && <span className="muted small">Username unavailable</span>}
+                        </span>
+                      </Link>
+                    </td>
+                    <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
+                    <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
+                    <td>{formatDate(lead.lastInboundAt)}</td>
+                    <td>{formatLastContactVia(lead.lastEventType)}</td>
+                    <td>{lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? <span className="pill pill-ok">open</span> : <span className="pill">closed</span>}</td>
+                    <td>{formatDate(lead.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
