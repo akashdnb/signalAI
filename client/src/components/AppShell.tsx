@@ -542,7 +542,10 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex h-full min-w-0 flex-1 flex-col">
+      <div
+        inert={mobileNavOpen && isMobileViewport}
+        className="flex h-full min-w-0 flex-1 flex-col"
+      >
         <header className="flex items-center gap-3 border-b border-line bg-card px-4 py-3 md:hidden">
           <button
             type="button"
