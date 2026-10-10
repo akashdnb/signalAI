@@ -109,7 +109,7 @@ export function BuilderNode({
       </div>
 
       {menu && (
-        <div className="absolute right-2.5 top-2.5 z-10" onClick={(event) => event.stopPropagation()}>
+        <div className="nodrag nopan absolute right-2.5 top-2.5 z-10" onClick={(event) => event.stopPropagation()}>
           {menu}
         </div>
       )}
