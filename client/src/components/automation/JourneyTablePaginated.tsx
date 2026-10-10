@@ -150,11 +150,32 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     setSelectedIds((current) => { const next = new Set(current); for (const campaign of campaigns) { if (allVisibleSelected) next.delete(campaign.id); else next.add(campaign.id); } return next; });
   }
   async function bulkToggle(enabled: boolean) {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 || bulkSaving) return;
     setBulkSaving(true);
-    try { await Promise.all([...selectedIds].map((campaignId) => api.setCampaignEnabled(tenantId, campaignId, enabled))); setSelectedIds(new Set()); setReloadToken((value) => value + 1); }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed to update journeys"); }
-    finally { setBulkSaving(false); }
+    setError(null);
+    try {
+      const results = await Promise.allSettled(
+        [...selectedIds].map((campaignId) => api.setCampaignEnabled(tenantId, campaignId, enabled)),
+      );
+      const failed = results.filter((result) => result.status === "rejected").length;
+      // Some requests may have succeeded even if others failed. Refresh the
+      // visible data so it reflects server state rather than stale selection.
+      if (results.some((result) => result.status === "fulfilled")) {
+        setSelectedIds(new Set());
+        setReloadToken((value) => value + 1);
+      }
+      if (failed > 0) {
+        setError(
+          failed === results.length
+            ? "Couldn't update the selected journeys. Please try again."
+            : `${results.length - failed} journey(s) updated; ${failed} failed. The list has been refreshed.`,
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update journeys");
+    } finally {
+      setBulkSaving(false);
+    }
   }
 
   const hasFilters = Boolean(search.trim()) || status !== "all" || trigger !== "all";
