@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useState } from "react";
 import {
   api,
   LANGUAGE_LABEL,
@@ -84,19 +84,62 @@ const VALUE_TYPES: { value: FieldDefinitionValueType; label: string }[] = [
 ];
 
 /**
- * Native <details>/<summary> — collapsible on mobile with zero JS, forced
- * open on desktop via the `.accordion-card` CSS in index.css (same markup,
- * different breakpoint behaviour; see that file's comment for why).
+ * Settings sections start expanded on desktop and remain true accordions on
+ * mobile. Using an explicit button/state pair keeps click and keyboard
+ * behaviour consistent instead of trying to reveal closed <details> content
+ * with CSS (which left sections hidden and their headings inert in Chromium).
  */
-function Card({ title, defaultOpen, children }: { title: string; defaultOpen: boolean; children: React.ReactNode }) {
+function Card({
+  title,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  defaultOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const contentId = useId();
+  const [expanded, setExpanded] = useState(
+    () =>
+      defaultOpen ||
+      (typeof window !== "undefined" &&
+        window.matchMedia("(min-width: 768px)").matches),
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const handleBreakpointChange = (event: MediaQueryListEvent) => {
+      // Keep settings discoverable on desktop; restore the mobile defaults
+      // when the viewport switches back to a narrow layout.
+      setExpanded(event.matches || defaultOpen);
+    };
+
+    media.addEventListener("change", handleBreakpointChange);
+    return () => media.removeEventListener("change", handleBreakpointChange);
+  }, [defaultOpen]);
+
   return (
-    <details className="accordion-card card" open={defaultOpen}>
-      <summary className="m-0 flex min-h-11 items-center justify-between text-[15px] font-semibold text-ink md:mb-3">
-        {title}
-        <ChevronDownIcon className="accordion-chevron h-5 w-5 text-subtle md:hidden" />
-      </summary>
-      <div className="mt-3 md:mt-0">{children}</div>
-    </details>
+    <section className="accordion-card card">
+      <button
+        type="button"
+        className="accordion-card-trigger flex min-h-11 w-full items-center justify-between text-left text-[15px] font-semibold text-ink md:mb-3"
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span>{title}</span>
+        <span aria-hidden="true">
+          <ChevronDownIcon className="accordion-chevron h-5 w-5 text-subtle md:hidden" />
+        </span>
+      </button>
+      <div
+        id={contentId}
+        className="accordion-card-content mt-3 md:mt-0"
+        hidden={!expanded}
+      >
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -113,7 +156,7 @@ function OptionCard({
 }) {
   return (
     <label
-      className={`mb-2 flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 ${
+      className={`mb-0 flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 ${
         checked ? "border-accent bg-chip" : "border-line bg-card"
       }`}
     >
@@ -446,7 +489,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
     }
 
     return (
-      <div className="flex flex-col gap-3 pb-4 md:gap-4">
+      <div className="campaign-editor-page flex w-full flex-col gap-3 pb-4 md:gap-4">
         <Card title="Basic Information" defaultOpen>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_200px]">
             <div>
@@ -475,19 +518,21 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
         </Card>
 
         <Card title="Trigger Settings" defaultOpen>
-          <OptionCard
-            checked={draft.triggerSource === "comment"}
-            title="Comments only"
-            subtitle="A keyword in a public comment"
-            onSelect={() => setDraft({ ...draft, triggerSource: "comment" })}
-          />
-          <OptionCard
-            checked={draft.triggerSource === "message"}
-            title="Direct messages only"
-            subtitle="A keyword in a DM"
-            onSelect={() => setDraft({ ...draft, triggerSource: "message" })}
-          />
-          <OptionCard checked={draft.triggerSource === "both"} title="Both" onSelect={() => setDraft({ ...draft, triggerSource: "both" })} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <OptionCard
+              checked={draft.triggerSource === "comment"}
+              title="Comments only"
+              subtitle="A keyword in a public comment"
+              onSelect={() => setDraft({ ...draft, triggerSource: "comment" })}
+            />
+            <OptionCard
+              checked={draft.triggerSource === "message"}
+              title="Direct messages only"
+              subtitle="A keyword in a DM"
+              onSelect={() => setDraft({ ...draft, triggerSource: "message" })}
+            />
+            <OptionCard checked={draft.triggerSource === "both"} title="Both" onSelect={() => setDraft({ ...draft, triggerSource: "both" })} />
+          </div>
 
           <div className="mt-3">
             <KeywordChips keywords={draft.keywords} onChange={(keywords) => setDraft({ ...draft, keywords })} />
@@ -496,8 +541,10 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
 
         <Card title="Reply Settings" defaultOpen>
           <div className="mb-1 text-sm">Reply Mode</div>
-          <OptionCard checked={draft.replyMode === "ai_generated"} title="AI-generated" onSelect={() => setDraft({ ...draft, replyMode: "ai_generated" })} />
-          <OptionCard checked={draft.replyMode === "rule_based"} title="Rule-based (fixed template)" onSelect={() => setDraft({ ...draft, replyMode: "rule_based" })} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <OptionCard checked={draft.replyMode === "ai_generated"} title="AI-generated" onSelect={() => setDraft({ ...draft, replyMode: "ai_generated" })} />
+            <OptionCard checked={draft.replyMode === "rule_based"} title="Rule-based (fixed template)" onSelect={() => setDraft({ ...draft, replyMode: "rule_based" })} />
+          </div>
 
           <label className="mt-2">
             Default reply (used for rule-based, and as the fail-closed fallback for AI)
@@ -543,21 +590,23 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           {replyTemplatesError && <div className="banner banner-error">{replyTemplatesError}</div>}
 
           <div className="mb-1 mt-2 text-sm">Reply Channel</div>
-          <OptionCard
-            checked={draft.replyChannel === "dm"}
-            title="Direct message only"
-            subtitle="Private reply sent to the commenter"
-            onSelect={() => setDraft({ ...draft, replyChannel: "dm" })}
-          />
-          <OptionCard
-            checked={draft.replyChannel === "comment"}
-            title="Public comment only"
-            subtitle="Public response under the comment"
-            onSelect={() => setDraft({ ...draft, replyChannel: "comment" })}
-          />
-          <OptionCard checked={draft.replyChannel === "both"} title="Both" onSelect={() => setDraft({ ...draft, replyChannel: "both" })} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <OptionCard
+              checked={draft.replyChannel === "dm"}
+              title="Direct message only"
+              subtitle="Private reply sent to the commenter"
+              onSelect={() => setDraft({ ...draft, replyChannel: "dm" })}
+            />
+            <OptionCard
+              checked={draft.replyChannel === "comment"}
+              title="Public comment only"
+              subtitle="Public response under the comment"
+              onSelect={() => setDraft({ ...draft, replyChannel: "comment" })}
+            />
+            <OptionCard checked={draft.replyChannel === "both"} title="Both" onSelect={() => setDraft({ ...draft, replyChannel: "both" })} />
+          </div>
 
-          <label>
+          <label className="block">
             CTA Link (optional)
             <input
               type="url"
@@ -566,7 +615,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
               onChange={(e) => setDraft({ ...draft, ctaLink: e.target.value })}
               placeholder="https://example.com/brochure"
             />
-            <span className="muted small">
+            <span className="muted small mt-1 block leading-5">
               An HTTPS link becomes an Instagram button. If a selected post has a thumbnail and the message fits the card limits, Instagram can show an image card instead.
             </span>
           </label>
