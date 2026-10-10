@@ -191,6 +191,8 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
         <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort journeys"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option></select>
       </div>
 
+      {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
+
       {selectedIds.size > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-soft bg-chip px-4 py-2.5"><span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span><div className="flex items-center gap-2"><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(true)}>Activate</button><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(false)}>Pause</button><button type="button" className="text-xs font-semibold text-subtle hover:text-ink" onClick={() => setSelectedIds(new Set())}>Clear</button></div></div>}
 
       <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
