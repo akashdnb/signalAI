@@ -51,11 +51,14 @@ type EditorActions = InspectorHandle;
 function useEditorActions(
   actions: EditorActions,
   onActionsChange?: (actions: EditorActions) => void,
+  enabled = true,
 ) {
   const latest = useRef(actions);
   latest.current = actions;
 
   useEffect(() => {
+    if (!enabled) return;
+
     const bridge: EditorActions = {
       save: () => latest.current.save(),
       discard: () => latest.current.discard(),
@@ -71,7 +74,7 @@ function useEditorActions(
     };
 
     onActionsChange?.(bridge);
-  }, [actions.dirty, actions.saving, actions.canSave, onActionsChange]);
+  }, [actions.dirty, actions.saving, actions.canSave, onActionsChange, enabled]);
 }
 
 function PanelHeader({
@@ -1065,6 +1068,10 @@ export const Inspector = forwardRef<
 
     useImperativeHandle(ref, () => actions, [actions]);
 
+    // Keep hook order stable while clearing stale node-editor actions for
+    // non-editable action panels such as handoff/link summaries.
+    useEditorActions(emptyActions, onActionsChange, selectedNode.type === "action");
+
     if (selectedNode.type === "trigger") {
       return (
         <TriggerEditor
@@ -1110,8 +1117,6 @@ export const Inspector = forwardRef<
         />
       );
     }
-
-    useEditorActions(emptyActions, onActionsChange);
 
     return <ActionPanel campaign={campaign} action={selectedNode.action} />;
   },
