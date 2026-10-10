@@ -283,7 +283,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       { goalDescription: "second step" },
     ]);
     const provider = mockProvider([
-      JSON.stringify({ reply: "First step complete.", milestone_satisfied: true }),
+      JSON.stringify({ reply: "First step complete.", milestone_satisfied: true, captured_values: { email: "customer@example.com" } }),
       JSON.stringify({ reply: "Let's start again.", milestone_satisfied: false }),
     ]);
     const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
@@ -902,7 +902,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
         tenant.id,
         "Qualification",
         ["BUY"],
-        { replyMode: "ai_generated" },
+        { replyMode: "ai_generated", replyChannel: "both" },
       );
 
       await setCampaignMilestones(pool, tenant.id, campaign.id, [
@@ -939,6 +939,8 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
         campaign.id,
         "BUY",
         "I want a 3BHK in Bangalore around ₹1.5 crore",
+        { commentId: "comment-score-1" },
+        null,
       );
 
       await handler({
@@ -1042,7 +1044,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     it("extracts and persists qualification for an ai_generated campaign with no milestones", async () => {
       const pool = getPool();
       const tenant = await createTenant(pool, "creator-a");
-      const campaign = await createCampaign(pool, tenant.id, "No milestones", ["BUY"], { replyMode: "ai_generated" });
+      const campaign = await createCampaign(pool, tenant.id, "No milestones", ["BUY"], { replyMode: "ai_generated", replyChannel: "both" });
       // Deliberately no setCampaignMilestones call — milestones.length === 0.
 
       const provider = mockProvider([
@@ -1053,7 +1055,7 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
       ]);
 
       const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
-      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "BUY", "I want a 3BHK in Bangalore around ₹1.5 crore");
+      const { lead, event } = await seedMatchedEvent(pool, tenant.id, campaign.id, "BUY", "I want a 3BHK in Bangalore around ₹1.5 crore", { commentId: "comment-score-2" }, null);
 
       await handler({ tenantId: tenant.id, leadId: lead.id, leadEventId: event.id, sequence: 1 });
 
