@@ -51,8 +51,12 @@ export function BuilderNode({
     <div
       role="button"
       tabIndex={0}
+      aria-pressed={selected}
       onClick={onClick}
       onKeyDown={(event) => {
+        // BuilderNode contains separate menu buttons. Their keyboard events
+        // must not also activate the parent node inspector.
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onClick();
