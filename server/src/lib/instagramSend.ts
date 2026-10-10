@@ -1,29 +1,55 @@
-/**
- * Sends a DM via Instagram's messaging API. Field names follow Meta's
- * published Send API shape (shared with Messenger), not exercised against
- * a live app yet — VERIFY against a real payload during Phase 0 pilot
- * testing (A6), same caveat as instagramWebhookParser.ts.
- */
+import {
+  buildInstagramMessagePayload,
+  type InstagramRichMessageOptions,
+} from "./instagramMessagePayload.js";
+
+/** Sends DMs via Instagram's Send API. */
 const GRAPH_BASE_URL = "https://graph.instagram.com";
 const SEND_TIMEOUT_MS = 8000;
+const LEGACY_TRAILING_CTA = /\s(https:\/\/[^\s]+)$/i;
 
 export interface SendInstagramMessageResult {
-  /** Meta's own id for this send (Send API response's `message_id` — same value Meta's echo webhook later reports as the message's `mid`) — VERIFY the field name against a real payload, same caveat as instagramWebhookParser.ts. Used to correlate our own echo back to this send, so it isn't mistaken for a human reply (see webhookIngestService.ts). Null if the response didn't include one. */
+  /** Meta's own id for this send (Send API response's `message_id`). */
   metaMessageId: string | null;
+}
+
+interface ResolvedLegacyMessage {
+  text: string;
+  richMessage?: InstagramRichMessageOptions;
+}
+
+/**
+ * Legacy compatibility adapter for the pre-journey reply engine.
+ *
+ * New callers should pass `richMessage.ctaUrl` explicitly. The legacy engine
+ * still composes the configured CTA directly into the final string, so this
+ * adapter preserves that existing contract until that caller is migrated.
+ */
+function resolveLegacyRichMessage(
+  text: string,
+  richMessage?: InstagramRichMessageOptions,
+): ResolvedLegacyMessage {
+  if (richMessage) return { text, richMessage };
+
+  const match = text.match(LEGACY_TRAILING_CTA);
+  if (!match || match.index === undefined) return { text };
+
+  return {
+    text: text.slice(0, match.index).trimEnd(),
+    richMessage: { ctaUrl: match[1] },
+  };
 }
 
 export async function sendInstagramMessage(
   accessToken: string,
   recipientInstagramUserId: string,
   text: string,
+  richMessage?: InstagramRichMessageOptions,
 ): Promise<SendInstagramMessageResult> {
-  // R6-04 fix: the token used to travel as an `access_token` URL query
-  // param — request URLs are the most-logged string in any stack (process
-  // logs, proxies, APM traces, error messages that echo the request line),
-  // so the one secret B2 went to the trouble of envelope-encrypting at
-  // rest was traveling in the one place everything writes down. Meta
-  // accepts it as a Bearer token too.
+  // Keep the token in the Authorization header rather than the URL so it
+  // doesn't appear in request-line logs, proxies, or APM traces.
   const url = `${GRAPH_BASE_URL}/v21.0/me/messages`;
+  const resolved = resolveLegacyRichMessage(text, richMessage);
 
   const res = await fetch(url, {
     method: "POST",
@@ -33,7 +59,10 @@ export async function sendInstagramMessage(
     },
     body: JSON.stringify({
       recipient: { id: recipientInstagramUserId },
-      message: { text },
+      message: buildInstagramMessagePayload(
+        resolved.text,
+        resolved.richMessage,
+      ),
     }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
@@ -48,22 +77,13 @@ export async function sendInstagramMessage(
 }
 
 /**
- * Posts a PUBLIC reply under a comment (Meta's `POST /{ig-comment-id}/replies`)
- * — distinct from `sendInstagramMessage` above, which sends a private DM.
- * This is what campaigns.reply_channel 'comment'/'both' actually deliver on;
- * `guardrails.ts`'s comment-tier length cap already assumes this reply is
- * visible to everyone, not just the commenter.
- *
- * Requires `instagram_business_manage_comments`, already requested
- * alongside `instagram_business_basic`/`instagram_business_manage_messages`
- * in the OAuth scope (instagramOAuth.ts) — but a scope being requested
- * isn't the same as Meta having approved it for this app in production
- * (App Review, Phase 0). VERIFY the field/endpoint shape against a real
- * payload and confirm the permission is actually granted during Phase 0
- * pilot testing (A6), same caveat as instagramWebhookParser.ts, before
- * enabling reply_channel 'comment'/'both' for a real tenant.
+ * Posts a PUBLIC reply under a comment (Meta's `POST /{ig-comment-id}/replies`).
  */
-export async function sendInstagramCommentReply(accessToken: string, commentId: string, text: string): Promise<void> {
+export async function sendInstagramCommentReply(
+  accessToken: string,
+  commentId: string,
+  text: string,
+): Promise<void> {
   const url = `${GRAPH_BASE_URL}/v21.0/${encodeURIComponent(commentId)}/replies`;
 
   const res = await fetch(url, {

@@ -36,6 +36,53 @@ describe("InstagramMessageSender", () => {
     });
   });
 
+  it("passes explicit journey rich-message metadata to the API client", async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+
+    const sender = new InstagramMessageSender(
+      {
+        sendMessage,
+      },
+      {
+        accessToken: "token-123",
+      },
+    );
+
+    await sender.send({
+      idempotencyKey: "action-rich-123",
+      tenantId: "tenant-1",
+      subjectKey: "instagram-user-123",
+      executionId: "execution-1",
+      actionId: "action-rich-123",
+      payload: {
+        data: {
+          text: "See our latest collection",
+          richMessage: {
+            ctaUrl: "https://example.com/collection",
+            imageUrl: "https://cdn.example.com/collection.jpg",
+            title: "Latest collection",
+            subtitle: "Explore the newest options",
+            buttonTitle: "View collection",
+          },
+        },
+      },
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      accessToken: "token-123",
+      recipientId: "instagram-user-123",
+      text: "See our latest collection",
+      idempotencyKey: "action-rich-123",
+      richMessage: {
+        ctaUrl: "https://example.com/collection",
+        imageUrl: "https://cdn.example.com/collection.jpg",
+        title: "Latest collection",
+        subtitle: "Explore the newest options",
+        buttonTitle: "View collection",
+      },
+    });
+  });
+
   it("rejects an empty message", async () => {
     const sendMessage = vi.fn();
 

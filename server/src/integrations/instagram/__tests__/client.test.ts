@@ -59,6 +59,69 @@ describe("MetaInstagramApiClient", () => {
     );
   });
 
+  it("sends a Generic Template when rich message metadata includes an image", async () => {
+    const http = createHttpClient({
+      status: 200,
+      body: {},
+    });
+
+    const client = new MetaInstagramApiClient(
+      http,
+      "https://graph.instagram.com/v24.0",
+    );
+
+    await client.sendMessage({
+      accessToken: "token-123",
+      recipientId: "instagram-user-1",
+      text: "Explore our latest collection",
+      idempotencyKey: "action-rich-123",
+      richMessage: {
+        ctaUrl: "https://example.com/collection",
+        imageUrl: "https://cdn.example.com/collection.jpg",
+        title: "Latest collection",
+        subtitle: "Explore the newest options",
+        buttonTitle: "View collection",
+      },
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      "https://graph.instagram.com/v24.0/me/messages",
+      expect.objectContaining({
+        body: {
+          recipient: {
+            id: "instagram-user-1",
+          },
+          message: {
+            attachment: {
+              type: "template",
+              payload: {
+                template_type: "generic",
+                elements: [
+                  {
+                    title: "Latest collection",
+                    image_url: "https://cdn.example.com/collection.jpg",
+                    subtitle: "Explore the newest options",
+                    default_action: {
+                      type: "web_url",
+                      url: "https://example.com/collection",
+                    },
+                    buttons: [
+                      {
+                        type: "web_url",
+                        url: "https://example.com/collection",
+                        title: "View collection",
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      }),
+    );
+  });
+
   it("throws an InstagramApiError for HTTP failures", async () => {
     const http = createHttpClient({
       status: 500,

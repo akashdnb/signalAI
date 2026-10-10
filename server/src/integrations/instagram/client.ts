@@ -1,8 +1,14 @@
+import {
+  buildInstagramMessagePayload,
+  type InstagramRichMessageOptions,
+} from "../../lib/instagramMessagePayload.js";
+
 export interface InstagramSendMessageRequest {
   accessToken: string;
   recipientId: string;
   text: string;
   idempotencyKey: string;
+  richMessage?: InstagramRichMessageOptions;
 }
 
 export interface InstagramApiClient {
@@ -45,9 +51,7 @@ export class MetaInstagramApiClient implements InstagramApiClient {
           recipient: {
             id: request.recipientId,
           },
-          message: {
-            text: request.text,
-          },
+          message: buildInstagramMessagePayload(request.text, request.richMessage),
         },
       },
     );
