@@ -210,7 +210,8 @@ export function InboxPage() {
             ))}
           </div>
           <div className="p-3 pt-0">
-            <input type="text" placeholder="Search by username…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <label className="sr-only" htmlFor="inbox-search">Search conversations by username</label>
+            <input id="inbox-search" type="text" aria-label="Search conversations by username" placeholder="Search by username…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           {leads === null ? (
