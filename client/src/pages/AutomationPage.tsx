@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Campaign } from "../api";
 import { AutomationHeader } from "../components/automation/AutomationHeader";
 import { AutomationTabs, type AutomationTab } from "../components/automation/AutomationTabs";
+import { AutomationTemplates, type AutomationTemplate } from "../components/automation/AutomationTemplates";
 import { JourneyTable } from "../components/automation/JourneyTable";
 import { NewJourneyDialog } from "../components/automation/NewJourneyDialog";
 import { ToastStack, useToasts } from "../components/Toast";
@@ -52,6 +53,29 @@ export function AutomationPage() {
     navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
   }
 
+  async function handleUseTemplate(template: AutomationTemplate) {
+    if (!tenantId) return;
+
+    try {
+      const created = await api.createCampaign(tenantId, template.name, template.keywords);
+      const { milestones: presetMilestones, ...replyConfig } = template.preset;
+
+      await api.updateReplyConfig(tenantId, created.id, {
+        ...replyConfig,
+        keywords: template.keywords,
+      });
+
+      if (presetMilestones) {
+        await api.setMilestones(tenantId, created.id, presetMilestones);
+      }
+
+      push(`${template.name} preset created`);
+      navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to create journey from preset");
+    }
+  }
+
   if (!tenantId) return null;
 
   return (
@@ -62,7 +86,9 @@ export function AutomationPage() {
 
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
 
-      {activeTab !== "journeys" ? (
+      {activeTab === "templates" ? (
+        <AutomationTemplates onUse={(template) => void handleUseTemplate(template)} />
+      ) : activeTab !== "journeys" ? (
         <div
           id="automation-tabpanel"
           role="tabpanel"
