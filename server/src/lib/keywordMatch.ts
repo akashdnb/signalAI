@@ -58,12 +58,7 @@ export function resolveDmCampaignTrigger(
   if (!activeDmCampaignId) return null;
   // A comment-triggered campaign can continue in the private conversation
   // it initiated, but only when the campaign is configured to send DMs.
-  const continuedCampaign = campaigns.find((campaign) =>
-    campaign.id === activeDmCampaignId && (
-      campaign.triggerSource === "message" || campaign.triggerSource === "both" ||
-      campaign.replyChannel === "dm" || campaign.replyChannel === "both"
-    )
-  );
+  const continuedCampaign = eligible.find((campaign) => campaign.id === activeDmCampaignId);
   if (!continuedCampaign) return null;
 
   // A customer's first DM after a comment private reply opens the first
