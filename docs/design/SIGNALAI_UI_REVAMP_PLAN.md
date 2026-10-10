@@ -61,11 +61,13 @@ These are code-level observations from the files inspected, combined with the UI
 
 **Active branch:** `feat/ui-revamp-phase-1`
 
-The implementation branch now includes the shared focus-visible styling and contrast-token pass; modal/dialog focus handling; toast live announcements; accessible search/filter labels; semantic keyboard-operable Automation, Journey Builder and inspector tabs; a focus-managed mobile navigation drawer; truthful AppShell affordances; shared page-width/surface conventions; dashboard no-data/all-zero chart states; and a mobile Add Goal action.
+The implementation branch now includes shared focus-visible styling and contrast-token groundwork; modal/dialog focus handling; toast live announcements; accessible search/filter labels; keyboard-operable Automation, Journey Builder, inspector and Lead Detail tabs; a focus-managed mobile navigation drawer; shared page-width/surface conventions; dashboard empty/all-zero/error states; mobile-safe data tables/forms; visible retry paths for failed data loads; and an Add Goal action on the mobile builder canvas.
 
-The highest-risk Journey Builder save change is also implemented in code: graph edits plus goal structure/order/content stage locally and submit through one version-checked, transactional save. Goal inspector “Apply to draft” no longer commits the goal independently; goal loading is guarded before Save; clean canvas-only saves preserve existing goal IDs; new journeys with zero goals remain saveable. Route-level regression coverage has been added for empty-goal saves, adding a goal, preserving IDs on graph-only saves, and rollback of invalid combined drafts.
+The Journey Builder save model now commits graph edits and goal structure/order/content as one version-checked transaction. Inspector “Apply to draft” does not persist independently; goal loading is guarded before Save; canvas-only saves preserve goal IDs; zero-goal journeys are saveable; and failed saves retain the draft. Backend regression tests cover empty-goal saves, goal creation, ID preservation, and rollback of invalid combined drafts.
 
-**Verification snapshot (2026-10-10):** Client CI passed lint and production build on commit `21da408`, including the change that retries failed saves without discarding the local draft. Server CI passed typecheck, production build, migrations and the full database-backed test suite on commit `b18b16c`, including the atomic-save regression tests. Browser visual QA, mobile-device interaction testing, and manual keyboard/screen-reader review have not been run in this environment, so the revamp remains in progress. Checklist items below stay unchecked until the relevant manual verification is completed.
+The branch also adds a dedicated Chromium Playwright workflow with 12 route/interaction checks: mobile overflow across operational pages, Login/Docs, mobile drawer keyboard dismissal, populated Inbox recovery, Lead Detail arrow-key tabs, operational-page retry recovery, and an axe scan for critical violations on Leads. Browser reports/traces are uploaded as workflow artifacts.
+
+**Verification snapshot (2026-10-10):** Client lint and production build passed on commit `70ae871`; the Chromium smoke suite passed on the same commit. Server CI passed typecheck, production build, database migrations and the full database-backed test suite on commit `b18b16c`, including the atomic-save regression tests. Real-device visual QA, tablet and dark-theme review, and manual keyboard/screen-reader testing have not been completed. The revamp remains in progress; those checks stay open rather than being treated as covered by automation.
 
 
 ---
@@ -606,13 +608,15 @@ Each PR should include:
 - [ ] Preview, test journey, publish confirmation and version/analytics/lead tabs
 
 ### Whole app
-- [ ] `npm run build` in `client/`
-- [ ] `npm run lint` in `client/` and run it in client CI
-- [ ] Add and run client component/interaction tests and Playwright smoke tests
-- [ ] Run automated accessibility scans on representative routes; document and manually review findings
-- [ ] Existing tests run; pre-existing CI/test issues are documented rather than hidden
-- [ ] Desktop, tablet, mobile; light and dark theme
-- [ ] Keyboard-only navigation, focus trap/restoration, focus-visible states, reduced motion, accessible names and live announcements
+- [x] `npm run build` in `client/` — CI pass on current branch head at the time of this update
+- [x] `npm run lint` in `client/` and run it in client CI
+- [ ] Add client component/interaction unit tests
+- [x] Add and run Chromium Playwright route/interaction smoke checks; upload HTML report and traces from CI
+- [x] Run an automated axe scan for critical violations on the representative Leads route
+- [ ] Expand automated accessibility scans to more routes and manually review findings
+- [x] Server typecheck, production build, migrations and database-backed tests pass in server CI
+- [ ] Desktop, tablet, mobile; light and dark theme visual QA
+- [ ] Manual keyboard-only navigation, focus trap/restoration, reduced motion, accessible names and live announcements
 - [ ] Contrast for text/statuses/graph edges and focus indicators in both themes
 
 ---
