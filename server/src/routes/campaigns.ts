@@ -104,6 +104,17 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/milestones", async
   try {
     await client.query("BEGIN");
 
+    // Serialize all journey writes on the campaign row before touching
+    // milestone rows. The atomic builder save uses this same lock order.
+    const campaignLock = await client.query(
+      `select builder_version from campaigns where id = $1 and tenant_id = $2 for update`,
+      [campaignId, tenantId],
+    );
+    if (campaignLock.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "campaign not found for this tenant" });
+    }
+
     const previousMilestones = await listMilestonesWithClient(client, tenantId, campaignId);
     let oldIndexToNewIndex: Array<number | null>;
     if (requestedIndexMap === undefined) {
@@ -361,6 +372,37 @@ function isValidEdge(value: unknown): value is JourneyEdge {
   );
 }
 
+interface MilestoneDraftInput {
+  id: string;
+  goalDescription: string;
+  captureFields?: string[];
+}
+
+function isValidMilestoneDrafts(value: unknown): value is MilestoneDraftInput[] {
+  if (!Array.isArray(value) || value.length === 0) return false;
+
+  const ids = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return false;
+    const milestone = item as Record<string, unknown>;
+    if (
+      typeof milestone.id !== "string" ||
+      milestone.id.length === 0 ||
+      ids.has(milestone.id) ||
+      typeof milestone.goalDescription !== "string" ||
+      milestone.goalDescription.trim().length === 0 ||
+      (milestone.captureFields !== undefined &&
+        (!Array.isArray(milestone.captureFields) ||
+          !milestone.captureFields.every((field: unknown) => typeof field === "string")))
+    ) {
+      return false;
+    }
+    ids.add(milestone.id);
+  }
+
+  return true;
+}
+
 /**
  * Advanced Automation Builder (graph data model): the whole visual journey
  * — nodes and edges — read and written as one atomic unit. GET synthesizes
@@ -385,7 +427,7 @@ campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
  */
 campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (req, res) => {
   const { tenantId, campaignId } = req.params;
-  const { expectedVersion, nodes, edges } = req.body ?? {};
+  const { expectedVersion, nodes, edges, milestones: draftMilestones } = req.body ?? {};
 
   if (typeof expectedVersion !== "number" || !Number.isInteger(expectedVersion)) {
     return res.status(400).json({ error: "expectedVersion must be an integer" });
@@ -400,20 +442,140 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
       .status(400)
       .json({ error: "edges must be an array of { id, sourceNodeId, targetNodeId, label, condition }" });
   }
+  if (draftMilestones !== undefined && !isValidMilestoneDrafts(draftMilestones)) {
+    return res.status(400).json({
+      error: "milestones must be a non-empty array of { id, goalDescription, captureFields?: string[] } with unique ids",
+    });
+  }
 
-  const result = await saveBuilderGraph(getPool(), tenantId, campaignId, expectedVersion, nodes, edges);
-  if (result.status === "not_found") {
-    return res.status(404).json({ error: "campaign not found for this tenant" });
+  // Backward-compatible graph-only writes remain available for clients that
+  // haven't adopted the combined Save contract yet.
+  if (draftMilestones === undefined) {
+    const result = await saveBuilderGraph(getPool(), tenantId, campaignId, expectedVersion, nodes, edges);
+    if (result.status === "not_found") {
+      return res.status(404).json({ error: "campaign not found for this tenant" });
+    }
+    if (result.status === "conflict") {
+      return res
+        .status(409)
+        .json({ error: "this journey changed elsewhere — reload before saving again", currentVersion: result.currentVersion });
+    }
+    if (result.status === "invalid") {
+      return res.status(400).json({ error: "invalid graph", details: result.errors });
+    }
+    return res.status(200).json(result.graph);
   }
-  if (result.status === "conflict") {
-    return res
-      .status(409)
-      .json({ error: "this journey changed elsewhere — reload before saving again", currentVersion: result.currentVersion });
+
+  // Graph positions/edges and the ordered semantic goals are one snapshot.
+  // Commit them together so version changes can't leave half a journey saved.
+  const client: PoolClient = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+
+    const campaignLock = await client.query<{ builder_version: number }>(
+      `select builder_version from campaigns where id = $1 and tenant_id = $2 for update`,
+      [campaignId, tenantId],
+    );
+    const campaign = campaignLock.rows[0];
+    if (!campaign) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "campaign not found for this tenant" });
+    }
+    if (campaign.builder_version !== expectedVersion) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "this journey changed elsewhere — reload before saving again",
+        currentVersion: campaign.builder_version,
+      });
+    }
+
+    const previousMilestones = await listMilestonesWithClient(client, tenantId, campaignId);
+    const savedMilestones = await setCampaignMilestonesWithClient(
+      client,
+      tenantId,
+      campaignId,
+      draftMilestones.map(({ goalDescription, captureFields }) => ({
+        goalDescription,
+        captureFields,
+      })),
+    );
+
+    const savedByDraftId = new Map(
+      draftMilestones.map((milestone, index) => [milestone.id, savedMilestones[index]!]),
+    );
+    const milestoneIndexByDraftId = new Map(
+      draftMilestones.map((milestone, index) => [milestone.id, index]),
+    );
+    const seenDraftIds = new Set<string>();
+    let milestoneNodeCount = 0;
+    const synchronizedNodes = nodes.map((node) => {
+      if (node.type !== "milestone_group") return node;
+      milestoneNodeCount += 1;
+
+      const draftId =
+        typeof node.data.milestoneId === "string" ? node.data.milestoneId : null;
+      const draftIndex =
+        draftId === null ? undefined : milestoneIndexByDraftId.get(draftId);
+      const resolvedId =
+        draftIndex === undefined && typeof node.data.ordinal === "number"
+          ? draftMilestones[node.data.ordinal]?.id
+          : draftId;
+      const index =
+        resolvedId === undefined ? undefined : milestoneIndexByDraftId.get(resolvedId);
+      const saved = resolvedId === undefined ? undefined : savedByDraftId.get(resolvedId);
+
+      if (index === undefined || !saved || seenDraftIds.has(resolvedId!)) {
+        return node;
+      }
+      seenDraftIds.add(resolvedId!);
+      return {
+        ...node,
+        data: { ...node.data, milestoneId: saved.id, ordinal: index },
+      };
+    });
+
+    if (
+      milestoneNodeCount !== draftMilestones.length ||
+      seenDraftIds.size !== draftMilestones.length
+    ) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "each goal must correspond to exactly one milestone node in the submitted graph",
+      });
+    }
+
+    const result = await saveBuilderGraphWithClient(
+      client,
+      tenantId,
+      campaignId,
+      expectedVersion,
+      synchronizedNodes,
+      edges,
+    );
+    if (result.status === "not_found") {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "campaign not found for this tenant" });
+    }
+    if (result.status === "conflict") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "this journey changed elsewhere — reload before saving again",
+        currentVersion: result.currentVersion,
+      });
+    }
+    if (result.status === "invalid") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "invalid graph", details: result.errors });
+    }
+
+    await client.query("COMMIT");
+    return res.status(200).json({ ...result.graph, milestones: savedMilestones });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
-  if (result.status === "invalid") {
-    return res.status(400).json({ error: "invalid graph", details: result.errors });
-  }
-  return res.status(200).json(result.graph);
 });
 
 /**
