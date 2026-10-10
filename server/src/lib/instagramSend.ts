@@ -12,11 +12,17 @@ export interface SendInstagramMessageResult {
   metaMessageId: string | null;
 }
 
+export interface InstagramSendOptions {
+  /** Only for a real human support reply using Meta-approved HUMAN_AGENT access. */
+  humanAgent?: boolean;
+}
+
 export async function sendInstagramMessage(
   accessToken: string,
   recipientInstagramUserId: string,
   text: string,
   richMessage?: InstagramRichMessageOptions,
+  options: InstagramSendOptions = {},
 ): Promise<SendInstagramMessageResult> {
   // Keep the token in the Authorization header rather than the URL so it
   // doesn't appear in request-line logs, proxies, or APM traces.
@@ -30,6 +36,7 @@ export async function sendInstagramMessage(
     },
     body: JSON.stringify({
       recipient: { id: recipientInstagramUserId },
+      ...(options.humanAgent ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}),
       message: buildInstagramMessagePayload(text, richMessage),
     }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
