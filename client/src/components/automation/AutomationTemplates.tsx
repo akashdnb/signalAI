@@ -1,4 +1,6 @@
-import { BotIcon, HandshakeIcon, InstagramMarkIcon, SendIcon } from "../icons";
+import { BotIcon, HandshakeIcon, InstagramMarkIcon, SendIcon, CloseIcon } from "../icons";
+import { useState } from "react";
+import { BottomSheet } from "../BottomSheet";
 import type { CampaignLanguage, CampaignTone, ReplyChannel, TriggerSource } from "../../api";
 
 export type AutomationTemplate = {
@@ -113,8 +115,15 @@ const TONE_CLASS: Record<AutomationTemplate["tone"], string> = {
 export function AutomationTemplates({
   onUse,
 }: {
-  onUse: (template: AutomationTemplate) => void;
+  onUse: (template: AutomationTemplate) => void | Promise<void>;
 }) {
+  const [selectedTemplate, setSelectedTemplate] = useState<AutomationTemplate | null>(null);
+
+  function confirmUse() {
+    if (!selectedTemplate) return;
+    void onUse(selectedTemplate);
+  }
+
   return (
     <section className="mt-5" aria-labelledby="automation-templates-title">
       <div className="mb-3 flex items-end justify-between gap-4">
@@ -156,7 +165,7 @@ export function AutomationTemplates({
               <button
                 type="button"
                 className="btn-secondary mt-4 min-h-9 w-full text-xs font-semibold group-hover:border-accent/40 group-hover:text-accent"
-                onClick={() => onUse(template)}
+                onClick={() => setSelectedTemplate(template)}
               >
                 Use preset
               </button>
@@ -165,5 +174,118 @@ export function AutomationTemplates({
         })}
       </div>
     </section>
+  );
+      {selectedTemplate && (
+        <TemplateDetailsDialog
+          template={selectedTemplate}
+          onClose={() => setSelectedTemplate(null)}
+          onCreate={confirmUse}
+        />
+      )}
+
+}
+
+
+function TemplateDetailsDialog({
+  template,
+  onClose,
+  onCreate,
+}: {
+  template: AutomationTemplate;
+  onClose: () => void;
+  onCreate: () => void;
+}) {
+  const Icon = template.icon;
+  const milestones = template.preset.milestones ?? [];
+  const [creating, setCreating] = useState(false);
+
+  async function create() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      onCreate();
+    } finally {
+      // The owning page closes the dialog after the API succeeds. Keep the
+      // local guard only for the current interaction; failed attempts can retry.
+      setCreating(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      title={`Use ${template.name}`}
+      onClose={() => { if (!creating) onClose(); }}
+      maxWidth={560}
+    >
+      <div className="flex items-start gap-3">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${TONE_CLASS[template.tone]}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="m-0 text-base font-semibold text-ink">{template.name}</h3>
+          <p className="muted m-0 mt-1 text-sm leading-5">{template.description}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-line bg-canvas/50 p-3">
+          <p className="muted m-0 text-[11px] font-semibold uppercase tracking-wide">Trigger</p>
+          <p className="m-0 mt-1 text-sm font-medium text-ink">{template.trigger}</p>
+        </div>
+        <div className="rounded-xl border border-line bg-canvas/50 p-3">
+          <p className="muted m-0 text-[11px] font-semibold uppercase tracking-wide">Reply mode</p>
+          <p className="m-0 mt-1 text-sm font-medium text-ink">{template.preset.replyMode === "ai_generated" ? "AI-generated" : "Rule-based"}</p>
+        </div>
+        <div className="rounded-xl border border-line bg-canvas/50 p-3">
+          <p className="muted m-0 text-[11px] font-semibold uppercase tracking-wide">Reply channel</p>
+          <p className="m-0 mt-1 text-sm font-medium text-ink">{template.preset.replyChannel === "dm" ? "Direct message" : template.preset.replyChannel === "comment" ? "Comment" : "Comment and DM"}</p>
+        </div>
+        <div className="rounded-xl border border-line bg-canvas/50 p-3">
+          <p className="muted m-0 text-[11px] font-semibold uppercase tracking-wide">Tone</p>
+          <p className="m-0 mt-1 text-sm font-medium capitalize text-ink">{template.preset.tone.replaceAll("_", " ")}</p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Trigger keywords</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {template.keywords.map((keyword) => (
+            <span key={keyword} className="rounded-md bg-chip px-2.5 py-1.5 text-xs font-medium text-ink">{keyword}</span>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-xl border border-line p-3.5">
+        <p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Default reply</p>
+        <p className="m-0 mt-2 whitespace-pre-wrap text-sm leading-5 text-ink">{template.preset.defaultReplyTemplate}</p>
+      </div>
+
+      {milestones.length > 0 && (
+        <div className="mt-5">
+          <p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Qualification goals</p>
+          <ol className="mt-2 space-y-2 pl-5">
+            {milestones.map((milestone, index) => (
+              <li key={milestone.goalDescription} className="pl-1 text-sm text-ink">
+                <span className="font-medium">{milestone.goalDescription}</span>
+                {milestone.captureFields.length > 0 && (
+                  <p className="muted m-0 mt-0.5 text-xs">Capture: {milestone.captureFields.join(", ")}</p>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      <p className="muted mt-5 text-xs leading-5">
+        This creates a disabled draft. Review the journey in Builder and publish it when it is ready.
+      </p>
+
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" className="btn-secondary" disabled={creating} onClick={onClose}>Cancel</button>
+        <button type="button" className="btn-primary" disabled={creating} onClick={() => void create()}>
+          {creating ? "Creating…" : "Create draft"}
+        </button>
+      </div>
+    </BottomSheet>
   );
 }
