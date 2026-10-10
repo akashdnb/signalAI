@@ -97,6 +97,7 @@ async function seedMatchedMessageEvent(
   campaignId: string,
   keyword: string,
   dmText: string,
+  attributesOverrides: Record<string, unknown> = {},
 ) {
   const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1");
   await updateMessagingWindow(pool, tenantId, lead.id, new Date(), new Date(Date.now() + 60 * 60 * 1000));
@@ -109,7 +110,7 @@ async function seedMatchedMessageEvent(
     eventType: "message",
     occurredAt: new Date(),
     sequence: 1,
-    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword },
+    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
   });
   await insertPii(pool, { tenantId, leadEventId: event!.id, leadId: lead.id, dmText, username: "real_handle" });
   return { lead, event: event! };
@@ -257,6 +258,31 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     // campaign switch — the email captured under A survives.
     const facts = await getCapturedFacts(pool, tenant.id, first.lead.id);
     expect(facts).toEqual({ email: "a@b.com" });
+  });
+
+  it("restarts a DM campaign at its first milestone when a customer returns after the window expires", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const campaign = await createCampaign(pool, tenant.id, "DM Restart", ["LINK"], { replyMode: "ai_generated", triggerSource: "message" });
+    const milestones = await setCampaignMilestones(pool, tenant.id, campaign.id, [
+      { goalDescription: "first step", captureFields: ["email"] },
+      { goalDescription: "second step" },
+    ]);
+    const provider = mockProvider([
+      JSON.stringify({ reply: "First step complete.", milestone_satisfied: true }),
+      JSON.stringify({ reply: "Let's start again.", milestone_satisfied: false }),
+    ]);
+    const handler = createLeadEventReplyHandler(pool, fakeBoss, provider, keyring, DEFAULT_AI_CAP);
+
+    const first = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "LINK", "send the link");
+    await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: first.event.id, sequence: 1 });
+    let lead = await getLead(pool, tenant.id, first.lead.id);
+    expect(lead!.activeMilestoneId).toBe(milestones[1]!.id);
+
+    const restart = await seedMatchedMessageEvent(pool, tenant.id, campaign.id, "LINK", "I'm back", { restartCampaign: true });
+    await handler({ tenantId: tenant.id, leadId: first.lead.id, leadEventId: restart.event.id, sequence: 2 });
+    lead = await getLead(pool, tenant.id, first.lead.id);
+    expect(lead!.activeMilestoneId).toBe(milestones[0]!.id);
   });
 
   it("falls back to a plain B7 reply (no milestone tracking) for a campaign with no milestones configured", async () => {
