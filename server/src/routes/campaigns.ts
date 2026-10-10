@@ -30,7 +30,7 @@ campaignsRouter.use("/tenants/:tenantId", requireTenantSession);
 
 campaignsRouter.post("/tenants/:tenantId/campaigns", async (req, res) => {
   const { tenantId } = req.params;
-  const { name, keywords } = req.body ?? {};
+  const { name, keywords, enabled } = req.body ?? {};
 
   if (typeof name !== "string" || !name.trim()) {
     return res.status(400).json({ error: "name is required" });
@@ -39,7 +39,15 @@ campaignsRouter.post("/tenants/:tenantId/campaigns", async (req, res) => {
     return res.status(400).json({ error: "keywords must be a non-empty array of strings" });
   }
 
-  const campaign = await createCampaign(getPool(), tenantId, name, keywords);
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled must be a boolean when provided" });
+  }
+
+  // Campaigns are inactive by default; callers must explicitly activate a
+  // journey after reviewing and publishing it.
+  const campaign = await createCampaign(getPool(), tenantId, name.trim(), keywords, {
+    enabled: enabled ?? false,
+  });
   return res.status(201).json(campaign);
 });
 
