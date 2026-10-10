@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type KeyboardEvent } from "react";
 
 export type AutomationTab =
   | "journeys"
@@ -26,7 +26,7 @@ export function AutomationTabs({
 }) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number | null = null;
     if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
     if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
