@@ -2,39 +2,28 @@ import type { Pool } from "pg";
 import type { Queryable } from "./types.js";
 
 export type ReplyMode = "rule_based" | "ai_generated";
-
-/** Where a triggered reply is delivered: a private DM, a public reply under the comment, or both. Default 'dm' preserves every existing campaign's current behaviour. */
 export type ReplyChannel = "dm" | "comment" | "both";
-
-/** What kind of inbound event a campaign's keywords match against — a comment, a DM, or either. Distinct from ReplyChannel (where the reply goes, not what it triggers). Default 'comment' preserves every existing campaign's current behaviour, since DM-triggered matching didn't exist before this field. */
 export type TriggerSource = "comment" | "message" | "both";
-
-/** AI Behaviour panel (UI revamp R3): a coarse tone knob alongside the tenant-wide free-text brandVoice — both get interpolated into the same prompt. */
 export type CampaignTone = "professional" | "friendly" | "casual" | "professional_and_friendly";
-/** 'auto' (default) leaves reply language unspecified, identical to every pre-R3 campaign's behavior. */
 export type CampaignLanguage = "auto" | "en" | "hi";
 
 export interface Campaign {
   id: string;
   tenantId: string;
   name: string;
-  /** Free-text summary shown on the journey card / Details page. Null for every campaign created before this field existed. */
   description: string | null;
   keywords: string[];
   enabled: boolean;
-  /** Whether an immutable journey snapshot has been published. */
   published?: boolean;
   replyMode: ReplyMode;
   replyTemplates: string[];
   defaultReplyTemplate: string;
   ctaLink: string | null;
-  /** Which post(s) this campaign matches comments on. Empty = every post (today's behaviour). Irrelevant to a message-triggered match — a DM isn't "on" a post. */
   targetMediaIds: string[];
   replyChannel: ReplyChannel;
   triggerSource: TriggerSource;
   tone: CampaignTone;
   language: CampaignLanguage;
-  /** Per-campaign override of the tenant's always-on-whenever-documents-exist RAG — default true preserves every existing campaign's current behavior. */
   useKnowledgeBase: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -112,7 +101,7 @@ export async function createCampaign(
        coalesce($8, array[]::text[]),
        coalesce($9, 'dm'),
        coalesce($10, 'comment'),
-       false)
+       coalesce($11, true))
      returning *`,
     [
       tenantId,
@@ -125,13 +114,11 @@ export async function createCampaign(
       options?.targetMediaIds ?? null,
       options?.replyChannel ?? null,
       options?.triggerSource ?? null,
+      options?.enabled ?? true,
     ],
   );
   return toCampaign(result.rows[0]!);
 }
-
-// New campaigns always start as drafts. Activation is only possible after an
-// immutable journey snapshot has been published via setCampaignEnabled().
 
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(
@@ -164,7 +151,6 @@ export async function getCampaign(pool: Pool, tenantId: string, campaignId: stri
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-/** Only what the matcher needs, for the hot ingestion path — not the full row. */
 export async function listActiveCampaignKeywords(
   pool: Queryable,
   tenantId: string,
@@ -175,9 +161,7 @@ export async function listActiveCampaignKeywords(
     target_media_ids: string[];
     trigger_source: TriggerSource;
     reply_channel: ReplyChannel;
-  }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [
-    tenantId,
-  ]);
+  }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [tenantId]);
   return result.rows.map((row) => ({
     id: row.id,
     keywords: row.keywords,
