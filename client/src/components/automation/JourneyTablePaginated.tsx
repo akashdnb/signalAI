@@ -64,9 +64,18 @@ function TriggerBadge({ campaign }: { campaign: Campaign }) {
 function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campaign; onOpen: () => void; onRename: () => void; onToggle: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   async function toggle() {
     setSaving(true);
-    try { await onToggle(); setOpen(false); } finally { setSaving(false); }
+    setError(null);
+    try {
+      await onToggle();
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't update journey status");
+    } finally {
+      setSaving(false);
+    }
   }
   return (
     <div className="relative inline-block">
@@ -75,7 +84,8 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
       </button>
       {open && <>
         <button type="button" aria-label="Close journey actions" className="fixed inset-0 z-20 cursor-default" onClick={(event) => { event.stopPropagation(); setOpen(false); }} />
-        <div className="absolute right-0 top-9 z-30 w-44 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
+        <div className="absolute right-0 top-9 z-30 w-52 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
+          {error && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
           <button type="button" disabled={saving} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>{saving ? "Saving…" : campaign.enabled ? "Pause journey" : "Activate journey"}</button>
