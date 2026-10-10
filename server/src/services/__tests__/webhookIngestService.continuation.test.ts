@@ -6,7 +6,7 @@ import { createTenant } from "../../db/tenants.js";
 import { upsertToken } from "../../db/tokens.js";
 import { createCampaign } from "../../db/campaigns.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
-import { CONTINUATION_KEYWORD } from "../../lib/keywordMatch.js";
+import { CONTINUATION_KEYWORD, RESTART_KEYWORD } from "../../lib/keywordMatch.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { ensureQueues } from "../../queue/leadEventsQueue.js";
 import { ensureUsernameResolutionQueue } from "../../queue/usernameResolutionQueue.js";
@@ -112,7 +112,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     expect(await matchedFieldsFor(pool, "evt-1")).toEqual({ matchedCampaignId: null, matchedKeyword: null });
   });
 
-  it("does not continue once the messaging window has closed", async () => {
+  it("restarts the active campaign once the messaging window has closed", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
@@ -143,7 +143,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
         dmText: "TechPro UltraBook 15",
       },
     ]);
-    expect(await matchedFieldsFor(pool, "evt-2")).toEqual({ matchedCampaignId: null, matchedKeyword: null });
+    expect(await matchedFieldsFor(pool, "evt-2")).toEqual({ matchedCampaignId: campaign.id, matchedKeyword: RESTART_KEYWORD });
   });
 
   it("never continues a comment event, even when the lead has an active DM campaign", async () => {
