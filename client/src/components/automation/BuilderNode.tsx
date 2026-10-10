@@ -48,67 +48,69 @@ export function BuilderNode({
   children?: ReactNode;
 }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        // BuilderNode contains separate menu buttons. Their keyboard events
-        // must not also activate the parent node inspector.
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
-      }}
-      className={`w-[300px] max-w-[calc(100vw-40px)] cursor-grab active:cursor-grabbing rounded-xl border border-l-4 bg-card p-3.5 text-left shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-shadow ${
-        ACCENT_BORDER[accent]
-      } ${
-        selected
-          ? "border-accent shadow-md ring-1 ring-accent"
-          : "border-line hover:shadow-md"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${ACCENT_ICON_BG[accent]}`}
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </span>
+    <div className="relative w-[300px] max-w-[calc(100vw-40px)]">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onClick();
+          }
+        }}
+        className={`relative w-full cursor-grab active:cursor-grabbing rounded-xl border border-l-4 bg-card p-3.5 pr-10 text-left shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-shadow ${
+          ACCENT_BORDER[accent]
+        } ${
+          selected
+            ? "border-accent shadow-md ring-1 ring-accent"
+            : "border-line hover:shadow-md"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${ACCENT_ICON_BG[accent]}`}
+          >
+            <Icon className="h-4.5 w-4.5" />
+          </span>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-          {eyebrow && (
-            <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
-              {eyebrow}
-            </div>
-          )}
+          <div className="min-w-0 flex-1">
+            {eyebrow && (
+              <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+                {eyebrow}
+              </div>
+            )}
 
-          <div className="break-words text-[13px] font-semibold leading-[1.35] text-ink">
+            <div className="break-words text-[13px] font-semibold leading-[1.35] text-ink">
               {title}
             </div>
-            {menu}
-          </div>
 
-          {subtitle && (
-            <div className="mt-0.5 text-[11px] leading-4 text-subtle">
-              {subtitle}
-            </div>
-          )}
+            {subtitle && (
+              <div className="mt-0.5 text-[11px] leading-4 text-subtle">
+                {subtitle}
+              </div>
+            )}
+          </div>
         </div>
+
+        {selected && (
+          <span
+            aria-hidden="true"
+            className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_3px_rgba(124,58,237,0.10)]"
+          />
+        )}
+
+        {children && (
+          <div className="mt-2 break-words text-[11px] leading-4 text-subtle">
+            {children}
+          </div>
+        )}
       </div>
 
-      {selected && (
-        <span
-          aria-hidden="true"
-          className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_3px_rgba(124,58,237,0.10)]"
-        />
-      )}
-
-      {children && (
-        <div className="mt-2 break-words text-[11px] leading-4 text-subtle">
-          {children}
+      {menu && (
+        <div className="absolute right-2.5 top-2.5 z-10" onClick={(event) => event.stopPropagation()}>
+          {menu}
         </div>
       )}
     </div>
