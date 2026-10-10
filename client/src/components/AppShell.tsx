@@ -134,7 +134,7 @@ function PlanCard({ tenantId, billing }: { tenantId: string; billing: BillingSum
       <div className="mt-0.5 text-base font-semibold text-ink">{billing?.planTierLabel ?? "…"}</div>
       {renewalLine && <div className="mt-0.5 text-xs text-subtle">{renewalLine}</div>}
       <Link
-        to={`/dashboard/${tenantId}/settings`}
+        to={`/dashboard/${tenantId}/billing`}
         className="mt-2.5 block rounded-lg bg-accent px-3 py-1.5 text-center text-sm font-semibold text-white no-underline hover:bg-accent-hover"
       >
         Upgrade
@@ -256,7 +256,6 @@ function AccountHeader({
             <span className="text-xs text-subtle">Instagram not connected</span>
           )}
         </div>
-        <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
@@ -283,8 +282,10 @@ function AccountHeader({
 
         <button
           type="button"
-          aria-label="Notifications"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+          aria-label="Notifications (coming soon)"
+          title="Notifications are not available yet"
+          disabled
+          className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-subtle opacity-50"
         >
           <BellIcon className="h-4.5 w-4.5" />
         </button>
@@ -430,6 +431,8 @@ export function AppShell() {
       )}
 
       <aside
+        id="primary-navigation-drawer"
+        aria-label="Primary navigation"
         className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-sidebar transition-transform duration-200 md:static md:z-auto md:w-[212px] md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
@@ -469,6 +472,8 @@ export function AppShell() {
           <button
             type="button"
             aria-label="Open menu"
+            aria-expanded={mobileNavOpen}
+            aria-controls="primary-navigation-drawer"
             className="flex h-11 w-11 items-center justify-center"
             onClick={() => setMobileNavOpen(true)}
           >
