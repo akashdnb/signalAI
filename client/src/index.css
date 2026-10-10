@@ -177,9 +177,32 @@ body {
 }
 
 .page {
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
+}
+
+/* Shared layout widths: content pages stay readable, dashboards breathe,
+   and high-density tools can use the full workspace without inline overrides. */
+.page-wide {
+  max-width: 1120px;
+}
+
+.page-workspace {
+  max-width: none;
+  margin: 0;
+  padding: 1.25rem clamp(1rem, 2vw, 2rem) 2rem;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .page-workspace {
+    padding: 1rem 0.875rem 1.5rem;
+  }
 }
 
 .page-narrow {
@@ -220,10 +243,11 @@ h4 {
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* Surfaces are separated by borders; reserve elevation for dialogs/menus. */
+  box-shadow: none;
 }
 
 .dashboard-header {
