@@ -153,6 +153,14 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
   const campaigns = data?.items ?? [];
   const allVisibleSelected = campaigns.length > 0 && campaigns.every((campaign) => selectedIds.has(campaign.id));
 
+  useEffect(() => {
+    const visibleIds = new Set(campaigns.map((campaign) => campaign.id));
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => visibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [data]);
+
   function toggleSelected(campaignId: string) {
     setSelectedIds((current) => { const next = new Set(current); if (next.has(campaignId)) next.delete(campaignId); else next.add(campaignId); return next; });
   }
