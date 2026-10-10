@@ -135,8 +135,18 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     let cancelled = false;
     setData(null);
     getCampaignsPage(tenantId, page, PAGE_SIZE, { q: search.trim() || undefined, status, trigger, sort })
-      .then((result) => { if (cancelled) return; setData(result); if (result.page !== page) setPage(result.page); setError(null); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load journeys"); });
+      .then((result) => {
+        if (cancelled) return;
+        setData(result);
+        if (result.page !== page) setPage(result.page);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setData(null);
+          setError(err instanceof Error ? err.message : "Failed to load journeys");
+        }
+      });
     return () => { cancelled = true; };
   }, [tenantId, page, search, status, trigger, sort, refreshToken, reloadToken]);
 
