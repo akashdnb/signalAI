@@ -297,7 +297,8 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     expect(sendInstagramMessage).toHaveBeenCalledWith(
       "token-1",
       "ig-user-1",
-      expect.stringContaining("https://example.com/offer"),
+      "Here you go!",
+      { ctaUrl: "https://example.com/offer" },
     );
   });
 
@@ -319,7 +320,8 @@ describe("createLeadEventReplyHandler — Milestone Engine integration", () => {
     expect(sendInstagramMessage).toHaveBeenCalledWith(
       "token-1",
       "ig-user-1",
-      expect.stringContaining("https://example.com/offer"),
+      "Here's our pricing.",
+      { ctaUrl: "https://example.com/offer" },
     );
   });
 

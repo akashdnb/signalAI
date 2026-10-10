@@ -42,6 +42,27 @@ import { HOURLY_SEND_LIMIT } from "../lib/sendLimits.js";
 // spin the queue in a tight retry loop.
 const RATE_LIMIT_RETRY_DELAY_SECONDS = 60;
 
+function prepareInstagramDmReply(
+  text: string,
+  configuredCta: string | null | undefined,
+): { text: string; richMessage?: { ctaUrl: string } } {
+  if (!configuredCta) return { text };
+
+  try {
+    const url = new URL(configuredCta);
+    if (url.protocol !== "https:" || !url.hostname) return { text };
+  } catch {
+    return { text };
+  }
+
+  const trimmed = text.trimEnd();
+  const body = trimmed.endsWith(configuredCta)
+    ? trimmed.slice(0, -configuredCta.length).trimEnd()
+    : text;
+
+  return { text: body, richMessage: { ctaUrl: configuredCta } };
+}
+
 /**
  * The B4/B9/B10 worker's handler for the main lead-events queue: decides
  * what (if anything) to reply, then actually sends it to Instagram.
@@ -438,7 +459,15 @@ export function createLeadEventReplyHandler(
 
     let delivered = false;
     if (dmReady) {
-      const sendResult = await sendInstagramMessage(token, lead.instagramUserId, replyText);
+      const preparedReply = prepareInstagramDmReply(replyText, campaign.ctaLink);
+      const sendResult = preparedReply.richMessage
+        ? await sendInstagramMessage(
+            token,
+            lead.instagramUserId,
+            preparedReply.text,
+            preparedReply.richMessage,
+          )
+        : await sendInstagramMessage(token, lead.instagramUserId, preparedReply.text);
       delivered = true;
       // Recorded per actual channel send, not per event — a 'both'-channel
       // campaign makes two real Instagram API calls below and now produces

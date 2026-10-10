@@ -228,6 +228,29 @@ export interface Milestone {
   captureFields: string[];
 }
 
+export type InstagramMessageButton =
+  | { type: "web_url"; title: string; url: string }
+  | { type: "postback"; title: string; payload: string };
+
+export interface InstagramQuickReply {
+  title: string;
+  payload: string;
+}
+
+export interface InstagramMessageCard {
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  buttons?: InstagramMessageButton[];
+}
+
+export type InstagramMessagePresentation =
+  | { type: "text" }
+  | { type: "buttons"; buttons: InstagramMessageButton[] }
+  | { type: "card"; card: InstagramMessageCard }
+  | { type: "gallery"; cards: InstagramMessageCard[] }
+  | { type: "quick_replies"; replies: InstagramQuickReply[] };
+
 export interface JourneyNode {
   id: string;
   type: string;

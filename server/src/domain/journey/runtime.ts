@@ -28,6 +28,11 @@ import {
   getJourneyActionForUpdate,
 } from "../../db/journeyActions.js";
 import { getPool } from "../../db/pool.js";
+import {
+  hasJourneyTargetInteraction,
+  INSTAGRAM_JOURNEY_NODE_PAYLOAD_PREFIX,
+  type InstagramRichMessageOptions,
+} from "../../lib/instagramMessagePayload.js";
 
 export interface JourneyRuntimeResult {
   execution: JourneyExecution;
@@ -130,6 +135,26 @@ function mergeContext(
     ...current,
     ...(additional ?? {}),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readJourneyNodeTarget(payload: Record<string, unknown> | undefined): string | null {
+  const interaction = payload?.interaction;
+  if (!isRecord(interaction) || typeof interaction.payload !== "string") return null;
+
+  const interactionPayload = interaction.payload;
+  if (!interactionPayload.startsWith(INSTAGRAM_JOURNEY_NODE_PAYLOAD_PREFIX)) return null;
+
+  const nodeId = interactionPayload.slice(INSTAGRAM_JOURNEY_NODE_PAYLOAD_PREFIX.length).trim();
+  return nodeId.length > 0 && nodeId.length <= 200 ? nodeId : null;
+}
+
+function nodeAwaitsInstagramInteraction(node: JourneyNode): boolean {
+  if (node.type !== "message" || !isRecord(node.data.richMessage)) return false;
+  return hasJourneyTargetInteraction(node.data.richMessage as InstagramRichMessageOptions);
 }
 
 /**
@@ -345,8 +370,36 @@ export class JourneyRuntime {
         );
       }
 
+      let routedTargetNodeId: string | null = null;
+      if (execution.status === "waiting" && execution.currentNodeId) {
+        const currentNode = getNode(published.graph, execution.currentNodeId);
+        if (nodeAwaitsInstagramInteraction(currentNode)) {
+          const requestedTargetNodeId = readJourneyNodeTarget(input.payload);
+          const allowedTarget = requestedTargetNodeId
+            ? outgoingNodes(published.graph, currentNode.id).find(
+                (candidate) => candidate.id === requestedTargetNodeId,
+              )
+            : undefined;
+
+          // Only a configured button/quick-reply payload that targets a
+          // direct outgoing edge can advance an interaction-waiting node.
+          // Unrelated text, forged ids, and stale clicks are acknowledged
+          // idempotently without jumping to arbitrary journey nodes.
+          if (!allowedTarget) {
+            await client.query("commit");
+            return {
+              execution,
+              action: execution.pendingAction,
+              duplicateEvent: false,
+            };
+          }
+          routedTargetNodeId = allowedTarget.id;
+        }
+      }
+
       const resumedExecution = {
         ...execution,
+        currentNodeId: routedTargetNodeId ?? execution.currentNodeId,
         pendingAction: null,
         status: "running" as const,
       };
@@ -577,6 +630,30 @@ export class JourneyRuntime {
         client,
         action.id,
       );
+
+      // A message with a configured journey-target postback/quick reply is
+      // a user-waiting step. A successful send acknowledges the outbound
+      // action but deliberately keeps the execution at this message node;
+      // the later, verified interaction selects a direct outgoing edge.
+      if (nodeAwaitsInstagramInteraction(node)) {
+        const waitingExecution = await updateJourneyExecution(
+          client,
+          execution.id,
+          {
+            status: "waiting",
+            currentNodeId: node.id,
+            context: execution.context,
+            pendingAction: null,
+            completed: false,
+          },
+        );
+
+        await client.query("commit");
+        return {
+          execution: waitingExecution,
+          action: null,
+        };
+      }
 
       if (!next) {
         const completedExecution =

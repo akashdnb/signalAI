@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Campaign, FieldDefinition, Milestone } from "../../api";
+import type { Campaign, FieldDefinition, InstagramMessagePresentation, Milestone } from "../../api";
 import { BottomSheet } from "../BottomSheet";
 import { CloseIcon } from "../icons";
 import {
@@ -50,6 +50,7 @@ export function NodeInspectorDialog({
   onCampaignChanged,
   onSaveMilestone,
   onFieldDefinitionsChanged,
+  onSaveMessageConfiguration,
 }: {
   open: boolean;
   tenantId: string;
@@ -64,6 +65,10 @@ export function NodeInspectorDialog({
     updates: { goalDescription: string; captureFields: string[] },
   ) => Promise<void>;
   onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
+  onSaveMessageConfiguration: (config: {
+    text: string;
+    presentation?: InstagramMessagePresentation;
+  }) => boolean;
 }) {
   const inspectorRef = useRef<InspectorHandle>(null);
   const discardDialogRef = useRef<HTMLDivElement>(null);
@@ -230,6 +235,7 @@ export function NodeInspectorDialog({
           onCampaignChanged={onCampaignChanged}
           onSaveMilestone={onSaveMilestone}
           onFieldDefinitionsChanged={onFieldDefinitionsChanged}
+          onSaveMessageConfiguration={onSaveMessageConfiguration}
           onActionsChange={setActions}
         />
       </BottomSheet>
