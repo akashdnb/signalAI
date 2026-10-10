@@ -113,19 +113,16 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, ki
         {hasMore && <button type="button" className="btn-secondary btn-small" disabled={loadingMore} onClick={() => void handleLoadOlder()}>{loadingMore ? "Loading older messages…" : "Load older messages"}</button>}
         {olderError && <span className="text-sm text-subtle" role="alert">{olderError}</span>}
       </div>
-      {allEntries.map((entry) => {
-        const stableEntry = entry as TimelineEntry & { source: string; id: string };
-        return (
-          <div className="timeline-entry" key={`${stableEntry.source}-${stableEntry.id}`}>
-            {entry.kind === "event" ? (
-              <><strong>{entry.eventType === "comment" ? "Comment" : "DM"}</strong>{entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}<div>{entry.text ?? "—"}</div></>
-            ) : entry.kind === "reply" ? (
-              <><strong>{entry.engine === "human" ? "Team reply" : "Bot reply"} ({entry.channel === "comment" ? "comment" : "DM"})</strong><span className="pill">{entry.engine === "human" ? "Sent by a teammate" : entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}</span><div>{entry.text}</div></>
-            ) : <div>{entry.summary}</div>}
-            <div className="timeline-meta">{formatDate(entry.occurredAt)}</div>
-          </div>
-        );
-      })}
+      {allEntries.map((entry) => (
+        <div className="timeline-entry" key={`${(entry as TimelineEntry & { source: string; id: string }).source}-${(entry as TimelineEntry & { source: string; id: string }).id}`}>
+          {entry.kind === "event" ? (
+            <><strong>{entry.eventType === "comment" ? "Comment" : "DM"}</strong>{entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}<div>{entry.text ?? "—"}</div></>
+          ) : entry.kind === "reply" ? (
+            <><strong>{entry.engine === "human" ? "Team reply" : "Bot reply"} ({entry.channel === "comment" ? "comment" : "DM"})</strong><span className="pill">{entry.engine === "human" ? "Sent by a teammate" : entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}</span><div>{entry.text}</div></>
+          ) : <div>{entry.summary}</div>}
+          <div className="timeline-meta">{formatDate(entry.occurredAt)}</div>
+        </div>
+      ))}
     </div>
   );
 }
