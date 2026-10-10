@@ -89,6 +89,9 @@ leadsRouter.patch("/tenants/:tenantId/leads/:leadId", async (req, res) => {
     lead = await updatePipelineStage(getPool(), { tenantId, leadId, stage: pipelineStage, actorUserId });
   }
   if (ownerUserId !== undefined) {
+    // Assignment is restricted to actual tenant members — an arbitrary
+    // userId would otherwise silently create an unresolvable "owner" no
+    // dropdown anywhere could ever have offered.
     let ownerEmail: string | null = null;
     if (ownerUserId !== null) {
       const members = await listTenantMembers(getPool(), tenantId);
@@ -105,11 +108,14 @@ leadsRouter.patch("/tenants/:tenantId/leads/:leadId", async (req, res) => {
 const VALID_HANDOFF_ACTIONS = ["request", "takeover", "release"] as const;
 type HandoffAction = (typeof VALID_HANDOFF_ACTIONS)[number];
 const HANDOFF_ACTION_TO_STATUS: Record<HandoffAction, HandoffStatus> = {
-  request: "requested",
-  takeover: "human",
-  release: "ai",
+  request: "requested", // Agent Escalation, triggered manually from the dashboard
+  takeover: "human", // Live Agent Takeover — pauses the Reply Engine for this lead
+  release: "ai", // Conversation Transfer back to the bot
 };
 
+// Phase 2A Human Handoff: Agent Escalation / Live Agent Takeover /
+// Conversation Transfer, all as one action-based endpoint rather than
+// three, since they're really three values of the same field.
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const { action } = req.body ?? {};
@@ -127,6 +133,7 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/handoff", async (req, res) =>
   return res.status(200).json(lead);
 });
 
+// Phase 2C Lead Intelligence: current qualification projection and score.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/intelligence", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
@@ -154,6 +161,10 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/intelligence/recalculate", as
   return res.status(200).json(intelligence);
 });
 
+// Captured Facts panel (UI revamp R3): what the Milestone Engine has
+// learned about this lead so far (budget, location, etc., keyed by
+// tenant-registered field keys) — previously server-internal only, no
+// route exposed lead_captured_facts to the client at all.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/captured-facts", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
@@ -163,6 +174,8 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId/captured-facts", async (req, r
   return res.status(200).json({ facts });
 });
 
+// Inbox "Unread": marks a conversation read. Called when a human opens it
+// (Inbox row click, LeadDetailPage mount) — no body, idempotent.
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/read", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const lead = await getLead(getPool(), tenantId, leadId);
@@ -172,6 +185,14 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/read", async (req, res) => {
   return res.status(204).send();
 });
 
+// Inbox compose box: a human sending their own DM reply, distinct from the
+// automated Reply Engine (leadEventReplyHandler.ts) — the only other caller
+// of sendInstagramMessage. Gated on handoffStatus === 'human' (Live Agent
+// Takeover) so a human reply can never race the bot for the same lead; DM
+// only, matching the messaging-window / Meta Send API constraints the
+// automated path already respects (comment replies stay automation-only —
+// there's no single "current comment" a conversation-thread UI reply
+// targets).
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const { text } = req.body ?? {};
@@ -215,6 +236,7 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
   return res.status(201).json({ ok: true });
 });
 
+// Phase 2A Lead Notes / Internal Comments.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const notes = await listLeadNotes(getPool(), tenantId, leadId);
@@ -240,6 +262,7 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   return res.status(201).json(note);
 });
 
+// Phase 2A Tagging System.
 leadsRouter.get("/tenants/:tenantId/tags", async (req, res) => {
   const tags = await listTagsForTenant(getPool(), req.params.tenantId);
   return res.status(200).json(tags);
@@ -276,12 +299,15 @@ leadsRouter.delete("/tenants/:tenantId/leads/:leadId/tags/:tagId", async (req, r
   const { tenantId, leadId, tagId } = req.params;
   const tags = await listTagsForLead(getPool(), tenantId, leadId);
   const tag = tags.find((t) => t.tagId === tagId);
-  if (!tag) return res.status(404).json({ error: "tag not found for this lead" });
+  if (!tag) return res.status(404).json({ error: "tag not found on this lead" });
 
-  await removeTagFromLead(getPool(), { tenantId, leadId, tagId, actorUserId: req.tenantSession!.userId });
+  await removeTagFromLead(getPool(), { tenantId, leadId, tagId, tagName: tag.name, actorUserId: req.tenantSession!.userId });
   return res.status(204).send();
 });
 
+// Phase 2A Data Model Amendment: deals, schema now / UI later — a minimal
+// CRUD surface so the schema isn't entirely dark before Phase 4 builds
+// real revenue reporting on it.
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/deals", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const deals = await listDealsForLead(getPool(), tenantId, leadId);
@@ -290,37 +316,60 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId/deals", async (req, res) => {
 
 leadsRouter.post("/tenants/:tenantId/leads/:leadId/deals", async (req, res) => {
   const { tenantId, leadId } = req.params;
-  const { title, value, currency, stage } = req.body ?? {};
-  if (typeof title !== "string" || !title.trim()) return res.status(400).json({ error: "title is required" });
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return res.status(400).json({ error: "value must be a non-negative number" });
-  if (typeof currency !== "string" || !currency.trim()) return res.status(400).json({ error: "currency is required" });
-  const validStages: DealStage[] = ["open", "won", "lost"];
-  if (stage !== undefined && !validStages.includes(stage)) return res.status(400).json({ error: `stage must be one of ${validStages.join(", ")}` });
+  const { value, currency } = req.body ?? {};
+  if (value !== undefined && value !== null && typeof value !== "number") {
+    return res.status(400).json({ error: "value must be a number or null" });
+  }
 
   const lead = await getLead(getPool(), tenantId, leadId);
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
+  if (!lead.customerId) {
+    // Can't happen for any lead created after the Phase 1 migration's
+    // backfill — guarded anyway since this is the first place customerId
+    // being null would actually break something, rather than silently
+    // going unused.
+    return res.status(409).json({ error: "lead has no customer record yet" });
+  }
 
-  const deal = await createDeal(getPool(), { tenantId, leadId, title: title.trim(), value, currency: currency.trim().toUpperCase(), stage, actorUserId: req.tenantSession!.userId });
+  const deal = await createDeal(getPool(), {
+    tenantId,
+    customerId: lead.customerId,
+    leadId,
+    value: value ?? null,
+    currency: typeof currency === "string" ? currency : undefined,
+    ownerUserId: lead.ownerUserId,
+    actorUserId: req.tenantSession!.userId,
+  });
   return res.status(201).json(deal);
 });
 
-leadsRouter.patch("/tenants/:tenantId/leads/:leadId/deals/:dealId", async (req, res) => {
-  const { tenantId, leadId, dealId } = req.params;
+const VALID_DEAL_STAGES: DealStage[] = ["open", "won", "lost"];
+
+leadsRouter.patch("/tenants/:tenantId/deals/:dealId", async (req, res) => {
+  const { tenantId, dealId } = req.params;
   const { stage } = req.body ?? {};
-  if (stage !== "open" && stage !== "won" && stage !== "lost") return res.status(400).json({ error: "stage must be one of open, won, lost" });
-  const deal = await updateDealStage(getPool(), { tenantId, leadId, dealId, stage, actorUserId: req.tenantSession!.userId });
-  if (!deal) return res.status(404).json({ error: "deal not found" });
+  if (!VALID_DEAL_STAGES.includes(stage)) {
+    return res.status(400).json({ error: `stage must be one of ${VALID_DEAL_STAGES.join(", ")}` });
+  }
+
+  const deal = await updateDealStage(getPool(), { tenantId, dealId, stage, actorUserId: req.tenantSession!.userId });
+  if (!deal) return res.status(404).json({ error: "deal not found for this tenant" });
   return res.status(200).json(deal);
 });
 
+// Backs the Lead Ownership assignment dropdown.
+leadsRouter.get("/tenants/:tenantId/members", async (req, res) => {
+  const members = await listTenantMembers(getPool(), req.params.tenantId);
+  return res.status(200).json(members);
+});
+
+// Phase 2A "Carried from Phase 1": Top Performing Posts / Top Trigger Keywords.
 leadsRouter.get("/tenants/:tenantId/analytics/top-posts", async (req, res) => {
-  const { tenantId } = req.params;
-  const posts = await getTopPosts(getPool(), tenantId);
+  const posts = await getTopPosts(getPool(), req.params.tenantId);
   return res.status(200).json(posts);
 });
 
 leadsRouter.get("/tenants/:tenantId/analytics/top-keywords", async (req, res) => {
-  const { tenantId } = req.params;
-  const keywords = await getTopKeywords(getPool(), tenantId);
+  const keywords = await getTopKeywords(getPool(), req.params.tenantId);
   return res.status(200).json(keywords);
 });
