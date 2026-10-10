@@ -56,6 +56,7 @@ export function JourneyBuilder({
   onBack: () => void;
 }) {
   const [subTab, setSubTab] = useState<BuilderTab>("builder");
+  const subTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([]);
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
@@ -568,27 +569,45 @@ export function JourneyBuilder({
             </p>
           </div>
 
-          <div className="mt-1.5 flex gap-7 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => requestSubTabChange(tab.key)}
-                className={`relative -mb-px shrink-0 px-0 pb-2.5 pt-0.5 text-[13px] leading-5 transition-colors ${
-                  subTab === tab.key
-                    ? "font-semibold text-ink"
-                    : "text-subtle hover:text-ink"
-                }`}
-              >
-                {tab.label}
-                <span
-                  aria-hidden="true"
-                  className={`absolute bottom-[-1px] left-0 h-[3px] rounded-full bg-accent transition-opacity ${
-                    subTab === tab.key ? "w-full opacity-100" : "w-0 opacity-0"
+          <div role="tablist" aria-label="Journey sections" className="mt-1.5 flex gap-5 overflow-x-auto md:gap-7">
+            {TABS.map((tab, index) => {
+              const selected = subTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  ref={(element) => { subTabRefs.current[index] = element; }}
+                  id={`journey-tab-${tab.key}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls="journey-tabpanel"
+                  tabIndex={selected ? 0 : -1}
+                  onKeyDown={(event) => {
+                    let nextIndex: number | null = null;
+                    if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
+                    if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
+                    if (event.key === "Home") nextIndex = 0;
+                    if (event.key === "End") nextIndex = TABS.length - 1;
+                    if (nextIndex !== null) {
+                      event.preventDefault();
+                      subTabRefs.current[nextIndex]?.focus();
+                    }
+                  }}
+                  onClick={() => requestSubTabChange(tab.key)}
+                  className={`relative -mb-px shrink-0 px-0 pb-2.5 pt-0.5 text-[13px] leading-5 transition-colors ${
+                    selected ? "font-semibold text-ink" : "text-subtle hover:text-ink"
                   }`}
-                />
-              </button>
-            ))}
+                >
+                  {tab.label}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute bottom-[-1px] left-0 h-[3px] rounded-full bg-accent transition-opacity ${
+                      selected ? "w-full opacity-100" : "w-0 opacity-0"
+                    }`}
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -596,7 +615,13 @@ export function JourneyBuilder({
           <div className="banner banner-error mx-4 mt-3 md:mx-5">{publishError}</div>
         )}
 
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div
+          id="journey-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`journey-tab-${subTab}`}
+          tabIndex={0}
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        >
           {subTab === "builder" && (
             <BuilderCanvas
               tenantId={tenantId}
