@@ -317,7 +317,7 @@ test.describe("responsive route smoke checks", () => {
     const ctaInput = page.getByRole("textbox", { name: "CTA link (HTTPS URL)" });
     await expect(ctaInput).toHaveValue("https://example.com/details");
     await expect(page.getByText("Image card", { exact: true })).toBeVisible();
-    await expect(page.locator('img[src="https://cdn.example.com/post-card.jpg"]')).toBeVisible();
+    await expect(page.locator('img[src="https://cdn.example.com/post-card.jpg"]').first()).toBeVisible();
     await expect(page.getByRole("link", { name: /View details/ }).last()).toHaveAttribute(
       "href",
       "https://example.com/details",
