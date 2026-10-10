@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ConversationsTimeseriesPoint } from "../api";
 
 /**
@@ -78,15 +78,13 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
   const maxValue = Math.max(1, ...data.map((d) => Math.max(d.comments, d.dms)));
   const stepX = data.length > 1 ? plotW / (data.length - 1) : 0;
 
-  const points = useMemo(
-    () =>
-      data.map((d, i) => ({
-        x: padding.left + i * stepX,
-        comments: padding.top + plotH - (d.comments / maxValue) * plotH,
-        dms: padding.top + plotH - (d.dms / maxValue) * plotH,
-      })),
-    [data, stepX, maxValue, plotH, padding.left, padding.top],
-  );
+  // The series is capped at a short daily window, so direct mapping is
+  // inexpensive and keeps all hooks above the empty/zero-state early returns.
+  const points = data.map((d, i) => ({
+    x: padding.left + i * stepX,
+    comments: padding.top + plotH - (d.comments / maxValue) * plotH,
+    dms: padding.top + plotH - (d.dms / maxValue) * plotH,
+  }));
 
   const linePath = (key: "comments" | "dms") =>
     points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p[key].toFixed(1)}`).join(" ");
