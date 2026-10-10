@@ -61,13 +61,15 @@ These are code-level observations from the files inspected, combined with the UI
 
 **Active branch:** `feat/ui-revamp-phase-1`
 
-The implementation branch now includes shared focus-visible styling and contrast-token groundwork; modal/dialog focus handling; toast live announcements; accessible search/filter labels; keyboard-operable Automation, Journey Builder, inspector and Lead Detail tabs; a focus-managed mobile navigation drawer; shared page-width/surface conventions; dashboard empty/all-zero/error states; mobile-safe data tables/forms; visible retry paths for failed data loads; and an Add Goal action on the mobile builder canvas.
+The branch is rebased on current `main` (`a92fed3`) and retains the latest Instagram product changes: **username recovery/backfill** (#11) and **rich CTA button/card messages** (#12). The UI follow-through provides neutral, consistent identity fallbacks while a username is unavailable and a campaign-details preview for text, CTA button, and image-card messages.
 
-The Journey Builder save model now commits graph edits and goal structure/order/content as one version-checked transaction. Inspector “Apply to draft” does not persist independently; goal loading is guarded before Save; canvas-only saves preserve goal IDs; zero-goal journeys are saveable; and failed saves retain the draft. Backend regression tests cover empty-goal saves, goal creation, ID preservation, and rollback of invalid combined drafts.
+The implementation also includes shared focus-visible styling and contrast-token groundwork; modal/dialog focus handling; toast live announcements; accessible search/filter labels; keyboard-operable Automation, Journey Builder, inspector and Lead Detail tabs; a focus-managed mobile navigation drawer; shared page-width/surface conventions; dashboard empty/all-zero/error states; mobile-safe data tables/forms; visible retry paths for failed data loads; and an Add Goal action on the mobile builder canvas.
 
-The branch also adds a dedicated Chromium Playwright workflow with 12 route/interaction checks: mobile overflow across operational pages, Login/Docs, mobile drawer keyboard dismissal, populated Inbox recovery, Lead Detail arrow-key tabs, operational-page retry recovery, and an axe scan for critical violations on Leads. Browser reports/traces are uploaded as workflow artifacts.
+The Journey Builder save model commits graph edits and goal structure/order/content as one version-checked transaction. Inspector “Apply to draft” does not persist independently; goal loading is guarded before Save; canvas-only saves preserve goal IDs; zero-goal journeys are saveable; and failed saves retain the draft. Backend regression tests cover empty-goal saves, goal creation, ID preservation, and rollback of invalid combined drafts.
 
-**Verification snapshot (2026-10-10):** Client lint and production build passed on commit `70ae871`; the Chromium smoke suite passed on the same commit. Server CI passed typecheck, production build, database migrations and the full database-backed test suite on commit `b18b16c`, including the atomic-save regression tests. Real-device visual QA, tablet and dark-theme review, and manual keyboard/screen-reader testing have not been completed. The revamp remains in progress; those checks stay open rather than being treated as covered by automation.
+The dedicated Chromium Playwright workflow now runs **14 route/interaction checks**, covering mobile overflow across operational pages, Login/Docs, mobile drawer keyboard dismissal, populated Inbox recovery, Lead Detail arrow-key tabs, operational-page retry recovery, CTA preview modes and invalid-HTTPS messaging, unresolved username presentation, and an axe scan for critical violations on Leads. Browser reports/traces are uploaded as workflow artifacts.
+
+**Verification snapshot (2026-10-10):** Client lint and production build passed on the current code head `a426b73`; Chromium smoke tests passed **14/14** on that head. The browser report is attached to [the successful run](https://github.com/akashdnb/signalAI/actions/runs/38047468231). Server typecheck, production build, and migrations passed on the rebased code; its full database-backed suite is still rerunning as of this update. Real-device visual QA, tablet and dark-theme review, and manual keyboard/screen-reader testing have not been completed. The revamp remains in progress; those checks stay open rather than being treated as covered by automation.
 
 
 ---
@@ -614,7 +616,8 @@ Each PR should include:
 - [x] Add and run Chromium Playwright route/interaction smoke checks; upload HTML report and traces from CI
 - [x] Run an automated axe scan for critical violations on the representative Leads route
 - [ ] Expand automated accessibility scans to more routes and manually review findings
-- [x] Server typecheck, production build, migrations and database-backed tests pass in server CI
+- [x] Server typecheck, production build and migrations pass in CI on the rebased branch
+- [ ] Full database-backed server suite passes on the rebased branch (rerun in progress at this snapshot)
 - [ ] Desktop, tablet, mobile; light and dark theme visual QA
 - [ ] Manual keyboard-only navigation, focus trap/restoration, reduced motion, accessible names and live announcements
 - [ ] Contrast for text/statuses/graph edges and focus indicators in both themes
