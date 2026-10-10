@@ -38,12 +38,6 @@ function toEvent(row: LeadEventRow): LeadEvent {
   };
 }
 
-/**
- * Persists a webhook event keyed by Meta's own event id. Returns null on a
- * duplicate delivery (the ON CONFLICT DO NOTHING path) rather than throwing —
- * a duplicate is an expected, normal outcome of at-least-once delivery, not
- * an error condition.
- */
 export interface EventForReply {
   leadId: string;
   eventType: string;
@@ -52,11 +46,9 @@ export interface EventForReply {
   commentText: string | null;
   dmText: string | null;
   username: string | null;
-  /** Meta's own comment id — required to post a public reply to this exact comment (replyChannel 'comment'/'both'). Null for older events ingested before this was captured. */
   commentId: string | null;
 }
 
-/** Everything the reply engine needs for one event, joined once rather than three separate round trips. */
 export async function getEventForReply(
   pool: Queryable,
   tenantId: string,
@@ -101,7 +93,6 @@ export interface LeadEventForTimeline {
   matchedKeyword: string | null;
 }
 
-/** Phase 2A Lead Timeline's Meta-webhook-sourced half — see db/leadTimeline.ts for how this merges with lead_activity's CRM-sourced half. */
 export async function listEventsForLead(pool: Queryable, tenantId: string, leadId: string): Promise<LeadEventForTimeline[]> {
   const result = await pool.query<{
     id: string;
@@ -116,7 +107,7 @@ export async function listEventsForLead(pool: Queryable, tenantId: string, leadI
      from lead_events e
      left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
      where e.tenant_id = $1 and e.lead_id = $2
-     order by e.occurred_at`,
+     order by e.occurred_at, e.id`,
     [tenantId, leadId],
   );
   return result.rows.map((row) => ({
@@ -136,20 +127,6 @@ export interface LeadEventForHistory {
   dmText: string | null;
 }
 
-/**
- * Bounded companion to listEventsForLead, for building LLM conversation
- * history rather than the full dashboard timeline: caps rows fetched to the
- * `limit` most-recent, so the query stays cheap regardless of how long the
- * lead's total history is. Excludes `excludeEventId` — the event currently
- * being replied to, whose text is already the LLM's userMessage, not history.
- *
- * `eventType`, when given, restricts to that event type (`"comment"` or
- * `"message"`) at the SQL level — the Comment Reply vs DM Reply privacy
- * boundary (conversationHistory.ts): a public comment reply's history must
- * never even be fetched from a private DM event, not just filtered out
- * afterward. Omitted (the default) preserves the original mixed-channel
- * query, unchanged, for the DM tier's existing behavior.
- */
 export async function listRecentEventsForLead(
   pool: Queryable,
   tenantId: string,
@@ -168,8 +145,8 @@ export async function listRecentEventsForLead(
          limit $4`
       : `select e.occurred_at, p.comment_text, p.dm_text
          from lead_events e
-         left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
-         where e.tenant_id = $1 and e.lead_id = $2 and e.id != $3
+         left join lead_pii p on p.lead_event_id = e.id and e.id != $3 and p.deleted_at is null
+         where e.tenant_id = $1 and e.lead_id = $2
          order by e.occurred_at desc
          limit $4`,
     eventType ? [tenantId, leadId, excludeEventId, limit, eventType] : [tenantId, leadId, excludeEventId, limit],
@@ -182,21 +159,18 @@ export async function listRecentEventsForLead(
 }
 
 /**
- * Bounded, cursor-paginated companion to listEventsForLead — for the Lead
- * Timeline UI (leadTimeline.ts's getLeadTimelinePage), which previously
- * fetched a lead's entire history on every load/reload, unbounded, and was
- * slow for a long-running conversation. `before` (exclusive) pages
- * backwards from the most recent event; omitted, starts from the newest.
- * Capped to `limit + 1` — see getLeadTimelinePage for why one extra row is
- * fetched per source (it's what lets `hasMore` be computed correctly after
- * merging three differently-sourced result sets).
+ * Cursor-paginated timeline source. The global timeline cursor contains
+ * occurredAt + source rank + unique id. The source rank is supplied by the
+ * merger so rows sharing a timestamp are still totally ordered across all
+ * three timeline tables.
  */
 export async function listEventsForLeadPage(
   pool: Queryable,
   tenantId: string,
   leadId: string,
   limit: number,
-  before?: Date,
+  cursor?: { occurredAt: Date; sourceRank: number; id: string },
+  sourceRank = 3,
 ): Promise<LeadEventForTimeline[]> {
   const result = await pool.query<{
     id: string;
@@ -210,10 +184,11 @@ export async function listEventsForLeadPage(
     `select e.id, e.event_type, e.occurred_at, e.attributes, p.comment_text, p.dm_text, p.username
      from lead_events e
      left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
-     where e.tenant_id = $1 and e.lead_id = $2 and ($4::timestamptz is null or e.occurred_at < $4)
-     order by e.occurred_at desc
+     where e.tenant_id = $1 and e.lead_id = $2
+       and ($4::timestamptz is null or (e.occurred_at, $5::int, e.id) < ($4::timestamptz, $5::int, $6::text))
+     order by e.occurred_at desc, e.id desc
      limit $3`,
-    [tenantId, leadId, limit, before ?? null],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? ""],
   );
   return result.rows.map((row) => ({
     id: row.id,
@@ -241,17 +216,9 @@ export async function insertEventIdempotent(
   const result = await pool.query<LeadEventRow>(
     `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
      values ($1, $2, $3, $4, $5, $6, $7)
-     on conflict (meta_event_id) do nothing
+     on conflict (tenant_id, meta_event_id) do nothing
      returning *`,
-    [
-      params.tenantId,
-      params.leadId,
-      params.metaEventId,
-      params.eventType,
-      params.occurredAt,
-      params.sequence,
-      JSON.stringify(params.attributes ?? {}),
-    ],
+    [params.tenantId, params.leadId, params.metaEventId, params.eventType, params.occurredAt, params.sequence, params.attributes ?? {}],
   );
   return result.rows[0] ? toEvent(result.rows[0]) : null;
 }
