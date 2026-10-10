@@ -556,6 +556,7 @@ export function BuilderCanvas({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorKind, setLoadErrorKind] = useState<"load" | "save" | null>(null);
 
   const setVersion = useCallback(
     (version: number) => {
@@ -595,6 +596,7 @@ export function BuilderCanvas({
       version: builderVersionRef.current ?? 0,
     }));
     setLoadError(null);
+    setLoadErrorKind(null);
     onCanvasDirtyChange?.(false);
     onSaveStateChange?.("saved");
   }, [onCanvasDirtyChange, onSaveStateChange, setEdges, setNodes]);
@@ -827,12 +829,14 @@ export function BuilderCanvas({
     async (silent = false) => {
       if (!silent) setLoading(true);
       setLoadError(null);
+      setLoadErrorKind(null);
 
       try {
         if (silent && isDirtyRef.current) {
           setLoadError(
             "This journey has unsaved canvas changes. Save or discard them before refreshing the flow.",
           );
+          setLoadErrorKind("load");
           return;
         }
 
@@ -856,6 +860,7 @@ export function BuilderCanvas({
         setLoadError(
           error instanceof Error ? error.message : "Failed to load journey flow",
         );
+        setLoadErrorKind("load");
       } finally {
         if (!silent) setLoading(false);
       }
@@ -888,6 +893,7 @@ export function BuilderCanvas({
       const version = builderVersionRef.current;
       if (version === null) {
         setLoadError("The journey is still loading. Try saving again in a moment.");
+        setLoadErrorKind("save");
         return false;
       }
 
@@ -903,6 +909,7 @@ export function BuilderCanvas({
       setSaving(true);
       onSaveStateChange?.("saving");
       setLoadError(null);
+      setLoadErrorKind(null);
 
       try {
         const saved = await api.saveBuilderGraph(
@@ -937,6 +944,7 @@ export function BuilderCanvas({
         setLoadError(
           error instanceof Error ? error.message : "Failed to save journey",
         );
+        setLoadErrorKind("save");
         // Keep the local draft intact on conflicts or failures so nothing the
         // user has changed is silently discarded.
         return false;
@@ -1203,9 +1211,13 @@ export function BuilderCanvas({
           <button
             type="button"
             className="font-semibold text-accent hover:text-accent-hover"
-            onClick={() => void loadGraph(false)}
+            onClick={() =>
+              loadErrorKind === "save"
+                ? void persistGraph(milestones)
+                : void loadGraph(false)
+            }
           >
-            Retry
+            {loadErrorKind === "save" ? "Retry save" : "Retry loading"}
           </button>
         </div>
       )}
