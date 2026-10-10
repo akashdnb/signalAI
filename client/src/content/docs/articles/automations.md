@@ -4,7 +4,7 @@ slug: automations
 group: Automations
 description: Manage keyword-triggered journeys and control how SignalAI responds to Instagram activity.
 order: 4
-related: triggers-and-keywords, rule-based-automation, journey-builder, beta-scope
+related: triggers-and-keywords, rule-based-automation, journey-builder, rich-media-messages, beta-scope
 ---
 
 ## Journey lifecycle
@@ -26,11 +26,15 @@ Use names that make trigger and intent easy to identify. For example, Course Bro
 
 ## Understand the journey tabs
 
-- **Builder:** configure the visual sequence and goal blocks.
-- **Details:** configure name, description, enabled state, trigger, reply mode, reply channel, templates, CTA link, AI behavior, post targeting, and milestones.
+- **Builder:** configure the visual sequence, message nodes, and goal blocks. Open a message node's editor and choose **Instagram layout** to create text with buttons, a card, a gallery/carousel, or quick replies. See [Rich Media Messages](/docs/rich-media-messages).
+- **Details:** configure name, description, enabled state, trigger, reply mode, reply channel, templates, campaign-level CTA link, AI behavior, post targeting, and milestones.
 - **Analytics:** inspect matched activity, leads, funnel indicators, and milestone drop-off.
 - **Leads:** view leads associated with the journey.
 - **Versions:** in the current beta, this is informational and does not provide a full version-history or rollback experience.
+
+## Campaign CTA versus a message-node layout
+
+The optional **CTA Link** under Details configures the campaign-level call to action. It is not the editor for a rich layout on an individual step. To add several buttons, a card, a gallery, or quick replies to a particular step, edit that message node in **Builder → Instagram layout**. Read [Rich Media Messages](/docs/rich-media-messages) for the full workflow.
 
 ## Best practices
 
