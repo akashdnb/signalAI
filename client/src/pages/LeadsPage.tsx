@@ -51,7 +51,7 @@ export function LeadsPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>Leads</h1>
 
       {error && <div className="banner banner-error">{error}</div>}
@@ -91,7 +91,8 @@ export function LeadsPage() {
         ) : leads.length === 0 ? (
           <p className="muted">No leads match this view yet.</p>
         ) : (
-          <table className="table">
+          <div className="-mx-2 overflow-x-auto sm:mx-0">
+          <table className="table min-w-[780px]">
             <thead>
               <tr>
                 <th>Username</th>
@@ -132,6 +133,7 @@ export function LeadsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>
