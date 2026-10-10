@@ -4,7 +4,7 @@ import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
-import { listActiveCampaignKeywords, type TriggerSource } from "../db/campaigns.js";
+import { listActiveCampaignKeywords, type ReplyChannel, type TriggerSource } from "../db/campaigns.js";
 import { findMatchingCampaign, resolveDmCampaignTrigger } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
@@ -29,7 +29,7 @@ export async function ingestWebhookEvents(
   const tenantIdByAccount = new Map<string, string | null>();
   const campaignsByTenant = new Map<
     string,
-    Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>
+    Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>
   >();
 
   for (const event of events) {
