@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findMatchingCampaign } from "../keywordMatch.js";
+import { CONTINUATION_KEYWORD, findMatchingCampaign, RESTART_KEYWORD, resolveDmCampaignTrigger } from "../keywordMatch.js";
 
 describe("findMatchingCampaign", () => {
   const campaigns = [
@@ -52,5 +52,39 @@ describe("findMatchingCampaign", () => {
     it("skips every post-scoped campaign when the event carries no media id", () => {
       expect(findMatchingCampaign("send the LINK", undefined, scoped)?.campaignId).toBe("c3");
     });
+  });
+});
+
+describe("resolveDmCampaignTrigger", () => {
+  const campaigns = [
+    { id: "dm-1", keywords: ["link"], targetMediaIds: [], triggerSource: "message" as const },
+    { id: "both-1", keywords: ["price"], targetMediaIds: [], triggerSource: "both" as const },
+    { id: "comment-1", keywords: ["hello"], targetMediaIds: [], triggerSource: "comment" as const },
+  ];
+
+  it("continues the active DM automation when the previous 24-hour window is open", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, "dm-1", true)).toEqual({
+      campaignId: "dm-1", keyword: CONTINUATION_KEYWORD, restartCampaign: false,
+    });
+  });
+
+  it("restarts the active DM automation when the customer returns after the window expires", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, "dm-1", false)).toEqual({
+      campaignId: "dm-1", keyword: RESTART_KEYWORD, restartCampaign: true,
+    });
+  });
+
+  it("prefers a real keyword and restarts from the beginning after a gap", () => {
+    expect(resolveDmCampaignTrigger("please send the LINK", campaigns, "dm-1", false)).toEqual({
+      campaignId: "dm-1", keyword: "link", restartCampaign: true,
+    });
+  });
+
+  it("does not restart a campaign for a lead with no active DM campaign", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, null, false)).toBeNull();
+  });
+
+  it("does not continue a disabled or comment-only campaign as a DM", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, "comment-1", false)).toBeNull();
   });
 });
