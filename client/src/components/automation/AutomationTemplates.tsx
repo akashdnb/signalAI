@@ -1,4 +1,4 @@
-import { BotIcon, HandshakeIcon, InstagramMarkIcon, SendIcon, CloseIcon } from "../icons";
+import { BotIcon, HandshakeIcon, InstagramMarkIcon, SendIcon } from "../icons";
 import { useState } from "react";
 import { BottomSheet } from "../BottomSheet";
 import type { CampaignLanguage, CampaignTone, ReplyChannel, TriggerSource } from "../../api";
@@ -121,7 +121,7 @@ export function AutomationTemplates({
 
   function confirmUse() {
     if (!selectedTemplate) return;
-    void onUse(selectedTemplate);
+    return onUse(selectedTemplate);
   }
 
   return (
@@ -192,20 +192,23 @@ function TemplateDetailsDialog({
 }: {
   template: AutomationTemplate;
   onClose: () => void;
-  onCreate: () => void;
+  onCreate: () => void | Promise<void>;
 }) {
   const Icon = template.icon;
   const milestones = template.preset.milestones ?? [];
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function create() {
     if (creating) return;
     setCreating(true);
+    setError(null);
     try {
-      onCreate();
+      await onCreate();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create draft");
     } finally {
-      // The owning page closes the dialog after the API succeeds. Keep the
-      // local guard only for the current interaction; failed attempts can retry.
       setCreating(false);
     }
   }
@@ -280,6 +283,7 @@ function TemplateDetailsDialog({
       </p>
 
       <div className="mt-5 flex justify-end gap-2">
+        {error && <div className="banner banner-error mr-auto" role="alert">{error}</div>}
         <button type="button" className="btn-secondary" disabled={creating} onClick={onClose}>Cancel</button>
         <button type="button" className="btn-primary" disabled={creating} onClick={() => void create()}>
           {creating ? "Creating…" : "Create draft"}
