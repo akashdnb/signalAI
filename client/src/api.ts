@@ -695,10 +695,10 @@ export const api = {
   listCampaigns: (tenantId: string) => request<Campaign[]>(`/tenants/${tenantId}/campaigns`),
   getCampaign: (tenantId: string, campaignId: string) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}`),
-  createCampaign: (tenantId: string, name: string, keywords: string[]) =>
+  createCampaign: (tenantId: string, name: string, keywords: string[], options?: { enabled?: boolean }) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns`, {
       method: "POST",
-      body: JSON.stringify({ name, keywords }),
+      body: JSON.stringify({ name, keywords, ...(options?.enabled === undefined ? {} : { enabled: options.enabled }) }),
     }),
   setCampaignEnabled: (tenantId: string, campaignId: string, enabled: boolean) =>
     request<{ id: string; enabled: boolean }>(`/tenants/${tenantId}/campaigns/${campaignId}/enabled`, {
