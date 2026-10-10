@@ -153,13 +153,16 @@ export function JourneyBuilder({
   useEffect(() => {
     if (!canvasDirty) return;
 
-    const interceptPopState = () => {
+    const interceptPopState = (event: PopStateEvent) => {
       if (restoringHistoryRef.current) {
         restoringHistoryRef.current = false;
         return;
       }
 
       const targetUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      // Stop BrowserRouter's own popstate listener before it changes routes
+      // and unmounts this draft. We immediately restore the prior history item.
+      event.stopImmediatePropagation();
       restoringHistoryRef.current = true;
       window.history.forward();
       requestNavigation(() => navigate(targetUrl));
