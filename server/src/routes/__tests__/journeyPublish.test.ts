@@ -67,6 +67,7 @@ describe("journey publishing", () => {
       });
 
     expect(create.status).toBe(201);
+    expect(create.body.enabled).toBe(false);
 
     const campaignId = create.body.id as string;
 
@@ -91,6 +92,12 @@ describe("journey publishing", () => {
     expect(publish.body.tenantId).toBe(tenant.id);
     expect(publish.body.campaignId).toBe(campaignId);
     expect(publish.body.graph.nodes).toHaveLength(3);
+
+    const activatedCampaign = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${campaignId}`)
+      .set(authHeader);
+    expect(activatedCampaign.status).toBe(200);
+    expect(activatedCampaign.body.enabled).toBe(true);
 
     const published = await request(app)
       .get(
