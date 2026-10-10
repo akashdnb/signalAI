@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendInstagramMessage } from "../instagramSend.js";
+import { sendInstagramMessage, sendInstagramPrivateReply } from "../instagramSend.js";
 
 function lastBody(fetchMock: ReturnType<typeof vi.spyOn>) {
   const request = fetchMock.mock.calls[0]![1] as RequestInit;
@@ -199,6 +199,24 @@ describe("sendInstagramMessage", () => {
     });
 
     expect(lastBody(fetchMock).message).toEqual({ text: longBody });
+  });
+
+  it("sends a comment private reply through the comment-specific endpoint", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response(JSON.stringify({ message_id: "private-reply-1" }), { status: 200 }),
+    );
+
+    const result = await sendInstagramPrivateReply("token", "comment-123", "Here's the information you asked for.");
+
+    expect(result.metaMessageId).toBe("private-reply-1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://graph.instagram.com/v21.0/comment-123/private_replies",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+        body: JSON.stringify({ message: "Here's the information you asked for." }),
+      }),
+    );
   });
 
   it("adds Meta's HUMAN_AGENT message tag only when explicitly requested", async () => {
