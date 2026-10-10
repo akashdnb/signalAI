@@ -44,13 +44,24 @@ async function getPage<T>(path: string): Promise<T> {
       // Keep the HTTP status text when the response is not JSON.
     }
     if (response.status === 401 || response.status === 403) {
-      // Match the shared API client's session handling.
       localStorage.removeItem("signalai.session");
     }
     throw new ApiError(response.status, message);
   }
 
-  return response.json() as Promise<T>;
+  const body = await response.json();
+  // Keep the paginated contract as the primary path, while tolerating legacy
+  // list responses from older deployments and fixtures during rollout.
+  if (Array.isArray(body)) {
+    return {
+      items: body,
+      page: 1,
+      pageSize: body.length,
+      total: body.length,
+      totalPages: body.length > 0 ? 1 : 0,
+    } as T;
+  }
+  return body as T;
 }
 
 function queryString(values: Record<string, string | number | boolean | undefined>): string {
