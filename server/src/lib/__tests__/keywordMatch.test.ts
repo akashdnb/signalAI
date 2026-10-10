@@ -80,8 +80,14 @@ describe("resolveDmCampaignTrigger", () => {
     });
   });
 
-  it("does not restart a campaign for a lead with no active DM campaign", () => {
+  it("does not restart a campaign for a lead with no active DM campaign and no keyword", () => {
     expect(resolveDmCampaignTrigger("just checking in", campaigns, null, false)).toBeNull();
+  });
+
+  it("starts a fresh run for a direct keyword match after the 24-hour window is closed", () => {
+    expect(resolveDmCampaignTrigger("please send the LINK", campaigns, null, false)).toEqual({
+      campaignId: "dm-1", keyword: "link", restartCampaign: true,
+    });
   });
 
   it("does not continue a disabled or comment-only campaign as a DM", () => {
