@@ -58,13 +58,15 @@ export function AutomationPage() {
 
     try {
       const created = await api.createCampaign(tenantId, template.name, template.keywords);
+      const { milestones: presetMilestones, ...replyConfig } = template.preset;
+
       await api.updateReplyConfig(tenantId, created.id, {
-        ...template.preset,
+        ...replyConfig,
         keywords: template.keywords,
       });
 
-      if (template.preset.milestones) {
-        await api.setMilestones(tenantId, created.id, template.preset.milestones);
+      if (presetMilestones) {
+        await api.setMilestones(tenantId, created.id, presetMilestones);
       }
 
       push(`${template.name} preset created`);
