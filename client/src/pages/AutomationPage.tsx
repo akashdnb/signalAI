@@ -23,7 +23,6 @@ export function AutomationPage() {
   const [activeTab, setActiveTab] = useState<AutomationTab>("journeys");
   const [error, setError] = useState<string | null>(null);
   const [showNewJourney, setShowNewJourney] = useState(false);
-  const [journeyRefreshToken, setJourneyRefreshToken] = useState(0);
   const { toasts, push } = useToasts();
 
   async function handleCreateJourney(name: string, keywords: string[]) {
@@ -55,7 +54,6 @@ export function AutomationPage() {
       <AutomationHeader />
       <AutomationTabs active={activeTab} onChange={setActiveTab} />
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
-
       {activeTab === "templates" ? (
         <AutomationTemplates onUse={(template) => void handleUseTemplate(template)} />
       ) : activeTab !== "journeys" ? (
@@ -69,13 +67,11 @@ export function AutomationPage() {
         <div id="automation-tabpanel" role="tabpanel" aria-labelledby="automation-tab-journeys" tabIndex={0} className="min-w-0 flex-1">
           <JourneyTablePaginated
             tenantId={tenantId}
-            refreshToken={journeyRefreshToken}
             onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)}
             onNewJourney={() => setShowNewJourney(true)}
           />
         </div>
       )}
-
       {showNewJourney && <NewJourneyDialog onClose={() => setShowNewJourney(false)} onCreate={handleCreateJourney} />}
       <ToastStack toasts={toasts} />
     </div>
