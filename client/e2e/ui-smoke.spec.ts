@@ -25,8 +25,11 @@ async function mockTenantApi(
   page: Page,
   options: { failFirstLeadsLoad?: boolean; failFirstTimelineLoad?: boolean } = {},
 ) {
-  let failedLeadsLoad = false;
-  let failedTimelineLoad = false;
+  // React Strict Mode intentionally mounts effects twice in development.
+  // Fail both initial attempts so the active effect sees the error; Retry is
+  // then the next request and must succeed.
+  let failedLeadsLoadCount = 0;
+  let failedTimelineLoadCount = 0;
   await page.route("http://localhost:3000/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -35,9 +38,9 @@ async function mockTenantApi(
       options.failFirstLeadsLoad &&
       path === `${tenantPath}/leads` &&
       !url.searchParams.has("unread") &&
-      !failedLeadsLoad
+      failedLeadsLoadCount < 2
     ) {
-      failedLeadsLoad = true;
+      failedLeadsLoadCount += 1;
       await route.fulfill({
         status: 503,
         contentType: "application/json",
@@ -49,9 +52,9 @@ async function mockTenantApi(
     if (
       options.failFirstTimelineLoad &&
       path === `${tenantPath}/leads/smoke-lead/timeline` &&
-      !failedTimelineLoad
+      failedTimelineLoadCount < 2
     ) {
-      failedTimelineLoad = true;
+      failedTimelineLoadCount += 1;
       await route.fulfill({
         status: 503,
         contentType: "application/json",
