@@ -36,3 +36,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run responsive and accessibility smoke tests
         run: npx playwright test
+      - name: Upload browser test report and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-browser-smoke-${{ github.run_number }}
+          path: |
+            client/playwright-report/
+            client/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
