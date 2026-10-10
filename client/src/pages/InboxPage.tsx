@@ -42,6 +42,7 @@ export function InboxPage() {
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
   // Keep the Inbox composer aligned with Meta's 24-hour reply window. The server
@@ -63,6 +64,7 @@ export function InboxPage() {
                 : {};
       const l = await api.getLeads(tenantId, { ...filters, q: search.trim() || undefined });
       setLeads(l);
+      setError(null);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         navigate("/login", { replace: true });
@@ -75,7 +77,7 @@ export function InboxPage() {
   useEffect(() => {
     reloadLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, tab, search]);
+  }, [tenantId, tab, search, reloadCount]);
 
   const reloadLeadsRef = useRef(reloadLeads);
   reloadLeadsRef.current = reloadLeads;
@@ -192,7 +194,16 @@ export function InboxPage() {
   return (
     <div className="page page-workspace">
       <h1>Inbox</h1>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {leads === null && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 md:h-[75vh] md:flex-row md:gap-0 md:overflow-hidden md:rounded-xl md:border md:border-line">
         {/* Conversation list */}
@@ -215,7 +226,7 @@ export function InboxPage() {
           </div>
 
           {leads === null ? (
-            <p className="muted p-3">Loading…</p>
+            <p className="muted p-3" role="status">{error ? "Conversations could not be loaded." : "Loading…"}</p>
           ) : leads.length === 0 ? (
             <p className="muted p-3">No conversations match this view.</p>
           ) : (
