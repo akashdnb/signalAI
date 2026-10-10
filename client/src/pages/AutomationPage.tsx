@@ -58,10 +58,19 @@ export function AutomationPage() {
 
     try {
       const created = await api.createCampaign(tenantId, template.name, template.keywords);
-      push(`${template.name} journey created`);
+      await api.updateReplyConfig(tenantId, created.id, {
+        ...template.preset,
+        keywords: template.keywords,
+      });
+
+      if (template.preset.milestones) {
+        await api.setMilestones(tenantId, created.id, template.preset.milestones);
+      }
+
+      push(`${template.name} preset created`);
       navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create journey from template");
+      setError(err instanceof ApiError ? err.message : "Failed to create journey from preset");
     }
   }
 
