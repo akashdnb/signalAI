@@ -528,11 +528,13 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
           })),
         );
 
-    const savedByDraftId = new Map(
-      draftMilestones.map((milestone, index) => [milestone.id, savedMilestones[index]!]),
+    const savedByDraftId = new Map<string, (typeof savedMilestones)[number]>(
+      draftMilestones.map(
+        (milestone, index) => [milestone.id, savedMilestones[index]!] as const,
+      ),
     );
-    const milestoneIndexByDraftId = new Map(
-      draftMilestones.map((milestone, index) => [milestone.id, index]),
+    const milestoneIndexByDraftId = new Map<string, number>(
+      draftMilestones.map((milestone, index) => [milestone.id, index] as const),
     );
     const seenDraftIds = new Set<string>();
     let milestoneNodeCount = 0;
