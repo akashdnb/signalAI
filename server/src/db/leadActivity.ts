@@ -39,13 +39,6 @@ function toLeadActivity(row: LeadActivityRow): LeadActivity {
   };
 }
 
-/**
- * The CRM-originated half of the Lead Timeline (see the migration's own
- * comment for why this is separate from lead_events). Called alongside
- * whatever mutation it's describing — never on its own — so pass the same
- * Queryable the caller is already using if that call happens inside a
- * transaction, so the activity row commits or rolls back with it.
- */
 export async function recordLeadActivity(
   pool: Queryable,
   params: {
@@ -67,26 +60,27 @@ export async function recordLeadActivity(
 
 export async function listLeadActivity(pool: Queryable, tenantId: string, leadId: string): Promise<LeadActivity[]> {
   const result = await pool.query<LeadActivityRow>(
-    `select * from lead_activity where tenant_id = $1 and lead_id = $2 order by created_at`,
+    `select * from lead_activity where tenant_id = $1 and lead_id = $2 order by created_at, id`,
     [tenantId, leadId],
   );
   return result.rows.map(toLeadActivity);
 }
 
-/** Bounded, cursor-paginated companion to listLeadActivity — see listEventsForLeadPage in db/events.ts for the pagination contract this and leadTimeline.ts's getLeadTimelinePage share. */
 export async function listLeadActivityPage(
   pool: Queryable,
   tenantId: string,
   leadId: string,
   limit: number,
-  before?: Date,
+  cursor?: { occurredAt: Date; sourceRank: number; id: string },
+  sourceRank = 1,
 ): Promise<LeadActivity[]> {
   const result = await pool.query<LeadActivityRow>(
     `select * from lead_activity
-     where tenant_id = $1 and lead_id = $2 and ($4::timestamptz is null or created_at < $4)
-     order by created_at desc
+     where tenant_id = $1 and lead_id = $2
+       and ($4::timestamptz is null or (created_at, $5::int, id) < ($4::timestamptz, $5::int, $6::text))
+     order by created_at desc, id desc
      limit $3`,
-    [tenantId, leadId, limit, before ?? null],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? ""],
   );
   return result.rows.map(toLeadActivity);
 }
