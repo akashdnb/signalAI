@@ -295,6 +295,14 @@ campaignsRouter.post(
         graph,
       );
 
+      // Publication and activation are one transaction: a draft cannot become
+      // a published-but-inert journey if activation fails after the snapshot.
+      await client.query(
+        `update campaigns set enabled = true, updated_at = now()
+          where id = $1 and tenant_id = $2`,
+        [campaignId, tenantId],
+      );
+
       await client.query("COMMIT");
 
       return res.status(200).json(published);
