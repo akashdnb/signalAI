@@ -268,7 +268,7 @@ function TemplateDetailsDialog({
         <div className="mt-5">
           <p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Qualification goals</p>
           <ol className="mt-2 space-y-2 pl-5">
-            {milestones.map((milestone, index) => (
+            {milestones.map((milestone) => (
               <li key={milestone.goalDescription} className="pl-1 text-sm text-ink">
                 <span className="font-medium">{milestone.goalDescription}</span>
                 {milestone.captureFields.length > 0 && (
