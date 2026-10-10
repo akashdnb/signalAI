@@ -6,7 +6,7 @@ export type ReplyMode = "rule_based" | "ai_generated";
 /** Where a triggered reply is delivered: a private DM, a public reply under the comment, or both. Default 'dm' preserves every existing campaign's current behaviour. */
 export type ReplyChannel = "dm" | "comment" | "both";
 
-/** What kind of inbound event a campaign's keywords match against — a comment, a DM, or either. Distinct from ReplyChannel (where the reply goes, not what triggers it). Default 'comment' preserves every existing campaign's current behaviour, since DM-triggered matching didn't exist before this field. */
+/** What kind of inbound event a campaign's keywords match against — a comment, a DM, or either. Distinct from ReplyChannel (where the reply goes, not what it triggers). Default 'comment' preserves every existing campaign's current behaviour, since DM-triggered matching didn't exist before this field. */
 export type TriggerSource = "comment" | "message" | "both";
 
 /** AI Behaviour panel (UI revamp R3): a coarse tone knob alongside the tenant-wide free-text brandVoice — both get interpolated into the same prompt. */
@@ -112,7 +112,7 @@ export async function createCampaign(
        coalesce($8, array[]::text[]),
        coalesce($9, 'dm'),
        coalesce($10, 'comment'),
-       coalesce($11, true))
+       false)
      returning *`,
     [
       tenantId,
@@ -125,16 +125,13 @@ export async function createCampaign(
       options?.targetMediaIds ?? null,
       options?.replyChannel ?? null,
       options?.triggerSource ?? null,
-      options?.enabled ?? true,
     ],
   );
   return toCampaign(result.rows[0]!);
 }
 
-// tone/language/useKnowledgeBase are deliberately left off createCampaign's
-// options — every campaign is created with the schema defaults
-// ('professional_and_friendly' / 'auto' / true) and configured afterward
-// via updateCampaignReplyConfig, same as replyMode/replyChannel already are.
+// New campaigns always start as drafts. Activation is only possible after an
+// immutable journey snapshot has been published via setCampaignEnabled().
 
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(
@@ -190,11 +187,6 @@ export async function listActiveCampaignKeywords(
   }));
 }
 
-/**
- * BUI: the campaign editor's post-targeting picker. Replaced wholesale on
- * each save, same shape as `setCampaignMilestones` — an empty array means
- * "every post" (today's behaviour), not "no posts match".
- */
 export async function setCampaignTargetMediaIds(
   pool: Pool,
   tenantId: string,
@@ -208,12 +200,6 @@ export async function setCampaignTargetMediaIds(
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-/**
- * Phase 2A "Multiple DM Variations" — replaced wholesale on each save,
- * same shape as setCampaignTargetMediaIds. An empty array falls back to
- * defaultReplyTemplate (see replyEngine.ts's pickReplyTemplate) — that's
- * every existing campaign's current behavior, left unaffected.
- */
 export async function setCampaignReplyTemplates(
   pool: Pool,
   tenantId: string,
@@ -248,13 +234,6 @@ export async function setCampaignEnabled(
   return result.rowCount === 1;
 }
 
-/**
- * BUI: "reply-engine mode toggle per campaign," plus the CTA link and the
- * rule-based template — the rest of the creator's per-campaign reply
- * configuration beyond enabled/disabled and milestones. Each field is
- * `coalesce`d against its current value so a partial PATCH only ever
- * touches the fields it explicitly sent.
- */
 export async function updateCampaignReplyConfig(
   pool: Pool,
   tenantId: string,
