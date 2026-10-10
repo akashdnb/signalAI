@@ -77,7 +77,7 @@ export async function listLeadActivityPage(
   const result = await pool.query<LeadActivityRow>(
     `select * from lead_activity
      where tenant_id = $1 and lead_id = $2
-       and ($4::timestamptz is null or (created_at, $5::int, id) < ($4::timestamptz, $5::int, $6::text))
+       and ($4::timestamptz is null or (created_at, $5::int, id::text) < ($4::timestamptz, $5::int, $6::text))
      order by created_at desc, id desc
      limit $3`,
     [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? ""],
