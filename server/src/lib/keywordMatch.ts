@@ -25,6 +25,40 @@
  * non-match, not look identical to one.
  */
 export const CONTINUATION_KEYWORD = "(ongoing conversation)";
+/** Timeline sentinel for an existing DM automation restarted after the 24-hour gap. */
+export const RESTART_KEYWORD = "(automation restarted after messaging gap)";
+
+export interface DmCampaignTrigger {
+  campaignId: string;
+  keyword: string;
+  restartCampaign: boolean;
+}
+
+/**
+ * Resolve a private inbound DM against active, DM-capable campaigns. A real
+ * keyword always wins. Otherwise an existing campaign continues within the
+ * previous 24-hour window, but restarts from its first milestone after a gap.
+ */
+export function resolveDmCampaignTrigger(
+  sourceText: string,
+  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: "comment" | "message" | "both" }>,
+  activeDmCampaignId: string | null,
+  previousWindowOpen: boolean,
+): DmCampaignTrigger | null {
+  const eligible = campaigns.filter((campaign) => campaign.triggerSource === "message" || campaign.triggerSource === "both");
+  const match = findMatchingCampaign(sourceText, undefined, eligible);
+  if (match) {
+    return { ...match, restartCampaign: !!activeDmCampaignId && !previousWindowOpen };
+  }
+
+  if (!activeDmCampaignId) return null;
+  const continuedCampaign = eligible.find((campaign) => campaign.id === activeDmCampaignId);
+  if (!continuedCampaign) return null;
+
+  return previousWindowOpen
+    ? { campaignId: continuedCampaign.id, keyword: CONTINUATION_KEYWORD, restartCampaign: false }
+    : { campaignId: continuedCampaign.id, keyword: RESTART_KEYWORD, restartCampaign: true };
+}
 
 export function findMatchingCampaign(
   commentText: string,
