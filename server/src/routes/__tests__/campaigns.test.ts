@@ -349,7 +349,7 @@ describe("campaigns routes", () => {
     const builderUrl = `/tenants/${tenant.id}/campaigns/${create.body.id}/builder`;
     const initial = await request(app).get(builderUrl).set(authHeader);
     expect(initial.status).toBe(200);
-    const graph = initial.body as {
+    let graph = initial.body as {
       version: number;
       nodes: Array<{
         id: string;
@@ -367,6 +367,27 @@ describe("campaigns routes", () => {
         condition: Record<string, unknown> | null;
       }>;
     };
+
+    // A fresh journey has zero goals. Saving a graph-only draft must work
+    // instead of requiring users to create a goal just to save layout.
+    const emptyGoalSave = await request(app)
+      .put(builderUrl)
+      .set(authHeader)
+      .send({
+        expectedVersion: graph.version,
+        nodes: graph.nodes.map((node) =>
+          node.type === "message"
+            ? { ...node, position: { ...node.position, x: node.position.x + 12 } }
+            : node,
+        ),
+        edges: graph.edges,
+        milestones: [],
+      });
+    expect(emptyGoalSave.status).toBe(200);
+    expect(emptyGoalSave.body.milestones).toEqual([]);
+    expect(emptyGoalSave.body.version).toBe(graph.version + 1);
+    graph = emptyGoalSave.body;
+
     const message = graph.nodes.find((node) => node.type === "message")!;
     const handoff = graph.nodes.find((node) => node.type === "human_handoff")!;
     const draftGoalId = `draft-${randomUUID()}`;
