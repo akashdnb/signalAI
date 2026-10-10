@@ -16,6 +16,7 @@ export function TeamPage() {
 
   const [members, setMembers] = useState<TenantMember[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [inviting, setInviting] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUnavailable, setInviteUnavailable] = useState(false);
@@ -26,7 +27,10 @@ export function TeamPage() {
     api
       .listMembers(tenantId)
       .then((m) => {
-        if (!cancelled) setMembers(m);
+        if (!cancelled) {
+          setMembers(m);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -39,7 +43,7 @@ export function TeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate]);
+  }, [tenantId, navigate, reloadCount]);
 
   if (!tenantId) return null;
 
@@ -50,11 +54,20 @@ export function TeamPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>Team</h1>
       <p className="muted">Everyone with access to this workspace.</p>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {members === null && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">
@@ -79,6 +92,7 @@ export function TeamPage() {
           <form onSubmit={handleInviteSubmit} className="inline-form mt-4">
             <input
               type="email"
+              aria-label="Teammate email address"
               placeholder="teammate@company.com"
               value={inviteEmail}
               onChange={(e) => {
@@ -92,13 +106,13 @@ export function TeamPage() {
           </form>
         )}
         {inviteUnavailable && (
-          <p className="muted small" style={{ marginTop: "-0.5rem" }}>
+          <p className="muted small" role="status" style={{ marginTop: "-0.5rem" }}>
             Team invites aren't available yet — reach out to support to add a teammate to this workspace.
           </p>
         )}
 
         {members === null ? (
-          <p className="muted">Loading…</p>
+          <p className="muted" role="status">{error ? "Team members could not be loaded." : "Loading team…"}</p>
         ) : (
           <ul className="list" style={{ marginTop: inviting ? "1.25rem" : 0 }}>
             {members.map((m) => (
