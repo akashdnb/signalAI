@@ -110,7 +110,7 @@ export async function createCampaign(
        coalesce($8, array[]::text[]),
        coalesce($9, 'dm'),
        coalesce($10, 'comment'),
-       coalesce($11, false))
+       coalesce($11, true))
      returning *`,
     [
       tenantId,
@@ -123,7 +123,7 @@ export async function createCampaign(
       options?.targetMediaIds ?? null,
       options?.replyChannel ?? null,
       options?.triggerSource ?? null,
-      options?.enabled ?? false,
+      options?.enabled ?? true,
     ],
   );
   return toCampaign(result.rows[0]!);
@@ -268,14 +268,14 @@ export async function updateCampaignReplyConfig(
       campaignId,
       tenantId,
       updates.replyMode ?? null,
-      updates.ctaLink !== undefined, // whether the caller sent ctaLink at all — coalesce can't distinguish "sent null" from "not sent"
+      updates.ctaLink !== undefined,
       updates.ctaLink ?? null,
       updates.defaultReplyTemplate ?? null,
       updates.replyChannel ?? null,
       updates.triggerSource ?? null,
       updates.tone ?? null,
       updates.language ?? null,
-      updates.useKnowledgeBase !== undefined, // same "was it sent at all" trick as ctaLink — useKnowledgeBase: false must not coalesce away
+      updates.useKnowledgeBase !== undefined,
       updates.useKnowledgeBase ?? null,
       updates.keywords ?? null,
       updates.name ?? null,
