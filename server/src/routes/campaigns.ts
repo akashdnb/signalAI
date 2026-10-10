@@ -379,7 +379,9 @@ interface MilestoneDraftInput {
 }
 
 function isValidMilestoneDrafts(value: unknown): value is MilestoneDraftInput[] {
-  if (!Array.isArray(value) || value.length === 0) return false;
+  // Fresh campaigns legitimately start without goals; graph layout must still
+  // be saveable before the user adds the first goal.
+  if (!Array.isArray(value)) return false;
 
   const ids = new Set<string>();
   for (const item of value) {
@@ -444,7 +446,7 @@ campaignsRouter.put("/tenants/:tenantId/campaigns/:campaignId/builder", async (r
   }
   if (draftMilestones !== undefined && !isValidMilestoneDrafts(draftMilestones)) {
     return res.status(400).json({
-      error: "milestones must be a non-empty array of { id, goalDescription, captureFields?: string[] } with unique ids",
+      error: "milestones must be an array of { id, goalDescription, captureFields?: string[] } with unique ids",
     });
   }
 
