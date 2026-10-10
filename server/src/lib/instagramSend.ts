@@ -6,10 +6,30 @@ import {
 /** Sends DMs via Instagram's Send API. */
 const GRAPH_BASE_URL = "https://graph.instagram.com";
 const SEND_TIMEOUT_MS = 8000;
+const LEGACY_TRAILING_CTA = /\s(https:\/\/[^\s]+)$/i;
 
 export interface SendInstagramMessageResult {
   /** Meta's own id for this send (Send API response's `message_id`). */
   metaMessageId: string | null;
+}
+
+/**
+ * Legacy compatibility adapter for the pre-journey reply engine.
+ *
+ * New callers should pass `richMessage.ctaUrl` explicitly. The legacy engine
+ * still composes the configured CTA directly into the final string, so this
+ * adapter preserves that existing contract until that caller is migrated.
+ */
+function resolveLegacyRichMessage(
+  text: string,
+  richMessage?: InstagramRichMessageOptions,
+): InstagramRichMessageOptions | undefined {
+  if (richMessage) return richMessage;
+
+  const match = text.match(LEGACY_TRAILING_CTA);
+  if (!match) return undefined;
+
+  return { ctaUrl: match[1] };
 }
 
 export async function sendInstagramMessage(
@@ -30,7 +50,10 @@ export async function sendInstagramMessage(
     },
     body: JSON.stringify({
       recipient: { id: recipientInstagramUserId },
-      message: buildInstagramMessagePayload(text, richMessage),
+      message: buildInstagramMessagePayload(
+        text,
+        resolveLegacyRichMessage(text, richMessage),
+      ),
     }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
