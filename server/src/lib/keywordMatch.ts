@@ -34,6 +34,15 @@ export interface DmCampaignTrigger {
   restartCampaign: boolean;
 }
 
+type DmCampaign = {
+  id: string;
+  keywords: string[];
+  targetMediaIds: string[];
+  triggerSource: "comment" | "message" | "both";
+  replyChannel?: "dm" | "comment" | "both";
+  enabled?: boolean;
+};
+
 /**
  * Resolve a private inbound DM against active, DM-capable campaigns. A real
  * keyword always wins. Otherwise an existing campaign continues within the
@@ -41,14 +50,19 @@ export interface DmCampaignTrigger {
  */
 export function resolveDmCampaignTrigger(
   sourceText: string,
-  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: "comment" | "message" | "both"; replyChannel?: "dm" | "comment" | "both" }>,
+  campaigns: DmCampaign[],
   activeDmCampaignId: string | null,
   previousWindowOpen: boolean,
   mediaId?: string,
   hasPriorInboundDm = true,
 ): DmCampaignTrigger | null {
-  const eligible = campaigns.filter((campaign) => campaign.triggerSource === "message" || campaign.triggerSource === "both");
-  const match = findMatchingCampaign(sourceText, mediaId, eligible);
+  // Direct keyword matching must remain restricted to campaigns explicitly
+  // configured to accept message triggers.
+  const keywordEligible = campaigns.filter((campaign) =>
+    (campaign.triggerSource === "message" || campaign.triggerSource === "both") &&
+    campaign.enabled !== false,
+  );
+  const match = findMatchingCampaign(sourceText, mediaId, keywordEligible);
   if (match) {
     // A closed (or never-opened) customer DM window starts a new run even
     // when this is the first message that can be associated with the campaign.
@@ -56,9 +70,17 @@ export function resolveDmCampaignTrigger(
   }
 
   if (!activeDmCampaignId) return null;
-  // A comment-triggered campaign can continue in the private conversation
-  // it initiated, but only when the campaign is configured to send DMs.
-  const continuedCampaign = eligible.find((campaign) => campaign.id === activeDmCampaignId);
+
+  // Continuation is deliberately independent of triggerSource. A comment
+  // campaign can own an active DM journey after its one-time private reply,
+  // so the customer's first DM must be able to continue it. It must still be
+  // enabled and explicitly DM-capable; public-comment-only campaigns cannot
+  // become DM journeys by virtue of activeDmCampaignId alone.
+  const continuedCampaign = campaigns.find((campaign) =>
+    campaign.id === activeDmCampaignId &&
+    campaign.enabled !== false &&
+    (campaign.replyChannel === "dm" || campaign.replyChannel === "both"),
+  );
   if (!continuedCampaign) return null;
 
   // A customer's first DM after a comment private reply opens the first
