@@ -1,30 +1,41 @@
+
 /* Phase 4 — core product screen polish. Uses existing design tokens and preserves existing APIs/components. */
-.phase4-surface{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>h1{margin:0 0 1rem;font-size:1.65rem;letter-spacing:-.025em}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);overflow:hidden}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card .filter-row{padding:1rem;border-bottom:1px solid var(--border);gap:.65rem}
-.page.page-wide:has(>h1:first-child+.banner-error+.card) .filter-row input,.page.page-wide:has(>h1:first-child+.banner-error+.card) .filter-row select{min-height:40px}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card .table th{background:var(--chip);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card .table td,.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card .table th{padding:.8rem 1rem}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card .table tbody tr:hover{background:var(--chip)}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.stat-grid{gap:.8rem}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.stat-grid .stat{border:1px solid var(--border);border-radius:14px;background:var(--card);padding:1rem}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.stat-grid .stat-value{font-size:1.45rem;letter-spacing:-.025em}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.stat-grid .stat-label{color:var(--muted);font-size:.76rem}
-.page.page-wide:has(>h1:first-child+.banner-error+.card)>.stat-grid+.card{margin-top:1rem;border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
-.page:has(>h1:first-child+p.muted+section.card)>h1{margin:0;font-size:1.65rem;letter-spacing:-.025em}
-.page:has(>h1:first-child+p.muted+section.card)>h1+p{max-width:720px;margin:.4rem 0 1rem;line-height:1.55}
-.page:has(>h1:first-child+p.muted+section.card)>section.card{border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);padding:1.2rem}
-.page:has(>h1:first-child+p.muted+section.card)>section.card h2{margin-top:0;font-size:1rem}
-.page:has(>h1:first-child+p.muted+section.card)>section.card input[type=file]{max-width:100%;padding:.55rem;border:1px dashed var(--border);border-radius:10px;background:var(--chip)}
-.page:has(>h1:first-child+p.muted+section.card)>section.card .table{margin-top:1rem}
-.page:has(>h1:first-child+p.muted+section.card)>section.card .table th{background:var(--chip);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em}
-.page:has(>h1:first-child+p.muted+section.card)>section.card .table td,.page:has(>h1:first-child+p.muted+section.card)>section.card .table th{padding:.8rem 1rem}
-.page.page-workspace>h1{margin:0 0 1rem;font-size:1.65rem;letter-spacing:-.025em}
-.page.page-workspace>div:last-child{border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
-.page.page-workspace .list-item-button{min-height:68px;transition:background .12s ease}
-.page.page-workspace .list-item-button:hover{background:var(--chip)}
-.page.page-workspace textarea{border-radius:10px;min-height:74px}
-.page.page-workspace .tag-chip{display:inline-flex;margin:.2rem .2rem 0 0}
-@media(max-width:760px){.page.page-wide:has(>h1:first-child+.banner-error+.card)>h1,.page:has(>h1:first-child+p.muted+section.card)>h1,.page.page-workspace>h1{font-size:1.4rem}.page.page-wide:has(>h1:first-child+.banner-error+.card)>.card,.page:has(>h1:first-child+p.muted+section.card)>section.card,.page.page-workspace>div:last-child{border-radius:12px}}
-@media(prefers-reduced-motion:reduce){.page.page-workspace *{transition:none!important}}
+.phase4-surface { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > h1 { margin: 0 0 1rem; font-size: 1.65rem; letter-spacing: -.025em; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); overflow: hidden; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card .filter-row { padding: 1rem; border-bottom: 1px solid var(--border); gap: .65rem; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) .filter-row input,
+.page.page-wide:has(> h1:first-child + .banner-error + .card) .filter-row select { min-height: 40px; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card .table th { background: var(--pill-bg); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card .table td,
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card .table th { padding: .8rem 1rem; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .card .table tbody tr:hover { background: var(--pill-bg); }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid { gap: .8rem; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid .stat { border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); padding: 1rem; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid .stat-value { font-size: 1.45rem; letter-spacing: -.025em; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid .stat-label { color: var(--text-muted); font-size: .76rem; }
+.page.page-wide:has(> h1:first-child + .banner-error + .card) > .stat-grid + .card { margin-top: 1rem; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); }
+.page:has(> h1:first-child + p.muted + section.card) > h1 { margin: 0; font-size: 1.65rem; letter-spacing: -.025em; }
+.page:has(> h1:first-child + p.muted + section.card) > h1 + p { max-width: 720px; margin: .4rem 0 1rem; line-height: 1.55; }
+.page:has(> h1:first-child + p.muted + section.card) > section.card { border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); padding: 1.2rem; }
+.page:has(> h1:first-child + p.muted + section.card) > section.card h2 { margin-top: 0; font-size: 1rem; }
+.page:has(> h1:first-child + p.muted + section.card) > section.card input[type=file] { max-width: 100%; padding: .55rem; border: 1px dashed var(--border); border-radius: 10px; background: var(--pill-bg); }
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table { margin-top: 1rem; }
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table th { background: var(--pill-bg); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table td,
+.page:has(> h1:first-child + p.muted + section.card) > section.card .table th { padding: .8rem 1rem; }
+.page.page-workspace > h1 { margin: 0 0 1rem; font-size: 1.65rem; letter-spacing: -.025em; }
+.page.page-workspace > div:last-child { border-radius: 16px; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); }
+.page.page-workspace .list-item-button { min-height: 68px; transition: background .12s ease; }
+.page.page-workspace .list-item-button:hover { background: var(--pill-bg); }
+.page.page-workspace textarea { border-radius: 10px; min-height: 74px; }
+.page.page-workspace .tag-chip { display: inline-flex; margin: .2rem .2rem 0 0; }
+@media (max-width: 760px) {
+  .page.page-wide:has(> h1:first-child + .banner-error + .card) > h1,
+  .page:has(> h1:first-child + p.muted + section.card) > h1,
+  .page.page-workspace > h1 { font-size: 1.4rem; }
+  .page.page-wide:has(> h1:first-child + .banner-error + .card) > .card,
+  .page:has(> h1:first-child + p.muted + section.card) > section.card,
+  .page.page-workspace > div:last-child { border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .page.page-workspace * { transition: none !important; } }
