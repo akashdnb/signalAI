@@ -154,12 +154,8 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
   const allVisibleSelected = campaigns.length > 0 && campaigns.every((campaign) => selectedIds.has(campaign.id));
 
   useEffect(() => {
-    const visibleIds = new Set(campaigns.map((campaign) => campaign.id));
-    setSelectedIds((current) => {
-      const next = new Set([...current].filter((id) => visibleIds.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [data]);
+    setSelectedIds(new Set());
+  }, [tenantId, page, search, status, trigger, sort]);
 
   function toggleSelected(campaignId: string) {
     setSelectedIds((current) => { const next = new Set(current); if (next.has(campaignId)) next.delete(campaignId); else next.add(campaignId); return next; });
