@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { api, type Campaign, type FieldDefinition, type Milestone } from "../../api";
 import { BottomSheet } from "../BottomSheet";
@@ -250,15 +251,14 @@ export function JourneyBuilder({
                 </span>
               )}
 
-              <button
-                type="button"
-                aria-label="Documentation"
+              <Link
+                to="/docs/journey-builder"
+                aria-label="Open Journey Builder documentation"
                 className="builder-toolbar-button hidden h-9 min-w-[72px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink lg:inline-flex"
-                title="Documentation is coming soon"
               >
                 <FileTextIcon className="h-4 w-4 shrink-0" />
                 Docs
-              </button>
+              </Link>
 
               <button
                 type="button"
