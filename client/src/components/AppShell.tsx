@@ -406,16 +406,16 @@ export function AppShell() {
       const focusable = getFocusable();
       if (focusable.length === 0) {
         event.preventDefault();
-        drawer.focus();
+        drawer!.focus();
         return;
       }
 
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
-      if (event.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) {
+      if (event.shiftKey && (document.activeElement === first || !drawer!.contains(document.activeElement))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) {
+      } else if (!event.shiftKey && (document.activeElement === last || !drawer!.contains(document.activeElement))) {
         event.preventDefault();
         first.focus();
       }
