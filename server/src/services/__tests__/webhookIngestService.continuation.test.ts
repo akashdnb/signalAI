@@ -144,6 +144,44 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     expect(await matchedFieldsFor(pool, "evt-2")).toEqual({ matchedCampaignId: campaign.id, matchedKeyword: RESTART_KEYWORD });
   });
 
+  it("continues a comment-started DM campaign when the commenter replies days later", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
+    const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { triggerSource: "comment", replyChannel: "dm" });
+
+    await ingestWebhookEvents(pool, boss, [{
+      instagramAccountId: "acct-1",
+      instagramUserId: "commenter-user",
+      metaEventId: "evt-comment-day-0",
+      eventType: "comment",
+      occurredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      commentText: "send me LINK",
+      commentId: "comment-day-0",
+      mediaId: "media-1",
+    }]);
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "commenter-user");
+    expect(lead.activeDmCampaignId).toBe(campaign.id);
+    expect(lead.windowOpenUntil).toBeNull();
+
+    await ingestWebhookEvents(pool, boss, [{
+      instagramAccountId: "acct-1",
+      instagramUserId: "commenter-user",
+      metaEventId: "evt-inbound-dm-day-3",
+      eventType: "message",
+      occurredAt: new Date(),
+      dmText: "Thanks, can you tell me more?",
+    }]);
+
+    expect(await matchedFieldsFor(pool, "evt-inbound-dm-day-3")).toEqual({
+      matchedCampaignId: campaign.id,
+      matchedKeyword: CONTINUATION_KEYWORD,
+    });
+    const updatedLead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "commenter-user");
+    expect(updatedLead.windowOpenUntil!.getTime()).toBeGreaterThan(Date.now());
+  });
+
   it("never continues a comment event, even when the lead has an active DM campaign", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
