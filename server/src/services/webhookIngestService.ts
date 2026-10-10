@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import type { PgBoss } from "pg-boss";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
-import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateMessagingWindow } from "../db/leads.js";
+import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateLastInboundAt, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
 import { listActiveCampaignKeywords, type ReplyChannel, type TriggerSource } from "../db/campaigns.js";
@@ -240,6 +240,10 @@ async function ingestOneEvent(
     if (event.eventType === "message") {
       const windowOpenUntil = new Date(event.occurredAt.getTime() + MESSAGING_WINDOW_HOURS * 60 * 60 * 1000);
       await updateMessagingWindow(client, tenantId, lead.id, event.occurredAt, windowOpenUntil);
+    } else {
+      // Keep comment conversations eligible for Inbox unread state, but don't
+      // create or extend the 24-hour DM window from a public comment alone.
+      await updateLastInboundAt(client, tenantId, lead.id, event.occurredAt);
     }
 
     await enqueueLeadEvent(
