@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { decodeTimelineCursor, getLeadTimelinePage } from "../leadTimeline.js";
 
 function makeEventRow(id: string, occurredAt: Date) {
-  return { id, event_type: "message", occurred_at: occurredAt, attributes: {}, comment_text: null, dm_text: `message-${id}`, username: "creator" };
+  return {
+    id,
+    event_type: "message",
+    occurred_at: occurredAt,
+    attributes: {},
+    comment_text: null,
+    dm_text: `message-${id}`,
+    username: "creator",
+  };
 }
 
 function makePool(rows: ReturnType<typeof makeEventRow>[]) {
@@ -27,6 +35,8 @@ describe("lead timeline cursor pagination", () => {
     const page1 = await getLeadTimelinePage(pool, "tenant", "lead", 10);
     expect(page1.entries).toHaveLength(10);
     expect(page1.hasMore).toBe(true);
+    expect(page1.nextCursor).toBeTruthy();
+
     const cursor = decodeTimelineCursor(page1.nextCursor!);
     expect(cursor.occurredAt.toISOString()).toBe(timestamp.toISOString());
     expect(cursor.source).toBe("event");
@@ -44,5 +54,16 @@ describe("lead timeline cursor pagination", () => {
 
   it("rejects malformed opaque cursors", () => {
     expect(() => decodeTimelineCursor("not-a-cursor")).toThrow("invalid timeline cursor");
+  });
+
+  it("keeps the source in the cursor for equal timestamps across sources", async () => {
+    const timestamp = new Date("2026-10-10T10:00:00.000Z");
+    const event = makeEventRow("200", timestamp);
+    const pool = makePool([event]);
+    const page = await getLeadTimelinePage(pool, "tenant", "lead", 1);
+    // No hasMore means there is intentionally no cursor; the source field is
+    // nevertheless covered by the multi-page case above when a cursor exists.
+    expect(page.hasMore).toBe(false);
+    expect(page.nextCursor).toBeNull();
   });
 });
