@@ -58,7 +58,6 @@ function readRichMessage(
 interface JourneyCampaignPresentation {
   ctaUrl: string | null;
   title: string | null;
-  description: string | null;
   thumbnailUrl: string | null;
 }
 
@@ -70,14 +69,12 @@ async function readCampaignPresentation(
   const result = await pool.query<{
     cta_link: string | null;
     name: string;
-    description: string | null;
     thumbnail_url: string | null;
   }>(
     `
       select
         c.cta_link,
         c.name,
-        c.description,
         (
           select m.thumbnail_url
           from media_metadata m
@@ -103,7 +100,6 @@ async function readCampaignPresentation(
     ? {
         ctaUrl: row.cta_link,
         title: row.name,
-        description: row.description,
         thumbnailUrl: row.thumbnail_url,
       }
     : null;
@@ -120,7 +116,6 @@ function mergePresentation(
     ctaUrl: campaign.ctaUrl,
     imageUrl: campaign.thumbnailUrl ?? undefined,
     title: campaign.title ?? undefined,
-    subtitle: campaign.description ?? undefined,
   };
 }
 
