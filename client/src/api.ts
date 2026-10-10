@@ -333,7 +333,7 @@ export interface LeadListItem {
   lastInboundAt: string | null;
   windowOpenUntil: string | null;
   /** Available only when approved HUMAN_AGENT support messaging is enabled, and only for the 7-day post-DM interval. */
-  humanAgentWindowUntil: string | null;
+  humanAgentWindowUntil?: string | null;
   createdAt: string;
   pipelineStage: PipelineStage;
   ownerUserId: string | null;
