@@ -49,6 +49,8 @@ export function InboxPage() {
 
   const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
+  const selectedLeadIdRef = useRef(selectedLeadId);
+  selectedLeadIdRef.current = selectedLeadId;
   const standardMessagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
   const humanAgentWindowOpen = !!selectedLead?.humanAgentWindowUntil && Date.parse(selectedLead.humanAgentWindowUntil) > Date.now();
   const humanAgentOnly = !standardMessagingWindowOpen && humanAgentWindowOpen;
@@ -107,6 +109,7 @@ export function InboxPage() {
       }
       if (!tenantId) return;
       api.getLead(tenantId, selectedLeadId).then((fresh) => {
+        if (selectedLeadIdRef.current !== selectedLeadId) return;
         if (fresh.lastInboundAt !== selectedLastInboundAtRef.current) {
           selectedLastInboundAtRef.current = fresh.lastInboundAt;
           setThreadRefreshToken((token) => token + 1);
