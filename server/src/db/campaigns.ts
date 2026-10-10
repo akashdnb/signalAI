@@ -47,6 +47,7 @@ interface CampaignRow {
   description: string | null;
   keywords: string[];
   enabled: boolean;
+  published?: boolean;
   reply_mode: ReplyMode;
   reply_templates: string[];
   default_reply_template: string;
@@ -69,6 +70,7 @@ function toCampaign(row: CampaignRow): Campaign {
     description: row.description,
     keywords: row.keywords,
     enabled: row.enabled,
+    published: row.published ?? false,
     replyMode: row.reply_mode,
     replyTemplates: row.reply_templates,
     defaultReplyTemplate: row.default_reply_template,
@@ -136,7 +138,15 @@ export async function createCampaign(
 
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(
-    `select * from campaigns where tenant_id = $1 order by created_at desc`,
+    `select campaigns.*,
+            exists (
+              select 1 from campaign_journey_versions published
+               where published.tenant_id = campaigns.tenant_id
+                 and published.campaign_id = campaigns.id
+            ) as published
+       from campaigns
+      where campaigns.tenant_id = $1
+      order by campaigns.created_at desc`,
     [tenantId],
   );
   return result.rows.map(toCampaign);
@@ -144,7 +154,14 @@ export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campa
 
 export async function getCampaign(pool: Pool, tenantId: string, campaignId: string): Promise<Campaign | null> {
   const result = await pool.query<CampaignRow>(
-    `select * from campaigns where id = $1 and tenant_id = $2`,
+    `select campaigns.*,
+            exists (
+              select 1 from campaign_journey_versions published
+               where published.tenant_id = campaigns.tenant_id
+                 and published.campaign_id = campaigns.id
+            ) as published
+       from campaigns
+      where campaigns.id = $1 and campaigns.tenant_id = $2`,
     [campaignId, tenantId],
   );
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
@@ -217,7 +234,15 @@ export async function setCampaignEnabled(
   enabled: boolean,
 ): Promise<boolean> {
   const result = await pool.query(
-    `update campaigns set enabled = $3, updated_at = now() where id = $1 and tenant_id = $2`,
+    `update campaigns
+        set enabled = $3, updated_at = now()
+      where id = $1
+        and tenant_id = $2
+        and ($3 = false or exists (
+          select 1 from campaign_journey_versions published
+           where published.tenant_id = campaigns.tenant_id
+             and published.campaign_id = campaigns.id
+        ))`,
     [campaignId, tenantId, enabled],
   );
   return result.rowCount === 1;
