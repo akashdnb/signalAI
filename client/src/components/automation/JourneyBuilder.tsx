@@ -59,7 +59,11 @@ export function JourneyBuilder({
   const subTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const savedMilestonesRef = useRef<Milestone[]>([]);
+  const milestonesLoadRequestRef = useRef(0);
   const [milestonesDirty, setMilestonesDirty] = useState(false);
+  const [milestonesLoading, setMilestonesLoading] = useState(true);
+  const [milestoneLoadError, setMilestoneLoadError] = useState<string | null>(null);
+  const milestonesReady = !milestonesLoading && milestoneLoadError === null;
   const [fieldDefinitions, setFieldDefinitions] = useState<FieldDefinition[]>([]);
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -109,6 +113,12 @@ export function JourneyBuilder({
   );
 
   async function saveCanvasDraft(): Promise<boolean> {
+    if (!milestonesReady) {
+      setUnsavedDialogError(
+        milestoneLoadError ?? "Goals are still loading. Try saving again in a moment.",
+      );
+      return false;
+    }
     const saved = await canvasActionsRef.current?.saveDraft(milestones);
     return saved === true;
   }
@@ -266,18 +276,40 @@ export function JourneyBuilder({
   }, [journeyDirty, navigate, requestNavigation]);
 
   async function loadMilestones() {
-    const [ms, defs] = await Promise.all([
-      api.listMilestones(tenantId, campaign.id),
-      api.listFieldDefinitions(tenantId),
-    ]);
+    const requestId = ++milestonesLoadRequestRef.current;
+    setMilestonesLoading(true);
+    setMilestoneLoadError(null);
 
-    savedMilestonesRef.current = ms;
-    setMilestonesState(ms);
-    setMilestonesDirty(false);
-    setFieldDefinitions(defs);
+    try {
+      const [ms, defs] = await Promise.all([
+        api.listMilestones(tenantId, campaign.id),
+        api.listFieldDefinitions(tenantId),
+      ]);
+      if (requestId !== milestonesLoadRequestRef.current) return;
+
+      savedMilestonesRef.current = ms;
+      setMilestonesState(ms);
+      setMilestonesDirty(false);
+      setFieldDefinitions(defs);
+    } catch (error) {
+      if (requestId !== milestonesLoadRequestRef.current) return;
+      setMilestoneLoadError(
+        error instanceof Error ? error.message : "Couldn't load the journey goals.",
+      );
+    } finally {
+      if (requestId === milestonesLoadRequestRef.current) {
+        setMilestonesLoading(false);
+      }
+    }
   }
 
   useEffect(() => {
+    // Clear the previous campaign's semantic draft before fetching the next.
+    savedMilestonesRef.current = [];
+    setMilestonesState([]);
+    setMilestonesDirty(false);
+    setMilestonesLoading(true);
+    setMilestoneLoadError(null);
     void loadMilestones();
     setSelectedNode({ type: "trigger" });
     setInspectorOpen(false);
@@ -286,6 +318,9 @@ export function JourneyBuilder({
     setGraphReloadSignal(0);
     setPublishError(null);
 
+    return () => {
+      milestonesLoadRequestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, campaign.id]);
 
@@ -433,7 +468,7 @@ export function JourneyBuilder({
               {subTab === "builder" && (
                 <button
                   type="button"
-                  disabled={!journeyDirty || builderSaveState === "saving" || publishing}
+                  disabled={!journeyDirty || builderSaveState === "saving" || publishing || !milestonesReady}
                   className={`builder-toolbar-button flex h-9 items-center justify-center rounded-lg px-3 text-[13px] font-semibold transition-colors ${
                     journeyDirty
                       ? "bg-accent text-white shadow-sm hover:bg-accent-hover"
@@ -441,7 +476,7 @@ export function JourneyBuilder({
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={() => void saveCanvasDraft()}
                 >
-                  {builderSaveState === "saving" ? "Saving…" : "Save changes"}
+                  {builderSaveState === "saving" ? "Saving…" : !milestonesReady ? "Loading goals…" : "Save changes"}
                 </button>
               )}
 
@@ -607,7 +642,26 @@ export function JourneyBuilder({
         </div>
 
         {publishError && (
-          <div className="banner banner-error mx-4 mt-3 md:mx-5">{publishError}</div>
+          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{publishError}</div>
+        )}
+
+        {milestonesLoading && (
+          <div className="mx-4 mt-3 flex items-center gap-2 text-xs text-subtle md:mx-5" role="status">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+            Loading goals and capture fields…
+          </div>
+        )}
+        {milestoneLoadError && (
+          <div className="banner banner-error mx-4 mt-3 flex items-center justify-between gap-3 md:mx-5" role="alert">
+            <span>{milestoneLoadError}</span>
+            <button
+              type="button"
+              className="shrink-0 font-semibold underline"
+              onClick={() => void loadMilestones()}
+            >
+              Retry
+            </button>
+          </div>
         )}
 
         <div
