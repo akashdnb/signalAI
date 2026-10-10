@@ -422,6 +422,7 @@ function toFlowNodes(graph: BuilderGraph): FlowNode[] {
     id: node.id,
     type: node.type === "milestone_group" ? "milestone" : node.type,
     position: node.position,
+    deletable: false,
     data: {
       ...node.data,
       milestoneId:
@@ -474,6 +475,7 @@ function toFlowEdges(graph: BuilderGraph): Edge[] {
       id: edge.id,
       source: edge.sourceNodeId,
       target: edge.targetNodeId,
+      deletable: false,
       sourceHandle: handles.sourceHandle,
       targetHandle: handles.targetHandle,
       label: edge.label ?? undefined,
@@ -579,7 +581,11 @@ export function BuilderCanvas({
     draftNodesRef.current = backendNodesRef.current;
     draftEdgesRef.current = backendEdgesRef.current;
     isDirtyRef.current = false;
-    setNodes(toFlowNodes(backendNodesRef.current));
+    setNodes(toFlowNodes({
+      nodes: backendNodesRef.current,
+      edges: backendEdgesRef.current,
+      version: builderVersionRef.current ?? 0,
+    }));
     setEdges(toFlowEdges({
       nodes: backendNodesRef.current,
       edges: backendEdgesRef.current,
@@ -1081,8 +1087,6 @@ export function BuilderCanvas({
           onNodeDragStop={handleNodeDragStop}
           nodesDraggable={!locked}
           nodesConnectable={!locked}
-          nodesDeletable={false}
-          edgesDeletable={false}
           connectionMode={ConnectionMode.Loose}
           connectionLineType={ConnectionLineType.SmoothStep}
           isValidConnection={(connection) =>
