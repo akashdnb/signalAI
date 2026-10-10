@@ -11,7 +11,9 @@ export type LeadActivityType =
   | "owner_assigned"
   | "handoff_changed"
   | "tag_added"
-  | "tag_removed";
+  | "tag_removed"
+  | "deal_stage_changed"
+  | "pipeline_stage_changed";
 
 export interface LeadActivity {
   id: string;
