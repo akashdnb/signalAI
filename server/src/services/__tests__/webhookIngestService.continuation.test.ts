@@ -6,7 +6,7 @@ import { createTenant } from "../../db/tenants.js";
 import { upsertToken } from "../../db/tokens.js";
 import { createCampaign } from "../../db/campaigns.js";
 import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
-import { CONTINUATION_KEYWORD } from "../../lib/keywordMatch.js";
+import { CONTINUATION_KEYWORD, RESTART_KEYWORD } from "../../lib/keywordMatch.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { ensureQueues } from "../../queue/leadEventsQueue.js";
 import { ensureUsernameResolutionQueue } from "../../queue/usernameResolutionQueue.js";
@@ -112,7 +112,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     expect(await matchedFieldsFor(pool, "evt-1")).toEqual({ matchedCampaignId: null, matchedKeyword: null });
   });
 
-  it("does not continue once the messaging window has closed", async () => {
+  it("restarts the active campaign once the messaging window has closed", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
@@ -124,14 +124,12 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
         instagramUserId: "user-1",
         metaEventId: "evt-1",
         eventType: "message",
-        occurredAt: new Date(),
+        occurredAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
         dmText: "product",
       },
     ]);
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "user-1");
     expect(lead.activeDmCampaignId).toBe(campaign.id);
-    // Slam the window shut, simulating it having closed since the last message.
-    await pool.query("update leads set window_open_until = $2 where id = $1", [lead.id, new Date(0)]);
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -143,7 +141,45 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
         dmText: "TechPro UltraBook 15",
       },
     ]);
-    expect(await matchedFieldsFor(pool, "evt-2")).toEqual({ matchedCampaignId: null, matchedKeyword: null });
+    expect(await matchedFieldsFor(pool, "evt-2")).toEqual({ matchedCampaignId: campaign.id, matchedKeyword: RESTART_KEYWORD });
+  });
+
+  it("continues a comment-started DM campaign when the commenter replies days later", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
+    const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { triggerSource: "both", replyChannel: "dm" });
+
+    await ingestWebhookEvents(pool, boss, [{
+      instagramAccountId: "acct-1",
+      instagramUserId: "commenter-user",
+      metaEventId: "evt-comment-day-0",
+      eventType: "comment",
+      occurredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      commentText: "send me LINK",
+      commentId: "comment-day-0",
+      mediaId: "media-1",
+    }]);
+
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "commenter-user");
+    expect(lead.activeDmCampaignId).toBe(campaign.id);
+    expect(lead.windowOpenUntil).toBeNull();
+
+    await ingestWebhookEvents(pool, boss, [{
+      instagramAccountId: "acct-1",
+      instagramUserId: "commenter-user",
+      metaEventId: "evt-inbound-dm-day-3",
+      eventType: "message",
+      occurredAt: new Date(),
+      dmText: "Thanks, can you tell me more?",
+    }]);
+
+    expect(await matchedFieldsFor(pool, "evt-inbound-dm-day-3")).toEqual({
+      matchedCampaignId: campaign.id,
+      matchedKeyword: CONTINUATION_KEYWORD,
+    });
+    const updatedLead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "commenter-user");
+    expect(updatedLead.windowOpenUntil!.getTime()).toBeGreaterThan(Date.now());
   });
 
   it("never continues a comment event, even when the lead has an active DM campaign", async () => {
@@ -226,7 +262,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
         dmText: "product",
       },
     ]);
-    await pool.query("update campaigns set trigger_source = 'comment' where id = $1", [campaign.id]);
+    await pool.query("update campaigns set trigger_source = 'comment', reply_channel = 'comment' where id = $1", [campaign.id]);
 
     await ingestWebhookEvents(pool, boss, [
       {

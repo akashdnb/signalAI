@@ -1,11 +1,11 @@
 import type { Pool } from "pg";
 import type { PgBoss } from "pg-boss";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
-import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateMessagingWindow } from "../db/leads.js";
+import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateLastInboundAt, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
-import { listActiveCampaignKeywords, type TriggerSource } from "../db/campaigns.js";
-import { findMatchingCampaign, CONTINUATION_KEYWORD } from "../lib/keywordMatch.js";
+import { listActiveCampaignKeywords, type ReplyChannel, type TriggerSource } from "../db/campaigns.js";
+import { findMatchingCampaign, resolveDmCampaignTrigger } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
 import { enqueueUsernameResolution } from "../queue/usernameResolutionQueue.js";
@@ -29,7 +29,7 @@ export async function ingestWebhookEvents(
   const tenantIdByAccount = new Map<string, string | null>();
   const campaignsByTenant = new Map<
     string,
-    Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>
+    Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>
   >();
 
   for (const event of events) {
@@ -109,7 +109,7 @@ async function ingestOneEvent(
   pool: Pool,
   boss: PgBoss,
   tenantId: string,
-  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>,
+  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>,
   event: ParsedWebhookEvent,
 ): Promise<void> {
   const client = await pool.connect();
@@ -118,6 +118,22 @@ async function ingestOneEvent(
 
     const lead = await findOrCreateLeadByInstagramUserId(client, tenantId, event.instagramUserId);
     const sequence = await nextSequence(client, tenantId, lead.id);
+
+    // Compare this DM with the prior genuine inbound DM, not the leads-table
+    // projection: older builds also refreshed that projection on comments.
+    // Only a previous customer DM keeps an existing automation in-window.
+    const previousDmResult = event.eventType === "message"
+      ? await client.query<{ occurred_at: Date }>(
+          `select occurred_at from lead_events
+           where tenant_id = $1 and lead_id = $2 and event_type = 'message'
+           order by occurred_at desc, id desc limit 1`,
+          [tenantId, lead.id],
+        )
+      : null;
+    const previousInboundDmAt = previousDmResult?.rows[0]?.occurred_at ?? null;
+    const previousWindowOpen = !!previousInboundDmAt &&
+      previousInboundDmAt.getTime() <= event.occurredAt.getTime() &&
+      event.occurredAt.getTime() - previousInboundDmAt.getTime() <= MESSAGING_WINDOW_HOURS * 60 * 60 * 1000;
 
     // Keyword matching (Phase 1 Automation Engine) runs here, not deferred
     // to the worker: cheap deterministic string comparison against
@@ -145,39 +161,33 @@ async function ingestOneEvent(
 
     const sourceText = event.eventType === "comment" ? event.commentText : event.dmText;
     if (sourceText) {
-      const eligible = campaigns.filter((c) => c.triggerSource === event.eventType || c.triggerSource === "both");
-      const match = findMatchingCampaign(sourceText, event.mediaId, eligible);
-      if (match) {
-        attributes.matchedCampaignId = match.campaignId;
-        attributes.matchedKeyword = match.keyword;
-        // DM Conversation Continuation: remember which campaign this lead's
-        // DM conversation belongs to, so a later message that doesn't
-        // independently match any keyword can still fall back to it (below,
-        // and on this lead's NEXT event). Comments never set/read this —
-        // a public comment thread isn't a private ongoing conversation the
-        // same way.
-        if (event.eventType === "message") {
+      if (event.eventType === "message") {
+        const match = resolveDmCampaignTrigger(sourceText, campaigns, lead.activeDmCampaignId, previousWindowOpen, event.mediaId, !!previousInboundDmAt);
+        if (match) {
+          attributes.matchedCampaignId = match.campaignId;
+          attributes.matchedKeyword = match.keyword;
+          if (match.restartCampaign) attributes.restartCampaign = true;
           await setActiveDmCampaignId(client, tenantId, lead.id, match.campaignId);
         }
-      } else if (event.eventType === "message" && lead.activeDmCampaignId) {
-        // DM Conversation Continuation fallback: this message didn't match
-        // any keyword on its own, but this lead already has an ongoing DM
-        // conversation — checked against `lead`'s PRE-update windowOpenUntil
-        // (the window's state as of the PRIOR interaction, before this
-        // function's own updateMessagingWindow call below extends it using
-        // THIS message's timestamp) so a customer who's gone quiet 24h+ and
-        // messages again out of the blue needs to mention a keyword again,
-        // same as Instagram's own DM policy window governs elsewhere here.
-        const stillOpen = !!lead.windowOpenUntil && lead.windowOpenUntil.getTime() >= event.occurredAt.getTime();
-        // `campaigns` already only contains tenant_id-scoped, enabled=true
-        // campaigns (listActiveCampaignKeywords) — a since-disabled
-        // campaign naturally isn't found here, no extra check needed.
-        const continuedCampaign = campaigns.find((c) => c.id === lead.activeDmCampaignId);
-        const dmEligible =
-          continuedCampaign && (continuedCampaign.triggerSource === "message" || continuedCampaign.triggerSource === "both");
-        if (stillOpen && dmEligible) {
-          attributes.matchedCampaignId = lead.activeDmCampaignId;
-          attributes.matchedKeyword = CONTINUATION_KEYWORD;
+      } else {
+        const eligible = campaigns.filter((c) => c.triggerSource === "comment" || c.triggerSource === "both");
+        const match = findMatchingCampaign(sourceText, event.mediaId, eligible);
+        if (match) {
+          attributes.matchedCampaignId = match.campaignId;
+          attributes.matchedKeyword = match.keyword;
+          const matchedCampaign = campaigns.find((campaign) => campaign.id === match.campaignId);
+          const commentAgeMs = Date.now() - event.occurredAt.getTime();
+          // Remember a comment-started campaign only when it can send a
+          // private DM reply for this comment. That lets the customer's later
+          // DM continue this run, but only an actual inbound DM opens the
+          // standard 24-hour window.
+          if (
+            matchedCampaign && event.commentId &&
+            (matchedCampaign.replyChannel === "dm" || matchedCampaign.replyChannel === "both") &&
+            commentAgeMs >= 0 && commentAgeMs < 7 * 24 * 60 * 60 * 1000
+          ) {
+            await setActiveDmCampaignId(client, tenantId, lead.id, match.campaignId);
+          }
         }
       }
     }
@@ -225,8 +235,16 @@ async function ingestOneEvent(
       );
     }
 
-    const windowOpenUntil = new Date(event.occurredAt.getTime() + MESSAGING_WINDOW_HOURS * 60 * 60 * 1000);
-    await updateMessagingWindow(client, tenantId, lead.id, event.occurredAt, windowOpenUntil);
+    // Only a genuine inbound DM refreshes the standard 24-hour messaging
+    // window. Comments and business echoes are not customer DM messages.
+    if (event.eventType === "message") {
+      const windowOpenUntil = new Date(event.occurredAt.getTime() + MESSAGING_WINDOW_HOURS * 60 * 60 * 1000);
+      await updateMessagingWindow(client, tenantId, lead.id, event.occurredAt, windowOpenUntil);
+    } else {
+      // Keep comment conversations eligible for Inbox unread state, but don't
+      // create or extend the 24-hour DM window from a public comment alone.
+      await updateLastInboundAt(client, tenantId, lead.id, event.occurredAt);
+    }
 
     await enqueueLeadEvent(
       boss,

@@ -78,7 +78,7 @@ describe("webhooks route", () => {
     expect(res.status).toBe(403);
   });
 
-  it("ingests a real comment event: resolves tenant, creates lead, stores PII, opens the messaging window", async () => {
+  it("ingests a real comment event without opening the standard DM messaging window", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
@@ -119,7 +119,8 @@ describe("webhooks route", () => {
     );
     expect(lead.rows).toHaveLength(1);
     expect(lead.rows[0].instagram_user_id).toBe("user-1");
-    expect(lead.rows[0].window_open_until).not.toBeNull();
+    expect(lead.rows[0].last_inbound_at).not.toBeNull();
+    expect(lead.rows[0].window_open_until).toBeNull();
 
     const pii = await pool.query("select comment_text, username from lead_pii where lead_id = $1", [
       lead.rows[0].id,

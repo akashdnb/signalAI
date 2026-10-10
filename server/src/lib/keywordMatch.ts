@@ -25,6 +25,71 @@
  * non-match, not look identical to one.
  */
 export const CONTINUATION_KEYWORD = "(ongoing conversation)";
+/** Timeline sentinel for an existing DM automation restarted after the 24-hour gap. */
+export const RESTART_KEYWORD = "(automation restarted after messaging gap)";
+
+export interface DmCampaignTrigger {
+  campaignId: string;
+  keyword: string;
+  restartCampaign: boolean;
+}
+
+type DmCampaign = {
+  id: string;
+  keywords: string[];
+  targetMediaIds: string[];
+  triggerSource: "comment" | "message" | "both";
+  replyChannel?: "dm" | "comment" | "both";
+  enabled?: boolean;
+};
+
+/**
+ * Resolve a private inbound DM against active, DM-capable campaigns. A real
+ * keyword always wins. Otherwise an existing campaign continues within the
+ * previous 24-hour window, but restarts from its first milestone after a gap.
+ */
+export function resolveDmCampaignTrigger(
+  sourceText: string,
+  campaigns: DmCampaign[],
+  activeDmCampaignId: string | null,
+  previousWindowOpen: boolean,
+  mediaId?: string,
+  hasPriorInboundDm = true,
+): DmCampaignTrigger | null {
+  // Direct keyword matching must remain restricted to campaigns explicitly
+  // configured to accept message triggers.
+  const keywordEligible = campaigns.filter((campaign) =>
+    (campaign.triggerSource === "message" || campaign.triggerSource === "both") &&
+    campaign.enabled !== false,
+  );
+  const match = findMatchingCampaign(sourceText, mediaId, keywordEligible);
+  if (match) {
+    // A closed (or never-opened) customer DM window starts a new run even
+    // when this is the first message that can be associated with the campaign.
+    return { ...match, restartCampaign: hasPriorInboundDm && !previousWindowOpen };
+  }
+
+  if (!activeDmCampaignId) return null;
+
+  // Continuation is deliberately independent of triggerSource. A comment
+  // campaign can own an active DM journey after its one-time private reply,
+  // so the customer's first DM must be able to continue it. It must still be
+  // enabled and explicitly DM-capable; public-comment-only campaigns cannot
+  // become DM journeys by virtue of activeDmCampaignId alone.
+  const continuedCampaign = campaigns.find((campaign) =>
+    campaign.id === activeDmCampaignId &&
+    campaign.enabled !== false &&
+    (campaign.replyChannel === "dm" || campaign.replyChannel === "both"),
+  );
+  if (!continuedCampaign) return null;
+
+  // A customer's first DM after a comment private reply opens the first
+  // standard messaging window; keep that run going. Restart only if there
+  // was a prior inbound DM and its 24-hour window has since expired.
+  return previousWindowOpen || !hasPriorInboundDm
+    ? { campaignId: continuedCampaign.id, keyword: CONTINUATION_KEYWORD, restartCampaign: false }
+    : { campaignId: continuedCampaign.id, keyword: RESTART_KEYWORD, restartCampaign: true };
+}
 
 export function findMatchingCampaign(
   commentText: string,

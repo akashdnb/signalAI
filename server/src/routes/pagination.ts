@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getPool } from "../db/pool.js";
+import { config } from "../config.js";
 import type { HandoffStatus, PipelineStage } from "../db/leads.js";
 import { getLeadTimelinePage, decodeTimelineCursor } from "../db/leadTimeline.js";
 import type { Campaign, CampaignLanguage, CampaignTone, ReplyChannel, ReplyMode, TriggerSource } from "../db/campaigns.js";
@@ -98,14 +99,15 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   const dataParams = [...params, pageSize, offset];
   const result = await pool.query<{
     id: string; instagram_user_id: string | null; username: string | null; last_event_type: string | null; last_message_preview: string | null;
-    unread: boolean; active_milestone_id: string | null; last_inbound_at: Date | null; window_open_until: Date | null; created_at: Date;
+    unread: boolean; active_milestone_id: string | null; last_inbound_at: Date | null; window_open_until: Date | null; last_dm_at: Date | null; created_at: Date;
     pipeline_stage: PipelineStage; owner_user_id: string | null; handoff_status: HandoffStatus;
   }>(
-    `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, l.created_at, l.pipeline_stage, l.owner_user_id, l.handoff_status,
+    `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, last_dm.last_dm_at, l.created_at, l.pipeline_stage, l.owner_user_id, l.handoff_status,
             p.username, e.event_type as last_event_type, coalesce(pii.comment_text, pii.dm_text) as last_message_preview,
             (l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)) as unread
      from leads l
      left join lateral (select username from lead_pii where lead_id = l.id and deleted_at is null and username is not null order by created_at desc limit 1) p on true
+     left join lateral (select occurred_at as last_dm_at from lead_events where tenant_id = l.tenant_id and lead_id = l.id and event_type = 'message' order by occurred_at desc, id desc limit 1) last_dm on true
      left join lateral (select id, event_type from lead_events where lead_id = l.id order by occurred_at desc, id desc limit 1) e on true
      left join lateral (select comment_text, dm_text from lead_pii where lead_event_id = e.id and deleted_at is null) pii on true
      where ${where}
@@ -113,7 +115,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
      limit $${dataParams.length - 1} offset $${dataParams.length}`,
     dataParams,
   );
-  const items = result.rows.map((row) => ({ id: row.id, instagramUserId: row.instagram_user_id, username: row.username, lastEventType: row.last_event_type, lastMessagePreview: row.last_message_preview, unread: row.unread, activeMilestoneId: row.active_milestone_id, lastInboundAt: row.last_inbound_at, windowOpenUntil: row.window_open_until, createdAt: row.created_at, pipelineStage: row.pipeline_stage, ownerUserId: row.owner_user_id, handoffStatus: row.handoff_status }));
+  const items = result.rows.map((row) => ({ id: row.id, instagramUserId: row.instagram_user_id, username: row.username, lastEventType: row.last_event_type, lastMessagePreview: row.last_message_preview, unread: row.unread, activeMilestoneId: row.active_milestone_id, lastInboundAt: row.last_inbound_at, windowOpenUntil: row.last_dm_at ? new Date(row.last_dm_at.getTime() + 24 * 60 * 60 * 1000).toISOString() : null, humanAgentWindowUntil: config.instagramHumanAgentEnabled && row.last_dm_at ? new Date(row.last_dm_at.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() : null, createdAt: row.created_at, pipelineStage: row.pipeline_stage, ownerUserId: row.owner_user_id, handoffStatus: row.handoff_status }));
   return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
 

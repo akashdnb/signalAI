@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findMatchingCampaign } from "../keywordMatch.js";
+import { CONTINUATION_KEYWORD, findMatchingCampaign, RESTART_KEYWORD, resolveDmCampaignTrigger } from "../keywordMatch.js";
 
 describe("findMatchingCampaign", () => {
   const campaigns = [
@@ -52,5 +52,94 @@ describe("findMatchingCampaign", () => {
     it("skips every post-scoped campaign when the event carries no media id", () => {
       expect(findMatchingCampaign("send the LINK", undefined, scoped)?.campaignId).toBe("c3");
     });
+  });
+});
+
+describe("resolveDmCampaignTrigger", () => {
+  const campaigns = [
+    { id: "dm-1", keywords: ["link"], targetMediaIds: [], triggerSource: "message" as const, replyChannel: "dm" as const },
+    { id: "both-1", keywords: ["price"], targetMediaIds: [], triggerSource: "both" as const, replyChannel: "both" as const },
+    { id: "comment-1", keywords: ["hello"], targetMediaIds: [], triggerSource: "comment" as const, replyChannel: "comment" as const },
+  ];
+
+  it("continues the active DM automation when the previous 24-hour window is open", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, "dm-1", true)).toEqual({
+      campaignId: "dm-1", keyword: CONTINUATION_KEYWORD, restartCampaign: false,
+    });
+  });
+
+  it("restarts the active DM automation when the customer returns after the window expires", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, "dm-1", false)).toEqual({
+      campaignId: "dm-1", keyword: RESTART_KEYWORD, restartCampaign: true,
+    });
+  });
+
+  it("prefers a real keyword and restarts from the beginning after a gap", () => {
+    expect(resolveDmCampaignTrigger("please send the LINK", campaigns, "dm-1", false)).toEqual({
+      campaignId: "dm-1", keyword: "link", restartCampaign: true,
+    });
+  });
+
+  it("does not restart a campaign for a lead with no active DM campaign and no keyword", () => {
+    expect(resolveDmCampaignTrigger("just checking in", campaigns, null, false)).toBeNull();
+  });
+
+  it("starts a fresh run for a direct keyword match after the 24-hour window is closed", () => {
+    expect(resolveDmCampaignTrigger("please send the LINK", campaigns, null, false)).toEqual({
+      campaignId: "dm-1", keyword: "link", restartCampaign: true,
+    });
+  });
+
+  it("continues a comment-started DM journey on the customer's first DM", () => {
+    const commentCampaign = {
+      id: "comment-dm-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "dm" as const,
+    };
+
+    expect(resolveDmCampaignTrigger("thanks", [commentCampaign], "comment-dm-1", false, undefined, false)).toEqual({
+      campaignId: "comment-dm-1", keyword: CONTINUATION_KEYWORD, restartCampaign: false,
+    });
+  });
+
+  it("restarts a comment-started DM journey after a later 24-hour gap", () => {
+    const commentCampaign = {
+      id: "comment-dm-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "dm" as const,
+    };
+
+    expect(resolveDmCampaignTrigger("back again", [commentCampaign], "comment-dm-1", false, undefined, true)).toEqual({
+      campaignId: "comment-dm-1", keyword: RESTART_KEYWORD, restartCampaign: true,
+    });
+  });
+
+  it("does not continue a campaign that cannot send DMs", () => {
+    const commentOnly = {
+      id: "comment-only-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "comment" as const,
+    };
+
+    expect(resolveDmCampaignTrigger("just checking in", [commentOnly], "comment-only-1", true)).toBeNull();
+  });
+
+  it("does not continue a disabled DM-capable campaign", () => {
+    const disabled = {
+      id: "disabled-dm-1",
+      keywords: ["hello"],
+      targetMediaIds: [],
+      triggerSource: "comment" as const,
+      replyChannel: "dm" as const,
+      enabled: false,
+    };
+
+    expect(resolveDmCampaignTrigger("just checking in", [disabled], "disabled-dm-1", true)).toBeNull();
   });
 });

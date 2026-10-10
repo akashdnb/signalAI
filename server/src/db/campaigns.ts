@@ -149,13 +149,14 @@ export async function getCampaign(pool: Pool, tenantId: string, campaignId: stri
 export async function listActiveCampaignKeywords(
   pool: Queryable,
   tenantId: string,
-): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>> {
+): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
   const result = await pool.query<{
     id: string;
     keywords: string[];
     target_media_ids: string[];
     trigger_source: TriggerSource;
-  }>(`select id, keywords, target_media_ids, trigger_source from campaigns where tenant_id = $1 and enabled = true`, [
+    reply_channel: ReplyChannel;
+  }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [
     tenantId,
   ]);
   return result.rows.map((row) => ({
@@ -163,6 +164,7 @@ export async function listActiveCampaignKeywords(
     keywords: row.keywords,
     targetMediaIds: row.target_media_ids,
     triggerSource: row.trigger_source,
+    replyChannel: row.reply_channel,
   }));
 }
 

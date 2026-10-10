@@ -9,10 +9,10 @@ import { getEventForReply } from "../db/events.js";
 import { config } from "../config.js";
 import { getRecentConversationHistory } from "./conversationHistory.js";
 import { getCampaign } from "../db/campaigns.js";
-import { getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
+import { getLastInboundDmAt, getLead, setActiveMilestone, updateHandoffStatus } from "../db/leads.js";
 import { getTenant } from "../db/tenants.js";
 import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
-import { recordSentReply, type SentReplyEngine } from "../db/sentReplies.js";
+import { recordSentReply, sentReplyExistsForLeadEvent, type SentReplyEngine } from "../db/sentReplies.js";
 import type { RagDependencies } from "./replyEngine.js";
 import {
   getFirstMilestone,
@@ -29,7 +29,7 @@ import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
 import { getTokenUsageSince, recordTokenUsage } from "../db/tokenUsage.js";
 import { getPlanTier } from "../lib/planTiers.js";
-import { sendInstagramCommentReply, sendInstagramMessage } from "../lib/instagramSend.js";
+import { sendInstagramCommentReply, sendInstagramMessage, sendInstagramPrivateReply } from "../lib/instagramSend.js";
 import { Sentry } from "../lib/sentry.js";
 import { generateReply } from "./replyEngine.js";
 import { runMilestoneCheck } from "./milestoneEngine.js";
@@ -147,14 +147,24 @@ export function createLeadEventReplyHandler(
     // and has no window of its own. A campaign can want either, or both.
     const wantsDm = campaign.replyChannel === "dm" || campaign.replyChannel === "both";
     const wantsComment = campaign.replyChannel === "comment" || campaign.replyChannel === "both";
-    const dmWindowOpen = !!lead.windowOpenUntil && lead.windowOpenUntil.getTime() >= Date.now();
-    const dmReady = wantsDm && dmWindowOpen;
+    // Derive the standard window from actual inbound DMs. A comment is not
+    // itself an inbound message and must not open the 24-hour window.
+    const lastInboundDmAt = await getLastInboundDmAt(pool, job.tenantId, job.leadId);
+    const now = Date.now();
+    const dmWindowOpen = !!lastInboundDmAt && lastInboundDmAt.getTime() + 24 * 60 * 60 * 1000 >= now;
+    // A comment has a separate one-time private-reply allowance, valid for
+    // seven days from the comment. It does not extend the normal DM window.
+    const commentAgeMs = now - event.occurredAt.getTime();
+    const privateReplyWindowOpen = isCommentTrigger && !!event.commentId && commentAgeMs >= 0 && commentAgeMs < 7 * 24 * 60 * 60 * 1000;
+    const dmAlreadySent = await sentReplyExistsForLeadEvent(pool, job.tenantId, job.leadEventId, "dm");
+    const dmReady = wantsDm && !dmAlreadySent && (dmWindowOpen || privateReplyWindowOpen);
+    const privateReplyOnly = dmReady && privateReplyWindowOpen && !dmWindowOpen;
     const commentReady = wantsComment && !!event.commentId;
 
     if (!dmReady && !commentReady) {
-      // Nothing deliverable for this event right now — DM's window is the
-      // only one of the two preconditions that can ever become true later
-      // (it doesn't, once closed), so there's no "retry later" here either.
+      // No deliverable channel is currently available (e.g. an old comment
+      // without a DM window or private-reply eligibility), so do not attempt
+      // a normal Send API message outside Meta's allowed window.
       return { advance: true };
     }
 
@@ -203,7 +213,7 @@ export function createLeadEventReplyHandler(
     // withheld after the fact. The dm tier's existing mixed-channel history
     // is unchanged.
     const history =
-      campaign.replyMode === "rule_based"
+      campaign.replyMode === "rule_based" || event.restartCampaign
         ? []
         : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns, tier);
     // B10: one guard per event, shared by whichever path below actually
@@ -284,7 +294,10 @@ export function createLeadEventReplyHandler(
         }
       }
     } else {
-      let activeMilestone = lead.activeMilestoneId
+      // A DM that resumes an old conversation after the messaging window
+      // expired is a new journey run: restart at milestone one and start fresh
+      // conversation history, while retaining lead-level captured CRM facts.
+      let activeMilestone = !event.restartCampaign && lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
         : null;
 
@@ -460,14 +473,22 @@ export function createLeadEventReplyHandler(
     let delivered = false;
     if (dmReady) {
       const preparedReply = prepareInstagramDmReply(replyText, campaign.ctaLink);
-      const sendResult = preparedReply.richMessage
-        ? await sendInstagramMessage(
-            token,
-            lead.instagramUserId,
-            preparedReply.text,
-            preparedReply.richMessage,
-          )
-        : await sendInstagramMessage(token, lead.instagramUserId, preparedReply.text);
+      // Comment private replies are a distinct API operation and accept one
+      // message only. Preserve an explicit CTA as a URL in the text fallback
+      // rather than silently dropping it with a button-template payload.
+      const privateReplyText = preparedReply.richMessage && campaign.ctaLink
+        ? `${preparedReply.text}\n${campaign.ctaLink}`
+        : preparedReply.text;
+      const sendResult = privateReplyOnly
+        ? await sendInstagramPrivateReply(token, event.commentId!, privateReplyText)
+        : preparedReply.richMessage
+          ? await sendInstagramMessage(
+              token,
+              lead.instagramUserId,
+              preparedReply.text,
+              preparedReply.richMessage,
+            )
+          : await sendInstagramMessage(token, lead.instagramUserId, preparedReply.text);
       delivered = true;
       // Recorded per actual channel send, not per event — a 'both'-channel
       // campaign makes two real Instagram API calls below and now produces

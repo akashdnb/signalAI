@@ -119,6 +119,19 @@ export async function listRecentSentRepliesForLead(
   return result.rows.map((row) => ({ text: row.text, sentAt: row.sent_at }));
 }
 
+export async function sentReplyExistsForLeadEvent(
+  pool: Queryable,
+  tenantId: string,
+  leadEventId: string,
+  channel: SentReplyChannel,
+): Promise<boolean> {
+  const result = await pool.query(
+    `select 1 from sent_replies where tenant_id = $1 and lead_event_id = $2 and channel = $3 limit 1`,
+    [tenantId, leadEventId, channel],
+  );
+  return result.rows.length > 0;
+}
+
 export async function sentReplyExistsForMetaMessageId(
   pool: Queryable,
   tenantId: string,

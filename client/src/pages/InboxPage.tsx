@@ -49,7 +49,12 @@ export function InboxPage() {
 
   const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
-  const messagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
+  const selectedLeadIdRef = useRef(selectedLeadId);
+  selectedLeadIdRef.current = selectedLeadId;
+  const standardMessagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
+  const humanAgentWindowOpen = !!selectedLead?.humanAgentWindowUntil && Date.parse(selectedLead.humanAgentWindowUntil) > Date.now();
+  const humanAgentOnly = !standardMessagingWindowOpen && humanAgentWindowOpen;
+  const messagingWindowOpen = standardMessagingWindowOpen || humanAgentWindowOpen;
 
   const getFilters = () =>
     tab === "unread"
@@ -90,16 +95,34 @@ export function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, tab, search, page, reloadCount]);
 
+  const selectedLastInboundAtRef = useRef<string | null>(null);
   const reloadLeadsRef = useRef(reloadLeads);
   reloadLeadsRef.current = reloadLeads;
   useEffect(() => {
     const interval = setInterval(() => {
-      // Don't let polling reorder the selected conversation out of the current
-      // page while a user is actively reading it.
-      if (!selectedLeadId) reloadLeadsRef.current();
+      // Don't let list polling reorder the selected conversation out of the
+      // current page while a user is actively reading it. Refresh the selected
+      // lead detail instead so new inbound DMs update the available reply window.
+      if (!selectedLeadId) {
+        reloadLeadsRef.current();
+        return;
+      }
+      if (!tenantId) return;
+      api.getLead(tenantId, selectedLeadId).then((fresh) => {
+        if (selectedLeadIdRef.current !== selectedLeadId) return;
+        if (fresh.lastInboundAt !== selectedLastInboundAtRef.current) {
+          selectedLastInboundAtRef.current = fresh.lastInboundAt;
+          setThreadRefreshToken((token) => token + 1);
+        }
+        setPageData((prev) => prev
+          ? { ...prev, items: prev.items.map((lead) => lead.id === fresh.id ? { ...lead, ...fresh } : lead) }
+          : prev);
+      }).catch(() => {
+        // Best-effort polling; avoid replacing a readable conversation with an error.
+      });
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [selectedLeadId]);
+  }, [selectedLeadId, tenantId]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -123,6 +146,7 @@ export function InboxPage() {
   function handleSelectLead(lead: LeadListItem) {
     if (!tenantId) return;
     setSelectedLeadId(lead.id);
+    selectedLastInboundAtRef.current = lead.lastInboundAt;
     setComposeText("");
     setPendingEntries([]);
     setError(null);
@@ -312,11 +336,15 @@ export function InboxPage() {
                   </button>
                 ) : (
                   <>
-                    {!messagingWindowOpen && (
+                    {humanAgentOnly ? (
                       <p className="muted small" role="status">
-                        Instagram&apos;s 24-hour messaging window is closed. A new inbound DM is required before you can send a reply.
+                        The standard 24-hour window has closed. Only eligible human support replies can use Meta&apos;s HUMAN_AGENT exception within 7 days of the customer&apos;s last DM.
                       </p>
-                    )}
+                    ) : !messagingWindowOpen ? (
+                      <p className="muted small" role="status">
+                        Instagram&apos;s messaging window is closed. A new inbound DM is required before you can send a reply.
+                      </p>
+                    ) : null}
                     <div className="inline-form" style={{ marginBottom: 0 }}>
                       <textarea
                         rows={2}

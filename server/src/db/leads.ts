@@ -111,6 +111,17 @@ export async function getLead(pool: Queryable, tenantId: string, leadId: string)
   return result.rows[0] ? toLead(result.rows[0]) : null;
 }
 
+/** Latest customer-originated DM for messaging-policy windows. Business echoes are not lead_events, so they cannot extend this timestamp. */
+export async function getLastInboundDmAt(pool: Queryable, tenantId: string, leadId: string): Promise<Date | null> {
+  const result = await pool.query<{ occurred_at: Date }>(
+    `select occurred_at from lead_events
+     where tenant_id = $1 and lead_id = $2 and event_type = 'message'
+     order by occurred_at desc, id desc limit 1`,
+    [tenantId, leadId],
+  );
+  return result.rows[0]?.occurred_at ?? null;
+}
+
 /**
  * `Lead`/`getLead` above carry no username — it lives in `lead_pii`, not
  * `leads`, and every OTHER caller of `getLead` (pipeline/handoff updates,
@@ -282,6 +293,15 @@ export async function setActiveDmCampaignId(
     tenantId,
     campaignId,
   ]);
+}
+
+/** Record an inbound interaction such as a comment for Inbox unread state without treating it as an inbound DM for Meta's 24-hour window. */
+export async function updateLastInboundAt(pool: Queryable, tenantId: string, leadId: string, occurredAt: Date): Promise<void> {
+  await pool.query(
+    `update leads set last_inbound_at = greatest(coalesce(last_inbound_at, $3), $3)
+     where id = $1 and tenant_id = $2`,
+    [leadId, tenantId, occurredAt],
+  );
 }
 
 export async function updateMessagingWindow(
