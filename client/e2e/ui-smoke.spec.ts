@@ -320,13 +320,14 @@ test.describe("responsive route smoke checks", () => {
     await expect(page.getByText("Image card", { exact: true })).toBeVisible();
 
     const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
+    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByLabel("Tone", { exact: true })).toBeVisible();
+    await expect(toneSelect).toBeVisible();
     await aiBehaviour.click();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByLabel("Tone", { exact: true })).toBeHidden();
+    await expect(toneSelect).toBeHidden();
     await aiBehaviour.click();
-    await expect(page.getByLabel("Tone", { exact: true })).toBeVisible();
+    await expect(toneSelect).toBeVisible();
 
     const ctaHelp = page.getByText(/An HTTPS link becomes an Instagram button/);
     const ctaBox = await ctaInput.boundingBox();
@@ -355,13 +356,14 @@ test.describe("responsive route smoke checks", () => {
     await detailsTab.click();
 
     const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
+    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
     await aiBehaviour.click();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByLabel("Tone", { exact: true })).toBeVisible();
+    await expect(toneSelect).toBeVisible();
     await aiBehaviour.click();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByLabel("Tone", { exact: true })).toBeHidden();
+    await expect(toneSelect).toBeHidden();
 
     const postTargeting = page.getByRole("button", { name: "Post Targeting" });
     await postTargeting.click();
