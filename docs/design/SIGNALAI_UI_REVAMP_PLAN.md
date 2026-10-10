@@ -65,7 +65,7 @@ The implementation branch now includes the shared focus-visible styling and cont
 
 The highest-risk Journey Builder save change is also implemented in code: graph edits plus goal structure/order/content stage locally and submit through one version-checked, transactional save. Goal inspector “Apply to draft” no longer commits the goal independently; goal loading is guarded before Save; clean canvas-only saves preserve existing goal IDs; new journeys with zero goals remain saveable. Route-level regression coverage has been added for empty-goal saves, adding a goal, preserving IDs on graph-only saves, and rollback of invalid combined drafts.
 
-**Verification remains outstanding.** This environment could inspect and commit source through the repository connection but could not resolve GitHub from the local shell, so build, lint, database-backed tests and browser interaction checks have not run here. Treat the implementation as in progress until CI and manual responsive/keyboard checks confirm it. Existing checklist items below intentionally remain unchecked until they are executed.
+**Verification snapshot (2026-10-10):** Client CI passed lint and production build on commit `3538118`; a follow-up change makes failed-save retry preserve the local draft and is currently being rechecked by client CI. Server CI passed typecheck, production build, migrations and the full database-backed test suite on commit `b18b16c`, including the atomic-save regression tests. Browser visual QA, mobile-device interaction testing, and manual keyboard/screen-reader review have not been run in this environment, so the revamp remains in progress. Checklist items below stay unchecked until the relevant manual verification is completed.
 
 
 ---
