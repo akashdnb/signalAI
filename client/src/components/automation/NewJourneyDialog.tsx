@@ -54,9 +54,9 @@ export function NewJourneyDialog({
             placeholder="price, details, brochure, site visit"
           />
         </label>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="mt-2 flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
           <button type="submit" className="btn-primary" disabled={!name.trim() || !keywords.trim() || saving}>
