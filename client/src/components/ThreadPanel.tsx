@@ -113,8 +113,8 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, ki
         {hasMore && <button type="button" className="btn-secondary btn-small" disabled={loadingMore} onClick={() => void handleLoadOlder()}>{loadingMore ? "Loading older messages…" : "Load older messages"}</button>}
         {olderError && <span className="text-sm text-subtle" role="alert">{olderError}</span>}
       </div>
-      {allEntries.map((entry, i) => (
-        <div className="timeline-entry" key={`${entry.occurredAt}-${entry.kind}-${i}`}>
+      {allEntries.map((entry) => (
+        <div className="timeline-entry" key={`${entry.source}-${entry.id}`}>
           {entry.kind === "event" ? (
             <><strong>{entry.eventType === "comment" ? "Comment" : "DM"}</strong>{entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}<div>{entry.text ?? "—"}</div></>
           ) : entry.kind === "reply" ? (
