@@ -351,7 +351,7 @@ export function AppShell() {
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
   );
-  const mobileNavRef = useRef<HTMLElement>(null);
+  const mobileNavRef = useRef<HTMLElement | null>(null);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
   // base) rather than the wizard vanishing the instant tenant.industry
