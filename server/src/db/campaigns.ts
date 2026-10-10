@@ -95,10 +95,11 @@ export async function createCampaign(
     targetMediaIds?: string[];
     replyChannel?: ReplyChannel;
     triggerSource?: TriggerSource;
+    enabled?: boolean;
   },
 ): Promise<Campaign> {
   const result = await pool.query<CampaignRow>(
-    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link, target_media_ids, reply_channel, trigger_source)
+    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link, target_media_ids, reply_channel, trigger_source, enabled)
      values ($1, $2, $3,
        coalesce($4, 'rule_based'),
        coalesce($5, array[]::text[]),
@@ -106,7 +107,8 @@ export async function createCampaign(
        $7,
        coalesce($8, array[]::text[]),
        coalesce($9, 'dm'),
-       coalesce($10, 'comment'))
+       coalesce($10, 'comment'),
+       coalesce($11, false))
      returning *`,
     [
       tenantId,
@@ -119,6 +121,7 @@ export async function createCampaign(
       options?.targetMediaIds ?? null,
       options?.replyChannel ?? null,
       options?.triggerSource ?? null,
+      options?.enabled ?? false,
     ],
   );
   return toCampaign(result.rows[0]!);
