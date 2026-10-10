@@ -33,7 +33,7 @@ function GoalHeader({
       </h2>
 
       <p className="muted m-0 mt-1 text-[11px] leading-4">
-        Conversational goal the AI works toward.
+        Changes stay in your draft until you save the journey.
       </p>
     </div>
   );
@@ -181,7 +181,11 @@ export function NodeInspectorDialog({
           }}
           disabled={actions.saving || !actions.canSave}
         >
-          {actions.saving ? "Saving…" : "Save changes"}
+          {actions.saving
+            ? "Applying…"
+            : selectedNode.type === "milestone"
+              ? "Apply to draft"
+              : "Save changes"}
         </button>
       </div>
     ),
