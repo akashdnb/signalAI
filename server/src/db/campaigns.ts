@@ -2,37 +2,28 @@ import type { Pool } from "pg";
 import type { Queryable } from "./types.js";
 
 export type ReplyMode = "rule_based" | "ai_generated";
-
-/** Where a triggered reply is delivered: a private DM, a public reply under the comment, or both. Default 'dm' preserves every existing campaign's current behaviour. */
 export type ReplyChannel = "dm" | "comment" | "both";
-
-/** What kind of inbound event a campaign's keywords match against — a comment, a DM, or either. Distinct from ReplyChannel (where the reply goes, not what triggers it). Default 'comment' preserves every existing campaign's current behaviour, since DM-triggered matching didn't exist before this field. */
 export type TriggerSource = "comment" | "message" | "both";
-
-/** AI Behaviour panel (UI revamp R3): a coarse tone knob alongside the tenant-wide free-text brandVoice — both get interpolated into the same prompt. */
 export type CampaignTone = "professional" | "friendly" | "casual" | "professional_and_friendly";
-/** 'auto' (default) leaves reply language unspecified, identical to every pre-R3 campaign's behavior. */
 export type CampaignLanguage = "auto" | "en" | "hi";
 
 export interface Campaign {
   id: string;
   tenantId: string;
   name: string;
-  /** Free-text summary shown on the journey card / Details page. Null for every campaign created before this field existed. */
   description: string | null;
   keywords: string[];
   enabled: boolean;
+  published?: boolean;
   replyMode: ReplyMode;
   replyTemplates: string[];
   defaultReplyTemplate: string;
   ctaLink: string | null;
-  /** Which post(s) this campaign matches comments on. Empty = every post (today's behaviour). Irrelevant to a message-triggered match — a DM isn't "on" a post. */
   targetMediaIds: string[];
   replyChannel: ReplyChannel;
   triggerSource: TriggerSource;
   tone: CampaignTone;
   language: CampaignLanguage;
-  /** Per-campaign override of the tenant's always-on-whenever-documents-exist RAG — default true preserves every existing campaign's current behavior. */
   useKnowledgeBase: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -45,6 +36,7 @@ interface CampaignRow {
   description: string | null;
   keywords: string[];
   enabled: boolean;
+  published?: boolean;
   reply_mode: ReplyMode;
   reply_templates: string[];
   default_reply_template: string;
@@ -67,6 +59,7 @@ function toCampaign(row: CampaignRow): Campaign {
     description: row.description,
     keywords: row.keywords,
     enabled: row.enabled,
+    published: row.published ?? false,
     replyMode: row.reply_mode,
     replyTemplates: row.reply_templates,
     defaultReplyTemplate: row.default_reply_template,
@@ -95,10 +88,11 @@ export async function createCampaign(
     targetMediaIds?: string[];
     replyChannel?: ReplyChannel;
     triggerSource?: TriggerSource;
+    enabled?: boolean;
   },
 ): Promise<Campaign> {
   const result = await pool.query<CampaignRow>(
-    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link, target_media_ids, reply_channel, trigger_source)
+    `insert into campaigns (tenant_id, name, keywords, reply_mode, reply_templates, default_reply_template, cta_link, target_media_ids, reply_channel, trigger_source, enabled)
      values ($1, $2, $3,
        coalesce($4, 'rule_based'),
        coalesce($5, array[]::text[]),
@@ -106,7 +100,8 @@ export async function createCampaign(
        $7,
        coalesce($8, array[]::text[]),
        coalesce($9, 'dm'),
-       coalesce($10, 'comment'))
+       coalesce($10, 'comment'),
+       coalesce($11, true))
      returning *`,
     [
       tenantId,
@@ -119,19 +114,23 @@ export async function createCampaign(
       options?.targetMediaIds ?? null,
       options?.replyChannel ?? null,
       options?.triggerSource ?? null,
+      options?.enabled ?? true,
     ],
   );
   return toCampaign(result.rows[0]!);
 }
 
-// tone/language/useKnowledgeBase are deliberately left off createCampaign's
-// options — every campaign is created with the schema defaults
-// ('professional_and_friendly' / 'auto' / true) and configured afterward
-// via updateCampaignReplyConfig, same as replyMode/replyChannel already are.
-
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(
-    `select * from campaigns where tenant_id = $1 order by created_at desc`,
+    `select campaigns.*,
+            exists (
+              select 1 from campaign_journey_versions published
+               where published.tenant_id = campaigns.tenant_id
+                 and published.campaign_id = campaigns.id
+            ) as published
+       from campaigns
+      where campaigns.tenant_id = $1
+      order by campaigns.created_at desc`,
     [tenantId],
   );
   return result.rows.map(toCampaign);
@@ -139,13 +138,19 @@ export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campa
 
 export async function getCampaign(pool: Pool, tenantId: string, campaignId: string): Promise<Campaign | null> {
   const result = await pool.query<CampaignRow>(
-    `select * from campaigns where id = $1 and tenant_id = $2`,
+    `select campaigns.*,
+            exists (
+              select 1 from campaign_journey_versions published
+               where published.tenant_id = campaigns.tenant_id
+                 and published.campaign_id = campaigns.id
+            ) as published
+       from campaigns
+      where campaigns.id = $1 and campaigns.tenant_id = $2`,
     [campaignId, tenantId],
   );
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-/** Only what the matcher needs, for the hot ingestion path — not the full row. */
 export async function listActiveCampaignKeywords(
   pool: Queryable,
   tenantId: string,
@@ -156,9 +161,7 @@ export async function listActiveCampaignKeywords(
     target_media_ids: string[];
     trigger_source: TriggerSource;
     reply_channel: ReplyChannel;
-  }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [
-    tenantId,
-  ]);
+  }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [tenantId]);
   return result.rows.map((row) => ({
     id: row.id,
     keywords: row.keywords,
@@ -168,11 +171,6 @@ export async function listActiveCampaignKeywords(
   }));
 }
 
-/**
- * BUI: the campaign editor's post-targeting picker. Replaced wholesale on
- * each save, same shape as `setCampaignMilestones` — an empty array means
- * "every post" (today's behaviour), not "no posts match".
- */
 export async function setCampaignTargetMediaIds(
   pool: Pool,
   tenantId: string,
@@ -186,12 +184,6 @@ export async function setCampaignTargetMediaIds(
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-/**
- * Phase 2A "Multiple DM Variations" — replaced wholesale on each save,
- * same shape as setCampaignTargetMediaIds. An empty array falls back to
- * defaultReplyTemplate (see replyEngine.ts's pickReplyTemplate) — that's
- * every existing campaign's current behavior, left unaffected.
- */
 export async function setCampaignReplyTemplates(
   pool: Pool,
   tenantId: string,
@@ -212,19 +204,20 @@ export async function setCampaignEnabled(
   enabled: boolean,
 ): Promise<boolean> {
   const result = await pool.query(
-    `update campaigns set enabled = $3, updated_at = now() where id = $1 and tenant_id = $2`,
+    `update campaigns
+        set enabled = $3, updated_at = now()
+      where id = $1
+        and tenant_id = $2
+        and ($3 = false or exists (
+          select 1 from campaign_journey_versions published
+           where published.tenant_id = campaigns.tenant_id
+             and published.campaign_id = campaigns.id
+        ))`,
     [campaignId, tenantId, enabled],
   );
   return result.rowCount === 1;
 }
 
-/**
- * BUI: "reply-engine mode toggle per campaign," plus the CTA link and the
- * rule-based template — the rest of the creator's per-campaign reply
- * configuration beyond enabled/disabled and milestones. Each field is
- * `coalesce`d against its current value so a partial PATCH only ever
- * touches the fields it explicitly sent.
- */
 export async function updateCampaignReplyConfig(
   pool: Pool,
   tenantId: string,
@@ -263,14 +256,14 @@ export async function updateCampaignReplyConfig(
       campaignId,
       tenantId,
       updates.replyMode ?? null,
-      updates.ctaLink !== undefined, // whether the caller sent ctaLink at all — coalesce can't distinguish "sent null" from "not sent"
+      updates.ctaLink !== undefined,
       updates.ctaLink ?? null,
       updates.defaultReplyTemplate ?? null,
       updates.replyChannel ?? null,
       updates.triggerSource ?? null,
       updates.tone ?? null,
       updates.language ?? null,
-      updates.useKnowledgeBase !== undefined, // same "was it sent at all" trick as ctaLink — useKnowledgeBase: false must not coalesce away
+      updates.useKnowledgeBase !== undefined,
       updates.useKnowledgeBase ?? null,
       updates.keywords ?? null,
       updates.name ?? null,

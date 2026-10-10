@@ -23,27 +23,52 @@ export function AutomationPage() {
   const [activeTab, setActiveTab] = useState<AutomationTab>("journeys");
   const [error, setError] = useState<string | null>(null);
   const [showNewJourney, setShowNewJourney] = useState(false);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+  const [templateDraftIds, setTemplateDraftIds] = useState<Record<string, string>>({});
   const { toasts, push } = useToasts();
 
   async function handleCreateJourney(name: string, keywords: string[]) {
     if (!tenantId) return;
-    const created = await api.createCampaign(tenantId, name, keywords);
+    const created = await api.createCampaign(tenantId, name, keywords, { enabled: false });
     setShowNewJourney(false);
-    push("Journey created");
+    push("Draft journey created");
     navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
   }
 
   async function handleUseTemplate(template: AutomationTemplate) {
-    if (!tenantId) return;
+    if (!tenantId || creatingTemplate) return;
+    setCreatingTemplate(true);
+    setError(null);
+    let campaignId = templateDraftIds[template.id];
     try {
-      const created = await api.createCampaign(tenantId, template.name, template.keywords);
+      if (!campaignId) {
+        const created = await api.createCampaign(tenantId, template.name, template.keywords, { enabled: false });
+        campaignId = created.id;
+        // Retain the campaign id before making any subsequent provisioning
+        // calls. If configuration or milestones fail, the next retry resumes
+        // this draft instead of creating a duplicate campaign.
+        setTemplateDraftIds((current) => ({ ...current, [template.id]: campaignId! }));
+      }
+
       const { milestones: presetMilestones, ...replyConfig } = template.preset;
-      await api.updateReplyConfig(tenantId, created.id, { ...replyConfig, keywords: template.keywords });
-      if (presetMilestones) await api.setMilestones(tenantId, created.id, presetMilestones);
-      push(`${template.name} preset created`);
-      navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
+      await api.updateReplyConfig(tenantId, campaignId, { ...replyConfig, keywords: template.keywords });
+      if (presetMilestones) await api.setMilestones(tenantId, campaignId, presetMilestones);
+
+      setTemplateDraftIds((current) => {
+        const next = { ...current };
+        delete next[template.id];
+        return next;
+      });
+      push(`${template.name} draft created`);
+      navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create journey from preset");
+      const message = err instanceof ApiError ? err.message : "Failed to create journey from preset";
+      setError(message);
+      // Keep the template details dialog open. If a campaign was already
+      // created, templateDraftIds makes retry idempotent for this template.
+      throw new Error(message);
+    } finally {
+      setCreatingTemplate(false);
     }
   }
 
@@ -55,7 +80,7 @@ export function AutomationPage() {
       <AutomationTabs active={activeTab} onChange={setActiveTab} />
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
       {activeTab === "templates" ? (
-        <AutomationTemplates onUse={(template) => void handleUseTemplate(template)} />
+        <AutomationTemplates onUse={handleUseTemplate} />
       ) : activeTab !== "journeys" ? (
         <div id="automation-tabpanel" role="tabpanel" aria-labelledby={`automation-tab-${activeTab}`} tabIndex={0} className="mt-6 flex min-h-[300px] flex-1 items-center justify-center rounded-2xl border border-dashed border-line px-5 md:min-h-[520px]">
           <div className="max-w-md text-center">

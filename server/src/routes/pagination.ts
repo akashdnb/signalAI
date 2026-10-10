@@ -41,11 +41,32 @@ type CampaignSort = (typeof VALID_CAMPAIGN_SORTS)[number];
 
 function mapCampaign(row: {
   id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean;
+  has_published_version?: boolean;
   reply_mode: ReplyMode; reply_templates: string[]; default_reply_template: string; cta_link: string | null;
   target_media_ids: string[]; reply_channel: ReplyChannel; trigger_source: TriggerSource; tone: CampaignTone;
   language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
 }): Campaign {
-  return { id: row.id, tenantId: row.tenant_id, name: row.name, description: row.description, keywords: row.keywords, enabled: row.enabled, replyMode: row.reply_mode, replyTemplates: row.reply_templates, defaultReplyTemplate: row.default_reply_template, ctaLink: row.cta_link, targetMediaIds: row.target_media_ids, replyChannel: row.reply_channel, triggerSource: row.trigger_source, tone: row.tone, language: row.language, useKnowledgeBase: row.use_knowledge_base, createdAt: row.created_at, updatedAt: row.updated_at };
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    name: row.name,
+    description: row.description,
+    keywords: row.keywords,
+    enabled: row.enabled,
+    published: row.has_published_version ?? false,
+    replyMode: row.reply_mode,
+    replyTemplates: row.reply_templates,
+    defaultReplyTemplate: row.default_reply_template,
+    ctaLink: row.cta_link,
+    targetMediaIds: row.target_media_ids,
+    replyChannel: row.reply_channel,
+    triggerSource: row.trigger_source,
+    tone: row.tone,
+    language: row.language,
+    useKnowledgeBase: row.use_knowledge_base,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function mapDocument(row: {
@@ -58,9 +79,6 @@ function mapDocument(row: {
 export const paginationRouter = Router();
 paginationRouter.use("/tenants/:tenantId", requireTenantSession);
 
-// Cursor-paginated timeline is mounted here because paginationRouter is
-// registered before the legacy leads router. The old route remains as a
-// compatibility fallback, while this route owns the opaque cursor contract.
 paginationRouter.get("/tenants/:tenantId/leads/:leadId/timeline", async (req, res) => {
   const { tenantId, leadId } = req.params;
   const leadResult = await getPool().query("select 1 from leads where id = $1 and tenant_id = $2", [leadId, tenantId]);
@@ -145,10 +163,24 @@ paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
   const offset = (page - 1) * pageSize;
   const orderBy = { updated_desc: "updated_at desc, id desc", updated_asc: "updated_at asc, id asc", name_asc: "name asc, id asc", name_desc: "name desc, id desc" }[sortValue as CampaignSort];
   const result = await pool.query<{
-    id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean; reply_mode: ReplyMode;
+    id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean;
+    has_published_version?: boolean; reply_mode: ReplyMode;
     reply_templates: string[]; default_reply_template: string; cta_link: string | null; target_media_ids: string[]; reply_channel: ReplyChannel;
     trigger_source: TriggerSource; tone: CampaignTone; language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
-  }>(`select * from campaigns where ${where} order by ${orderBy} limit $${params.length + 1} offset $${params.length + 2}`, [...params, pageSize, offset]);
+  }>(
+    `select campaigns.*,
+            exists (
+              select 1
+                from campaign_journey_versions published
+               where published.tenant_id = campaigns.tenant_id
+                 and published.campaign_id = campaigns.id
+            ) as has_published_version
+       from campaigns
+       where ${where}
+       order by ${orderBy}
+       limit $${params.length + 1} offset $${params.length + 2}`,
+    [...params, pageSize, offset],
+  );
   const items = result.rows.map(mapCampaign);
   return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
@@ -158,7 +190,6 @@ paginationRouter.get("/tenants/:tenantId/knowledge-base", async (req, res) => {
   const query = req.query as Record<string, unknown>;
   const { page: requestedPage, pageSize } = parsePagination(query);
   const pool = getPool();
-  // Preserve listDocumentsForTenant semantics exactly: all versions, including superseded versions.
   const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from knowledge_base_documents where tenant_id = $1`, [tenantId]);
   const total = Number(countResult.rows[0]?.count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

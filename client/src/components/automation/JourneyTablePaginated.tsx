@@ -31,6 +31,30 @@ function relativeUpdatedAt(value: string): { label: string; title: string } {
   return { label: date.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) }), title: date.toLocaleString() };
 }
 
+function JourneyStatusBadge({ campaign }: { campaign: Campaign }) {
+  const label = !campaign.published
+    ? campaign.enabled
+      ? "Unpublished · Active"
+      : "Draft"
+    : campaign.enabled
+      ? "Published · Active"
+      : "Published · Paused";
+  const styling = !campaign.published
+    ? campaign.enabled
+      ? "bg-[#FEE2E2] text-[#991B1B]"
+      : "bg-[#E2E8F0] text-[#475569]"
+    : campaign.enabled
+      ? "bg-[#D1FAE5] text-[#047857]"
+      : "bg-[#FEF3C7] text-[#92400E]";
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${styling}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {label}
+    </span>
+  );
+}
+
 function TriggerBadge({ campaign }: { campaign: Campaign }) {
   const isComment = campaign.triggerSource !== "message";
   return (
@@ -44,9 +68,20 @@ function TriggerBadge({ campaign }: { campaign: Campaign }) {
 function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campaign; onOpen: () => void; onRename: () => void; onToggle: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canActivate = campaign.published === true;
   async function toggle() {
+    if (!campaign.enabled && !canActivate) return;
     setSaving(true);
-    try { await onToggle(); setOpen(false); } finally { setSaving(false); }
+    setError(null);
+    try {
+      await onToggle();
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't update journey status");
+    } finally {
+      setSaving(false);
+    }
   }
   return (
     <div className="relative inline-block">
@@ -55,10 +90,13 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
       </button>
       {open && <>
         <button type="button" aria-label="Close journey actions" className="fixed inset-0 z-20 cursor-default" onClick={(event) => { event.stopPropagation(); setOpen(false); }} />
-        <div className="absolute right-0 top-9 z-30 w-44 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
+        <div className="absolute right-0 top-9 z-30 w-52 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
+          {error && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
-          <button type="button" disabled={saving} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>{saving ? "Saving…" : campaign.enabled ? "Pause journey" : "Activate journey"}</button>
+          <button type="button" disabled={saving || (!campaign.enabled && !canActivate)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>
+            {saving ? "Saving…" : campaign.enabled ? "Pause journey" : canActivate ? "Activate journey" : "Publish first"}
+          </button>
         </div>
       </>}
     </div>
@@ -105,13 +143,27 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     let cancelled = false;
     setData(null);
     getCampaignsPage(tenantId, page, PAGE_SIZE, { q: search.trim() || undefined, status, trigger, sort })
-      .then((result) => { if (cancelled) return; setData(result); if (result.page !== page) setPage(result.page); setError(null); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load journeys"); });
+      .then((result) => {
+        if (cancelled) return;
+        setData(result);
+        if (result.page !== page) setPage(result.page);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setData(null);
+          setError(err instanceof Error ? err.message : "Failed to load journeys");
+        }
+      });
     return () => { cancelled = true; };
   }, [tenantId, page, search, status, trigger, sort, refreshToken, reloadToken]);
 
   const campaigns = data?.items ?? [];
   const allVisibleSelected = campaigns.length > 0 && campaigns.every((campaign) => selectedIds.has(campaign.id));
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [tenantId, page, search, status, trigger, sort]);
 
   function toggleSelected(campaignId: string) {
     setSelectedIds((current) => { const next = new Set(current); if (next.has(campaignId)) next.delete(campaignId); else next.add(campaignId); return next; });
@@ -120,11 +172,36 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     setSelectedIds((current) => { const next = new Set(current); for (const campaign of campaigns) { if (allVisibleSelected) next.delete(campaign.id); else next.add(campaign.id); } return next; });
   }
   async function bulkToggle(enabled: boolean) {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 || bulkSaving) return;
     setBulkSaving(true);
-    try { await Promise.all([...selectedIds].map((campaignId) => api.setCampaignEnabled(tenantId, campaignId, enabled))); setSelectedIds(new Set()); setReloadToken((value) => value + 1); }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed to update journeys"); }
-    finally { setBulkSaving(false); }
+    setError(null);
+    try {
+      const selectedCampaigns = campaigns.filter((campaign) => selectedIds.has(campaign.id));
+      const blockedUnpublished = enabled ? selectedCampaigns.filter((campaign) => !campaign.published).length : 0;
+      const eligible = enabled ? selectedCampaigns.filter((campaign) => campaign.published) : selectedCampaigns;
+      const results = await Promise.allSettled(
+        eligible.map((campaign) => api.setCampaignEnabled(tenantId, campaign.id, enabled)),
+      );
+      const failed = results.filter((result) => result.status === "rejected").length;
+      if (results.some((result) => result.status === "fulfilled")) {
+        setSelectedIds(new Set());
+        setReloadToken((value) => value + 1);
+      }
+      if (failed > 0 || blockedUnpublished > 0) {
+        const updated = results.length - failed;
+        setError(
+          enabled && blockedUnpublished > 0
+            ? `${updated} journey(s) activated; ${blockedUnpublished} draft journey(s) were skipped. Publish them first.`
+            : failed === results.length
+              ? "Couldn't update the selected journeys. Please try again."
+              : `${updated} journey(s) updated; ${failed} failed. The list has been refreshed.`,
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update journeys");
+    } finally {
+      setBulkSaving(false);
+    }
   }
 
   const hasFilters = Boolean(search.trim()) || status !== "all" || trigger !== "all";
@@ -140,13 +217,15 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
         <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort journeys"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option></select>
       </div>
 
+      {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
+
       {selectedIds.size > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-soft bg-chip px-4 py-2.5"><span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span><div className="flex items-center gap-2"><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(true)}>Activate</button><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(false)}>Pause</button><button type="button" className="text-xs font-semibold text-subtle hover:text-ink" onClick={() => setSelectedIds(new Set())}>Clear</button></div></div>}
 
       <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
         <div className="overflow-x-auto">
           {data === null && !error ? <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-chip" />)}</div> : error && data === null ? <div className="p-5"><div className="banner banner-error" role="alert">{error}</div><button type="button" className="link-button mt-3" onClick={() => setReloadToken((value) => value + 1)}>Retry</button></div> : data?.total === 0 ? <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center"><h3 className="m-0 text-lg font-semibold text-ink">{hasFilters ? "No journeys match your filters" : "No journeys yet"}</h3><p className="muted m-0 mt-2 max-w-md text-sm">{hasFilters ? "Try changing your search or filters." : "Create your first AI-powered journey to automate conversations."}</p>{!hasFilters && <button type="button" className="btn-primary mt-5" onClick={onNewJourney}>+ New Journey</button>}</div> : (
             <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible journeys" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Trigger</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
-              {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} tabIndex={0} aria-pressed={selected} role="button" onClick={() => onSelect(campaign.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(campaign.id); } }} className={`cursor-pointer border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"} focus:bg-chip/35 focus:outline-none`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><div className="text-[15px] font-semibold leading-5 text-ink">{campaign.name}</div><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} keyword${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${campaign.enabled ? "bg-[#D1FAE5] text-[#047857]" : "bg-[#E2E8F0] text-[#475569]"}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{campaign.enabled ? "Active" : "Inactive"}</span></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
+              {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} tabIndex={0} aria-pressed={selected} role="button" onClick={() => onSelect(campaign.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(campaign.id); } }} className={`cursor-pointer border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"} focus:bg-chip/35 focus:outline-none`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><div className="text-[15px] font-semibold leading-5 text-ink">{campaign.name}</div><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} keyword${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><JourneyStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
             </tbody></table>
           )}
         </div>

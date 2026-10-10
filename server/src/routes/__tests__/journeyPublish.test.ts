@@ -48,7 +48,7 @@ describe("journey publishing", () => {
     expect(response.status).toBe(401);
   });
 
-  it("publishes a valid journey as an immutable snapshot", async () => {
+  it("publishes a valid journey without activating it", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(
       pool,
@@ -67,16 +67,10 @@ describe("journey publishing", () => {
       });
 
     expect(create.status).toBe(201);
+    expect(create.body.enabled).toBe(false);
 
     const campaignId = create.body.id as string;
 
-    /*
-     * A fresh campaign has the synthesized:
-     *
-     * trigger -> message -> human_handoff
-     *
-     * graph, which is valid for publishing.
-     */
     const publish = await request(app)
       .post(
         `/tenants/${tenant.id}/campaigns/${campaignId}/journey/publish`,
@@ -91,6 +85,25 @@ describe("journey publishing", () => {
     expect(publish.body.tenantId).toBe(tenant.id);
     expect(publish.body.campaignId).toBe(campaignId);
     expect(publish.body.graph.nodes).toHaveLength(3);
+
+    const publishedCampaign = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${campaignId}`)
+      .set(authHeader);
+    expect(publishedCampaign.status).toBe(200);
+    expect(publishedCampaign.body.enabled).toBe(false);
+    expect(publishedCampaign.body.published).toBe(true);
+
+    const activate = await request(app)
+      .patch(`/tenants/${tenant.id}/campaigns/${campaignId}/enabled`)
+      .set(authHeader)
+      .send({ enabled: true });
+    expect(activate.status).toBe(200);
+    expect(activate.body.enabled).toBe(true);
+
+    const activatedCampaign = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${campaignId}`)
+      .set(authHeader);
+    expect(activatedCampaign.body.enabled).toBe(true);
 
     const published = await request(app)
       .get(
@@ -177,9 +190,6 @@ describe("journey publishing", () => {
 
     const campaignId = create.body.id as string;
 
-    /*
-     * Change the builder from version 1 -> version 2.
-     */
     const update = await request(app)
       .put(`/tenants/${tenant.id}/campaigns/${campaignId}/builder`)
       .set(authHeader)
