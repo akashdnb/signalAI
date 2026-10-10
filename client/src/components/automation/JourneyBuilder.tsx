@@ -167,21 +167,22 @@ export function JourneyBuilder({
       }
 
       const currentIndex = lastHistoryIndexRef.current;
-      const movingBack =
-        targetIndex !== null && currentIndex !== null && targetIndex < currentIndex;
-      const targetUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const historyDelta =
+        targetIndex !== null && currentIndex !== null
+          ? targetIndex - currentIndex
+          : -1;
 
       // Stop BrowserRouter's own popstate listener before it changes routes
       // and unmounts this draft. Restore the current item in whichever
-      // direction the browser moved; confirmed navigation happens afterwards.
+      // direction the browser moved; confirmed navigation replays that move.
       event.stopImmediatePropagation();
       restoringHistoryRef.current = true;
-      if (movingBack) {
+      if (historyDelta < 0) {
         window.history.forward();
       } else {
         window.history.back();
       }
-      requestNavigation(() => navigate(targetUrl));
+      requestNavigation(() => window.history.go(historyDelta));
     };
 
     window.addEventListener("popstate", interceptPopState, true);
