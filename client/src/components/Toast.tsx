@@ -28,7 +28,7 @@ export function ToastStack({ toasts }: { toasts: ToastItem[] }) {
       <div role="status" aria-live="polite" aria-atomic="false" className="flex flex-col gap-2">
         {successToasts.map((toast) => (
           <div key={toast.id} className="toast-stack-final pointer-events-auto flex items-center gap-2 rounded-xl border border-line bg-card px-4 py-3 text-sm font-semibold text-ink shadow-lg">
-            <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-ok text-ok-ink">✓</span>
+            <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-chip text-accent">✓</span>
             {toast.text}
           </div>
         ))}
