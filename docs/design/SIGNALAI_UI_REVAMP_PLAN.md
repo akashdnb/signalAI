@@ -59,6 +59,31 @@ These are code-level observations from the files inspected, combined with the UI
 
 ---
 
+### Audit findings to treat as implementation requirements
+
+A source-level audit is documented in [SIGNALAI_UI_UX_AUDIT.md](./SIGNALAI_UI_UX_AUDIT.md). The revamp is not complete until the findings below are addressed and verified. This is code inspection, not a formal WCAG conformance claim; browser, keyboard, assistive-technology and automated accessibility checks still need to be run during implementation.
+
+#### P1 — Resolve before calling the journey builder safe
+- **One consistent draft/save boundary.** In the reviewed code, BuilderCanvas keeps node movement and edge connections local, but JourneyBuilder calls the milestone API immediately when goals are added, removed or reordered. The server synchronizes milestone edits into the graph and advances its version. Graph positions, connections, graph structure, goal ordering and goal content must participate in one coherent draft/save model. No journey edit should commit or increment the saved version before the primary explicit Save action.
+- **Preserve the inspector dialog pattern.** Do not introduce a persistent right-side inspector. Preserve the Goal editor tabs: Basic, Capture Fields, Validation, Success Message. Make the meaning of the inspector's Save/Apply action explicit; it must not secretly persist part of the journey ahead of the agreed Save boundary.
+- **Fix the shared modal primitive.** BottomSheet marks a custom container as a modal dialog but does not itself implement initial focus, focus containment, focus restoration or Escape handling. Adopt a tested accessible dialog primitive or implement and verify those behaviors. Audit publish confirmation, unsaved-change prompts and mobile account UI because they share the component.
+
+#### P2 — Address in the shared design-system pass
+- **Contrast:** the source-token audit calculated about 3.58:1 for green success text (#059669 on #ECFDF5), 4.41:1 for muted text (#6B7280 on canvas #F1F5F9), and 1.81:1 for the cyan chart series (#22D3EE on white). Verify real component pairings in both themes. Target at least 4.5:1 for normal text and 3:1 for meaningful graphical objects, and darken success text / chart cyan-teal as needed.
+- **Form names:** add explicitly associated labels to Leads stage and handoff filters and search fields; give Inbox search an accessible name. Prefer visible labels over placeholders where space permits.
+- **Live feedback:** add an intentional live-region strategy to the shared toast stack. Routine success/status messages should be announced politely; reserve assertive alerts for genuinely urgent errors and avoid duplicate announcements.
+- **Keyboard interactions:** BuilderNode is a button-like div with nested menu buttons. Ensure Enter/Space on child actions does not also trigger parent node selection. Verify node controls with Tab, Shift+Tab, Enter and Space.
+- **Tabs:** use one consistent semantic model. Real navigation should use links; in-place tabs should expose selected state and expected keyboard behavior. Apply the chosen pattern to Automation and Journey Builder tabs.
+- **Mobile navigation:** expose expanded/collapsed state and deliberately manage focus and background interaction according to the chosen modal or non-modal drawer pattern.
+- **Truthful affordances:** review the workspace chevron, Notifications control and Upgrade destination. Visible controls must work as presented or be clearly marked non-interactive.
+- **Low-data dashboard:** the conversation chart needs an intentional no-points/all-zero state. Distinguish loading, no recorded activity, low real activity, unavailable data and errors; never manufacture data or trends.
+
+#### P2 — Make UI quality measurable
+- The current client CI workflow runs dependency installation and the TypeScript/Vite build. The package has a lint script, but client CI does not run it; no dedicated client test script or configured UI/e2e/accessibility suite was found in the reviewed tree.
+- Add lint to CI, focused component/interaction tests for dialogs, labels, toasts, tabs and journey drafts, Playwright smoke tests for core workflows, and an automated accessibility scan such as axe. Automated scans are a baseline, not a substitute for manual keyboard and assistive-technology review.
+
+#### Audit conclusion
+Keep the current design tokens, semantic app landmarks, reduced-motion rules, chart table fallbacks and working graph draft protections. The audit recommends targeted fixes and consistent polish—not a rewrite. Fix behavior and accessibility before visual effects. See the audit document for source links and detailed evidence.
 ## 3. Design principles
 
 1. **Business outcome first.** Prioritize conversations, leads, qualification, response needs and measurable conversion over vanity metrics.
@@ -69,6 +94,8 @@ These are code-level observations from the files inspected, combined with the UI
 6. **Consistency without flattening differences.** Shared controls and typography should match across pages; the Inbox and Journey Builder can still have task-specific layouts.
 7. **Preserve working behavior.** This is primarily a design and usability revamp, not a backend/API overhaul.
 8. **Design from the real data.** Treat missing revenue as unavailable (not ₹0), avoid presenting zero-filled charts as activity, and never fabricate trend deltas.
+9. **Accessibility is part of the component definition.** Dialog focus, visible labels, keyboard behavior, live feedback, semantic tabs and contrast are acceptance criteria—not optional final polish.
+10. **One action, one truthful result.** Every visible control should work as presented, and every Save affordance must clearly communicate what is committed versus still drafted.
 
 ---
 
@@ -132,7 +159,9 @@ Use the existing Plus Jakarta Sans stack as the starting point; avoid a font mig
 - Provide clear hover, active, focus-visible, disabled, loading and pressed states.
 - Keep motion subtle (roughly 120–180ms for color/opacity and 160–220ms for small transitions).
 - Honor `prefers-reduced-motion`.
-- Use a visible focus ring in both themes.
+- Use a visible focus ring in both themes; do not remove outlines without a clearly visible replacement.
+- Verify real foreground/background pairings in both themes. Target WCAG 2.2 AA contrast for normal text and meaningful graphical controls.
+- Every control needs an accessible name; tab-like controls must use a valid navigation or tab pattern; dynamic success/error messages need an intentional announcement strategy.
 - Never rely on color alone to communicate status.
 
 ---
@@ -184,7 +213,8 @@ Proposed information hierarchy:
 Specific changes:
 - Reduce excessive chart height when data is sparse; ensure chart drawing area is proportional to its content.
 - Time range selector should be added only if data APIs support the same range consistently.
-- Charts should show axis labels/gridlines only when they add meaning; keep their colors restrained and map series consistently.
+- Charts should show axis labels/gridlines only when they add meaning; keep their colors restrained and map series consistently. Darken the current cyan/teal DMs line so it is distinguishable on light and dark surfaces.
+- Handle an empty timeseries and an all-zero series deliberately. Do not render a large, apparently broken plot in a new workspace.
 - If data is empty or effectively all-zero, show a helpful empty state with a next action (e.g. open Inbox, create an automation, connect Instagram). Do not show a dramatic spike caused by a single event without adequate context.
 - Distinguish “no revenue recorded” from true zero revenue. Keep the em dash / unavailable meaning when no revenue value exists.
 - KPI change indicators must only display if there is a reliable comparison API; never hard-code sample percentage deltas.
@@ -199,6 +229,7 @@ Goal: make the Inbox feel like a focused communication workspace.
 
 - Keep a three-zone structure where viewport permits: conversation list, active thread, contextual lead controls—using the existing layout where possible.
 - Improve search and filter hierarchy: All, Unread, AI Handling, Qualified, Needs Attention.
+- Give Inbox search an explicit accessible name; keep the reply composer’s existing accessible label.
 - Conversation rows should prioritize avatar/username, last message, time, unread state, and AI/human ownership.
 - Selected conversation state should be obvious but not overly saturated.
 - Separate thread transcript from metadata and actions; keep message sending and Meta's 24-hour window restriction highly clear.
@@ -215,6 +246,7 @@ Goal: an efficient lightweight CRM rather than a generic table in a card.
 
 - Add a shared page heading with title, explanation and contextual primary action only when one exists.
 - Keep search and filters in a compact toolbar above the table.
+- Give Pipeline stage, Handoff status and Search explicitly associated accessible labels; visible labels are preferred where layout permits.
 - Reduce table padding where useful; align numbers and dates, keep stage / handoff states visually distinct, and use subtle row separators.
 - Make rows scannable: username, stage, handoff owner/state, last contact/channel, messaging-window status.
 - Keep table usability on mobile via deliberate horizontal scrolling or stacked row layouts—not a squeezed desktop table.
@@ -239,8 +271,9 @@ Goal: make automation feel like a powerful workflow product, not a settings page
 Goal: a clean visual automation canvas that remains task-focused and safe to edit.
 
 Non-negotiable behavior constraints:
-- Node movement, connection and layout changes are local until the user explicitly clicks Save.
-- Preserve draft dirty state, “saved/saving/unsaved” status, version handling, save-error recovery and save/discard/keep-editing navigation protection.
+- **Every journey edit must follow one explicit-save contract:** node movement, connections, graph structure, adding/removing/reordering goals, and goal content must update a local draft and dirty state. The audit found that add/remove/reorder goal handlers currently call the milestone API immediately, even though drag/connect edits wait for Save. Resolve this mismatch before the builder revamp is complete.
+- The inspector remains dialog-based. Its local Save/Apply behavior must be explicit and must not persist part of the journey ahead of the primary Save contract. Preserve Goal editor tabs: **Basic, Capture Fields, Validation, Success Message**.
+- Preserve dirty state, saved/saving/unsaved indicators, version handling, save-error recovery and save/discard/keep-editing navigation protection for every edit type—not only node positions and edges.
 - Never regress to saving the graph on every drag or interaction.
 - Keep node inspector/editor dialog-based. **Do not add a right-side persistent inspector.**
 - Preserve Goal editor tabs: **Basic, Capture Fields, Validation, Success Message**.
@@ -250,6 +283,7 @@ Visual improvements:
 - Reduce canvas chrome and give the actual graph more room.
 - Make the node palette compact, consistent and scannable; clearly separate available actions from “Soon” nodes.
 - Give node types semantic icon/color accents, but use restrained light fills with clear readable text.
+- Fix keyboard bubbling between selectable node surfaces and nested action menus. Test node selection and menu actions with Enter, Space, Tab and Shift+Tab.
 - Improve selected-node outline and connection handles without making every node glow.
 - Normalize edge/arrow contrast in light and dark themes.
 - Keep zoom/fit, minimap and controls accessible without covering nodes.
@@ -367,14 +401,19 @@ Do not immediately refactor every component to a new abstraction. Add primitives
 ### Phase 1 — Design tokens and app shell
 **Scope**
 - Refine `index.css` tokens, type hierarchy, radii, borders, buttons, inputs, focus rings and surfaces.
-- Standardize AppShell navigation and top-bar hierarchy.
+- Correct the audited contrast pairings for success text, muted canvas text and the cyan/teal chart series; recheck actual components in both themes.
+- Standardize AppShell navigation and top-bar hierarchy, including mobile menu state and truthful workspace/notification/Upgrade affordances.
+- Establish accessible shared dialog and toast behavior (or adopt tested primitives), plus consistent labels, status messages and focus styles.
 - Keep brand identity and existing theme preference behavior.
 - Test light and dark mode together.
 
 **Acceptance**
-- Same shared elements look consistent across all routes.
-- No native browser button chrome, broken input/autofill styles, inaccessible muted text or invisible dark-mode controls.
-- Desktop and mobile navigation, profile menu, trial card, usage display and theme toggle remain functional.
+- Shared elements look consistent across routes.
+- Text and meaningful graphics pass contrast checks in both themes; no color token is considered accessible solely because it looks good in isolation.
+- Dialogs move focus inside when opened, contain focus while open, handle expected keyboard dismissal, and return focus to the trigger. Close/backdrop controls do not create confusing duplicate tab stops.
+- Toast success/error states are announced appropriately to assistive technology.
+- Controls have accessible names and visible focus styles; reduced-motion preferences remain honored.
+- Desktop and mobile navigation, profile menu, trial card, usage display and theme toggle remain functional; the mobile drawer exposes state and follows its documented focus model.
 
 ### Phase 2 — Overview dashboard
 **Scope**
@@ -383,7 +422,8 @@ Do not immediately refactor every component to a new abstraction. Add primitives
 - Move connection status into workspace context where practical.
 
 **Acceptance**
-- Empty/low-data workspaces do not show huge meaningless charts.
+- Empty/low-data workspaces do not show huge meaningless charts; loading, no points, all-zero activity, low real activity, unavailable data and errors are distinct.
+- The DMs series is distinguishable on light and dark surfaces and is not the only way the data is communicated; the table fallback remains available.
 - No invented comparative percentages, revenue, AI activity or attention counts.
 - Existing API data and navigation destinations remain correct.
 
@@ -404,12 +444,13 @@ Do not immediately refactor every component to a new abstraction. Add primitives
 - Preserve the existing dialog pattern and unsaved-draft safety.
 
 **Acceptance**
-- Dragging/moving/connecting nodes changes local draft only.
-- Save increments the version only when explicitly invoked and data is dirty.
-- Save failure retains draft; discard restores the saved graph.
-- Navigation away while dirty offers keep editing / discard / save and continue.
-- Inspector remains a dialog; Goal tabs remain Basic, Capture Fields, Validation, Success Message.
-- Preview/test/publish flows remain available.
+- Moving nodes, connecting edges, adding/removing/reordering goals and editing goal content change the local journey draft only; no graph/milestone persistence or saved-version increment occurs before the primary explicit Save action.
+- Save is disabled when the complete draft is clean, enabled when any journey-editable field is dirty, and increments the saved version only after an explicit successful save.
+- Save failure preserves the complete draft; discard restores the saved graph and goals together.
+- Internal tab changes, route navigation and browser back/forward while any journey part is dirty offer keep editing / discard / save and continue.
+- Inspector remains a dialog; Goal tabs remain Basic, Capture Fields, Validation, Success Message. Dialog-level Save/Apply stages draft changes without bypassing the primary save boundary.
+- Keyboard interaction with node surfaces and nested action menus does not trigger duplicate actions.
+- Preview/test/publish flows remain available; publish version/concurrency protections remain intact.
 
 ### Phase 5 — Knowledge, Content, Analytics
 **Scope**
@@ -433,13 +474,17 @@ Do not immediately refactor every component to a new abstraction. Add primitives
 ### Phase 7 — QA, accessibility and polish
 **Scope**
 - Responsive pass, keyboard/focus testing, contrast checks, reduced motion, browser visual QA and regression run.
+- Add `npm run lint` to client CI; the existing workflow currently runs install and build only.
+- Add focused client interaction tests, Playwright smoke coverage and automated accessibility scans for representative routes. Supplement scans with manual keyboard and assistive-technology checks.
 - Address build/lint/tests separately from cosmetic changes; do not smuggle behavior changes into styling PRs.
 
 **Acceptance**
 - Frontend build and lint pass (or any pre-existing failure is explicitly recorded).
+- Automated UI checks cover dialog focus/keyboard behavior, toast announcements, labels, tab semantics, mobile navigation and journey draft/save behavior.
 - Functional smoke tests pass.
-- Light and dark mode tested on representative pages.
-- No critical overflow, obscured actions, unreadable statuses or navigation regressions.
+- Light and dark mode tested at desktop, tablet and mobile sizes; contrast is checked on real components.
+- Keyboard-only navigation, focus restoration, reduced motion, accessible names and dynamic status announcements have been reviewed.
+- No critical overflow, obscured actions, misleading interactive affordances, unreadable statuses or navigation regressions.
 
 ---
 
@@ -448,14 +493,15 @@ Do not immediately refactor every component to a new abstraction. Add primitives
 Use small, reviewable PRs. Do not attempt an all-pages rewrite in one change.
 
 Suggested sequence:
-1. **PR 1:** Tokens + shared primitives + AppShell.
-2. **PR 2:** Overview dashboard.
-3. **PR 3:** Inbox / Leads / Lead Detail.
-4. **PR 4:** Automation list.
-5. **PR 5:** Journey Builder canvas and controls (visual-only except UI state needed for save affordance).
-6. **PR 6:** Knowledge / Content / Analytics.
-7. **PR 7:** Settings / Team / Integrations / Billing / onboarding / docs.
-8. **PR 8:** Responsive, accessibility and visual regression cleanup.
+1. **PR 1:** Design tokens, contrast fixes and accessible shared primitives (dialogs, toast semantics, focus styles, labels/status patterns).
+2. **PR 2:** AppShell navigation, mobile drawer and truthful workspace/notification/Upgrade affordances.
+3. **PR 3:** Overview dashboard and sparse-data chart states.
+4. **PR 4:** Inbox / Leads / Lead Detail, including labels and responsive states.
+5. **PR 5:** Journey draft/save consistency and keyboard-safe node interactions; treat this as behavior-correctness work, not merely visual polish.
+6. **PR 6:** Automation list and Journey Builder visual refinement, preserving the dialog inspector and Goal tabs.
+7. **PR 7:** Knowledge / Content / Analytics.
+8. **PR 8:** Settings / Team / Integrations / Billing / onboarding / docs.
+9. **PR 9:** Client CI lint, UI/e2e/accessibility checks, responsive and visual-regression cleanup.
 
 Each PR should include:
 - Scope and screenshots before/after.
@@ -476,7 +522,18 @@ Each PR should include:
 - [ ] Profile menu and logout
 - [ ] Inbox unread badge
 - [ ] Mobile sidebar/account sheet
-- [ ] Trial card and upgrade navigation
+- [ ] Trial card and upgrade navigation; Upgrade leads to the intended billing/plan destination
+- [ ] Workspace selector and notification controls work as presented, or are explicitly non-interactive
+- [ ] Mobile menu exposes expanded state and follows the chosen focus/background interaction model
+
+### Accessibility primitives
+- [ ] Dialog focus enters, stays contained, handles expected keyboard dismissal and returns to opener
+- [ ] Backdrop and close controls do not create confusing duplicate close stops in the tab order
+- [ ] Toast messages use appropriate live announcements without duplicate speech
+- [ ] Every form control has an accessible name; visible labels are associated with inputs/selects
+- [ ] Tabs use a consistent navigation or tab interaction pattern with exposed state and keyboard support
+- [ ] Success text, muted canvas text, chart series, node edges and focus rings have verified contrast in both themes
+- [ ] Nested node action menus do not trigger parent node selection via keyboard
 
 ### Overview / data
 - [ ] Analytics, funnel, revenue, timeseries and leads load
@@ -494,11 +551,12 @@ Each PR should include:
 
 ### Automation
 - [ ] List, create, navigate to journey
-- [ ] Drag/move nodes, connect edges, add/reorder/remove goals
-- [ ] Local draft state remains unsaved until Save is clicked
-- [ ] Save disabled when clean; enabled when dirty
-- [ ] Save sets saved state and updates version; errors preserve draft
-- [ ] Discard restores backend snapshot
+- [ ] Drag/move nodes, connect edges, add/reorder/remove goals and edit goal content
+- [ ] Every journey edit stays local until the primary explicit Save action
+- [ ] No milestone API mutation or saved-version increment occurs while staging goal structural changes
+- [ ] Save disabled when the complete draft is clean; enabled when any journey part is dirty
+- [ ] Save updates version on success; errors preserve the complete draft
+- [ ] Discard restores saved graph and goal data as one consistent snapshot
 - [ ] Internal tab change, route navigation and browser back/forward guard dirty drafts
 - [ ] Inspector dialog opens/closes and warns on dirty node edits
 - [ ] Goal tabs unchanged
@@ -506,11 +564,13 @@ Each PR should include:
 
 ### Whole app
 - [ ] `npm run build` in `client/`
-- [ ] `npm run lint` in `client/`
+- [ ] `npm run lint` in `client/` and run it in client CI
+- [ ] Add and run client component/interaction tests and Playwright smoke tests
+- [ ] Run automated accessibility scans on representative routes; document and manually review findings
 - [ ] Existing tests run; pre-existing CI/test issues are documented rather than hidden
 - [ ] Desktop, tablet, mobile; light and dark theme
-- [ ] Keyboard-only navigation, focus-visible states, reduced motion
-- [ ] Contrast for text/statuses/graph edges in both themes
+- [ ] Keyboard-only navigation, focus trap/restoration, focus-visible states, reduced motion, accessible names and live announcements
+- [ ] Contrast for text/statuses/graph edges and focus indicators in both themes
 
 ---
 
@@ -518,6 +578,9 @@ Each PR should include:
 
 The redesign is complete when:
 - The product reads as one intentional design system across routes, not a collection of individually styled pages.
+- P1/P2 findings in [SIGNALAI_UI_UX_AUDIT.md](./SIGNALAI_UI_UX_AUDIT.md) are resolved or explicitly dispositioned with evidence; modal, toast, form, tab, contrast, mobile navigation and node-keyboard behaviors are verified.
+- Journey edits—including goal structure/content—share one predictable explicit-save boundary, with regression tests proving there is no premature persistence or version increment.
+- Client lint, interaction smoke tests and accessibility scans run through the agreed quality gates.
 - The first screen communicates business outcomes and operational status without empty visual bulk.
 - AI activity is identifiable through meaningful labels and state treatment, not pervasive purple glow.
 - Inbox and journey editing remain efficient and safe.
@@ -529,7 +592,7 @@ The redesign is complete when:
 
 - Backend/API changes to produce new analytics.
 - Adding AI-generated insight claims or trend percentages without data support.
-- Reworking journey semantics, publish/version behavior or save architecture.
+- Broad redesign of journey semantics or publish/version architecture; the specific draft/save consistency correction in §2 and Phase 4 is in scope and must preserve existing version-conflict and publish protections.
 - Replacing the dialog-based node inspector with a right-side panel.
 - Changing the product's navigation or hiding upcoming destinations without a product decision.
 - Replacing the font, charting architecture or route structure just for visual novelty.
