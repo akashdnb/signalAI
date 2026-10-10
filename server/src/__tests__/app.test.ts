@@ -8,8 +8,8 @@ import { findOrCreateLeadByInstagramUserId } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
 import { getBoss, stopBoss } from "../queue/boss.js";
-import { ensureDataDeletionQueue, startDataDeletionWorker } from "../queue/dataDeletionQueue.js";
-import { resetDb } from "./helpers/db.js";
+import { DATA_DELETION_QUEUE, ensureDataDeletionQueue, startDataDeletionWorker } from "../queue/dataDeletionQueue.js";
+import { clearPgBossJobs, resetDb } from "./helpers/db.js";
 
 const APP_SECRET = "test-secret";
 
@@ -32,6 +32,8 @@ function sleep(ms: number) {
 }
 
 describe("app", () => {
+  let deletionBoss: Awaited<ReturnType<typeof getBoss>>;
+
   beforeAll(async () => {
     process.env.META_APP_SECRET = APP_SECRET;
     process.env.INSTAGRAM_APP_SECRET = APP_SECRET;
@@ -45,9 +47,11 @@ describe("app", () => {
     }
     // R1-09: deletion now runs through a worker, not synchronously inside
     // the route — the test needs one running to observe 'pending' -> 'complete'.
-    const boss = await getBoss();
-    await ensureDataDeletionQueue(boss);
-    await startDataDeletionWorker(boss, getPool());
+    deletionBoss = await getBoss();
+    await ensureDataDeletionQueue(deletionBoss);
+    await clearPgBossJobs(getPool(), [DATA_DELETION_QUEUE]);
+    // Register the worker in the test after confirming the request initially
+    // reports pending; NOTIFY can otherwise finish the job before the GET.
   });
 
   beforeEach(async () => {
@@ -135,6 +139,9 @@ describe("app", () => {
     // responds — the whole point is that the scrub is asynchronous.
     const immediateStatus = await request(app).get(`/data-deletion/status/${post.body.confirmation_code}`);
     expect(immediateStatus.body.status).toBe("pending");
+
+    // Start asynchronous processing only after the pending-state assertion.
+    await startDataDeletionWorker(deletionBoss, pool);
 
     let finalStatus: string | undefined;
     const deadline = Date.now() + 10000;
