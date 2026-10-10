@@ -1,3 +1,5 @@
+import type { Pool } from "pg";
+
 import type {
   MessageSender,
   MessageSendRequest,
@@ -53,6 +55,75 @@ function readRichMessage(
   return Object.keys(options).length > 0 ? options : undefined;
 }
 
+interface JourneyCampaignPresentation {
+  ctaUrl: string | null;
+  title: string | null;
+  description: string | null;
+  thumbnailUrl: string | null;
+}
+
+async function readCampaignPresentation(
+  pool: Pool,
+  tenantId: string,
+  executionId: string,
+): Promise<JourneyCampaignPresentation | null> {
+  const result = await pool.query<{
+    cta_link: string | null;
+    name: string;
+    description: string | null;
+    thumbnail_url: string | null;
+  }>(
+    `
+      select
+        c.cta_link,
+        c.name,
+        c.description,
+        (
+          select m.thumbnail_url
+          from media_metadata m
+          where m.tenant_id = c.tenant_id
+            and m.media_id = any(c.target_media_ids)
+            and m.thumbnail_url is not null
+          order by array_position(c.target_media_ids, m.media_id)
+          limit 1
+        ) as thumbnail_url
+      from journey_executions e
+      join campaigns c
+        on c.id = e.campaign_id
+       and c.tenant_id = e.tenant_id
+      where e.id = $1
+        and e.tenant_id = $2
+      limit 1
+    `,
+    [executionId, tenantId],
+  );
+
+  const row = result.rows[0];
+  return row
+    ? {
+        ctaUrl: row.cta_link,
+        title: row.name,
+        description: row.description,
+        thumbnailUrl: row.thumbnail_url,
+      }
+    : null;
+}
+
+function mergePresentation(
+  explicit: InstagramRichMessageOptions | undefined,
+  campaign: JourneyCampaignPresentation | null,
+): InstagramRichMessageOptions | undefined {
+  if (explicit?.ctaUrl || explicit?.imageUrl) return explicit;
+  if (!campaign?.ctaUrl) return explicit;
+
+  return {
+    ctaUrl: campaign.ctaUrl,
+    imageUrl: campaign.thumbnailUrl ?? undefined,
+    title: campaign.title ?? undefined,
+    subtitle: campaign.description ?? undefined,
+  };
+}
+
 export interface InstagramMessageSenderConfig {
   accessToken: string;
 }
@@ -63,6 +134,7 @@ export class InstagramMessageSender
   constructor(
     private readonly client: InstagramApiClient,
     private readonly config: InstagramMessageSenderConfig,
+    private readonly pool: Pool,
   ) {}
 
   async send(
@@ -80,6 +152,15 @@ export class InstagramMessageSender
       );
     }
 
+    const explicitRichMessage = readRichMessage(request.payload);
+    const campaignPresentation = explicitRichMessage?.ctaUrl
+      ? null
+      : await readCampaignPresentation(
+          this.pool,
+          request.tenantId,
+          request.executionId,
+        );
+
     await this.client.sendMessage({
       accessToken:
         this.config.accessToken,
@@ -88,7 +169,10 @@ export class InstagramMessageSender
       text: text.trim(),
       idempotencyKey:
         request.idempotencyKey,
-      richMessage: readRichMessage(request.payload),
+      richMessage: mergePresentation(
+        explicitRichMessage,
+        campaignPresentation,
+      ),
     });
   }
 }
