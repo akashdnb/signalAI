@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getPool } from "../pool.js";
 import { createTenantForUser } from "../tenants.js";
 import { findOrCreateUserByEmail } from "../users.js";
-import { findOrCreateLead } from "../leads.js";
+import { findOrCreateLeadByInstagramUserId } from "../leads.js";
 import { getLeadTimeline, getLeadTimelinePage } from "../leadTimeline.js";
 
 async function seedConversation(tenantId: string, leadId: string) {
@@ -26,7 +26,7 @@ describe("lead timeline pagination", () => {
     const pool = getPool();
     const owner = await findOrCreateUserByEmail(pool, "owner@example.com");
     const tenant = await createTenantForUser(pool, "creator-a", owner.id);
-    const lead = await findOrCreateLead(pool, tenant.id, "ig-user-1");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
     await seedConversation(tenant.id, lead.id);
 
     const page = await getLeadTimelinePage(pool, tenant.id, lead.id, 4);
@@ -39,7 +39,7 @@ describe("lead timeline pagination", () => {
     const pool = getPool();
     const owner = await findOrCreateUserByEmail(pool, "owner@example.com");
     const tenant = await createTenantForUser(pool, "creator-a", owner.id);
-    const lead = await findOrCreateLead(pool, tenant.id, "ig-user-1");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
 
     const page = await getLeadTimelinePage(pool, tenant.id, lead.id, 50);
     expect(page).toEqual({ entries: [], hasMore: false, nextCursor: null });
@@ -49,7 +49,7 @@ describe("lead timeline pagination", () => {
     const pool = getPool();
     const owner = await findOrCreateUserByEmail(pool, "owner@example.com");
     const tenant = await createTenantForUser(pool, "creator-a", owner.id);
-    const lead = await findOrCreateLead(pool, tenant.id, "ig-user-1");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
     await seedConversation(tenant.id, lead.id);
 
     const full = await getLeadTimeline(pool, tenant.id, lead.id);
@@ -72,7 +72,7 @@ describe("lead timeline pagination", () => {
     const pool = getPool();
     const owner = await findOrCreateUserByEmail(pool, "owner@example.com");
     const tenant = await createTenantForUser(pool, "creator-a", owner.id);
-    const lead = await findOrCreateLead(pool, tenant.id, "ig-user-1");
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
 
     await expect(getLeadTimelinePage(pool, tenant.id, lead.id, 50, "not-a-cursor"))
       .rejects.toThrow("invalid timeline cursor");
