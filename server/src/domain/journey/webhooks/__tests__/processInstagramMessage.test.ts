@@ -14,7 +14,7 @@ import type { BuilderGraph } from "../../../../db/journeyGraph.js";
 const pool = getPool();
 const runtime = new JourneyRuntime(pool);
 
-function makeGraph(version: number): BuilderGraph {
+function makeGraph(version: number, interactive = false): BuilderGraph {
   return {
     version,
     nodes: [
@@ -32,6 +32,20 @@ function makeGraph(version: number): BuilderGraph {
         position: { x: 200, y: 0 },
         data: {
           text: "Hello",
+          ...(interactive
+            ? {
+                richMessage: {
+                  presentation: {
+                    type: "buttons",
+                    buttons: [{
+                      type: "postback",
+                      title: "Continue",
+                      payload: "signalai:node:handoff-1",
+                    }],
+                  },
+                },
+              }
+            : {}),
         },
         parentGroupId: null,
         collapsed: false,
@@ -417,6 +431,89 @@ describe("processInstagramMessage", () => {
         status: "processed",
         journey_execution_id: started.execution.id,
       });
+    } finally {
+      await cleanup(setupData.tenantId);
+    }
+  });
+
+
+  it("waits for a configured postback and routes only to a connected target node", async () => {
+    const setupData = await setup();
+
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        await createPublishedJourneyWithClient(
+          client,
+          setupData.tenantId,
+          setupData.campaignId,
+          makeGraph(2, true),
+        );
+        await client.query("commit");
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      const started = await runtime.start({
+        tenantId: setupData.tenantId,
+        campaignId: setupData.campaignId,
+        subjectKey: setupData.subjectKey,
+      });
+      expect(started.action?.type).toBe("SEND_MESSAGE");
+
+      const actionResult = await pool.query<{ id: string }>(
+        "select id from journey_actions where execution_id = $1 order by created_at desc limit 1",
+        [started.execution.id],
+      );
+      const actionId = actionResult.rows[0]?.id;
+      expect(actionId).toBeTruthy();
+
+      await pool.query(
+        "update journey_actions set status = 'processing', claimed_at = now() where id = $1",
+        [actionId],
+      );
+
+      const afterSend = await runtime.completeAction(actionId!);
+      expect(afterSend.execution.status).toBe("waiting");
+      expect(afterSend.execution.currentNodeId).toBe("message-1");
+
+      // A forged/non-connected target cannot advance or jump the execution.
+      const ignoredTarget = await runtime.resumeFromEvent({
+        tenantId: setupData.tenantId,
+        executionId: started.execution.id,
+        eventId: "event-invalid-" + randomUUID(),
+        eventType: "message",
+        payload: {
+          interaction: {
+            type: "postback",
+            payload: "signalai:node:not-an-edge",
+          },
+        },
+      });
+      expect(ignoredTarget.execution.status).toBe("waiting");
+      expect(ignoredTarget.execution.currentNodeId).toBe("message-1");
+
+      const selected = await runtime.resumeFromEvent({
+        tenantId: setupData.tenantId,
+        executionId: started.execution.id,
+        eventId: "event-valid-" + randomUUID(),
+        eventType: "message",
+        payload: {
+          interaction: {
+            type: "postback",
+            title: "Continue",
+            payload: "signalai:node:handoff-1",
+          },
+        },
+      });
+
+      expect(selected.execution.status).toBe("handoff");
+      expect(selected.execution.currentNodeId).toBe("handoff-1");
+      expect(selected.action?.type).toBe("HANDOFF");
     } finally {
       await cleanup(setupData.tenantId);
     }

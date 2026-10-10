@@ -26,6 +26,7 @@ import {
   type JourneyEdge,
   type JourneyNode,
   type Milestone,
+  type InstagramMessagePresentation,
 } from "../../api";
 import {
   BotIcon,
@@ -40,9 +41,19 @@ import {
 } from "../icons";
 import { BuilderNode } from "./BuilderNode";
 
+export interface MessageJourneyTarget {
+  id: string;
+  label: string;
+}
+
 export type SelectedNode =
   | { type: "trigger" }
-  | { type: "message" }
+  | {
+      type: "message";
+      nodeId?: string;
+      data?: Record<string, unknown>;
+      outgoingTargets?: MessageJourneyTarget[];
+    }
   | { type: "milestone"; milestoneIndex: number }
   | { type: "action"; action: "handoff" | "link" };
 
@@ -50,6 +61,10 @@ export type BuilderCanvasActions = {
   saveDraft: (milestones: Milestone[]) => Promise<boolean>;
   discardDraft: () => void;
   stageMilestones: (previousMilestones: Milestone[], nextMilestones: Milestone[]) => void;
+  updateMessageConfiguration: (
+    nodeId: string | undefined,
+    config: { text: string; presentation?: InstagramMessagePresentation },
+  ) => Record<string, unknown> | null;
 };
 
 type FlowNodeData = {
@@ -766,6 +781,62 @@ export function BuilderCanvas({
     });
   }, []);
 
+  const selectMessageNode = useCallback(
+    (requestedNodeId?: string) => {
+      const messageNode = draftNodesRef.current.find(
+        (candidate) =>
+          candidate.type === "message" &&
+          (!requestedNodeId || candidate.id === requestedNodeId),
+      );
+      if (!messageNode) {
+        onSelectNode({ type: "message" });
+        return;
+      }
+
+      const outgoingTargets = draftEdgesRef.current
+        .filter((edge) => edge.sourceNodeId === messageNode.id)
+        .map((edge) => {
+          const target = draftNodesRef.current.find(
+            (candidate) => candidate.id === edge.targetNodeId,
+          );
+          if (!target) return null;
+
+          const milestoneId =
+            typeof target.data.milestoneId === "string"
+              ? target.data.milestoneId
+              : null;
+          const milestone = milestones.find((item) => item.id === milestoneId);
+          const explicitLabel = [
+            target.data.label,
+            target.data.title,
+            target.data.goalDescription,
+          ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+          const typeLabel =
+            target.type === "milestone_group"
+              ? milestone?.goalDescription ?? "Goal"
+              : target.type === "human_handoff"
+                ? "Human handoff"
+                : target.type === "action_link"
+                  ? "Send link"
+                  : target.type.replaceAll("_", " ");
+
+          return {
+            id: target.id,
+            label: explicitLabel ?? (typeLabel + " · " + target.id.slice(0, 8)),
+          };
+        })
+        .filter((target): target is MessageJourneyTarget => target !== null);
+
+      onSelectNode({
+        type: "message",
+        nodeId: messageNode.id,
+        data: messageNode.data,
+        outgoingTargets,
+      });
+    },
+    [milestones, onSelectNode],
+  );
+
   const selectForNode = useCallback(
     (node: FlowNode) => {
       if (locked) return;
@@ -776,7 +847,7 @@ export function BuilderCanvas({
       }
 
       if (node.type === "message") {
-        onSelectNode({ type: "message" });
+        selectMessageNode(node.id);
         return;
       }
 
@@ -797,7 +868,7 @@ export function BuilderCanvas({
         onSelectNode({ type: "action", action: "handoff" });
       }
     },
-    [locked, onSelectNode],
+    [locked, onSelectNode, selectMessageNode],
   );
 
   const isSelected = useCallback(
@@ -888,6 +959,40 @@ export function BuilderCanvas({
     void loadGraph(true);
   }, [loadGraph, reloadSignal]);
 
+  const updateMessageConfiguration = useCallback(
+    (
+      nodeId: string | undefined,
+      config: { text: string; presentation?: InstagramMessagePresentation },
+    ): Record<string, unknown> | null => {
+      const target = draftNodesRef.current.find(
+        (node) => node.type === "message" && (!nodeId || node.id === nodeId),
+      );
+      if (!target) return null;
+
+      const nextData: Record<string, unknown> = {
+        ...target.data,
+        text: config.text,
+      };
+      if (config.presentation && config.presentation.type !== "text") {
+        nextData.richMessage = { presentation: config.presentation };
+      } else {
+        delete nextData.richMessage;
+      }
+
+      const nextNodes = draftNodesRef.current.map((node) =>
+        node.id === target.id ? { ...node, data: nextData } : node,
+      );
+      updateDraft(nextNodes, draftEdgesRef.current);
+      setNodes(toFlowNodes({
+        nodes: nextNodes,
+        edges: draftEdgesRef.current,
+        version: builderVersionRef.current ?? 0,
+      }));
+      return nextData;
+    },
+    [setNodes, updateDraft],
+  );
+
   const persistGraph = useCallback(
     async (milestonesToSave: Milestone[]): Promise<boolean> => {
       const version = builderVersionRef.current;
@@ -965,9 +1070,14 @@ export function BuilderCanvas({
   );
 
   useEffect(() => {
-    onCanvasActionsChange?.({ saveDraft: persistGraph, discardDraft, stageMilestones });
+    onCanvasActionsChange?.({
+      saveDraft: persistGraph,
+      discardDraft,
+      stageMilestones,
+      updateMessageConfiguration,
+    });
     return () => onCanvasActionsChange?.(null);
-  }, [discardDraft, onCanvasActionsChange, persistGraph, stageMilestones]);
+  }, [discardDraft, onCanvasActionsChange, persistGraph, stageMilestones, updateMessageConfiguration]);
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -1123,7 +1233,7 @@ export function BuilderCanvas({
         <button
           type="button"
           className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
-          onClick={() => onSelectNode({ type: "message" })}
+          onClick={() => selectMessageNode()}
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DBEAFE] text-[#2563EB]">
             <BotIcon className="h-4 w-4" />
@@ -1134,7 +1244,7 @@ export function BuilderCanvas({
         <button
           type="button"
           className="flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium text-ink hover:bg-chip"
-          onClick={() => onSelectNode({ type: "message" })}
+          onClick={() => selectMessageNode()}
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DBEAFE] text-[#2563EB]">
             <SendIcon className="h-4 w-4" />

@@ -73,7 +73,7 @@ describe("MetaInstagramApiClient", () => {
     await client.sendMessage({
       accessToken: "token-123",
       recipientId: "instagram-user-1",
-      text: "Explore our latest collection",
+      text: "Explore the newest options",
       idempotencyKey: "action-rich-123",
       richMessage: {
         ctaUrl: "https://example.com/collection",

@@ -136,3 +136,71 @@ describe("parseInstagramWebhook", () => {
     ).toEqual([]);
   });
 });
+
+
+describe("Instagram message interactions", () => {
+  it("parses quick reply title and payload separately from normal message text", () => {
+    const [event] = parseInstagramWebhook({
+      object: "instagram",
+      entry: [{
+        id: "instagram-account-1",
+        messaging: [{
+          sender: { id: "customer-123" },
+          recipient: { id: "instagram-account-1" },
+          timestamp: 1759276800000,
+          message: {
+            mid: "mid.quick-reply",
+            text: "Pricing",
+            quick_reply: {
+              title: "Pricing",
+              payload: "signalai:node:pricing-node",
+            },
+          },
+        }],
+      }],
+    });
+
+    expect(event).toMatchObject({
+      providerEventId: "mid.quick-reply",
+      instagramAccountId: "instagram-account-1",
+      instagramUserId: "customer-123",
+      messageText: "Pricing",
+      interaction: {
+        type: "quick_reply",
+        title: "Pricing",
+        payload: "signalai:node:pricing-node",
+      },
+    });
+  });
+
+  it("parses top-level postback events that have no message object", () => {
+    const [event] = parseInstagramWebhook({
+      object: "instagram",
+      entry: [{
+        id: "instagram-account-1",
+        messaging: [{
+          sender: { id: "customer-123" },
+          recipient: { id: "instagram-account-1" },
+          timestamp: 1759276800000,
+          postback: {
+            title: "Pricing",
+            payload: "signalai:node:pricing-node",
+          },
+        }],
+      }],
+    });
+
+    expect(event).toMatchObject({
+      instagramAccountId: "instagram-account-1",
+      instagramUserId: "customer-123",
+      messageText: "Pricing",
+      interaction: {
+        type: "postback",
+        title: "Pricing",
+        payload: "signalai:node:pricing-node",
+      },
+    });
+    expect(event.providerEventId).toMatch(/^postback:[0-9a-f]{64}$/);
+    expect(event.providerEventId.length).toBeLessThan(100);
+  });
+});

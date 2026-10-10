@@ -1,6 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type Campaign, type FieldDefinition, type Milestone } from "../../api";
+import {
+  api,
+  type Campaign,
+  type FieldDefinition,
+  type InstagramMessagePresentation,
+  type Milestone,
+} from "../../api";
 import { BottomSheet } from "../BottomSheet";
 import { CampaignEditor, type CampaignEditorHandle } from "../CampaignEditor";
 import {
@@ -326,6 +332,22 @@ export function JourneyBuilder({
     setSelectedNode(node);
     setInspectorOpen(true);
   }
+
+  const saveMessageConfiguration = useCallback(
+    (config: { text: string; presentation?: InstagramMessagePresentation }): boolean => {
+      const nodeId = selectedNode.type === "message" ? selectedNode.nodeId : undefined;
+      const data = canvasActionsRef.current?.updateMessageConfiguration(nodeId, config);
+      if (!data) return false;
+
+      setSelectedNode((current) =>
+        current.type === "message"
+          ? { ...current, nodeId: current.nodeId ?? nodeId, data }
+          : current,
+      );
+      return true;
+    },
+    [selectedNode],
+  );
 
   function requestSubTabChange(next: BuilderTab) {
     if (subTab === "details" && detailsDirty && next !== "details") {
@@ -747,6 +769,7 @@ export function JourneyBuilder({
         onCampaignChanged={onChanged}
         onSaveMilestone={handleSaveMilestone}
         onFieldDefinitionsChanged={setFieldDefinitions}
+        onSaveMessageConfiguration={saveMessageConfiguration}
       />
 
       {showPublishConfirm && (

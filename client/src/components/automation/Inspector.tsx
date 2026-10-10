@@ -14,6 +14,10 @@ import {
   type CampaignTone,
   type FieldDefinition,
   type FieldDefinitionValueType,
+  type InstagramMessageButton,
+  type InstagramMessageCard,
+  type InstagramMessagePresentation,
+  type InstagramQuickReply,
   type Milestone,
   type TriggerSource,
 } from "../../api";
@@ -23,7 +27,7 @@ import {
   InstagramMarkIcon,
   SendIcon,
 } from "../icons";
-import type { SelectedNode } from "./BuilderCanvas";
+import type { MessageJourneyTarget, SelectedNode } from "./BuilderCanvas";
 
 const VALUE_TYPES: { value: FieldDefinitionValueType; label: string }[] = [
   { value: "email", label: "Email" },
@@ -424,68 +428,410 @@ function TriggerEditor({
   );
 }
 
+const JOURNEY_NODE_PAYLOAD_PREFIX = "signalai:node:";
+type MessagePresentationKind = "text" | "buttons" | "card" | "gallery" | "quick_replies";
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function initialPresentationFromData(
+  data: Record<string, unknown> | undefined,
+): InstagramMessagePresentation | undefined {
+  const richMessage = data?.richMessage;
+  if (!isPlainRecord(richMessage) || !isPlainRecord(richMessage.presentation)) return undefined;
+  const presentation = richMessage.presentation;
+  if (
+    presentation.type === "text" ||
+    presentation.type === "buttons" ||
+    presentation.type === "card" ||
+    presentation.type === "gallery" ||
+    presentation.type === "quick_replies"
+  ) {
+    return presentation as unknown as InstagramMessagePresentation;
+  }
+  return undefined;
+}
+
+function initialButtons(presentation: InstagramMessagePresentation | undefined): InstagramMessageButton[] {
+  if (presentation?.type === "buttons") return presentation.buttons.map((button) => ({ ...button }));
+  return [{ type: "web_url", title: "View details", url: "" }];
+}
+
+function initialCards(presentation: InstagramMessagePresentation | undefined, kind: "card" | "gallery"): InstagramMessageCard[] {
+  if (presentation?.type === "card") return [{ ...presentation.card, buttons: presentation.card.buttons?.map((button) => ({ ...button })) ?? [] }];
+  if (presentation?.type === "gallery") return presentation.cards.map((card) => ({ ...card, buttons: card.buttons?.map((button) => ({ ...button })) ?? [] }));
+  const defaults: InstagramMessageCard[] = [{ title: "Your offer", subtitle: "", imageUrl: "", buttons: [] }];
+  if (kind === "gallery") defaults.push({ title: "Another option", subtitle: "", imageUrl: "", buttons: [] });
+  return defaults;
+}
+
+function initialQuickReplies(presentation: InstagramMessagePresentation | undefined): InstagramQuickReply[] {
+  if (presentation?.type === "quick_replies") return presentation.replies.map((reply) => ({ ...reply }));
+  return [
+    { title: "Pricing", payload: "" },
+    { title: "More information", payload: "" },
+  ];
+}
+
+function normalizeEditorCard(card: InstagramMessageCard): InstagramMessageCard {
+  const buttons = card.buttons ?? [];
+  return {
+    title: card.title,
+    ...(card.subtitle ? { subtitle: card.subtitle } : {}),
+    ...(card.imageUrl?.trim() ? { imageUrl: card.imageUrl } : {}),
+    ...(buttons.length ? { buttons } : {}),
+  };
+}
+
+function normalizeEditorPresentation(
+  presentation: InstagramMessagePresentation | undefined,
+): InstagramMessagePresentation | undefined {
+  if (!presentation || presentation.type === "text") return undefined;
+  if (presentation.type === "card") {
+    return { type: "card", card: normalizeEditorCard(presentation.card) };
+  }
+  if (presentation.type === "gallery") {
+    return { type: "gallery", cards: presentation.cards.map(normalizeEditorCard) };
+  }
+  if (presentation.type === "buttons") {
+    return { type: "buttons", buttons: presentation.buttons.map((button) => ({ ...button })) };
+  }
+  return { type: "quick_replies", replies: presentation.replies.map((reply) => ({ ...reply })) };
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:" && new URL(value).hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function selectedTarget(payload: string): string {
+  return payload.startsWith(JOURNEY_NODE_PAYLOAD_PREFIX)
+    ? payload.slice(JOURNEY_NODE_PAYLOAD_PREFIX.length)
+    : "";
+}
+
+function messagePresentationProblem(
+  kind: MessagePresentationKind,
+  text: string,
+  buttons: InstagramMessageButton[],
+  cards: InstagramMessageCard[],
+  quickReplies: InstagramQuickReply[],
+  targets: MessageJourneyTarget[],
+): string | null {
+  const targetIds = new Set(targets.map((target) => target.id));
+  const checkButtons = (items: InstagramMessageButton[], required: boolean): string | null => {
+    if (items.length > 3) return "Instagram allows up to 3 buttons per message or card.";
+    if (required && items.length === 0) return "Add at least one button.";
+    for (const button of items) {
+      if (!button.title.trim()) return "Every button needs a label.";
+      if (button.title.trim().length > 20) return "Button labels must be 20 characters or fewer.";
+      if (button.type === "web_url") {
+        if (!isHttpsUrl(button.url.trim())) return "Website buttons need a valid HTTPS URL.";
+      } else {
+        const targetId = selectedTarget(button.payload);
+        if (!targetIds.has(targetId)) return "Choose a connected journey step for every journey button.";
+      }
+    }
+    return null;
+  };
+  const checkCard = (card: InstagramMessageCard): string | null => {
+    if (!card.title.trim()) return "Every card needs a title.";
+    if (card.title.trim().length > 80) return "Card titles must be 80 characters or fewer.";
+    if ((card.subtitle ?? "").trim().length > 80) return "Card subtitles must be 80 characters or fewer.";
+    if (card.imageUrl?.trim() && !isHttpsUrl(card.imageUrl.trim())) return "Card images need a valid HTTPS URL.";
+    return checkButtons(card.buttons ?? [], false);
+  };
+
+  if (kind === "text") return null;
+  if (kind === "buttons") {
+    if (!text.trim()) return "Add message text before adding buttons.";
+    if (text.length > 640) return "Button templates support up to 640 characters of text.";
+    return checkButtons(buttons, true);
+  }
+  if (kind === "quick_replies") {
+    if (!text.trim()) return "Add message text before adding quick replies.";
+    if (text.length > 640) return "Quick-reply messages support up to 640 characters of text.";
+    if (quickReplies.length === 0) return "Add at least one quick reply.";
+    if (quickReplies.length > 13) return "Instagram allows up to 13 quick replies.";
+    for (const reply of quickReplies) {
+      if (!reply.title.trim()) return "Every quick reply needs a label.";
+      if (reply.title.trim().length > 20) return "Quick-reply labels must be 20 characters or fewer.";
+      if (!targetIds.has(selectedTarget(reply.payload))) return "Choose a connected journey step for every quick reply.";
+    }
+    return null;
+  }
+  if (kind === "card") {
+    const card = cards[0];
+    return card ? checkCard(card) : "Add a card.";
+  }
+  if (cards.length === 0) return "Add at least one card to the gallery.";
+  if (cards.length > 10) return "Instagram galleries can contain up to 10 cards.";
+  for (const card of cards) {
+    const problem = checkCard(card);
+    if (problem) return problem;
+  }
+  return null;
+}
+
+function MessageButtonEditor({
+  button,
+  targets,
+  onChange,
+  onRemove,
+}: {
+  button: InstagramMessageButton;
+  targets: MessageJourneyTarget[];
+  onChange: (button: InstagramMessageButton) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="grid gap-2 rounded-xl border border-line bg-canvas/50 p-3">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_auto]">
+        <label className="block min-w-0">
+          <span className="text-[10px] font-semibold text-subtle">Button label</span>
+          <input
+            value={button.title}
+            maxLength={80}
+            onChange={(event) => onChange({ ...button, title: event.target.value })}
+            placeholder="View details"
+            className="!mt-1 !text-[12px]"
+          />
+        </label>
+        <label className="block min-w-0">
+          <span className="text-[10px] font-semibold text-subtle">Action</span>
+          <select
+            value={button.type}
+            onChange={(event) => {
+              if (event.target.value === "web_url") {
+                onChange({ type: "web_url", title: button.title, url: "" });
+              } else {
+                onChange({ type: "postback", title: button.title, payload: "" });
+              }
+            }}
+            className="!mt-1 !text-[12px]"
+          >
+            <option value="web_url">Open website</option>
+            <option value="postback">Continue journey</option>
+          </select>
+        </label>
+        <button type="button" className="btn-secondary btn-small self-end" onClick={onRemove}>
+          Remove
+        </button>
+      </div>
+      {button.type === "web_url" ? (
+        <label className="block">
+          <span className="text-[10px] font-semibold text-subtle">HTTPS URL</span>
+          <input
+            type="url"
+            value={button.url}
+            onChange={(event) => onChange({ ...button, url: event.target.value })}
+            placeholder="https://example.com/product"
+            className="!mt-1 !text-[12px]"
+          />
+        </label>
+      ) : (
+        <label className="block">
+          <span className="text-[10px] font-semibold text-subtle">Journey destination</span>
+          <select
+            value={selectedTarget(button.payload)}
+            onChange={(event) => onChange({
+              ...button,
+              payload: event.target.value ? JOURNEY_NODE_PAYLOAD_PREFIX + event.target.value : "",
+            })}
+            className="!mt-1 !text-[12px]"
+          >
+            <option value="">Choose connected step…</option>
+            {targets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+          </select>
+          {targets.length === 0 && (
+            <span className="muted mt-1 block text-[10px]">Connect this message to a next step in the journey first.</span>
+          )}
+        </label>
+      )}
+    </div>
+  );
+}
+
+function MessageCardEditor({
+  card,
+  index,
+  targets,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  card: InstagramMessageCard;
+  index: number;
+  targets: MessageJourneyTarget[];
+  canRemove: boolean;
+  onChange: (card: InstagramMessageCard) => void;
+  onRemove: () => void;
+}) {
+  const cardButtons = card.buttons ?? [];
+  return (
+    <section className="space-y-3 rounded-xl border border-line p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="m-0 text-[12px] font-semibold text-ink">Card {index + 1}</h4>
+        {canRemove && <button type="button" className="text-[11px] font-medium text-subtle hover:text-ink" onClick={onRemove}>Remove card</button>}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-[10px] font-semibold text-subtle">Title</span>
+          <input value={card.title} maxLength={80} onChange={(event) => onChange({ ...card, title: event.target.value })} className="!mt-1 !text-[12px]" placeholder="Product or offer name" />
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold text-subtle">Image URL (optional)</span>
+          <input type="url" value={card.imageUrl ?? ""} onChange={(event) => onChange({ ...card, imageUrl: event.target.value })} className="!mt-1 !text-[12px]" placeholder="https://cdn.example.com/image.jpg" />
+        </label>
+      </div>
+      <label className="block">
+        <span className="text-[10px] font-semibold text-subtle">Subtitle (optional)</span>
+        <textarea value={card.subtitle ?? ""} rows={2} maxLength={80} onChange={(event) => onChange({ ...card, subtitle: event.target.value })} className="!mt-1 !min-h-[64px] !text-[12px]" placeholder="Briefly explain this option" />
+      </label>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-semibold text-ink">Card actions</span>
+          <button
+            type="button"
+            className="btn-secondary btn-small"
+            disabled={cardButtons.length >= 3}
+            onClick={() => onChange({ ...card, buttons: [...cardButtons, { type: "web_url", title: "View details", url: "" }] })}
+          >+ Add action</button>
+        </div>
+        {cardButtons.map((button, buttonIndex) => (
+          <MessageButtonEditor
+            key={buttonIndex}
+            button={button}
+            targets={targets}
+            onChange={(next) => onChange({ ...card, buttons: cardButtons.map((item, i) => i === buttonIndex ? next : item) })}
+            onRemove={() => onChange({ ...card, buttons: cardButtons.filter((_, i) => i !== buttonIndex) })}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function MessageEditor({
   tenantId,
   campaign,
   onCampaignChanged,
   onActionsChange,
+  selectedNode,
+  onSaveMessageConfiguration,
 }: {
   tenantId: string;
   campaign: Campaign;
   onCampaignChanged: () => Promise<void> | void;
   onActionsChange?: (actions: EditorActions) => void;
+  selectedNode: Extract<SelectedNode, { type: "message" }>;
+  onSaveMessageConfiguration: (config: {
+    text: string;
+    presentation?: InstagramMessagePresentation;
+  }) => boolean;
 }) {
+  const initialPresentation = initialPresentationFromData(selectedNode.data);
+  const initialMessage =
+    (initialPresentation?.type === "card" || initialPresentation?.type === "gallery") ||
+    typeof selectedNode.data?.text !== "string"
+      ? campaign.defaultReplyTemplate
+      : selectedNode.data.text;
   const [tab, setTab] = useState("basic");
-  const [message, setMessage] = useState(campaign.defaultReplyTemplate);
+  const [message, setMessage] = useState(initialMessage);
   const [tone, setTone] = useState<CampaignTone>(campaign.tone);
-  const [useKnowledgeBase, setUseKnowledgeBase] = useState(
-    campaign.useKnowledgeBase,
-  );
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(campaign.useKnowledgeBase);
+  const [presentationType, setPresentationType] = useState<MessagePresentationKind>(initialPresentation?.type ?? "text");
+  const [buttons, setButtons] = useState<InstagramMessageButton[]>(() => initialButtons(initialPresentation));
+  const [cards, setCards] = useState<InstagramMessageCard[]>(() => initialCards(initialPresentation, initialPresentation?.type === "gallery" ? "gallery" : "card"));
+  const [quickReplies, setQuickReplies] = useState<InstagramQuickReply[]>(() => initialQuickReplies(initialPresentation));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const targets = selectedNode.outgoingTargets ?? [];
 
   useEffect(() => {
-    setMessage(campaign.defaultReplyTemplate);
+    setMessage(initialMessage);
     setTone(campaign.tone);
     setUseKnowledgeBase(campaign.useKnowledgeBase);
-  }, [campaign]);
+    setPresentationType(initialPresentation?.type ?? "text");
+    setButtons(initialButtons(initialPresentation));
+    setCards(initialCards(initialPresentation, initialPresentation?.type === "gallery" ? "gallery" : "card"));
+    setQuickReplies(initialQuickReplies(initialPresentation));
+    setError(null);
+  }, [campaign, initialMessage, initialPresentation]);
 
   const original = useMemo(
     () => ({
-      message: campaign.defaultReplyTemplate,
+      campaignMessage: campaign.defaultReplyTemplate,
+      graphMessage: initialMessage,
       tone: campaign.tone,
       useKnowledgeBase: campaign.useKnowledgeBase,
     }),
-    [campaign],
+    [campaign, initialMessage],
   );
 
+  const presentation = useMemo<InstagramMessagePresentation | undefined>(() => {
+    switch (presentationType) {
+      case "buttons": return normalizeEditorPresentation({ type: "buttons", buttons });
+      case "card": return normalizeEditorPresentation({ type: "card", card: cards[0] ?? { title: "" } });
+      case "gallery": return normalizeEditorPresentation({ type: "gallery", cards });
+      case "quick_replies": return normalizeEditorPresentation({ type: "quick_replies", replies: quickReplies });
+      default: return undefined;
+    }
+  }, [buttons, cards, presentationType, quickReplies]);
+
+  const validationProblem = messagePresentationProblem(
+    presentationType,
+    message,
+    buttons,
+    presentationType === "card" ? cards.slice(0, 1) : cards,
+    quickReplies,
+    targets,
+  );
+
+  const presentationDirty =
+    JSON.stringify(normalizeEditorPresentation(presentation)) !== JSON.stringify(
+      normalizeEditorPresentation(initialPresentation),
+    );
+  const campaignUpdates = {
+    ...(message !== original.graphMessage && message !== original.campaignMessage
+      ? { defaultReplyTemplate: message }
+      : {}),
+    ...(tone !== original.tone ? { tone } : {}),
+    ...(useKnowledgeBase !== original.useKnowledgeBase ? { useKnowledgeBase } : {}),
+  };
+  const campaignDirty = Object.keys(campaignUpdates).length > 0;
   const dirty =
-    message !== original.message ||
+    message !== original.graphMessage ||
     tone !== original.tone ||
-    useKnowledgeBase !== original.useKnowledgeBase;
+    useKnowledgeBase !== original.useKnowledgeBase ||
+    presentationDirty;
 
   const discard = () => {
-    setMessage(original.message);
+    setMessage(original.graphMessage);
     setTone(original.tone);
     setUseKnowledgeBase(original.useKnowledgeBase);
+    setPresentationType(initialPresentation?.type ?? "text");
+    setButtons(initialButtons(initialPresentation));
+    setCards(initialCards(initialPresentation, initialPresentation?.type === "gallery" ? "gallery" : "card"));
+    setQuickReplies(initialQuickReplies(initialPresentation));
     setError(null);
   };
 
   function insertVariable() {
     const el = textareaRef.current;
-
     if (!el) {
-      setMessage((value) => `${value}{name}`);
+      setMessage((value) => value + "{name}");
       return;
     }
-
     const start = el.selectionStart ?? message.length;
     const end = el.selectionEnd ?? message.length;
-    const next = `${message.slice(0, start)}{name}${message.slice(end)}`;
-
+    const next = message.slice(0, start) + "{name}" + message.slice(end);
     setMessage(next);
-
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + 6, start + 6);
@@ -493,16 +839,29 @@ function MessageEditor({
   }
 
   const save = async (): Promise<boolean> => {
+    if (validationProblem) {
+      setError(validationProblem);
+      return false;
+    }
+
     setSaving(true);
     setError(null);
-
     try {
-      await api.updateReplyConfig(tenantId, campaign.id, {
-        defaultReplyTemplate: message,
-        tone,
-        useKnowledgeBase,
+      if (campaignDirty) {
+        await api.updateReplyConfig(tenantId, campaign.id, campaignUpdates);
+      }
+
+      const messageText = presentationType === "card" || presentationType === "gallery" ? "" : message;
+      const saved = onSaveMessageConfiguration({
+        text: messageText,
+        ...(presentation ? { presentation } : {}),
       });
-      await onCampaignChanged();
+      if (!saved) {
+        setError("Couldn't update the journey draft. Close this dialog and retry.");
+        return false;
+      }
+
+      if (campaignDirty) await onCampaignChanged();
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save message");
@@ -518,100 +877,174 @@ function MessageEditor({
       discard,
       dirty,
       saving,
-      canSave: true,
+      canSave: !saving && !validationProblem,
     },
     onActionsChange,
   );
 
+  const changeKind = (next: MessagePresentationKind) => {
+    setPresentationType(next);
+    setError(null);
+  };
+
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+    <div className="flex min-w-0 flex-col gap-5 md:flex-row">
       <SectionTabs
         items={[
-          { key: "basic", label: "Basic" },
+          { key: "basic", label: "Message" },
+          { key: "presentation", label: "Instagram layout" },
           { key: "ai", label: "AI Settings" },
         ]}
         active={tab}
         onChange={setTab}
       />
 
-      <div
-        id="inspector-tabpanel"
-        role="tabpanel"
-        aria-labelledby={`inspector-tab-${tab}`}
-        tabIndex={0}
-        className="min-w-0 flex-1"
-      >
-        {tab === "basic" ? (
+      <div className="min-w-0 flex-1">
+        {tab === "basic" && (
           <>
             <PanelHeader
               icon={BotIcon}
               title={campaign.replyMode === "ai_generated" ? "AI Reply" : "Reply Message"}
-              description="Configure the response sent after this step."
+              description="Write the response for this step. Interactive layouts can route a selection to a connected journey step."
             />
+            {presentationType !== "card" && presentationType !== "gallery" ? (
+              <div className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-ink">Message</span>
+                  <textarea
+                    ref={textareaRef}
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    rows={5}
+                    placeholder="Write the reply your leads will receive."
+                    className="!mt-1.5 !min-h-[120px] !text-[13px]"
+                  />
+                </label>
+                <button type="button" className="btn-secondary btn-small" onClick={insertVariable}>
+                  {"{ }"} Insert variable
+                </button>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-xl border border-line bg-canvas/50 p-3 text-[12px] leading-5 text-subtle">
+                Cards and galleries use each card's title and subtitle instead of a separate message caption.
+              </div>
+            )}
+          </>
+        )}
 
-            <div className="mt-6 space-y-5">
-              <label className="block">
-                <span className="text-[11px] font-semibold text-ink">
-                  Message
-                </span>
-                <textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  rows={6}
-                  placeholder="Write the reply you want leads to receive."
-                  className="!mt-1.5 !min-h-[128px] !text-[13px]"
-                />
-              </label>
-
-              <button
-                type="button"
-                className="btn-secondary btn-small"
-                onClick={insertVariable}
-              >
-                {"{ }"} Insert variable
-              </button>
-
-              <label className="block">
-                <span className="text-[11px] font-semibold text-ink">
-                  AI behavior
-                </span>
-                <select
-                  value={tone}
-                  onChange={(event) =>
-                    setTone(event.target.value as CampaignTone)
-                  }
-                  className="!mt-1.5"
-                >
-                  {(Object.keys(TONE_LABEL) as CampaignTone[]).map((toneKey) => (
-                    <option key={toneKey} value={toneKey}>
-                      {TONE_LABEL[toneKey]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex items-start gap-2 text-[11px] leading-4 text-subtle">
-                <input
-                  type="checkbox"
-                  checked={useKnowledgeBase}
-                  onChange={(event) =>
-                    setUseKnowledgeBase(event.target.checked)
-                  }
-                />
-                <span>Use knowledge base for context</span>
-              </label>
+        {tab === "presentation" && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="m-0 text-[15px] font-semibold text-ink">Instagram message layout</h3>
+              <p className="muted m-0 mt-1 text-[11px] leading-4">Choose the native Instagram presentation for this journey step.</p>
             </div>
-          </>
-        ) : (
-          <>
-            <h3 className="m-0 text-[15px] font-semibold text-ink">
-              AI Settings
-            </h3>
-            <p className="muted m-0 mt-2 max-w-md text-[12px] leading-5">
-              Configure tone and knowledge context from the Basic tab.
+            <label className="block max-w-sm">
+              <span className="text-[11px] font-semibold text-ink">Layout</span>
+              <select value={presentationType} onChange={(event) => changeKind(event.target.value as MessagePresentationKind)} className="!mt-1.5">
+                <option value="text">Plain text</option>
+                <option value="buttons">Text + buttons</option>
+                <option value="card">Single card</option>
+                <option value="gallery">Gallery / carousel</option>
+                <option value="quick_replies">Quick replies</option>
+              </select>
+            </label>
+
+            {presentationType === "buttons" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-ink">Buttons</span>
+                  <button type="button" className="btn-secondary btn-small" disabled={buttons.length >= 3} onClick={() => setButtons((items) => [...items, { type: "web_url", title: "", url: "" }])}>+ Add button</button>
+                </div>
+                {buttons.map((button, index) => (
+                  <MessageButtonEditor
+                    key={index}
+                    button={button}
+                    targets={targets}
+                    onChange={(next) => setButtons((items) => items.map((item, i) => i === index ? next : item))}
+                    onRemove={() => setButtons((items) => items.filter((_, i) => i !== index))}
+                  />
+                ))}
+              </div>
+            )}
+
+            {(presentationType === "card" || presentationType === "gallery") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-ink">{presentationType === "gallery" ? "Gallery cards" : "Card content"}</span>
+                  {presentationType === "gallery" && (
+                    <button type="button" className="btn-secondary btn-small" disabled={cards.length >= 10} onClick={() => setCards((items) => [...items, { title: "New option", subtitle: "", imageUrl: "", buttons: [] }])}>+ Add card</button>
+                  )}
+                </div>
+                {(presentationType === "gallery" ? cards : cards.slice(0, 1)).map((card, index) => (
+                  <MessageCardEditor
+                    key={index}
+                    card={card}
+                    index={index}
+                    targets={targets}
+                    canRemove={presentationType === "gallery" && cards.length > 1}
+                    onChange={(next) => setCards((items) => items.map((item, i) => i === index ? next : item))}
+                    onRemove={() => setCards((items) => items.filter((_, i) => i !== index))}
+                  />
+                ))}
+                {presentationType === "gallery" && cards.length < 2 && (
+                  <p className="muted m-0 text-[10px]">Add a second card to create a carousel.</p>
+                )}
+              </div>
+            )}
+
+            {presentationType === "quick_replies" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-ink">Quick replies</span>
+                  <button type="button" className="btn-secondary btn-small" disabled={quickReplies.length >= 13} onClick={() => setQuickReplies((items) => [...items, { title: "", payload: "" }])}>+ Add quick reply</button>
+                </div>
+                {quickReplies.map((reply, index) => (
+                  <div key={index} className="grid gap-2 rounded-xl border border-line bg-canvas/50 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    <label className="block min-w-0">
+                      <span className="text-[10px] font-semibold text-subtle">Label</span>
+                      <input value={reply.title} maxLength={20} onChange={(event) => setQuickReplies((items) => items.map((item, i) => i === index ? { ...item, title: event.target.value } : item))} placeholder="Pricing" className="!mt-1 !text-[12px]" />
+                    </label>
+                    <label className="block min-w-0">
+                      <span className="text-[10px] font-semibold text-subtle">Journey destination</span>
+                      <select value={selectedTarget(reply.payload)} onChange={(event) => setQuickReplies((items) => items.map((item, i) => i === index ? { ...item, payload: event.target.value ? JOURNEY_NODE_PAYLOAD_PREFIX + event.target.value : "" } : item))} className="!mt-1 !text-[12px]">
+                        <option value="">Choose connected step…</option>
+                        {targets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+                      </select>
+                    </label>
+                    <button type="button" className="btn-secondary btn-small self-end" onClick={() => setQuickReplies((items) => items.filter((_, i) => i !== index))}>Remove</button>
+                  </div>
+                ))}
+                {targets.length === 0 && <p className="muted m-0 text-[10px]">Connect the message node to a next step before assigning quick replies.</p>}
+              </div>
+            )}
+
+            {validationProblem && (
+              <div role="status" className="rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2 text-[11px] leading-4 text-ink">
+                {validationProblem}
+              </div>
+            )}
+            <p className="muted m-0 text-[10px] leading-4">
+              Changes stay in the unsaved journey draft. Use Save in the builder to persist them; Discard restores the last saved version.
             </p>
-          </>
+          </div>
+        )}
+
+        {tab === "ai" && (
+          <div className="space-y-5">
+            <PanelHeader icon={BotIcon} title="AI Settings" description="Choose how AI writes text for this journey step." />
+            <label className="block max-w-sm">
+              <span className="text-[11px] font-semibold text-ink">AI behavior</span>
+              <select value={tone} onChange={(event) => setTone(event.target.value as CampaignTone)} className="!mt-1.5">
+                {(Object.keys(TONE_LABEL) as CampaignTone[]).map((toneKey) => (
+                  <option key={toneKey} value={toneKey}>{TONE_LABEL[toneKey]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-start gap-2 text-[11px] leading-4 text-subtle">
+              <input type="checkbox" checked={useKnowledgeBase} onChange={(event) => setUseKnowledgeBase(event.target.checked)} />
+              <span>Use knowledge base for context</span>
+            </label>
+          </div>
         )}
 
         {error && <div className="banner banner-error mt-5">{error}</div>}
@@ -1035,6 +1468,10 @@ export const Inspector = forwardRef<
       updates: { goalDescription: string; captureFields: string[] },
     ) => Promise<void>;
     onFieldDefinitionsChanged: (defs: FieldDefinition[]) => void;
+    onSaveMessageConfiguration: (config: {
+      text: string;
+      presentation?: InstagramMessagePresentation;
+    }) => boolean;
     onActionsChange?: (actions: InspectorHandle) => void;
   }
 >(
@@ -1048,6 +1485,7 @@ export const Inspector = forwardRef<
       onCampaignChanged,
       onSaveMilestone,
       onFieldDefinitionsChanged,
+      onSaveMessageConfiguration,
       onActionsChange,
     },
     ref,
@@ -1088,7 +1526,9 @@ export const Inspector = forwardRef<
         <MessageEditor
           tenantId={tenantId}
           campaign={campaign}
+          selectedNode={selectedNode}
           onCampaignChanged={onCampaignChanged}
+          onSaveMessageConfiguration={onSaveMessageConfiguration}
           onActionsChange={setActions}
         />
       );
