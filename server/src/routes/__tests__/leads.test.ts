@@ -21,6 +21,7 @@ const keyring = new Map<string, Buffer>([["v1", TOKEN_KEY]]);
 
 describe("leads routes (Phase 2A)", () => {
   const originalFetch = global.fetch;
+  const originalHumanAgentFlag = process.env.INSTAGRAM_HUMAN_AGENT_ENABLED;
 
   beforeAll(() => {
     process.env.SESSION_SECRET = SESSION_SECRET;
@@ -37,6 +38,8 @@ describe("leads routes (Phase 2A)", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    if (originalHumanAgentFlag === undefined) delete process.env.INSTAGRAM_HUMAN_AGENT_ENABLED;
+    else process.env.INSTAGRAM_HUMAN_AGENT_ENABLED = originalHumanAgentFlag;
   });
 
   afterAll(async () => {
@@ -162,7 +165,14 @@ describe("leads routes (Phase 2A)", () => {
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
-    await pool.query(`update leads set window_open_until = now() + interval '1 hour' where id = $1`, [lead.id]);
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-inbound-reply-test",
+      eventType: "message",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
     const app = createApp();
 
     await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
@@ -188,7 +198,14 @@ describe("leads routes (Phase 2A)", () => {
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
     const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-1");
-    await pool.query(`update leads set window_open_until = now() + interval '1 hour' where id = $1`, [lead.id]);
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-inbound-reply-test",
+      eventType: "message",
+      occurredAt: new Date(),
+      sequence: 1,
+    });
     const app = createApp();
 
     const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "Hi" });
@@ -206,6 +223,74 @@ describe("leads routes (Phase 2A)", () => {
     await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
 
     const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "Hi" });
+    expect(res.status).toBe(409);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("POST /reply uses HUMAN_AGENT only for an approved human reply within seven days", async () => {
+    process.env.INSTAGRAM_HUMAN_AGENT_ENABLED = "true";
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-human-agent-user");
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-human-agent-two-days-ago",
+      eventType: "message",
+      occurredAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      sequence: 1,
+    });
+    const app = createApp();
+    await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
+    vi.mocked(global.fetch).mockResolvedValue({ ok: true, json: async () => ({ message_id: "mid-human-agent" }) } as Response);
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "I checked your support issue." });
+    expect(res.status).toBe(201);
+    const requestOptions = vi.mocked(global.fetch).mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(String(requestOptions.body))).toMatchObject({ messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" });
+  });
+
+  it("POST /reply does not use HUMAN_AGENT when its feature flag is disabled", async () => {
+    process.env.INSTAGRAM_HUMAN_AGENT_ENABLED = "false";
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-human-agent-disabled-user");
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-human-agent-disabled-two-days-ago",
+      eventType: "message",
+      occurredAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      sequence: 1,
+    });
+    const app = createApp();
+    await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "I checked your support issue." });
+    expect(res.status).toBe(409);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("POST /reply rejects HUMAN_AGENT after seven days", async () => {
+    process.env.INSTAGRAM_HUMAN_AGENT_ENABLED = "true";
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "token-1" });
+    const lead = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-human-agent-expired-user");
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id,
+      leadId: lead.id,
+      metaEventId: "evt-human-agent-eight-days-ago",
+      eventType: "message",
+      occurredAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+      sequence: 1,
+    });
+    const app = createApp();
+    await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/handoff`).set(authHeader).send({ action: "takeover" });
+
+    const res = await request(app).post(`/tenants/${tenant.id}/leads/${lead.id}/reply`).set(authHeader).send({ text: "I checked your support issue." });
     expect(res.status).toBe(409);
     expect(global.fetch).not.toHaveBeenCalled();
   });
