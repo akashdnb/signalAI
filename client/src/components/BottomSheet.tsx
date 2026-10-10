@@ -33,10 +33,15 @@ export function BottomSheet({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const closeDisabledRef = useRef(closeDisabled);
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    closeDisabledRef.current = closeDisabled;
+  }, [closeDisabled]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -70,7 +75,7 @@ export function BottomSheet({
 
       if (event.key === "Escape") {
         event.preventDefault();
-        if (!closeDisabled) onCloseRef.current();
+        if (!closeDisabledRef.current) onCloseRef.current();
         return;
       }
 
