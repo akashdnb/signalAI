@@ -51,12 +51,38 @@ describe("campaigns routes", () => {
       .set(authHeader)
       .send({ name: "Giveaway Reel", keywords: ["LINK", "giveaway"] });
     expect(create.status).toBe(201);
-    expect(create.body).toMatchObject({ name: "Giveaway Reel", keywords: ["LINK", "giveaway"], enabled: true });
+    expect(create.body).toMatchObject({ name: "Giveaway Reel", keywords: ["LINK", "giveaway"], enabled: false });
 
     const list = await request(app).get(`/tenants/${tenant.id}/campaigns`).set(authHeader);
     expect(list.status).toBe(200);
     expect(list.body).toHaveLength(1);
     expect(list.body[0].id).toBe(create.body.id);
+  });
+
+  it("creates a new campaign disabled by default and accepts an explicit enabled value", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-draft");
+    const app = createApp();
+
+    const draft = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Draft journey", keywords: ["demo"] });
+    expect(draft.status).toBe(201);
+    expect(draft.body.enabled).toBe(false);
+
+    const explicitlyEnabled = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Legacy enabled journey", keywords: ["hello"], enabled: true });
+    expect(explicitlyEnabled.status).toBe(201);
+    expect(explicitlyEnabled.body.enabled).toBe(true);
+
+    const invalidEnabled = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Invalid", keywords: ["hello"], enabled: "true" });
+    expect(invalidEnabled.status).toBe(400);
   });
 
   it("rejects a campaign with no keywords", async () => {
