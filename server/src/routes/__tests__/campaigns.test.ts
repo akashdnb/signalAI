@@ -53,11 +53,13 @@ describe("campaigns routes", () => {
     expect(create.status).toBe(201);
     expect(create.body).toMatchObject({ name: "Giveaway Reel", keywords: ["LINK", "giveaway"], enabled: false });
 
-    const list = await request(app).get(`/tenants/${tenant.id}/campaigns`).set(authHeader);
+    const list = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns?page=1&pageSize=10`)
+      .set(authHeader);
     expect(list.status).toBe(200);
-    expect(list.body).toHaveLength(1);
-    expect(list.body[0].id).toBe(create.body.id);
-    expect(list.body[0].published).toBe(false);
+    expect(list.body.items).toHaveLength(1);
+    expect(list.body.items[0].id).toBe(create.body.id);
+    expect(list.body.items[0].published).toBe(false);
   });
 
   it("creates a new campaign disabled by default and accepts an explicit enabled value", async () => {
