@@ -162,7 +162,7 @@ async function ingestOneEvent(
     const sourceText = event.eventType === "comment" ? event.commentText : event.dmText;
     if (sourceText) {
       if (event.eventType === "message") {
-        const match = resolveDmCampaignTrigger(sourceText, campaigns, lead.activeDmCampaignId, previousWindowOpen, event.mediaId);
+        const match = resolveDmCampaignTrigger(sourceText, campaigns, lead.activeDmCampaignId, previousWindowOpen, event.mediaId, !!previousInboundDmAt);
         if (match) {
           attributes.matchedCampaignId = match.campaignId;
           attributes.matchedKeyword = match.keyword;
@@ -175,6 +175,19 @@ async function ingestOneEvent(
         if (match) {
           attributes.matchedCampaignId = match.campaignId;
           attributes.matchedKeyword = match.keyword;
+          const matchedCampaign = campaigns.find((campaign) => campaign.id === match.campaignId);
+          const commentAgeMs = Date.now() - event.occurredAt.getTime();
+          // Remember a comment-started campaign only when it can send a
+          // private DM reply for this comment. That lets the customer's later
+          // DM continue this run, but only an actual inbound DM opens the
+          // standard 24-hour window.
+          if (
+            matchedCampaign &&
+            (matchedCampaign.replyChannel === "dm" || matchedCampaign.replyChannel === "both") &&
+            commentAgeMs >= 0 && commentAgeMs < 7 * 24 * 60 * 60 * 1000
+          ) {
+            await setActiveDmCampaignId(client, tenantId, lead.id, match.campaignId);
+          }
         }
       }
     }
