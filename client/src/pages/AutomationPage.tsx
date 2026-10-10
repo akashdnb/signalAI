@@ -46,7 +46,11 @@ export function AutomationPage() {
       push(`${template.name} draft created`);
       navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create journey from preset");
+      const message = err instanceof ApiError ? err.message : "Failed to create journey from preset";
+      setError(message);
+      // Keep the template details dialog open so the error is actionable and
+      // the user can retry instead of losing the selected preset context.
+      throw new Error(message);
     } finally {
       setCreatingTemplate(false);
     }
