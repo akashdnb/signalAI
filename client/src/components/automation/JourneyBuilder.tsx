@@ -306,30 +306,6 @@ export function JourneyBuilder({
     });
   }
 
-  async function persistMilestones(next: Milestone[]) {
-    setBuilderSaveState("saving");
-
-    const oldIndexToNewIndex = milestones.map((milestone) => {
-      const nextIndex = next.findIndex((candidate) => candidate.id === milestone.id);
-      return nextIndex < 0 ? null : nextIndex;
-    });
-
-    const saved = await api.setMilestones(
-      tenantId,
-      campaign.id,
-      next.map((milestone) => ({
-        goalDescription: milestone.goalDescription,
-        captureFields: milestone.captureFields,
-      })),
-      oldIndexToNewIndex,
-    );
-
-    setMilestonesState(saved);
-    setGraphReloadSignal((value) => value + 1);
-    setBuilderSaveState("saved");
-    return saved;
-  }
-
   async function handleSaveMilestone(
     index: number,
     updates: { goalDescription: string; captureFields: string[] },
