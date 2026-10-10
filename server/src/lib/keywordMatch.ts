@@ -41,24 +41,35 @@ export interface DmCampaignTrigger {
  */
 export function resolveDmCampaignTrigger(
   sourceText: string,
-  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: "comment" | "message" | "both" }>,
+  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: "comment" | "message" | "both"; replyChannel?: "dm" | "comment" | "both" }>,
   activeDmCampaignId: string | null,
   previousWindowOpen: boolean,
   mediaId?: string,
+  hasPriorInboundDm = true,
 ): DmCampaignTrigger | null {
   const eligible = campaigns.filter((campaign) => campaign.triggerSource === "message" || campaign.triggerSource === "both");
   const match = findMatchingCampaign(sourceText, mediaId, eligible);
   if (match) {
     // A closed (or never-opened) customer DM window starts a new run even
     // when this is the first message that can be associated with the campaign.
-    return { ...match, restartCampaign: !previousWindowOpen };
+    return { ...match, restartCampaign: hasPriorInboundDm && !previousWindowOpen };
   }
 
   if (!activeDmCampaignId) return null;
-  const continuedCampaign = eligible.find((campaign) => campaign.id === activeDmCampaignId);
+  // A comment-triggered campaign can continue in the private conversation
+  // it initiated, but only when the campaign is configured to send DMs.
+  const continuedCampaign = campaigns.find((campaign) =>
+    campaign.id === activeDmCampaignId && (
+      campaign.triggerSource === "message" || campaign.triggerSource === "both" ||
+      campaign.replyChannel === "dm" || campaign.replyChannel === "both"
+    )
+  );
   if (!continuedCampaign) return null;
 
-  return previousWindowOpen
+  // A customer's first DM after a comment private reply opens the first
+  // standard messaging window; keep that run going. Restart only if there
+  // was a prior inbound DM and its 24-hour window has since expired.
+  return previousWindowOpen || !hasPriorInboundDm
     ? { campaignId: continuedCampaign.id, keyword: CONTINUATION_KEYWORD, restartCampaign: false }
     : { campaignId: continuedCampaign.id, keyword: RESTART_KEYWORD, restartCampaign: true };
 }
