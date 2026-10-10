@@ -77,6 +77,9 @@ export function JourneyBuilder({
   const canvasActionsRef = useRef<BuilderCanvasActions | null>(null);
   const pendingActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const restoringHistoryRef = useRef(false);
+  const lastHistoryIndexRef = useRef<number | null>(
+    typeof window.history.state?.idx === "number" ? window.history.state.idx : null,
+  );
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -154,17 +157,30 @@ export function JourneyBuilder({
     if (!canvasDirty) return;
 
     const interceptPopState = (event: PopStateEvent) => {
+      const targetIndex =
+        typeof event.state?.idx === "number" ? event.state.idx : null;
+
       if (restoringHistoryRef.current) {
         restoringHistoryRef.current = false;
+        lastHistoryIndexRef.current = targetIndex;
         return;
       }
 
+      const currentIndex = lastHistoryIndexRef.current;
+      const movingBack =
+        targetIndex !== null && currentIndex !== null && targetIndex < currentIndex;
       const targetUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
       // Stop BrowserRouter's own popstate listener before it changes routes
-      // and unmounts this draft. We immediately restore the prior history item.
+      // and unmounts this draft. Restore the current item in whichever
+      // direction the browser moved; confirmed navigation happens afterwards.
       event.stopImmediatePropagation();
       restoringHistoryRef.current = true;
-      window.history.forward();
+      if (movingBack) {
+        window.history.forward();
+      } else {
+        window.history.back();
+      }
       requestNavigation(() => navigate(targetUrl));
     };
 
