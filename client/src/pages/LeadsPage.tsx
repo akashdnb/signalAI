@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
+import { ApiError, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
+import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
+import { Pagination } from "../components/Pagination";
 import { PIPELINE_STAGES, formatDate, formatLastContactVia, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
@@ -10,29 +12,37 @@ const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
   { value: "human", label: "Human Handling" },
 ];
 
+const PAGE_SIZE = 20;
+
 export function LeadsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
 
-  const [leads, setLeads] = useState<LeadListItem[] | null>(null);
+  const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
   const [handoffFilter, setHandoffFilter] = useState<HandoffStatus | "">("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+
+  useEffect(() => {
+    setPage(1);
+  }, [stageFilter, handoffFilter, search]);
 
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
     async function load() {
       try {
-        const l = await api.getLeads(tenantId!, {
+        const result = await getLeadsPage(tenantId!, page, PAGE_SIZE, {
           stage: stageFilter || undefined,
           handoffStatus: handoffFilter || undefined,
           q: search.trim() || undefined,
         });
         if (cancelled) return;
-        setLeads(l);
+        setPageData(result);
+        if (result.page !== page) setPage(result.page);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -47,10 +57,11 @@ export function LeadsPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, stageFilter, handoffFilter, search, reloadCount]);
+  }, [tenantId, stageFilter, handoffFilter, search, page, reloadCount, navigate]);
 
   if (!tenantId) return null;
+
+  const leads = pageData?.items ?? null;
 
   return (
     <div className="page page-wide page-leads">
@@ -96,32 +107,44 @@ export function LeadsPage() {
         ) : leads.length === 0 ? (
           <p className="muted">No leads match this view yet.</p>
         ) : (
-          <div className="-mx-2 overflow-x-auto sm:mx-0">
-            <table className="table min-w-[780px]">
-              <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
-              <tbody>
-                {leads.map((lead) => (
-                  <tr key={lead.id}>
-                    <td>
-                      <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
-                        {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
-                        <span className="inline-flex flex-col align-top">
-                          <span>{leadDisplayName(lead.username)}</span>
-                          {!lead.username && <span className="muted small">Username unavailable</span>}
-                        </span>
-                      </Link>
-                    </td>
-                    <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
-                    <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
-                    <td>{formatDate(lead.lastInboundAt)}</td>
-                    <td>{formatLastContactVia(lead.lastEventType)}</td>
-                    <td>{lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? <span className="pill pill-ok">open</span> : <span className="pill">closed</span>}</td>
-                    <td>{formatDate(lead.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="-mx-2 overflow-x-auto sm:mx-0">
+              <table className="table min-w-[780px]">
+                <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
+                <tbody>
+                  {leads.map((lead) => (
+                    <tr key={lead.id}>
+                      <td>
+                        <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
+                          {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
+                          <span className="inline-flex flex-col align-top">
+                            <span>{leadDisplayName(lead.username)}</span>
+                            {!lead.username && <span className="muted small">Username unavailable</span>}
+                          </span>
+                        </Link>
+                      </td>
+                      <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
+                      <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
+                      <td>{formatDate(lead.lastInboundAt)}</td>
+                      <td>{formatLastContactVia(lead.lastEventType)}</td>
+                      <td>{lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? <span className="pill pill-ok">open</span> : <span className="pill">closed</span>}</td>
+                      <td>{formatDate(lead.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pageData && (
+              <Pagination
+                page={pageData.page}
+                totalPages={pageData.totalPages}
+                total={pageData.total}
+                pageSize={pageData.pageSize}
+                onPageChange={setPage}
+                label="leads"
+              />
+            )}
+          </>
         )}
       </section>
     </div>
