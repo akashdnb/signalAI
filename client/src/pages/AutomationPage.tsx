@@ -24,6 +24,7 @@ export function AutomationPage() {
   const [error, setError] = useState<string | null>(null);
   const [showNewJourney, setShowNewJourney] = useState(false);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
+  const [templateDraftIds, setTemplateDraftIds] = useState<Record<string, string>>({});
   const { toasts, push } = useToasts();
 
   async function handleCreateJourney(name: string, keywords: string[]) {
@@ -38,18 +39,33 @@ export function AutomationPage() {
     if (!tenantId || creatingTemplate) return;
     setCreatingTemplate(true);
     setError(null);
+    let campaignId = templateDraftIds[template.id];
     try {
-      const created = await api.createCampaign(tenantId, template.name, template.keywords, { enabled: false });
+      if (!campaignId) {
+        const created = await api.createCampaign(tenantId, template.name, template.keywords, { enabled: false });
+        campaignId = created.id;
+        // Retain the campaign id before making any subsequent provisioning
+        // calls. If configuration or milestones fail, the next retry resumes
+        // this draft instead of creating a duplicate campaign.
+        setTemplateDraftIds((current) => ({ ...current, [template.id]: campaignId! }));
+      }
+
       const { milestones: presetMilestones, ...replyConfig } = template.preset;
-      await api.updateReplyConfig(tenantId, created.id, { ...replyConfig, keywords: template.keywords });
-      if (presetMilestones) await api.setMilestones(tenantId, created.id, presetMilestones);
+      await api.updateReplyConfig(tenantId, campaignId, { ...replyConfig, keywords: template.keywords });
+      if (presetMilestones) await api.setMilestones(tenantId, campaignId, presetMilestones);
+
+      setTemplateDraftIds((current) => {
+        const next = { ...current };
+        delete next[template.id];
+        return next;
+      });
       push(`${template.name} draft created`);
-      navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
+      navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to create journey from preset";
       setError(message);
-      // Keep the template details dialog open so the error is actionable and
-      // the user can retry instead of losing the selected preset context.
+      // Keep the template details dialog open. If a campaign was already
+      // created, templateDraftIds makes retry idempotent for this template.
       throw new Error(message);
     } finally {
       setCreatingTemplate(false);
