@@ -15,7 +15,7 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
-  const describedBy = error ? `${htmlFor ?? "field"}-error` : hint ? `${htmlFor ?? "field"}-hint` : undefined;
+  const messageId = error ? `${htmlFor ?? "field"}-error` : hint ? `${htmlFor ?? "field"}-hint` : undefined;
   return (
     <div className={["min-w-0", className].filter(Boolean).join(" ")}>
       <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
@@ -25,7 +25,7 @@ export function Field({
       ) : hint ? (
         <p id={`${htmlFor ?? "field"}-hint`} className="m-0 mt-1.5 text-xs leading-5 text-subtle">{hint}</p>
       ) : null}
-      {describedBy && <span className="sr-only" aria-live={error ? "polite" : undefined} />}
+      {messageId && <span className="sr-only" aria-live="polite" />}
     </div>
   );
 }
