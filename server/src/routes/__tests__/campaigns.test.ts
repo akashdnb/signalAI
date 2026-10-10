@@ -57,6 +57,7 @@ describe("campaigns routes", () => {
     expect(list.status).toBe(200);
     expect(list.body).toHaveLength(1);
     expect(list.body[0].id).toBe(create.body.id);
+    expect(list.body[0].published).toBe(false);
   });
 
   it("creates a new campaign disabled by default and accepts an explicit enabled value", async () => {
