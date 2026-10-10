@@ -134,7 +134,7 @@ export class InstagramMessageSender
   constructor(
     private readonly client: InstagramApiClient,
     private readonly config: InstagramMessageSenderConfig,
-    private readonly pool: Pool,
+    private readonly pool?: Pool,
   ) {}
 
   async send(
@@ -153,7 +153,7 @@ export class InstagramMessageSender
     }
 
     const explicitRichMessage = readRichMessage(request.payload);
-    const campaignPresentation = explicitRichMessage?.ctaUrl
+    const campaignPresentation = explicitRichMessage?.ctaUrl || !this.pool
       ? null
       : await readCampaignPresentation(
           this.pool,
