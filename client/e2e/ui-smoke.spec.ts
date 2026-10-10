@@ -316,7 +316,25 @@ test.describe("responsive route smoke checks", () => {
 
     const ctaInput = page.getByRole("textbox", { name: "CTA link (HTTPS URL)" });
     await expect(ctaInput).toHaveValue("https://example.com/details");
+    await expect(ctaInput).toHaveCSS("display", "block");
     await expect(page.getByText("Image card", { exact: true })).toBeVisible();
+
+    const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
+    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
+    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
+    await expect(toneSelect).toBeVisible();
+    await aiBehaviour.click();
+    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await expect(toneSelect).toBeHidden();
+    await aiBehaviour.click();
+    await expect(toneSelect).toBeVisible();
+
+    const ctaHelp = page.getByText(/An HTTPS link becomes an Instagram button/);
+    const ctaBox = await ctaInput.boundingBox();
+    const helpBox = await ctaHelp.boundingBox();
+    expect(ctaBox).not.toBeNull();
+    expect(helpBox).not.toBeNull();
+    expect(helpBox!.y).toBeGreaterThan(ctaBox!.y + ctaBox!.height);
     await expect(page.locator('img[src="https://cdn.example.com/post-card.jpg"]').first()).toBeVisible();
     await expect(page.getByRole("link", { name: /View details/ }).last()).toHaveAttribute(
       "href",
@@ -326,6 +344,39 @@ test.describe("responsive route smoke checks", () => {
     await ctaInput.fill("http://example.com/details");
     await expect(page.getByText("Text only", { exact: true })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "Interactive Instagram CTAs require a valid HTTPS URL" })).toBeVisible();
+  });
+
+  test("Campaign Details accordions are interactive on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page, { journeyEditor: true });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    const detailsTab = page.getByRole("tab", { name: "Details" });
+    await expect(detailsTab).toBeVisible();
+    await detailsTab.click();
+
+    const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
+    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
+    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await aiBehaviour.click();
+    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
+    await expect(toneSelect).toBeVisible();
+    await aiBehaviour.click();
+    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await expect(toneSelect).toBeHidden();
+
+    const postTargeting = page.getByRole("button", { name: "Post Targeting" });
+    await postTargeting.click();
+    await expect(page.getByText("Which posts should trigger this journey?")).toBeVisible();
+
+    const milestones = page.getByRole("button", { name: "Milestones" });
+    await milestones.click();
+    await expect(page.getByRole("button", { name: "+ Add milestone" })).toBeVisible();
+
+    const dangerZone = page.getByRole("button", { name: "Danger Zone" });
+    await dangerZone.click();
+    await expect(page.getByRole("button", { name: "Delete journey" })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
   });
 
   test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {

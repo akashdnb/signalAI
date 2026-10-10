@@ -268,10 +268,12 @@ label {
 
 input[type="text"],
 input[type="email"],
+input[type="url"],
 textarea,
 select {
   display: block;
   width: 100%;
+  min-width: 0;
   margin-top: 0.3rem;
   padding: 0.6rem 0.8rem;
   border: 1px solid var(--border);
@@ -285,6 +287,7 @@ select {
 
 input[type="text"]:focus,
 input[type="email"]:focus,
+input[type="url"]:focus,
 textarea:focus,
 select:focus {
   outline: none;
@@ -295,6 +298,7 @@ select:focus {
    shared focus ring for keyboard users with matching selector specificity. */
 input[type="text"]:focus-visible,
 input[type="email"]:focus-visible,
+input[type="url"]:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--accent);
@@ -649,19 +653,34 @@ button:disabled {
 }
 
 /*
- * Accordion sections (Automation Details, mobile): plain <details>/
- * <summary>, so open/close needs zero JS — the browser already toggles
- * the `open` attribute on a summary click. Desktop forces every section
- * visible regardless of `open`, since the same markup renders both
- * layouts (section content/business logic is identical; only whether a
- * section can be *collapsed* differs by breakpoint).
+ * Campaign Details layout: keep the content readable on wide screens, use
+ * real button controls for keyboard/mouse accessible accordions, and let the
+ * React component decide which section bodies are expanded. Avoid the old
+ * closed <details> CSS override, which left desktop panels hidden and their
+ * headings with pointer-events disabled.
  */
-.accordion-card > summary {
-  cursor: pointer;
-  list-style: none;
+.campaign-editor-page {
+  max-width: 1200px;
+  margin-inline: auto;
 }
 
-.accordion-card > summary::-webkit-details-marker {
+.accordion-card-trigger {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.accordion-card-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.accordion-card-content[hidden] {
   display: none;
 }
 
@@ -669,7 +688,7 @@ button:disabled {
   transition: transform 150ms ease;
 }
 
-.accordion-card[open] .accordion-chevron {
+.accordion-card-trigger[aria-expanded="true"] .accordion-chevron {
   transform: rotate(180deg);
 }
 
@@ -680,18 +699,14 @@ button:disabled {
 }
 
 @media (min-width: 768px) {
-  .accordion-card > summary {
-    cursor: default;
-    pointer-events: none;
-  }
   .accordion-card .accordion-chevron {
     display: none;
   }
-  .accordion-card:not([open]) {
-    display: block;
-  }
-  .accordion-card:not([open]) > *:not(summary) {
-    display: block !important;
+}
+
+@media (max-width: 640px) {
+  .campaign-editor-page {
+    max-width: none;
   }
 }
 
