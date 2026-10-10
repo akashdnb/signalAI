@@ -622,11 +622,15 @@ export function BuilderCanvas({
             parentGroupId: null,
             collapsed: false,
           }),
-          // Preserve hand-adjusted positions for existing goals. Only
-          // brand-new goals receive a predictable default placement.
-          position: existing
+          // Preserve manual placement for goals that stay in the same
+          // semantic order. Goals shifted by add/remove/reorder are reflowed
+          // vertically so the visual chain follows the new goal order.
+          position: existing && oldIndex === index
             ? { ...existing.position }
-            : { x: 0, y: 320 + index * 160 },
+            : {
+                x: existing?.position.x ?? 0,
+                y: 320 + index * 160,
+              },
           data: {
             ...(existing?.data ?? {}),
             milestoneId: milestone.id,
