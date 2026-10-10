@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -348,6 +348,10 @@ export function AppShell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
+  const mobileNavRef = useRef<HTMLElement>(null);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
   // base) rather than the wizard vanishing the instant tenant.industry
@@ -358,6 +362,72 @@ export function AppShell() {
   const [wizardLatchedOpen, setWizardLatchedOpen] = useState(false);
   const session = loadSession();
   const sessionValid = Boolean(tenantId && session && session.tenantId === tenantId);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncViewport = (event: MediaQueryList | MediaQueryListEvent) => {
+      setIsMobileViewport(event.matches);
+      if (!event.matches) setMobileNavOpen(false);
+    };
+    syncViewport(media);
+    media.addEventListener("change", syncViewport);
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileNavOpen || !isMobileViewport) return;
+
+    const drawer = mobileNavRef.current;
+    if (!drawer) return;
+
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    const getFocusable = () =>
+      Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
+    document.body.style.overflow = "hidden";
+    (getFocusable()[0] ?? drawer).focus();
+
+    function handleDrawerKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDrawerKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDrawerKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      if (previousActiveElement?.isConnected) previousActiveElement.focus();
+    };
+  }, [isMobileViewport, mobileNavOpen]);
 
   useEffect(() => {
     if (!sessionValid) {
@@ -431,8 +501,13 @@ export function AppShell() {
       )}
 
       <aside
+        ref={mobileNavRef}
         id="primary-navigation-drawer"
+        role={mobileNavOpen && isMobileViewport ? "dialog" : undefined}
+        aria-modal={mobileNavOpen && isMobileViewport ? true : undefined}
         aria-label="Primary navigation"
+        tabIndex={mobileNavOpen && isMobileViewport ? -1 : undefined}
+        inert={isMobileViewport && !mobileNavOpen}
         className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-sidebar transition-transform duration-200 md:static md:z-auto md:w-[212px] md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
