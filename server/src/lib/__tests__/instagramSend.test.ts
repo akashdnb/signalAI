@@ -200,4 +200,24 @@ describe("sendInstagramMessage", () => {
 
     expect(lastBody(fetchMock).message).toEqual({ text: longBody });
   });
+
+  it("adds Meta's HUMAN_AGENT message tag only when explicitly requested", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message_id: "human-agent-1" }), { status: 200 }),
+    );
+
+    await sendInstagramMessage("token", "recipient-1", "I checked your support issue.", undefined, { humanAgent: true });
+    expect(lastBody(fetchMock)).toMatchObject({
+      recipient: { id: "recipient-1" },
+      messaging_type: "MESSAGE_TAG",
+      tag: "HUMAN_AGENT",
+      message: { text: "I checked your support issue." },
+    });
+
+    fetchMock.mockClear();
+    await sendInstagramMessage("token", "recipient-1", "A normal in-window reply.");
+    const standardBody = lastBody(fetchMock);
+    expect(standardBody).not.toHaveProperty("messaging_type");
+    expect(standardBody).not.toHaveProperty("tag");
+  });
 });
