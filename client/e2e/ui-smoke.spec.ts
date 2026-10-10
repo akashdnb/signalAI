@@ -178,7 +178,9 @@ test.describe("responsive route smoke checks", () => {
     const leadButton = page.getByRole("button", { name: /smoke_creator_handle_example_01/ });
     await expect(leadButton).toBeVisible();
     await leadButton.click();
-    await expect(page.getByText("Can you share pricing?", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.locator(".timeline-entry").filter({ hasText: "Can you share pricing?" }).first(),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 
