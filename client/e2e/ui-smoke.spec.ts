@@ -21,10 +21,45 @@ const leadFixture = {
   handoffStatus: "ai",
 };
 
-async function mockTenantApi(page: Page) {
+async function mockTenantApi(
+  page: Page,
+  options: { failFirstLeadsLoad?: boolean; failFirstTimelineLoad?: boolean } = {},
+) {
+  let failedLeadsLoad = false;
+  let failedTimelineLoad = false;
   await page.route("http://localhost:3000/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+
+    if (
+      options.failFirstLeadsLoad &&
+      path === `${tenantPath}/leads` &&
+      !url.searchParams.has("unread") &&
+      !failedLeadsLoad
+    ) {
+      failedLeadsLoad = true;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Temporary test outage" }),
+      });
+      return;
+    }
+
+    if (
+      options.failFirstTimelineLoad &&
+      path === `${tenantPath}/leads/smoke-lead/timeline` &&
+      !failedTimelineLoad
+    ) {
+      failedTimelineLoad = true;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Temporary timeline outage" }),
+      });
+      return;
+    }
+
     let data: unknown = [];
 
     if (path === tenantPath) {
@@ -173,11 +208,14 @@ test.describe("responsive route smoke checks", () => {
 
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await mockTenantApi(page);
+    await mockTenantApi(page, { failFirstTimelineLoad: true });
     await page.goto("/dashboard/smoke-tenant/inbox");
     const leadButton = page.getByRole("button", { name: /smoke_creator_handle_example_01/ });
     await expect(leadButton).toBeVisible();
     await leadButton.click();
+    const retryMessages = page.getByRole("button", { name: "Retry loading messages" });
+    await expect(retryMessages).toBeVisible();
+    await retryMessages.click();
     await expect(
       page.locator(".timeline-entry").filter({ hasText: "Can you share pricing?" }).first(),
     ).toBeVisible();
@@ -197,6 +235,18 @@ test.describe("responsive route smoke checks", () => {
     await expect(conversation).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("tabpanel")).toContainText("Can you share pricing?");
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page, { failFirstLeadsLoad: true });
+    await page.goto("/dashboard/smoke-tenant/leads");
+
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("Temporary test outage");
+    await page.getByRole("button", { name: "Retry" }).click();
+    await expect(page.locator("tbody")).toContainText("smoke_creator_handle_example_01");
     await expectNoHorizontalOverflow(page);
   });
 
