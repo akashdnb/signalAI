@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import {
   getLead,
+  getLastInboundDmAt,
   getLatestUsernameForLead,
   updatePipelineStage,
   assignLeadOwner,
@@ -39,7 +40,12 @@ leadsRouter.get("/tenants/:tenantId/leads/:leadId", async (req, res) => {
   const lead = await getLead(pool, tenantId, leadId);
   if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   const username = await getLatestUsernameForLead(pool, leadId);
-  return res.status(200).json({ ...lead, username });
+  const lastInboundDmAt = await getLastInboundDmAt(pool, tenantId, leadId);
+  const windowOpenUntil = lastInboundDmAt ? new Date(lastInboundDmAt.getTime() + 24 * 60 * 60 * 1000) : null;
+  const humanAgentWindowUntil = config.instagramHumanAgentEnabled && lastInboundDmAt
+    ? new Date(lastInboundDmAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+    : null;
+  return res.status(200).json({ ...lead, username, lastInboundAt: lastInboundDmAt, windowOpenUntil, humanAgentWindowUntil });
 });
 
 const TIMELINE_DEFAULT_PAGE_SIZE = 50;
@@ -195,8 +201,13 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
   if (!lead.instagramUserId) {
     return res.status(400).json({ error: "this lead has no Instagram identity to message" });
   }
-  if (!lead.windowOpenUntil || lead.windowOpenUntil.getTime() <= Date.now()) {
-    return res.status(409).json({ error: "the messaging window for this lead is closed — it needs a fresh inbound message before you can reply" });
+  const lastInboundDmAt = await getLastInboundDmAt(pool, tenantId, leadId);
+  const now = Date.now();
+  const standardWindowOpen = !!lastInboundDmAt && lastInboundDmAt.getTime() + 24 * 60 * 60 * 1000 > now;
+  const humanAgentWindowOpen = !!lastInboundDmAt && lastInboundDmAt.getTime() + 7 * 24 * 60 * 60 * 1000 > now;
+  const humanAgentOnly = !standardWindowOpen && config.instagramHumanAgentEnabled && humanAgentWindowOpen;
+  if (!standardWindowOpen && !humanAgentOnly) {
+    return res.status(409).json({ error: "the messaging window is closed — a fresh inbound DM is required, or an approved HUMAN_AGENT support reply must be within 7 days of the customer's last DM" });
   }
 
   const account = await getSoleConnectedAccount(pool, tenantId);
@@ -208,7 +219,13 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
   const reserved = await tryReserveSend(pool, tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT);
   if (!reserved) return res.status(429).json({ error: "hourly send limit reached for this Instagram account — try again shortly" });
 
-  const sendResult = await sendInstagramMessage(token, lead.instagramUserId, text.trim());
+  const sendResult = await sendInstagramMessage(
+    token,
+    lead.instagramUserId,
+    text.trim(),
+    undefined,
+    humanAgentOnly ? { humanAgent: true } : undefined,
+  );
   await recordSentReply(pool, {
     tenantId,
     leadId,
