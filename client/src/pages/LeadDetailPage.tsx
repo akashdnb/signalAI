@@ -14,7 +14,7 @@ import {
   type TenantMember,
 } from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, handoffLabel, scoreBandLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, handoffLabel, leadDisplayName, scoreBandLabel } from "../lib/leadFormatting";
 
 export function LeadDetailPage() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
@@ -254,11 +254,17 @@ export function LeadDetailPage() {
   return (
     <div className="page page-wide">
       <h1>
-        {lead?.username ?? "Lead"}
+        {lead ? leadDisplayName(lead.username) : "Lead"}
         {lead && (
           <span className={handoffLabel(lead.handoffStatus).className}>{handoffLabel(lead.handoffStatus).text}</span>
         )}
       </h1>
+
+      {lead && !lead.username && (
+        <p className="muted small -mt-2 mb-4">
+          Instagram hasn't provided a username for this lead yet. You can still review the conversation and captured details here.
+        </p>
+      )}
 
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
