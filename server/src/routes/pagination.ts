@@ -170,16 +170,20 @@ paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
     has_published_version: boolean; reply_mode: ReplyMode;
     reply_templates: string[]; default_reply_template: string; cta_link: string | null; target_media_ids: string[]; reply_channel: ReplyChannel;
     trigger_source: TriggerSource; tone: CampaignTone; language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
-  }>(`select campaigns.*,
+  }>(
+    `select campaigns.*,
             exists (
-              select 1 from campaign_journey_versions published
-              where published.tenant_id = campaigns.tenant_id
-                and published.campaign_id = campaigns.id
+              select 1
+                from campaign_journey_versions published
+               where published.tenant_id = campaigns.tenant_id
+                 and published.campaign_id = campaigns.id
             ) as has_published_version
        from campaigns
        where ${where}
        order by ${orderBy}
-       limit ${params.length + 1} offset ${params.length + 2}`, [...params, pageSize, offset]);
+       limit ${params.length + 1} offset ${params.length + 2}`,
+    [...params, pageSize, offset],
+  );
   const items = result.rows.map(mapCampaign);
   return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
