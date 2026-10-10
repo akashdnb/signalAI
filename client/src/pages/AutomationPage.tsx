@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type AccountHealth, type Campaign } from "../api";
+import { createCampaignFromPreset } from "../api/campaignPresets";
 import { ActivationGuide } from "../components/automation/ActivationGuide";
 import { AutomationHeader } from "../components/automation/AutomationHeader";
 import { AutomationTabs, type AutomationTab } from "../components/automation/AutomationTabs";
@@ -68,18 +69,13 @@ export function AutomationPage() {
 
     setCreatingPreset(true);
     setError(null);
-    let created: Campaign | null = null;
 
     try {
-      created = await api.createCampaign(tenantId, template.name, template.keywords);
-      const { milestones: presetMilestones, ...replyConfig } = template.preset;
-      await api.updateReplyConfig(tenantId, created.id, {
-        ...replyConfig,
+      const created = await createCampaignFromPreset(tenantId, {
+        name: template.name,
         keywords: template.keywords,
+        preset: template.preset,
       });
-      if (presetMilestones) {
-        await api.setMilestones(tenantId, created.id, presetMilestones);
-      }
 
       await loadJourneys();
       push(`${template.name} preset created — customize it before publishing`);
@@ -87,19 +83,9 @@ export function AutomationPage() {
     } catch (err) {
       const message = err instanceof ApiError
         ? err.message
-        : "Failed to finish creating the journey from this preset";
-
-      // Campaign creation is currently separate from preset configuration on
-      // the API. If a later step fails, keep the created campaign available as
-      // a recoverable draft rather than silently creating a second one on retry.
-      if (created) {
-        await loadJourneys();
-        push("The journey was created but preset setup did not finish. Open the draft to complete it.", "error");
-        navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
-      } else {
-        setError(message);
-        push(message, "error");
-      }
+        : "Failed to create the journey from this preset";
+      setError(message);
+      push(message, "error");
     } finally {
       setCreatingPreset(false);
     }
