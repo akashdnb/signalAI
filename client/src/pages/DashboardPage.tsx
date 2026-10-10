@@ -16,7 +16,7 @@ import { ConversationsChart } from "../components/ConversationsChart";
 import { LeadsByStageDonut } from "../components/LeadsByStageDonut";
 import { InboxIcon, LeadsIcon, CalendarIcon, RevenueIcon } from "../components/icons";
 import { useTenant } from "../context/TenantContext";
-import { PIPELINE_STAGES, deriveDisplayName, formatRelativeTime } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, deriveDisplayName, formatRelativeTime, leadDisplayName } from "../lib/leadFormatting";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
@@ -224,7 +224,7 @@ export function DashboardPage() {
         ) : (
           <ul className="list">
             {recentLeads.map((lead) => {
-              const name = lead.username ?? "Unknown";
+              const name = leadDisplayName(lead.username);
               const stage = PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage);
               return (
                 <li key={lead.id} className="list-item">
