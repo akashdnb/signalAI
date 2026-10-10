@@ -14,6 +14,7 @@ export function IntegrationsPage() {
 
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [connecting, setConnecting] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -24,7 +25,10 @@ export function IntegrationsPage() {
     api
       .getAccountHealth(tenantId)
       .then((a) => {
-        if (!cancelled) setAccount(a);
+        if (!cancelled) {
+          setAccount(a);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -37,7 +41,7 @@ export function IntegrationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate]);
+  }, [tenantId, navigate, reloadCount]);
 
   async function handleConnect() {
     if (!tenantId) return;
@@ -70,11 +74,20 @@ export function IntegrationsPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>Integrations</h1>
       <p className="muted">Channels signalAI can send and receive messages through.</p>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {account === null && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry connection check
+            </button>
+          )}
+        </div>
+      )}
 
       <section className="card flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">

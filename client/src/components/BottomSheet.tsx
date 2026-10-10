@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { CloseIcon } from "./icons";
 
 /**
@@ -29,19 +29,93 @@ export function BottomSheet({
   height?: number | string;
   zIndex?: number;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousBodyOverflow = document.body.style.overflow;
+
+    const getFocusableElements = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
+    document.body.style.overflow = "hidden";
+    (getFocusableElements()[0] ?? dialog).focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      // A nested alert dialog (for example, confirming discard) owns focus
+      // while it is open; let that dialog manage its own keyboard interaction.
+      const activeElement = document.activeElement;
+      const activeDialog =
+        activeElement instanceof HTMLElement
+          ? activeElement.closest('[role="alertdialog"], [role="dialog"][aria-modal="true"]')
+          : null;
+      if (activeDialog && activeDialog !== dialog) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog!.focus();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !dialog!.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog!.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      if (previousActiveElement?.isConnected) previousActiveElement.focus();
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 flex items-end justify-center md:items-center"
       style={{ zIndex }}
     >
-      <button
-        type="button"
-        aria-label="Close"
+      <div
+        aria-hidden="true"
         className="fixed inset-0 bg-black/40"
-        onClick={onClose}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) onCloseRef.current();
+        }}
       />
 
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}

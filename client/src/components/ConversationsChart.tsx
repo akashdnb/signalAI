@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ConversationsTimeseriesPoint } from "../api";
 
 /**
@@ -13,6 +13,62 @@ import type { ConversationsTimeseriesPoint } from "../api";
 export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoint[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
+  if (data.length === 0) {
+    return (
+      <div className="flex min-h-24 items-center rounded-xl border border-dashed border-line px-4 py-5">
+        <div>
+          <p className="m-0 text-sm font-semibold text-ink">No conversation data available</p>
+          <p className="muted mb-0 mt-1 text-sm">There are no daily records for this period yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const hasActivity = data.some((point) => point.comments > 0 || point.dms > 0);
+  if (!hasActivity) {
+    return (
+      <div className="space-y-3">
+        <div className="flex min-h-24 items-center rounded-xl border border-dashed border-line px-4 py-5">
+          <div>
+            <p className="m-0 text-sm font-semibold text-ink">No conversations recorded</p>
+            <p className="muted mb-0 mt-1 text-sm">Comments and DMs sent will appear here when activity is recorded.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg bg-chip/50 px-3 py-2">
+            <div className="text-xs text-subtle">Comments</div>
+            <div className="text-lg font-semibold text-ink">0</div>
+          </div>
+          <div className="rounded-lg bg-chip/50 px-3 py-2">
+            <div className="text-xs text-subtle">DMs sent</div>
+            <div className="text-lg font-semibold text-ink">0</div>
+          </div>
+        </div>
+        <details>
+          <summary className="cursor-pointer text-xs text-subtle">View daily records</summary>
+          <table className="table mt-2">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Comments</th>
+                <th>DMs sent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((point) => (
+                <tr key={point.date}>
+                  <td>{new Date(point.date).toLocaleDateString()}</td>
+                  <td>{point.comments}</td>
+                  <td>{point.dms}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      </div>
+    );
+  }
+
   const width = 640;
   const height = 220;
   const padding = { top: 12, right: 12, bottom: 24, left: 32 };
@@ -22,21 +78,23 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
   const maxValue = Math.max(1, ...data.map((d) => Math.max(d.comments, d.dms)));
   const stepX = data.length > 1 ? plotW / (data.length - 1) : 0;
 
-  const points = useMemo(
-    () =>
-      data.map((d, i) => ({
-        x: padding.left + i * stepX,
-        comments: padding.top + plotH - (d.comments / maxValue) * plotH,
-        dms: padding.top + plotH - (d.dms / maxValue) * plotH,
-      })),
-    [data, stepX, maxValue, plotH, padding.left, padding.top],
-  );
+  // The series is capped at a short daily window, so direct mapping is
+  // inexpensive and keeps all hooks above the empty/zero-state early returns.
+  const points = data.map((d, i) => ({
+    x: padding.left + i * stepX,
+    comments: padding.top + plotH - (d.comments / maxValue) * plotH,
+    dms: padding.top + plotH - (d.dms / maxValue) * plotH,
+  }));
 
   const linePath = (key: "comments" | "dms") =>
     points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p[key].toFixed(1)}`).join(" ");
 
   function handleMove(e: React.MouseEvent<SVGRectElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
+    if (data.length <= 1) {
+      setHoverIndex(0);
+      return;
+    }
     const relX = e.clientX - rect.left;
     const idx = Math.round(relX / (rect.width / (data.length - 1)));
     setHoverIndex(Math.max(0, Math.min(data.length - 1, idx)));

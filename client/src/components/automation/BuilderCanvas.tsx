@@ -47,8 +47,9 @@ export type SelectedNode =
   | { type: "action"; action: "handoff" | "link" };
 
 export type BuilderCanvasActions = {
-  saveDraft: () => Promise<boolean>;
+  saveDraft: (milestones: Milestone[]) => Promise<boolean>;
   discardDraft: () => void;
+  stageMilestones: (previousMilestones: Milestone[], nextMilestones: Milestone[]) => void;
 };
 
 type FlowNodeData = {
@@ -518,6 +519,7 @@ export function BuilderCanvas({
   onSaveStateChange,
   onCanvasDirtyChange,
   onCanvasActionsChange,
+  onMilestonesSaved,
 }: {
   tenantId: string;
   campaign: Campaign;
@@ -532,6 +534,7 @@ export function BuilderCanvas({
   onSaveStateChange?: (state: "saved" | "saving" | "unsaved") => void;
   onCanvasDirtyChange?: (dirty: boolean) => void;
   onCanvasActionsChange?: (actions: BuilderCanvasActions | null) => void;
+  onMilestonesSaved?: (milestones: Milestone[]) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -553,6 +556,7 @@ export function BuilderCanvas({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorKind, setLoadErrorKind] = useState<"load" | "save" | null>(null);
 
   const setVersion = useCallback(
     (version: number) => {
@@ -592,9 +596,142 @@ export function BuilderCanvas({
       version: builderVersionRef.current ?? 0,
     }));
     setLoadError(null);
+    setLoadErrorKind(null);
     onCanvasDirtyChange?.(false);
     onSaveStateChange?.("saved");
   }, [onCanvasDirtyChange, onSaveStateChange, setEdges, setNodes]);
+
+  const stageMilestones = useCallback(
+    (previousMilestones: Milestone[], nextMilestones: Milestone[]) => {
+      const currentNodes = draftNodesRef.current;
+      const currentEdges = draftEdgesRef.current;
+      const oldMilestoneNodes = currentNodes.filter((node) => node.type === "milestone_group");
+
+      const oldNodesByIndex = previousMilestones.map((milestone, index) =>
+        oldMilestoneNodes.find((node) => node.data.milestoneId === milestone.id) ??
+        oldMilestoneNodes.find((node) => node.data.ordinal === index),
+      );
+
+      const nextNodesByIndex = nextMilestones.map((milestone, index) => {
+        const oldIndex = previousMilestones.findIndex((candidate) => candidate.id === milestone.id);
+        const existing = oldIndex >= 0 ? oldNodesByIndex[oldIndex] : undefined;
+        return {
+          ...(existing ?? {
+            id: crypto.randomUUID(),
+            type: "milestone_group",
+            position: { x: 0, y: 0 },
+            data: {},
+            parentGroupId: null,
+            collapsed: false,
+          }),
+          // Preserve manual placement for goals that stay in the same
+          // semantic order. Goals shifted by add/remove/reorder are reflowed
+          // vertically so the visual chain follows the new goal order.
+          position: existing && oldIndex === index
+            ? { ...existing.position }
+            : {
+                x: existing?.position.x ?? 0,
+                y: 320 + index * 160,
+              },
+          data: {
+            ...(existing?.data ?? {}),
+            milestoneId: milestone.id,
+            ordinal: index,
+          },
+        };
+      });
+
+      const handoffY = 320 + nextMilestones.length * 160;
+      const nodes = currentNodes
+        .filter((node) => node.type !== "milestone_group")
+        .map((node) =>
+          node.type === "human_handoff" || node.type === "action_link"
+            ? { ...node, position: { ...node.position, y: handoffY } }
+            : node,
+        );
+      const insertAt = Math.max(
+        0,
+        nodes.findIndex((node) => node.type === "message") + 1,
+      );
+      nodes.splice(insertAt, 0, ...nextNodesByIndex);
+
+      const trigger = nodes.find((node) => node.type === "trigger");
+      const message = nodes.find((node) => node.type === "message");
+      const handoff = nodes.find((node) => node.type === "human_handoff");
+      const oldPath = [
+        trigger?.id,
+        message?.id,
+        ...oldNodesByIndex.map((node) => node?.id),
+        handoff?.id,
+      ].filter((id): id is string => Boolean(id));
+      const newPath = [
+        trigger?.id,
+        message?.id,
+        ...nextNodesByIndex.map((node) => node.id),
+        handoff?.id,
+      ].filter((id): id is string => Boolean(id));
+
+      const consumedEdgeIds = new Set<string>();
+      const oldSpineEdges: Array<JourneyEdge | undefined> = [];
+      for (let index = 0; index < oldPath.length - 1; index += 1) {
+        const edge = currentEdges.find(
+          (candidate) =>
+            candidate.sourceNodeId === oldPath[index] &&
+            candidate.targetNodeId === oldPath[index + 1],
+        );
+        oldSpineEdges.push(edge);
+        if (edge) consumedEdgeIds.add(edge.id);
+      }
+
+      const spineEdges: JourneyEdge[] = [];
+      for (let index = 0; index < newPath.length - 1; index += 1) {
+        const oldEdge = oldSpineEdges[index];
+        spineEdges.push({
+          id: oldEdge?.id ?? crypto.randomUUID(),
+          sourceNodeId: newPath[index]!,
+          targetNodeId: newPath[index + 1]!,
+          label: oldEdge?.label ?? null,
+          condition: oldEdge?.condition ?? null,
+        });
+      }
+
+      const oldNodeIds = new Set(oldMilestoneNodes.map((node) => node.id));
+      const nextNodeIds = new Set(nextNodesByIndex.map((node) => node.id));
+      const removedNodeIds = new Set(
+        oldMilestoneNodes
+          .filter((node) => !nextNodeIds.has(node.id))
+          .map((node) => node.id),
+      );
+      const finalMilestoneId = nextNodesByIndex.at(-1)?.id ?? message?.id;
+      const nodeById = new Map(nodes.map((node) => [node.id, node]));
+      const otherEdges = currentEdges.flatMap((edge) => {
+        if (consumedEdgeIds.has(edge.id)) return [];
+        const targetNode = nodeById.get(edge.targetNodeId);
+        if (
+          targetNode?.type === "action_link" &&
+          finalMilestoneId &&
+          (edge.sourceNodeId === message?.id || oldNodeIds.has(edge.sourceNodeId))
+        ) {
+          return [{ ...edge, sourceNodeId: finalMilestoneId }];
+        }
+        if (removedNodeIds.has(edge.sourceNodeId) || removedNodeIds.has(edge.targetNodeId)) {
+          return [];
+        }
+        return [edge];
+      });
+
+      const nextEdges = [...spineEdges, ...otherEdges];
+      updateDraft(nodes, nextEdges);
+      const nextGraph: BuilderGraph = {
+        nodes,
+        edges: nextEdges,
+        version: builderVersionRef.current ?? 0,
+      };
+      setNodes(toFlowNodes(nextGraph));
+      setEdges(toFlowEdges(nextGraph));
+    },
+    [setEdges, setNodes, updateDraft],
+  );
 
   const scheduleInitialFit = useCallback(() => {
     if (
@@ -692,12 +829,14 @@ export function BuilderCanvas({
     async (silent = false) => {
       if (!silent) setLoading(true);
       setLoadError(null);
+      setLoadErrorKind(null);
 
       try {
         if (silent && isDirtyRef.current) {
           setLoadError(
             "This journey has unsaved canvas changes. Save or discard them before refreshing the flow.",
           );
+          setLoadErrorKind("load");
           return;
         }
 
@@ -721,6 +860,7 @@ export function BuilderCanvas({
         setLoadError(
           error instanceof Error ? error.message : "Failed to load journey flow",
         );
+        setLoadErrorKind("load");
       } finally {
         if (!silent) setLoading(false);
       }
@@ -749,12 +889,11 @@ export function BuilderCanvas({
   }, [loadGraph, reloadSignal]);
 
   const persistGraph = useCallback(
-    async (): Promise<boolean> => {
-      if (!isDirtyRef.current) return true;
-
+    async (milestonesToSave: Milestone[]): Promise<boolean> => {
       const version = builderVersionRef.current;
       if (version === null) {
         setLoadError("The journey is still loading. Try saving again in a moment.");
+        setLoadErrorKind("save");
         return false;
       }
 
@@ -770,6 +909,7 @@ export function BuilderCanvas({
       setSaving(true);
       onSaveStateChange?.("saving");
       setLoadError(null);
+      setLoadErrorKind(null);
 
       try {
         const saved = await api.saveBuilderGraph(
@@ -779,6 +919,11 @@ export function BuilderCanvas({
             expectedVersion: version,
             nodes: nodesToSave,
             edges: edgesToSave,
+            milestones: milestonesToSave.map(({ id, goalDescription, captureFields }) => ({
+              id,
+              goalDescription,
+              captureFields,
+            })),
           },
         );
 
@@ -790,6 +935,7 @@ export function BuilderCanvas({
         setNodes(toFlowNodes(saved));
         setEdges(toFlowEdges(saved));
         setVersion(saved.version);
+        if (saved.milestones) onMilestonesSaved?.(saved.milestones);
         onCanvasDirtyChange?.(false);
         onSaveStateChange?.("saved");
         return true;
@@ -798,6 +944,7 @@ export function BuilderCanvas({
         setLoadError(
           error instanceof Error ? error.message : "Failed to save journey",
         );
+        setLoadErrorKind("save");
         // Keep the local draft intact on conflicts or failures so nothing the
         // user has changed is silently discarded.
         return false;
@@ -808,6 +955,7 @@ export function BuilderCanvas({
     [
       campaign.id,
       onCanvasDirtyChange,
+      onMilestonesSaved,
       onSaveStateChange,
       setEdges,
       setNodes,
@@ -817,9 +965,9 @@ export function BuilderCanvas({
   );
 
   useEffect(() => {
-    onCanvasActionsChange?.({ saveDraft: persistGraph, discardDraft });
+    onCanvasActionsChange?.({ saveDraft: persistGraph, discardDraft, stageMilestones });
     return () => onCanvasActionsChange?.(null);
-  }, [discardDraft, onCanvasActionsChange, persistGraph]);
+  }, [discardDraft, onCanvasActionsChange, persistGraph, stageMilestones]);
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -1063,9 +1211,13 @@ export function BuilderCanvas({
           <button
             type="button"
             className="font-semibold text-accent hover:text-accent-hover"
-            onClick={() => void loadGraph(false)}
+            onClick={() =>
+              loadErrorKind === "save"
+                ? void persistGraph(milestones)
+                : void loadGraph(false)
+            }
           >
-            Retry
+            {loadErrorKind === "save" ? "Retry save" : "Retry loading"}
           </button>
         </div>
       )}
@@ -1138,10 +1290,18 @@ export function BuilderCanvas({
         </ReactFlow>
       </div>
 
-      <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-20 flex justify-start md:hidden">
-        <div className="rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
+      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between gap-3 md:hidden">
+        <div className="pointer-events-none rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
           Tap a node to edit it
         </div>
+        <button
+          type="button"
+          onClick={onAddMilestone}
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-white shadow-lg"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Add goal
+        </button>
       </div>
 
       {saving && (

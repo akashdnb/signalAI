@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
-import { PIPELINE_STAGES, formatDate, formatLastContactVia, handoffLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatDate, formatLastContactVia, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -19,6 +19,7 @@ export function LeadsPage() {
   const [handoffFilter, setHandoffFilter] = useState<HandoffStatus | "">("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -32,6 +33,7 @@ export function LeadsPage() {
         });
         if (cancelled) return;
         setLeads(l);
+        setError(null);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -46,19 +48,27 @@ export function LeadsPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, stageFilter, handoffFilter, search]);
+  }, [tenantId, stageFilter, handoffFilter, search, reloadCount]);
 
   if (!tenantId) return null;
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>Leads</h1>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <section className="card">
         <div className="filter-row">
-          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
+          <label className="sr-only" htmlFor="leads-stage-filter">Pipeline stage</label>
+          <select id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
             <option value="">All stages</option>
             {PIPELINE_STAGES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -66,15 +76,19 @@ export function LeadsPage() {
               </option>
             ))}
           </select>
-          <select value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
+          <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
+          <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
             {HANDOFF_FILTERS.map((h) => (
               <option key={h.value} value={h.value}>
                 {h.label}
               </option>
             ))}
           </select>
+          <label className="sr-only" htmlFor="leads-search">Search leads by username</label>
           <input
+            id="leads-search"
             type="text"
+            aria-label="Search leads by username"
             placeholder="Search by username…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -82,11 +96,12 @@ export function LeadsPage() {
         </div>
 
         {leads === null ? (
-          <p className="muted">Loading…</p>
+          <p className="muted" role="status">{error ? "Leads could not be loaded. Use Retry above." : "Loading…"}</p>
         ) : leads.length === 0 ? (
           <p className="muted">No leads match this view yet.</p>
         ) : (
-          <table className="table">
+          <div className="-mx-2 overflow-x-auto sm:mx-0">
+          <table className="table min-w-[780px]">
             <thead>
               <tr>
                 <th>Username</th>
@@ -104,7 +119,10 @@ export function LeadsPage() {
                   <td>
                     <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
                       {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
-                      {lead.username ?? "(unknown)"}
+                      <span className="inline-flex flex-col align-top">
+                        <span>{leadDisplayName(lead.username)}</span>
+                        {!lead.username && <span className="muted small">Username unavailable</span>}
+                      </span>
                     </Link>
                   </td>
                   <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
@@ -127,6 +145,7 @@ export function LeadsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

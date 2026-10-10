@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../app.js";
@@ -333,6 +333,180 @@ describe("campaigns routes", () => {
       .set(authHeader)
       .send({ url: "https://www.instagram.com/p/notfound/" });
     expect(res.status).toBe(404);
+  });
+
+  it("saves goals and graph as one versioned snapshot and rolls back invalid combined drafts", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const create = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Atomic Save", keywords: ["LEAD"] });
+    expect(create.status).toBe(201);
+
+    const builderUrl = `/tenants/${tenant.id}/campaigns/${create.body.id}/builder`;
+    const initial = await request(app).get(builderUrl).set(authHeader);
+    expect(initial.status).toBe(200);
+    let graph = initial.body as {
+      version: number;
+      nodes: Array<{
+        id: string;
+        type: string;
+        position: { x: number; y: number };
+        data: Record<string, unknown>;
+        parentGroupId: string | null;
+        collapsed: boolean;
+      }>;
+      edges: Array<{
+        id: string;
+        sourceNodeId: string;
+        targetNodeId: string;
+        label: string | null;
+        condition: Record<string, unknown> | null;
+      }>;
+    };
+
+    // A fresh journey has zero goals. Saving a graph-only draft must work
+    // instead of requiring users to create a goal just to save layout.
+    const emptyGoalSave = await request(app)
+      .put(builderUrl)
+      .set(authHeader)
+      .send({
+        expectedVersion: graph.version,
+        nodes: graph.nodes.map((node) =>
+          node.type === "message"
+            ? { ...node, position: { ...node.position, x: node.position.x + 12 } }
+            : node,
+        ),
+        edges: graph.edges,
+        milestones: [],
+      });
+    expect(emptyGoalSave.status).toBe(200);
+    expect(emptyGoalSave.body.milestones).toEqual([]);
+    expect(emptyGoalSave.body.version).toBe(graph.version + 1);
+    graph = emptyGoalSave.body;
+
+    const message = graph.nodes.find((node) => node.type === "message")!;
+    const handoff = graph.nodes.find((node) => node.type === "human_handoff")!;
+    const draftGoalId = `draft-${randomUUID()}`;
+    const goalNodeId = randomUUID();
+    const goalNode = {
+      id: goalNodeId,
+      type: "milestone_group",
+      position: { x: 40, y: 340 },
+      data: { milestoneId: draftGoalId, ordinal: 0 },
+      parentGroupId: null,
+      collapsed: false,
+    };
+    const edges = [
+      ...graph.edges.filter(
+        (edge) => !(edge.sourceNodeId === message.id && edge.targetNodeId === handoff.id),
+      ),
+      {
+        id: randomUUID(),
+        sourceNodeId: message.id,
+        targetNodeId: goalNodeId,
+        label: null,
+        condition: null,
+      },
+      {
+        id: randomUUID(),
+        sourceNodeId: goalNodeId,
+        targetNodeId: handoff.id,
+        label: null,
+        condition: null,
+      },
+    ];
+    const nodes = [
+      ...graph.nodes.filter((node) => node.type !== "human_handoff"),
+      goalNode,
+      handoff,
+    ];
+
+    const save = await request(app)
+      .put(builderUrl)
+      .set(authHeader)
+      .send({
+        expectedVersion: graph.version,
+        nodes,
+        edges,
+        milestones: [{
+          id: draftGoalId,
+          goalDescription: "Capture email",
+          captureFields: ["email"],
+        }],
+      });
+
+    expect(save.status).toBe(200);
+    expect(save.body.version).toBe(graph.version + 1);
+    expect(save.body.milestones).toHaveLength(1);
+    expect(save.body.milestones[0]).toMatchObject({
+      goalDescription: "Capture email",
+      captureFields: ["email"],
+      ordinal: 0,
+    });
+    const persistedGoal = save.body.milestones[0] as { id: string };
+    expect(persistedGoal.id).not.toBe(draftGoalId);
+    expect(save.body.nodes.find((node: { id: string }) => node.id === goalNodeId).data)
+      .toMatchObject({ milestoneId: persistedGoal.id, ordinal: 0 });
+
+    // Moving a node with an unchanged semantic goal list must increment the
+    // graph version without replacing the milestone IDs used by analytics.
+    const movedNodes = save.body.nodes.map((node: { id: string; position: { x: number; y: number } }) =>
+      node.id === message.id
+        ? { ...node, position: { ...node.position, x: node.position.x + 24 } }
+        : node,
+    );
+    const graphOnlySave = await request(app)
+      .put(builderUrl)
+      .set(authHeader)
+      .send({
+        expectedVersion: save.body.version,
+        nodes: movedNodes,
+        edges: save.body.edges,
+        milestones: save.body.milestones.map((milestone: {
+          id: string;
+          goalDescription: string;
+          captureFields: string[];
+        }) => ({
+          id: milestone.id,
+          goalDescription: milestone.goalDescription,
+          captureFields: milestone.captureFields,
+        })),
+      });
+    expect(graphOnlySave.status).toBe(200);
+    expect(graphOnlySave.body.version).toBe(save.body.version + 1);
+    expect(graphOnlySave.body.milestones[0].id).toBe(persistedGoal.id);
+
+    // A malformed combined draft must roll back goal changes and must not
+    // increment the graph version even if the milestone rows were staged first.
+    const invalid = await request(app)
+      .put(builderUrl)
+      .set(authHeader)
+      .send({
+        expectedVersion: graphOnlySave.body.version,
+        nodes: graphOnlySave.body.nodes.filter((node: { id: string }) => node.id !== goalNodeId),
+        edges: graphOnlySave.body.edges,
+        milestones: [{
+          id: persistedGoal.id,
+          goalDescription: "This must not persist",
+          captureFields: ["email"],
+        }],
+      });
+    expect(invalid.status).toBe(400);
+
+    const reloadedGraph = await request(app).get(builderUrl).set(authHeader);
+    expect(reloadedGraph.status).toBe(200);
+    expect(reloadedGraph.body.version).toBe(graphOnlySave.body.version);
+    const reloadedMilestones = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${create.body.id}/milestones`)
+      .set(authHeader);
+    expect(reloadedMilestones.status).toBe(200);
+    expect(reloadedMilestones.body).toMatchObject([
+      { id: persistedGoal.id, goalDescription: "Capture email", captureFields: ["email"] },
+    ]);
   });
 
   it("POST known-media rejects a missing url", async () => {

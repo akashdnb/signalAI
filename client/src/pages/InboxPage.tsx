@@ -11,7 +11,7 @@ import {
   type TimelineEntry,
 } from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatRelativeTime, handoffLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 type Tab = "all" | "unread" | "ai" | "qualified" | "attention";
 
@@ -42,6 +42,7 @@ export function InboxPage() {
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
 
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
   // Keep the Inbox composer aligned with Meta's 24-hour reply window. The server
@@ -63,6 +64,7 @@ export function InboxPage() {
                 : {};
       const l = await api.getLeads(tenantId, { ...filters, q: search.trim() || undefined });
       setLeads(l);
+      setError(null);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         navigate("/login", { replace: true });
@@ -75,7 +77,7 @@ export function InboxPage() {
   useEffect(() => {
     reloadLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, tab, search]);
+  }, [tenantId, tab, search, reloadCount]);
 
   const reloadLeadsRef = useRef(reloadLeads);
   reloadLeadsRef.current = reloadLeads;
@@ -190,9 +192,18 @@ export function InboxPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page" style={{ maxWidth: "none" }}>
+    <div className="page page-workspace">
       <h1>Inbox</h1>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {leads === null && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 md:h-[75vh] md:flex-row md:gap-0 md:overflow-hidden md:rounded-xl md:border md:border-line">
         {/* Conversation list */}
@@ -210,11 +221,12 @@ export function InboxPage() {
             ))}
           </div>
           <div className="p-3 pt-0">
-            <input type="text" placeholder="Search by username…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <label className="sr-only" htmlFor="inbox-search">Search conversations by username</label>
+            <input id="inbox-search" type="text" aria-label="Search conversations by username" placeholder="Search by username…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           {leads === null ? (
-            <p className="muted p-3">Loading…</p>
+            <p className="muted p-3" role="status">{error ? "Conversations could not be loaded." : "Loading…"}</p>
           ) : leads.length === 0 ? (
             <p className="muted p-3">No conversations match this view.</p>
           ) : (
@@ -229,10 +241,13 @@ export function InboxPage() {
                   >
                     <div className="flex items-center gap-2">
                       {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
-                      <strong className="truncate">{lead.username ?? "(unknown)"}</strong>
+                      <strong className="truncate" title={lead.username ?? "Instagram username unavailable"}>{leadDisplayName(lead.username)}</strong>
                       <span className="text-subtle ml-auto shrink-0 text-xs">{formatRelativeTime(lead.lastInboundAt)}</span>
                     </div>
-                    <div className="muted small truncate">{lead.lastMessagePreview ?? "No messages yet"}</div>
+                    <div className="muted small truncate">
+                      {!lead.username && <span>Username unavailable · </span>}
+                      {lead.lastMessagePreview ?? "No messages yet"}
+                    </div>
                     <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>
                       {handoffLabel(lead.handoffStatus).text}
                     </span>

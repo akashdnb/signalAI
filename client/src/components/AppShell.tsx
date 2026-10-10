@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -134,7 +134,7 @@ function PlanCard({ tenantId, billing }: { tenantId: string; billing: BillingSum
       <div className="mt-0.5 text-base font-semibold text-ink">{billing?.planTierLabel ?? "…"}</div>
       {renewalLine && <div className="mt-0.5 text-xs text-subtle">{renewalLine}</div>}
       <Link
-        to={`/dashboard/${tenantId}/settings`}
+        to={`/dashboard/${tenantId}/billing`}
         className="mt-2.5 block rounded-lg bg-accent px-3 py-1.5 text-center text-sm font-semibold text-white no-underline hover:bg-accent-hover"
       >
         Upgrade
@@ -256,7 +256,6 @@ function AccountHeader({
             <span className="text-xs text-subtle">Instagram not connected</span>
           )}
         </div>
-        <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
@@ -283,8 +282,10 @@ function AccountHeader({
 
         <button
           type="button"
-          aria-label="Notifications"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+          aria-label="Notifications (coming soon)"
+          title="Notifications are not available yet"
+          disabled
+          className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-subtle opacity-50"
         >
           <BellIcon className="h-4.5 w-4.5" />
         </button>
@@ -347,6 +348,10 @@ export function AppShell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
+  const mobileNavRef = useRef<HTMLElement | null>(null);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
   // base) rather than the wizard vanishing the instant tenant.industry
@@ -357,6 +362,72 @@ export function AppShell() {
   const [wizardLatchedOpen, setWizardLatchedOpen] = useState(false);
   const session = loadSession();
   const sessionValid = Boolean(tenantId && session && session.tenantId === tenantId);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncViewport = (event: MediaQueryList | MediaQueryListEvent) => {
+      setIsMobileViewport(event.matches);
+      if (!event.matches) setMobileNavOpen(false);
+    };
+    syncViewport(media);
+    media.addEventListener("change", syncViewport);
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileNavOpen || !isMobileViewport) return;
+
+    const drawer = mobileNavRef.current;
+    if (!drawer) return;
+
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    const getFocusable = () =>
+      Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
+    document.body.style.overflow = "hidden";
+    (getFocusable()[0] ?? drawer).focus();
+
+    function handleDrawerKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        drawer!.focus();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !drawer!.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !drawer!.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDrawerKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDrawerKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      if (previousActiveElement?.isConnected) previousActiveElement.focus();
+    };
+  }, [isMobileViewport, mobileNavOpen]);
 
   useEffect(() => {
     if (!sessionValid) {
@@ -430,6 +501,13 @@ export function AppShell() {
       )}
 
       <aside
+        ref={mobileNavRef}
+        id="primary-navigation-drawer"
+        role={mobileNavOpen && isMobileViewport ? "dialog" : undefined}
+        aria-modal={mobileNavOpen && isMobileViewport ? true : undefined}
+        aria-label="Primary navigation"
+        tabIndex={mobileNavOpen && isMobileViewport ? -1 : undefined}
+        inert={isMobileViewport && !mobileNavOpen}
         className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-sidebar transition-transform duration-200 md:static md:z-auto md:w-[212px] md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
@@ -464,11 +542,16 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex h-full min-w-0 flex-1 flex-col">
+      <div
+        inert={mobileNavOpen && isMobileViewport}
+        className="flex h-full min-w-0 flex-1 flex-col"
+      >
         <header className="flex items-center gap-3 border-b border-line bg-card px-4 py-3 md:hidden">
           <button
             type="button"
             aria-label="Open menu"
+            aria-expanded={mobileNavOpen}
+            aria-controls="primary-navigation-drawer"
             className="flex h-11 w-11 items-center justify-center"
             onClick={() => setMobileNavOpen(true)}
           >

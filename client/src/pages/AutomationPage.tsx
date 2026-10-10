@@ -58,25 +58,40 @@ export function AutomationPage() {
     <div className="flex flex-col px-4 py-3.5 md:min-h-[calc(100vh-56px)] md:px-6 md:py-3.5">
       <AutomationHeader />
 
-      <div className="hidden md:block">
-        <AutomationTabs active={activeTab} onChange={setActiveTab} />
-      </div>
+      <AutomationTabs active={activeTab} onChange={setActiveTab} />
 
-      {error && <div className="banner banner-error mt-4">{error}</div>}
+      {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
 
       {activeTab !== "journeys" ? (
-        <div className="mt-6 flex min-h-[520px] flex-1 items-center justify-center rounded-2xl border border-dashed border-line">
-          <p className="muted text-sm">{AUTOMATION_TAB_LABEL[activeTab]} is coming soon.</p>
+        <div
+          id="automation-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`automation-tab-${activeTab}`}
+          tabIndex={0}
+          className="mt-6 flex min-h-[300px] flex-1 items-center justify-center rounded-2xl border border-dashed border-line px-5 md:min-h-[520px]"
+        >
+          <div className="max-w-md text-center">
+            <p className="m-0 text-sm font-semibold text-ink">{AUTOMATION_TAB_LABEL[activeTab]} is not available yet</p>
+            <p className="muted mb-0 mt-1 text-sm">This section is still in development. Journeys are available now.</p>
+          </div>
         </div>
       ) : (
-        <JourneyTable
-          campaigns={campaigns}
-          onSelect={(campaignId) =>
-            navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)
-          }
-          onNewJourney={() => setShowNewJourney(true)}
-          onChanged={loadJourneys}
-        />
+        <div
+          id="automation-tabpanel"
+          role="tabpanel"
+          aria-labelledby="automation-tab-journeys"
+          tabIndex={0}
+          className="min-w-0 flex-1"
+        >
+          <JourneyTable
+            campaigns={campaigns}
+            onSelect={(campaignId) =>
+              navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)
+            }
+            onNewJourney={() => setShowNewJourney(true)}
+            onChanged={loadJourneys}
+          />
+        </div>
       )}
 
       {showNewJourney && (

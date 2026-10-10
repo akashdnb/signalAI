@@ -251,6 +251,11 @@ export interface BuilderGraph {
   version: number;
 }
 
+export interface BuilderGraphSaveResult extends BuilderGraph {
+  /** Present when the explicit Save included the semantic goal draft. */
+  milestones?: Milestone[];
+}
+
 
 export type JourneyStatus = "draft" | "published";
 
@@ -742,9 +747,14 @@ export const api = {
   saveBuilderGraph: (
     tenantId: string,
     campaignId: string,
-    graph: { expectedVersion: number; nodes: JourneyNode[]; edges: JourneyEdge[] },
+    graph: {
+      expectedVersion: number;
+      nodes: JourneyNode[];
+      edges: JourneyEdge[];
+      milestones?: Array<{ id: string; goalDescription: string; captureFields: string[] }>;
+    },
   ) =>
-    request<BuilderGraph>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`, {
+    request<BuilderGraphSaveResult>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`, {
       method: "PUT",
       body: JSON.stringify(graph),
     }),

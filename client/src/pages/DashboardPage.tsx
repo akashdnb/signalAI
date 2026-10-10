@@ -16,7 +16,7 @@ import { ConversationsChart } from "../components/ConversationsChart";
 import { LeadsByStageDonut } from "../components/LeadsByStageDonut";
 import { InboxIcon, LeadsIcon, CalendarIcon, RevenueIcon } from "../components/icons";
 import { useTenant } from "../context/TenantContext";
-import { PIPELINE_STAGES, deriveDisplayName, formatRelativeTime } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, deriveDisplayName, formatRelativeTime, leadDisplayName } from "../lib/leadFormatting";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
@@ -63,6 +63,8 @@ export function DashboardPage() {
   const [timeseries, setTimeseries] = useState<ConversationsTimeseriesPoint[] | null>(null);
   const [leads, setLeads] = useState<LeadListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [connecting, setConnecting] = useState(false);
   const justConnected = searchParams.get("connected") === "1";
 
@@ -74,6 +76,7 @@ export function DashboardPage() {
 
     let cancelled = false;
     async function load() {
+      setDataLoadError(null);
       try {
         const [a, f, r, ts, l, acc] = await Promise.all([
           api.getAnalytics(tenantId!),
@@ -96,14 +99,14 @@ export function DashboardPage() {
           navigate("/login", { replace: true });
           return;
         }
-        setError(err instanceof Error ? err.message : "Failed to load dashboard");
+        setDataLoadError(err instanceof Error ? err.message : "Failed to load dashboard");
       }
     }
     load();
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate]);
+  }, [tenantId, navigate, reloadCount]);
 
   async function handleConnectInstagram() {
     if (!tenantId) return;
@@ -133,7 +136,7 @@ export function DashboardPage() {
   const recentLeads = leads?.slice(0, 5) ?? [];
 
   return (
-    <div className="page" style={{ maxWidth: 1080 }}>
+    <div className="page page-wide">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="m-0">
@@ -150,7 +153,19 @@ export function DashboardPage() {
         )}
       </div>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {dataLoadError && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{dataLoadError}</span>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => setReloadCount((count) => count + 1)}
+          >
+            Retry loading dashboard
+          </button>
+        </div>
+      )}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       {justConnected && (
         <div className="banner banner-ok">
           Instagram connected.{" "}
@@ -180,12 +195,20 @@ export function DashboardPage() {
       <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="card mb-0">
           <h2>Conversations over time</h2>
-          {timeseries === null ? <p className="muted">Loading…</p> : <ConversationsChart data={timeseries} />}
+          {timeseries === null ? (
+            <p className="muted">{dataLoadError ? "Conversation data is unavailable." : "Loading…"}</p>
+          ) : (
+            <ConversationsChart data={timeseries} />
+          )}
         </section>
 
         <section className="card mb-0">
           <h2>Leads by stage</h2>
-          {stageCounts === undefined ? <p className="muted">Loading…</p> : <LeadsByStageDonut counts={stageCounts} />}
+          {stageCounts === undefined ? (
+            <p className="muted">{dataLoadError ? "Lead stage data is unavailable." : "Loading…"}</p>
+          ) : (
+            <LeadsByStageDonut counts={stageCounts} />
+          )}
         </section>
       </div>
 
@@ -195,13 +218,13 @@ export function DashboardPage() {
           <Link to={`/dashboard/${tenantId}/leads`}>View all leads →</Link>
         </div>
         {leads === null ? (
-          <p className="muted">Loading…</p>
+          <p className="muted">{dataLoadError ? "Recent conversations are unavailable." : "Loading…"}</p>
         ) : recentLeads.length === 0 ? (
           <p className="muted">No leads yet.</p>
         ) : (
           <ul className="list">
             {recentLeads.map((lead) => {
-              const name = lead.username ?? "Unknown";
+              const name = leadDisplayName(lead.username);
               const stage = PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage);
               return (
                 <li key={lead.id} className="list-item">

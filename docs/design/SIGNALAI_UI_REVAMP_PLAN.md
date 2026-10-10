@@ -1,6 +1,6 @@
 # SignalAI UI Revamp Plan
 
-**Status:** Proposed — design and implementation plan only; source-reviewed against `main` on 2026-10-10  
+**Status:** Implementation in progress — shared foundation, page layout and Journey Builder explicit-save slice; source-reviewed against `main` on 2026-10-10  
 **Repository:** `akashdnb/signalAI`  
 **Primary branch reviewed:** `main`  
 **Scope:** Frontend visual system and UX consistency across the authenticated SaaS product, with special care for the automation/journey builder. This plan includes a verified current-code delta section; it does not claim runtime/browser QA.
@@ -57,11 +57,26 @@ The repository already has substantial UI foundations, so the revamp should be i
 
 These are code-level observations from the files inspected, combined with the UI screenshots shared in the discussion.
 
+### Implementation kickoff
+
+**Active branch:** `feat/ui-revamp-phase-1`
+
+The branch is rebased on current `main` (`a92fed3`) and retains the latest Instagram product changes: **username recovery/backfill** (#11) and **rich CTA button/card messages** (#12). The UI follow-through provides neutral, consistent identity fallbacks while a username is unavailable and a campaign-details preview for text, CTA button, and image-card messages.
+
+The implementation also includes shared focus-visible styling and contrast-token groundwork; modal/dialog focus handling; toast live announcements; accessible search/filter labels; keyboard-operable Automation, Journey Builder, inspector and Lead Detail tabs; a focus-managed mobile navigation drawer; shared page-width/surface conventions; dashboard empty/all-zero/error states; mobile-safe data tables/forms; visible retry paths for failed data loads; and an Add Goal action on the mobile builder canvas.
+
+The Journey Builder save model commits graph edits and goal structure/order/content as one version-checked transaction. Inspector “Apply to draft” does not persist independently; goal loading is guarded before Save; canvas-only saves preserve goal IDs; zero-goal journeys are saveable; and failed saves retain the draft. Backend regression tests cover empty-goal saves, goal creation, ID preservation, and rollback of invalid combined drafts.
+
+The dedicated Chromium Playwright workflow now runs **14 route/interaction checks**, covering mobile overflow across operational pages, Login/Docs, mobile drawer keyboard dismissal, populated Inbox recovery, Lead Detail arrow-key tabs, operational-page retry recovery, CTA preview modes and invalid-HTTPS messaging, unresolved username presentation, and an axe scan for critical violations on Leads. Browser reports/traces are uploaded as workflow artifacts.
+
+**Verification snapshot (2026-10-10):** Client lint and production build passed on the current code head `a426b73`; Chromium smoke tests passed **14/14** on that head. The browser report is attached to [the successful run](https://github.com/akashdnb/signalAI/actions/runs/38047468231). Server typecheck, production build, and migrations passed on the rebased code; its full database-backed suite is still rerunning as of this update. Real-device visual QA, tablet and dark-theme review, and manual keyboard/screen-reader testing have not been completed. The revamp remains in progress; those checks stay open rather than being treated as covered by automation.
+
+
 ---
 
 ### Audit findings to treat as implementation requirements
 
-A source-level audit is documented in [SIGNALAI_UI_UX_AUDIT.md](./SIGNALAI_UI_UX_AUDIT.md). The revamp is not complete until the findings below are addressed and verified. This is code inspection, not a formal WCAG conformance claim; browser, keyboard, assistive-technology and automated accessibility checks still need to be run during implementation.
+A source-level audit is documented in [SIGNALAI_UI_UX_AUDIT.md](./SIGNALAI_UI_UX_AUDIT.md). The findings below are a snapshot of `main` reviewed on 2026-10-10, not a claim that every item remains unimplemented on the active branch. Use the implementation progress above for branch-specific status. This is code inspection, not a formal WCAG conformance claim; browser, keyboard, assistive-technology and automated accessibility checks still need to be run during implementation.
 
 #### P1 — Resolve before calling the journey builder safe
 - **One consistent draft/save boundary.** In the reviewed code, BuilderCanvas keeps node movement and edge connections local, but JourneyBuilder calls the milestone API immediately when goals are added, removed or reordered. The server synchronizes milestone edits into the graph and advances its version. Graph positions, connections, graph structure, goal ordering and goal content must participate in one coherent draft/save model. No journey edit should commit or increment the saved version before the primary explicit Save action.
@@ -595,13 +610,16 @@ Each PR should include:
 - [ ] Preview, test journey, publish confirmation and version/analytics/lead tabs
 
 ### Whole app
-- [ ] `npm run build` in `client/`
-- [ ] `npm run lint` in `client/` and run it in client CI
-- [ ] Add and run client component/interaction tests and Playwright smoke tests
-- [ ] Run automated accessibility scans on representative routes; document and manually review findings
-- [ ] Existing tests run; pre-existing CI/test issues are documented rather than hidden
-- [ ] Desktop, tablet, mobile; light and dark theme
-- [ ] Keyboard-only navigation, focus trap/restoration, focus-visible states, reduced motion, accessible names and live announcements
+- [x] `npm run build` in `client/` — CI pass on current branch head at the time of this update
+- [x] `npm run lint` in `client/` and run it in client CI
+- [ ] Add client component/interaction unit tests
+- [x] Add and run Chromium Playwright route/interaction smoke checks; upload HTML report and traces from CI
+- [x] Run an automated axe scan for critical violations on the representative Leads route
+- [ ] Expand automated accessibility scans to more routes and manually review findings
+- [x] Server typecheck, production build and migrations pass in CI on the rebased branch
+- [ ] Full database-backed server suite passes on the rebased branch (rerun in progress at this snapshot)
+- [ ] Desktop, tablet, mobile; light and dark theme visual QA
+- [ ] Manual keyboard-only navigation, focus trap/restoration, reduced motion, accessible names and live announcements
 - [ ] Contrast for text/statuses/graph edges and focus indicators in both themes
 
 ---

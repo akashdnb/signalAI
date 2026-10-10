@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
 } from "react";
 import {
   api,
@@ -50,11 +51,14 @@ type EditorActions = InspectorHandle;
 function useEditorActions(
   actions: EditorActions,
   onActionsChange?: (actions: EditorActions) => void,
+  enabled = true,
 ) {
   const latest = useRef(actions);
   latest.current = actions;
 
   useEffect(() => {
+    if (!enabled) return;
+
     const bridge: EditorActions = {
       save: () => latest.current.save(),
       discard: () => latest.current.discard(),
@@ -70,7 +74,7 @@ function useEditorActions(
     };
 
     onActionsChange?.(bridge);
-  }, [actions.dirty, actions.saving, actions.canSave, onActionsChange]);
+  }, [actions.dirty, actions.saving, actions.canSave, onActionsChange, enabled]);
 }
 
 function PanelHeader({
@@ -105,18 +109,65 @@ function SectionTabs({
   active: string;
   onChange: (key: string) => void;
 }) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [orientation, setOrientation] = useState<"horizontal" | "vertical">(
+    () => window.matchMedia("(max-width: 767px)").matches ? "horizontal" : "vertical",
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncOrientation = (event: MediaQueryList | MediaQueryListEvent) =>
+      setOrientation(event.matches ? "horizontal" : "vertical");
+    syncOrientation(media);
+    media.addEventListener("change", syncOrientation);
+    return () => media.removeEventListener("change", syncOrientation);
+  }, []);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+    if (orientation === "vertical" && event.key === "ArrowDown") nextIndex = (index + 1) % items.length;
+    if (orientation === "vertical" && event.key === "ArrowUp") nextIndex = (index - 1 + items.length) % items.length;
+    if (orientation === "horizontal" && event.key === "ArrowRight") nextIndex = (index + 1) % items.length;
+    if (orientation === "horizontal" && event.key === "ArrowLeft") nextIndex = (index - 1 + items.length) % items.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = items.length - 1;
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      tabRefs.current[nextIndex]?.focus();
+    }
+  }
+
   return (
-    <nav className="w-[128px] shrink-0 border-r border-line pr-3">
-      <div className="space-y-1">
-        {items.map((item) => {
+    <div
+      role="tablist"
+      aria-label="Editor sections"
+      aria-orientation={orientation}
+      className={
+        orientation === "vertical"
+          ? "w-[128px] shrink-0 border-r border-line pr-3"
+          : "w-full shrink-0 overflow-x-auto border-b border-line pb-2"
+      }
+    >
+      <div className={orientation === "vertical" ? "space-y-1" : "flex gap-1"}>
+        {items.map((item, index) => {
           const selected = active === item.key;
 
           return (
             <button
               key={item.key}
+              ref={(element) => { tabRefs.current[index] = element; }}
+              id={`inspector-tab-${item.key}`}
               type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="inspector-tabpanel"
+              tabIndex={selected ? 0 : -1}
+              onKeyDown={(event) => handleKeyDown(event, index)}
               onClick={() => onChange(item.key)}
-              className={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
+              className={`flex min-h-10 items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
+                orientation === "vertical" ? "w-full" : "w-auto shrink-0"
+              } ${
                 selected
                   ? "bg-chip font-semibold text-accent"
                   : "text-subtle hover:bg-chip hover:text-ink"
@@ -127,7 +178,7 @@ function SectionTabs({
           );
         })}
       </div>
-    </nav>
+    </div>
   );
 }
 
@@ -235,7 +286,7 @@ function TriggerEditor({
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -246,7 +297,13 @@ function TriggerEditor({
         onChange={setTab}
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        id="inspector-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${tab}`}
+        tabIndex={0}
+        className="min-w-0 flex-1"
+      >
         {tab === "basic" ? (
           <>
             <PanelHeader
@@ -467,7 +524,7 @@ function MessageEditor({
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -477,7 +534,13 @@ function MessageEditor({
         onChange={setTab}
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        id="inspector-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${tab}`}
+        tabIndex={0}
+        className="min-w-0 flex-1"
+      >
         {tab === "basic" ? (
           <>
             <PanelHeader
@@ -686,7 +749,7 @@ function GoalEditor({
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       <SectionTabs
         items={[
           { key: "basic", label: "Basic" },
@@ -698,7 +761,13 @@ function GoalEditor({
         onChange={setTab}
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        id="inspector-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${tab}`}
+        tabIndex={0}
+        className="min-w-0 flex-1"
+      >
         {tab === "basic" && (
           <div className="max-w-[590px]">
             <div className="space-y-5">
@@ -999,6 +1068,10 @@ export const Inspector = forwardRef<
 
     useImperativeHandle(ref, () => actions, [actions]);
 
+    // Keep hook order stable while clearing stale node-editor actions for
+    // non-editable action panels such as handoff/link summaries.
+    useEditorActions(emptyActions, onActionsChange, selectedNode.type === "action");
+
     if (selectedNode.type === "trigger") {
       return (
         <TriggerEditor
@@ -1044,8 +1117,6 @@ export const Inspector = forwardRef<
         />
       );
     }
-
-    useEditorActions(emptyActions, onActionsChange);
 
     return <ActionPanel campaign={campaign} action={selectedNode.action} />;
   },

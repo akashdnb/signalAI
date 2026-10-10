@@ -59,21 +59,21 @@ button {
 :root {
   /* Brand guide (docs/signalai-brand-assets/BRAND-GUIDE.txt): Primary
      Purple #7C3AED, Primary Blue #2563EB, Accent Cyan #22D3EE, Dark
-     #0F172A, Background #F1F5F9, Muted Text #6B7280. Surface/Border from
+     #0F172A, Background #F1F5F9, Muted Text #596273 (adjusted for contrast). Surface/Border from
      the guide (#1F2937/#374151) are the dark-mode pair, applied below. */
   --bg: #f1f5f9;
   --card-bg: #ffffff;
   --text: #0f172a;
-  --text-muted: #6b7280;
+  --text-muted: #596273;
   --border: #e2e8f0;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-soft: #a78bfa;
   --accent-blue: #2563eb;
-  --accent-cyan: #22d3ee;
+  --accent-cyan: #0e7490;
   --brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb, #7c3aed);
   --ok-bg: #ecfdf5;
-  --ok-text: #059669;
+  --ok-text: #047857;
   --error-bg: #fef2f2;
   --error-text: #dc2626;
   --pill-bg: #f3e8ff;
@@ -104,6 +104,7 @@ button {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f172a;
+    --accent-cyan: #22d3ee;
     --card-bg: #1f2937;
     --text: #f8fafc;
     --text-muted: #94a3b8;
@@ -130,6 +131,7 @@ button {
 
 :root[data-theme="dark"] {
   --bg: #0f172a;
+  --accent-cyan: #22d3ee;
   --card-bg: #1f2937;
   --text: #f8fafc;
   --text-muted: #94a3b8;
@@ -156,6 +158,16 @@ button {
   box-sizing: border-box;
 }
 
+/* A consistent keyboard focus indicator across legacy CSS and Tailwind controls. */
+:where(a, button, input, select, textarea, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:where(input, select, textarea):focus-visible {
+  border-color: var(--accent);
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -165,9 +177,32 @@ body {
 }
 
 .page {
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
+}
+
+/* Shared layout widths: content pages stay readable, dashboards breathe,
+   and high-density tools can use the full workspace without inline overrides. */
+.page-wide {
+  max-width: 1120px;
+}
+
+.page-workspace {
+  max-width: none;
+  margin: 0;
+  padding: 1.25rem clamp(1rem, 2vw, 2rem) 2rem;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .page-workspace {
+    padding: 1rem 0.875rem 1.5rem;
+  }
 }
 
 .page-narrow {
@@ -179,6 +214,7 @@ body {
 h1 {
   font-size: 1.6rem;
   margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
 }
 
 h2 {
@@ -208,10 +244,11 @@ h4 {
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* Surfaces are separated by borders; reserve elevation for dialogs/menus. */
+  box-shadow: none;
 }
 
 .dashboard-header {
@@ -252,6 +289,16 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* The legacy selector above removes the browser outline, so restore the
+   shared focus ring for keyboard users with matching selector specificity. */
+input[type="text"]:focus-visible,
+input[type="email"]:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /*
@@ -791,5 +838,72 @@ button:disabled {
 @media (prefers-reduced-motion: reduce) {
   .automation-builder .flow-handle {
     transition: none;
+  }
+}
+
+/* Responsive defaults for dense operational views. Keep controls reachable
+   without forcing tiny inputs or letting long CRM values expand the viewport. */
+.kv {
+  grid-template-columns: minmax(6.5rem, max-content) minmax(0, 1fr);
+}
+
+.kv dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.table th,
+.table td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1rem;
+  }
+
+  .filter-row select,
+  .filter-row input {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inline-form {
+    align-items: stretch;
+  }
+
+  .inline-form > input,
+  .inline-form > textarea {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inline-form > button {
+    min-height: 42px;
+  }
+
+  .kv {
+    grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+  }
+
+  .list-item {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -23,19 +23,32 @@ export function useToasts() {
 }
 
 export function ToastStack({ toasts }: { toasts: ToastItem[] }) {
-  if (toasts.length === 0) return null;
+  const successToasts = toasts.filter((toast) => toast.kind === "ok");
+  const errorToasts = toasts.filter((toast) => toast.kind === "error");
+
   return (
-    <div className="fixed bottom-5 right-5 z-[60] flex flex-col gap-2">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`rounded-xl border px-4 py-2.5 text-sm font-medium shadow-lg ${
-            t.kind === "error" ? "border-err bg-err text-err-ink" : "border-line bg-card text-ink"
-          }`}
-        >
-          {t.text}
-        </div>
-      ))}
+    <div className="pointer-events-none fixed bottom-5 right-5 z-[60] flex max-w-[calc(100vw-2.5rem)] flex-col gap-2">
+      {/* Keep the live regions mounted while empty so newly added messages are announced. */}
+      <div role="status" aria-live="polite" aria-atomic="false" className="flex flex-col gap-2">
+        {successToasts.map((toast) => (
+          <div
+            key={toast.id}
+            className="pointer-events-auto rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg"
+          >
+            {toast.text}
+          </div>
+        ))}
+      </div>
+      <div role="alert" aria-live="assertive" aria-atomic="false" className="flex flex-col gap-2">
+        {errorToasts.map((toast) => (
+          <div
+            key={toast.id}
+            className="pointer-events-auto rounded-xl border border-err bg-err px-4 py-2.5 text-sm font-medium text-err-ink shadow-lg"
+          >
+            {toast.text}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -12,7 +12,7 @@ export function SettingsPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>{tenant?.name ?? "Settings"}</h1>
 
       <FieldDefinitionsPanel tenantId={tenantId} />

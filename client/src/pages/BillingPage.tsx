@@ -7,7 +7,7 @@ export function BillingPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>Billing</h1>
       <BillingPanel tenantId={tenantId} />
     </div>

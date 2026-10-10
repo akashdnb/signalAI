@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
@@ -14,7 +14,7 @@ import {
   type TenantMember,
 } from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, handoffLabel, scoreBandLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, handoffLabel, leadDisplayName, scoreBandLabel } from "../lib/leadFormatting";
 
 export function LeadDetailPage() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
@@ -33,7 +33,9 @@ export function LeadDetailPage() {
   const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [activeTab, setActiveTab] = useState<"overview" | "conversation" | "activities" | "notes">("overview");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const [noteBody, setNoteBody] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -61,6 +63,7 @@ export function LeadDetailPage() {
     setMembers(m);
     setCapturedFacts(cf);
     setFieldDefinitions(fd);
+    setError(null);
   }
 
   // Loaded separately from loadAll: a failure fetching intelligence (a
@@ -120,7 +123,7 @@ export function LeadDetailPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, leadId]);
+  }, [tenantId, leadId, reloadCount]);
 
   async function handleStageChange(stage: PipelineStage) {
     if (!tenantId || !leadId) return;
@@ -249,26 +252,58 @@ export function LeadDetailPage() {
   ];
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>
-        {lead?.username ?? "Lead"}
+        {lead ? leadDisplayName(lead.username) : "Lead"}
         {lead && (
           <span className={handoffLabel(lead.handoffStatus).className}>{handoffLabel(lead.handoffStatus).text}</span>
         )}
       </h1>
 
-      {error && <div className="banner banner-error">{error}</div>}
+      {lead && !lead.username && (
+        <p className="muted small -mt-2 mb-4">
+          Instagram hasn't provided a username for this lead yet. You can still review the conversation and captured details here.
+        </p>
+      )}
+
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {!lead && (
+            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
+              Retry loading lead
+            </button>
+          )}
+        </div>
+      )}
 
       {!lead ? (
-        <p className="muted">Loading…</p>
+        <p className="muted" role="status">{error ? "Lead details could not be loaded." : "Loading lead…"}</p>
       ) : (
         <>
-          <div className="button-row">
-            {TABS.map((t) => (
+          <div className="button-row" role="tablist" aria-label="Lead details">
+            {TABS.map((t, index) => (
               <button
                 key={t.value}
+                ref={(element) => { tabRefs.current[index] = element; }}
+                id={`lead-tab-${t.value}`}
                 type="button"
+                role="tab"
+                aria-selected={activeTab === t.value}
+                aria-controls="lead-tabpanel"
+                tabIndex={activeTab === t.value ? 0 : -1}
                 className={activeTab === t.value ? "btn-primary btn-small" : "btn-secondary btn-small"}
+                onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
+                  let nextIndex: number | null = null;
+                  if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
+                  if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
+                  if (event.key === "Home") nextIndex = 0;
+                  if (event.key === "End") nextIndex = TABS.length - 1;
+                  if (nextIndex !== null) {
+                    event.preventDefault();
+                    tabRefs.current[nextIndex]?.focus();
+                  }
+                }}
                 onClick={() => setActiveTab(t.value)}
               >
                 {t.label}
@@ -276,11 +311,17 @@ export function LeadDetailPage() {
             ))}
           </div>
 
+          <div
+            id="lead-tabpanel"
+            role="tabpanel"
+            aria-labelledby={`lead-tab-${activeTab}`}
+            tabIndex={0}
+          >
           {activeTab === "overview" && (
             <>
           <section className="card">
             <h2>Overview</h2>
-            <div className="field-group">
+            <div className="field-group grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label>
                 Pipeline stage
                 <select value={lead.pipelineStage} disabled={busy} onChange={(e) => handleStageChange(e.target.value as PipelineStage)}>
@@ -335,6 +376,7 @@ export function LeadDetailPage() {
             <div className="inline-form">
               <input
                 type="text"
+                aria-label="Tag name"
                 placeholder="Add a tag…"
                 value={tagName}
                 onChange={(e) => setTagName(e.target.value)}
@@ -372,7 +414,7 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            {intelligenceError && <div className="banner banner-error">{intelligenceError}</div>}
+            {intelligenceError && <div className="banner banner-error" role="alert">{intelligenceError}</div>}
 
             {intelligence === undefined ? (
               <p className="muted">Loading…</p>
@@ -473,6 +515,7 @@ export function LeadDetailPage() {
             <div className="inline-form">
               <input
                 type="text"
+                aria-label="Deal value (optional)"
                 placeholder="Deal value (optional)"
                 value={dealValue}
                 onChange={(e) => setDealValue(e.target.value)}
@@ -530,6 +573,7 @@ export function LeadDetailPage() {
               )}
               <div className="inline-form">
                 <textarea
+                  aria-label="Internal note"
                   placeholder="Add an internal note…"
                   value={noteBody}
                   onChange={(e) => setNoteBody(e.target.value)}
@@ -541,6 +585,7 @@ export function LeadDetailPage() {
               </div>
             </section>
           )}
+          </div>
         </>
       )}
     </div>
