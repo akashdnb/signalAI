@@ -476,7 +476,7 @@ export function JourneyBuilder({
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={() => void saveCanvasDraft()}
                 >
-                  {builderSaveState === "saving" ? "Saving…" : !milestonesReady ? "Loading goals…" : "Save changes"}
+                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading goals…" : "Save changes"}
                 </button>
               )}
 
