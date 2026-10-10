@@ -202,7 +202,7 @@ describe("sendInstagramMessage", () => {
   });
 
   it("adds Meta's HUMAN_AGENT message tag only when explicitly requested", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
       new Response(JSON.stringify({ message_id: "human-agent-1" }), { status: 200 }),
     );
 
