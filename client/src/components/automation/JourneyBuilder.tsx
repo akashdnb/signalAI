@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Campaign, type FieldDefinition, type Milestone } from "../../api";
 import { BottomSheet } from "../BottomSheet";
 import { CampaignEditor, type CampaignEditorHandle } from "../CampaignEditor";
@@ -10,7 +10,11 @@ import {
   FileTextIcon,
 } from "../icons";
 import { AnalyticsPanel } from "./AnalyticsPanel";
-import { BuilderCanvas, type SelectedNode } from "./BuilderCanvas";
+import {
+  BuilderCanvas,
+  type BuilderCanvasActions,
+  type SelectedNode,
+} from "./BuilderCanvas";
 import { LeadsPanel } from "./LeadsPanel";
 import { NodeInspectorDialog } from "./NodeInspectorDialog";
 import { PreviewDialog } from "./PreviewDialog";
@@ -66,11 +70,132 @@ export function JourneyBuilder({
   const [builderSaveState, setBuilderSaveState] = useState<
     "saved" | "saving" | "unsaved"
   >("saved");
+  const [canvasDirty, setCanvasDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [unsavedDialogError, setUnsavedDialogError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const canvasActionsRef = useRef<BuilderCanvasActions | null>(null);
+  const pendingActionRef = useRef<(() => void | Promise<void>) | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
+
+  const registerCanvasActions = useCallback((actions: BuilderCanvasActions | null) => {
+    canvasActionsRef.current = actions;
+  }, []);
+
+  const requestNavigation = useCallback(
+    (action: () => void | Promise<void>) => {
+      if (!canvasDirty) {
+        void action();
+        return;
+      }
+
+      pendingActionRef.current = action;
+      setUnsavedDialogError(null);
+      setShowUnsavedDialog(true);
+    },
+    [canvasDirty],
+  );
+
+  async function saveCanvasDraft(): Promise<boolean> {
+    const saved = await canvasActionsRef.current?.saveDraft();
+    return saved === true;
+  }
+
+  function keepEditing() {
+    pendingActionRef.current = null;
+    setUnsavedDialogError(null);
+    setShowUnsavedDialog(false);
+  }
+
+  async function saveAndContinue() {
+    const saved = await saveCanvasDraft();
+    if (!saved) {
+      setUnsavedDialogError("Couldn't save your journey. Your changes are still here; please try again.");
+      return;
+    }
+
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    setUnsavedDialogError(null);
+    setShowUnsavedDialog(false);
+    await action?.();
+  }
+
+  async function discardAndContinue() {
+    canvasActionsRef.current?.discardDraft();
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    setUnsavedDialogError(null);
+    setShowUnsavedDialog(false);
+    await action?.();
+  }
+
+  useEffect(() => {
+    if (!canvasDirty) return;
+
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [canvasDirty]);
+
+  // BrowserRouter does not block SPA navigation by itself. Intercept ordinary
+  // same-origin links while a canvas draft exists and resume navigation only
+  // after the user explicitly saves or discards it.
+  useEffect(() => {
+    if (!canvasDirty) return;
+
+    const interceptInternalLink = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const element =
+        event.target instanceof Element
+          ? event.target.closest("a[href]")
+          : null;
+      if (!(element instanceof HTMLAnchorElement)) return;
+      if ((element.target && element.target !== "_self") || element.hasAttribute("download")) {
+        return;
+      }
+
+      const targetUrl = new URL(element.href, window.location.href);
+      if (targetUrl.origin !== window.location.origin) return;
+
+      const currentUrl = new URL(window.location.href);
+      if (
+        targetUrl.pathname === currentUrl.pathname &&
+        targetUrl.search === currentUrl.search &&
+        targetUrl.hash === currentUrl.hash
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      requestNavigation(() =>
+        navigate(`${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`),
+      );
+    };
+
+    document.addEventListener("click", interceptInternalLink, true);
+    return () => document.removeEventListener("click", interceptInternalLink, true);
+  }, [canvasDirty, navigate, requestNavigation]);
 
   async function loadMilestones() {
     const [ms, defs] = await Promise.all([
@@ -105,7 +230,10 @@ export function JourneyBuilder({
       return;
     }
 
-    setSubTab(next);
+    requestNavigation(() => {
+      if (subTab === "builder" && next !== "builder") setInspectorOpen(false);
+      setSubTab(next);
+    });
   }
 
   async function persistMilestones(next: Milestone[]) {
@@ -187,13 +315,15 @@ export function JourneyBuilder({
   }
 
   function requestPublish() {
-    if (builderVersion === null) {
-      setPublishError("The journey version is still loading.");
-      return;
-    }
+    requestNavigation(() => {
+      if (builderVersion === null) {
+        setPublishError("The journey version is still loading.");
+        return;
+      }
 
-    setMenuOpen(false);
-    setShowPublishConfirm(true);
+      setMenuOpen(false);
+      setShowPublishConfirm(true);
+    });
   }
 
   async function handlePublish() {
@@ -223,7 +353,7 @@ export function JourneyBuilder({
             <button
               type="button"
               className="builder-toolbar-button mt-0.5 flex h-8 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-ink hover:bg-chip"
-              onClick={onBack}
+              onClick={() => requestNavigation(onBack)}
             >
               ← Back to journeys
             </button>
@@ -249,6 +379,21 @@ export function JourneyBuilder({
                         : "Saved"}
                   </span>
                 </span>
+              )}
+
+              {subTab === "builder" && (
+                <button
+                  type="button"
+                  disabled={!canvasDirty || builderSaveState === "saving"}
+                  className={`builder-toolbar-button flex h-9 items-center justify-center rounded-lg px-3 text-[13px] font-semibold transition-colors ${
+                    canvasDirty
+                      ? "bg-accent text-white shadow-sm hover:bg-accent-hover"
+                      : "bg-chip text-subtle"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                  onClick={() => void saveCanvasDraft()}
+                >
+                  {builderSaveState === "saving" ? "Saving…" : "Save changes"}
+                </button>
               )}
 
               <Link
@@ -414,6 +559,8 @@ export function JourneyBuilder({
               reloadSignal={graphReloadSignal}
               onBuilderVersionChange={setBuilderVersion}
               onSaveStateChange={setBuilderSaveState}
+              onCanvasDirtyChange={setCanvasDirty}
+              onCanvasActionsChange={registerCanvasActions}
             />
           )}
 
@@ -508,6 +655,43 @@ export function JourneyBuilder({
               onClick={() => void handlePublish()}
             >
               {publishing ? "Publishing…" : "Publish"}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {showUnsavedDialog && (
+        <BottomSheet
+          title="Unsaved changes"
+          onClose={keepEditing}
+        >
+          <p className="m-0 text-sm text-ink">
+            You have unsaved changes to this journey. If you leave now, those changes will be discarded.
+          </p>
+          {unsavedDialogError && (
+            <div className="banner banner-error mt-3">{unsavedDialogError}</div>
+          )}
+          <div className="mt-5 flex flex-col gap-2">
+            <button
+              type="button"
+              className="btn-secondary min-h-11"
+              onClick={keepEditing}
+            >
+              Keep editing
+            </button>
+            <button
+              type="button"
+              className="btn-secondary min-h-11"
+              onClick={() => void discardAndContinue()}
+            >
+              Discard changes
+            </button>
+            <button
+              type="button"
+              className="btn-primary min-h-11"
+              onClick={() => void saveAndContinue()}
+            >
+              Save changes and continue
             </button>
           </div>
         </BottomSheet>
