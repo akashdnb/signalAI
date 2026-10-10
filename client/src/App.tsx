@@ -7,6 +7,7 @@ import { BillingPage } from "./pages/BillingPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { ContentPage } from "./pages/ContentPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { DocsPage } from "./pages/DocsPage";
 import { InboxPage } from "./pages/InboxPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { KnowledgePage } from "./pages/KnowledgePage";
@@ -26,6 +27,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
+      <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
+      <Route path="/docs/*" element={<DocsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/connect" element={<ConnectPage />} />
       <Route path="/dashboard/:tenantId" element={<AppShell />}>
