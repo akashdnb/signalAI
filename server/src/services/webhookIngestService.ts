@@ -109,7 +109,7 @@ async function ingestOneEvent(
   pool: Pool,
   boss: PgBoss,
   tenantId: string,
-  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource }>,
+  campaigns: Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>,
   event: ParsedWebhookEvent,
 ): Promise<void> {
   const client = await pool.connect();
