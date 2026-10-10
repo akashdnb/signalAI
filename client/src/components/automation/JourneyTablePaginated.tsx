@@ -33,12 +33,16 @@ function relativeUpdatedAt(value: string): { label: string; title: string } {
 
 function JourneyStatusBadge({ campaign }: { campaign: Campaign }) {
   const label = !campaign.published
-    ? "Draft"
+    ? campaign.enabled
+      ? "Unpublished · Active"
+      : "Draft"
     : campaign.enabled
       ? "Published · Active"
       : "Published · Paused";
   const styling = !campaign.published
-    ? "bg-[#E2E8F0] text-[#475569]"
+    ? campaign.enabled
+      ? "bg-[#FEE2E2] text-[#991B1B]"
+      : "bg-[#E2E8F0] text-[#475569]"
     : campaign.enabled
       ? "bg-[#D1FAE5] text-[#047857]"
       : "bg-[#FEF3C7] text-[#92400E]";
@@ -65,7 +69,9 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canActivate = campaign.published === true;
   async function toggle() {
+    if (!campaign.enabled && !canActivate) return;
     setSaving(true);
     setError(null);
     try {
@@ -88,7 +94,9 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
           {error && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
-          <button type="button" disabled={saving} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>{saving ? "Saving…" : campaign.enabled ? "Pause journey" : "Activate journey"}</button>
+          <button type="button" disabled={saving || (!campaign.enabled && !canActivate)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>
+            {saving ? "Saving…" : campaign.enabled ? "Pause journey" : canActivate ? "Activate journey" : "Publish first"}
+          </button>
         </div>
       </>}
     </div>
@@ -168,21 +176,25 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     setBulkSaving(true);
     setError(null);
     try {
+      const selectedCampaigns = campaigns.filter((campaign) => selectedIds.has(campaign.id));
+      const blockedUnpublished = enabled ? selectedCampaigns.filter((campaign) => !campaign.published).length : 0;
+      const eligible = enabled ? selectedCampaigns.filter((campaign) => campaign.published) : selectedCampaigns;
       const results = await Promise.allSettled(
-        [...selectedIds].map((campaignId) => api.setCampaignEnabled(tenantId, campaignId, enabled)),
+        eligible.map((campaign) => api.setCampaignEnabled(tenantId, campaign.id, enabled)),
       );
       const failed = results.filter((result) => result.status === "rejected").length;
-      // Some requests may have succeeded even if others failed. Refresh the
-      // visible data so it reflects server state rather than stale selection.
       if (results.some((result) => result.status === "fulfilled")) {
         setSelectedIds(new Set());
         setReloadToken((value) => value + 1);
       }
-      if (failed > 0) {
+      if (failed > 0 || blockedUnpublished > 0) {
+        const updated = results.length - failed;
         setError(
-          failed === results.length
-            ? "Couldn't update the selected journeys. Please try again."
-            : `${results.length - failed} journey(s) updated; ${failed} failed. The list has been refreshed.`,
+          enabled && blockedUnpublished > 0
+            ? `${updated} journey(s) activated; ${blockedUnpublished} draft journey(s) were skipped. Publish them first.`
+            : failed === results.length
+              ? "Couldn't update the selected journeys. Please try again."
+              : `${updated} journey(s) updated; ${failed} failed. The list has been refreshed.`,
         );
       }
     } catch (err) {
