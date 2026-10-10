@@ -13,6 +13,11 @@ export interface SendInstagramMessageResult {
   metaMessageId: string | null;
 }
 
+interface ResolvedLegacyMessage {
+  text: string;
+  richMessage?: InstagramRichMessageOptions;
+}
+
 /**
  * Legacy compatibility adapter for the pre-journey reply engine.
  *
@@ -23,13 +28,16 @@ export interface SendInstagramMessageResult {
 function resolveLegacyRichMessage(
   text: string,
   richMessage?: InstagramRichMessageOptions,
-): InstagramRichMessageOptions | undefined {
-  if (richMessage) return richMessage;
+): ResolvedLegacyMessage {
+  if (richMessage) return { text, richMessage };
 
   const match = text.match(LEGACY_TRAILING_CTA);
-  if (!match) return undefined;
+  if (!match || match.index === undefined) return { text };
 
-  return { ctaUrl: match[1] };
+  return {
+    text: text.slice(0, match.index).trimEnd(),
+    richMessage: { ctaUrl: match[1] },
+  };
 }
 
 export async function sendInstagramMessage(
@@ -41,6 +49,7 @@ export async function sendInstagramMessage(
   // Keep the token in the Authorization header rather than the URL so it
   // doesn't appear in request-line logs, proxies, or APM traces.
   const url = `${GRAPH_BASE_URL}/v21.0/me/messages`;
+  const resolved = resolveLegacyRichMessage(text, richMessage);
 
   const res = await fetch(url, {
     method: "POST",
@@ -51,8 +60,8 @@ export async function sendInstagramMessage(
     body: JSON.stringify({
       recipient: { id: recipientInstagramUserId },
       message: buildInstagramMessagePayload(
-        text,
-        resolveLegacyRichMessage(text, richMessage),
+        resolved.text,
+        resolved.richMessage,
       ),
     }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
