@@ -89,7 +89,7 @@ describe("sendInstagramMessage", () => {
     });
   });
 
-  it("keeps a normal trailing URL as plain text when no CTA metadata is provided", async () => {
+  it("keeps an ordinary trailing URL plain when the caller explicitly opts out of legacy CTA inference", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ message_id: "text-message-1" }), { status: 200 }),
     );
@@ -98,12 +98,44 @@ describe("sendInstagramMessage", () => {
       "token",
       "recipient-1",
       "Here is the article: https://example.com/article",
+      {},
     );
 
     const request = fetchMock.mock.calls[0]![1] as RequestInit;
     const body = JSON.parse(String(request.body));
     expect(body.message).toEqual({
       text: "Here is the article: https://example.com/article",
+    });
+  });
+
+  it("preserves the existing legacy trailing-CTA behavior", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message_id: "legacy-rich-message-1" }), { status: 200 }),
+    );
+
+    await sendInstagramMessage(
+      "token",
+      "recipient-1",
+      "To share complete details, please fill out the enquiry form below. https://example.com/enquiry",
+    );
+
+    const request = fetchMock.mock.calls[0]![1] as RequestInit;
+    const body = JSON.parse(String(request.body));
+    expect(body.message).toEqual({
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: "To share complete details, please fill out the enquiry form below.",
+          buttons: [
+            {
+              type: "web_url",
+              url: "https://example.com/enquiry",
+              title: "View details",
+            },
+          ],
+        },
+      },
     });
   });
 
