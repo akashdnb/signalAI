@@ -282,8 +282,8 @@ function TemplateDetailsDialog({
         This creates a disabled draft. Review the journey in Builder and publish it when it is ready.
       </p>
 
+      {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
       <div className="mt-5 flex justify-end gap-2">
-        {error && <div className="banner banner-error mr-auto" role="alert">{error}</div>}
         <button type="button" className="btn-secondary" disabled={creating} onClick={onClose}>Cancel</button>
         <button type="button" className="btn-primary" disabled={creating} onClick={() => void create()}>
           {creating ? "Creating…" : "Create draft"}
