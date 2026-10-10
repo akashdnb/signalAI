@@ -14,8 +14,9 @@ import {
 
 import { JourneyRuntime } from "../runtime.js";
 
-import type {
-  InstagramInboundMessage,
+import {
+  readInstagramInteraction,
+  type InstagramInboundMessage,
 } from "../../../integrations/instagram/webhooks/parser.js";
 
 export interface ProcessInstagramMessageDependencies {
@@ -140,12 +141,12 @@ export async function processPersistedInstagramInboundEvent(
           event.eventType,
         payload: {
           provider: "instagram",
-          messageText:
-            event.messageText,
-          instagramUserId:
-            event.instagramUserId,
-          receivedAt:
-            event.eventAt,
+          messageText: event.messageText,
+          instagramUserId: event.instagramUserId,
+          receivedAt: event.eventAt,
+          ...(readInstagramInteraction(event.payload)
+            ? { interaction: readInstagramInteraction(event.payload) }
+            : {}),
         },
       });
 
