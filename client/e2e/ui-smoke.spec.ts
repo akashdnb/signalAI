@@ -23,8 +23,46 @@ const leadFixture = {
 
 async function mockTenantApi(
   page: Page,
-  options: { failFirstLeadsLoad?: boolean; failFirstTimelineLoad?: boolean } = {},
+  options: {
+    failFirstLeadsLoad?: boolean;
+    failFirstTimelineLoad?: boolean;
+    unknownUsername?: boolean;
+    journeyEditor?: boolean;
+  } = {},
 ) {
+  const activeLead = options.unknownUsername
+    ? { ...leadFixture, username: null }
+    : leadFixture;
+  const campaignFixture = {
+    id: "smoke-campaign",
+    tenantId,
+    name: "Product enquiry journey",
+    description: null,
+    keywords: ["price"],
+    enabled: true,
+    replyMode: "ai_generated",
+    replyTemplates: [],
+    defaultReplyTemplate: "Here's the information you asked for.",
+    ctaLink: "https://example.com/details",
+    targetMediaIds: ["post-card"],
+    replyChannel: "dm",
+    triggerSource: "message",
+    tone: "friendly",
+    language: "en",
+    useKnowledgeBase: false,
+    createdAt: "2026-10-10T09:00:00.000Z",
+    updatedAt: "2026-10-10T09:00:00.000Z",
+  };
+  const mediaFixture = {
+    mediaId: "post-card",
+    commentCount: 3,
+    lastSeenAt: "2026-10-10T10:00:00.000Z",
+    caption: "A sample product post",
+    mediaType: "IMAGE",
+    thumbnailUrl: "https://cdn.example.com/post-card.jpg",
+    permalink: "https://instagram.com/p/example",
+    postedAt: "2026-10-01T10:00:00.000Z",
+  };
   // React Strict Mode intentionally mounts effects twice in development.
   // Fail both initial attempts so the active effect sees the error; Retry is
   // then the next request and must succeed.
@@ -124,13 +162,21 @@ async function mockTenantApi(
     } else if (path === `${tenantPath}/analytics/top-keywords`) {
       data = [];
     } else if (path === `${tenantPath}/observed-media`) {
+      data = options.journeyEditor ? [mediaFixture] : [];
+    } else if (path === `${tenantPath}/field-definitions`) {
+      data = { fieldDefinitions: [] };
+    } else if (path === `${tenantPath}/campaigns/smoke-campaign`) {
+      data = campaignFixture;
+    } else if (path === `${tenantPath}/campaigns/smoke-campaign/builder`) {
+      data = { nodes: [], edges: [], version: 0 };
+    } else if (path === `${tenantPath}/campaigns/smoke-campaign/milestones`) {
       data = [];
     } else if (path === `${tenantPath}/members`) {
       data = [{ userId: "smoke-owner", email: "owner@example.com", role: "owner" }];
     } else if (path === `${tenantPath}/leads`) {
-      data = [leadFixture];
+      data = [activeLead];
     } else if (path === `${tenantPath}/leads/smoke-lead`) {
-      data = leadFixture;
+      data = activeLead;
     } else if (path === `${tenantPath}/leads/smoke-lead/timeline`) {
       data = {
         entries: [{
@@ -138,7 +184,7 @@ async function mockTenantApi(
           occurredAt: "2026-10-10T10:00:00.000Z",
           eventType: "message",
           text: "Can you share pricing?",
-          username: leadFixture.username,
+          username: activeLead.username,
           matchedKeyword: null,
         }],
         hasMore: false,
@@ -239,6 +285,47 @@ test.describe("responsive route smoke checks", () => {
     await page.keyboard.press("Enter");
     await expect(page.getByRole("tabpanel")).toContainText("Can you share pricing?");
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("unresolved Instagram usernames have a clear fallback across lead surfaces", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page, { unknownUsername: true });
+
+    await page.goto("/dashboard/smoke-tenant/leads");
+    await expect(page.getByText("Instagram user", { exact: true })).toBeVisible();
+    await expect(page.getByText("Username unavailable", { exact: true })).toBeVisible();
+
+    await page.goto("/dashboard/smoke-tenant/inbox");
+    await expect(page.getByRole("button", { name: /Instagram user/ })).toBeVisible();
+    await expect(page.getByText(/Username unavailable/).first()).toBeVisible();
+
+    await page.goto("/dashboard/smoke-tenant/leads/smoke-lead");
+    await expect(page.locator("h1")).toContainText("Instagram user");
+    await expect(page.getByText(/Instagram hasn't provided a username for this lead yet/)).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("journey Details previews CTA cards and explains non-HTTPS fallback", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    const detailsTab = page.getByRole("tab", { name: "Details" });
+    await expect(detailsTab).toBeVisible();
+    await detailsTab.click();
+
+    const ctaInput = page.getByRole("textbox", { name: "CTA link (HTTPS URL)" });
+    await expect(ctaInput).toHaveValue("https://example.com/details");
+    await expect(page.getByText("Image card", { exact: true })).toBeVisible();
+    await expect(page.locator('img[src="https://cdn.example.com/post-card.jpg"]')).toBeVisible();
+    await expect(page.getByRole("link", { name: /View details/ }).last()).toHaveAttribute(
+      "href",
+      "https://example.com/details",
+    );
+
+    await ctaInput.fill("http://example.com/details");
+    await expect(page.getByText("Text only", { exact: true })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Interactive Instagram CTAs require a valid HTTPS URL" })).toBeVisible();
   });
 
   test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {
