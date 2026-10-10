@@ -4,7 +4,7 @@ slug: rule-based-automation
 group: Automations
 description: Send a fixed, predictable response when a comment or DM matches a journey trigger.
 order: 6
-related: triggers-and-keywords, ai-automation, preview-test-publish
+related: triggers-and-keywords, ai-automation, rich-media-messages, preview-test-publish
 ---
 
 ## When to use a rule-based reply
@@ -30,13 +30,13 @@ Optional reply variations let SignalAI select one variation at random instead of
 3. Choose Save variations.
 4. Review several previews to check that every variation is appropriate.
 
-## Use a CTA link
+## Use a campaign-level CTA link
 
-If the journey includes a Send Link action, configure the optional CTA Link in Details. The Builder's Send Link action uses this campaign link as the reply. Verify that the URL is correct and accessible before publishing.
+If the journey includes a Send Link action, configure the optional CTA Link in Details. The Builder's Send Link action uses this campaign-level link. For a card, carousel, multiple buttons, or quick replies on a particular message step, configure the message node's **Instagram layout** in Builder instead. These are separate settings; see [Rich Media Messages](/docs/rich-media-messages).
 
 ## Example
 
-Trigger: comment contains brochure. Reply: “Thanks for your interest! I'll send you the brochure.” Channel: direct message. CTA link: the current brochure URL. Test with a comment containing brochure and with an unrelated comment before enabling the journey.
+Trigger: comment contains brochure. Reply: “Thanks for your interest! I'll send you the brochure.” Channel: direct message. CTA link: the current brochure URL. If you need several resources or a choice such as “Pricing” versus “Book a visit,” use a rich message with interaction destinations connected to the appropriate outgoing nodes.
 
 ## Best practices
 

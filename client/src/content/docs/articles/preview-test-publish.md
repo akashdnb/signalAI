@@ -4,7 +4,7 @@ slug: preview-test-publish
 group: Journey Builder
 description: Check replies and the qualification path before a journey handles real Instagram traffic.
 order: 11
-related: journey-builder, troubleshooting, quick-start
+related: journey-builder, rich-media-messages, troubleshooting, quick-start
 ---
 
 ## Preview one message
@@ -14,7 +14,20 @@ related: journey-builder, troubleshooting, quick-start
 3. Run the preview and compare rule-based and AI-generated results.
 4. Look for fallback explanations or a human-handoff signal, then revise configuration if needed.
 
-Preview simulates an Instagram DM with sample text. It helps inspect response behavior without sending that sample to an actual Instagram user.
+Preview simulates an Instagram DM with sample text. It helps inspect response behavior without sending that sample to an actual Instagram user. A preview or Test Journey walkthrough is not proof that Instagram will deliver a structured message to a recipient.
+
+## Test a rich media message
+
+Before publishing a message with buttons, cards, a gallery, or quick replies:
+
+- Confirm the intended layout is selected in the message node's **Instagram layout** tab.
+- Check all button labels, card titles/subtitles, image URLs, and destination selections.
+- For journey interactions, confirm each **Continue journey** button or quick reply points to an outgoing node connected to the same message.
+- Ensure website buttons and card images use public HTTPS URLs.
+- Save the message dialog, save the Builder draft, and publish the intended version.
+- Run a real end-to-end test with a connected professional Instagram account. Tap each button/quick reply and verify the expected journey step is reached.
+
+See [Rich Media Messages](/docs/rich-media-messages) for supported types and limits.
 
 ## Test the journey sequence
 
@@ -33,6 +46,7 @@ Test Journey is a walkthrough/simulation. It does not create a real lead or prov
 - The default reply is current and works as a safe fallback.
 - AI replies use current knowledge where needed.
 - Goals capture only the data the team needs.
+- Rich-message copy and interaction destinations are valid for the intended step.
 - Preview output is accurate for common questions and edge cases.
 
 ## Publish the version
@@ -48,7 +62,7 @@ Publishing is separate from the journey's Active/Inactive status. If a journey i
 ## Best practices
 
 - Always test both the intended path and at least one non-matching or awkward message.
-- Preview changes after saving, then use a real connected account to validate delivery.
+- Preview changes after saving, then use a real Instagram account to validate delivery.
 - Publish when you understand which version is going live and how to disable it if needed.
 - Avoid changing trigger, reply, and goals simultaneously; smaller changes are easier to diagnose.
 - Keep a short release note for substantial journey changes until full version history is available.
