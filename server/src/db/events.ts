@@ -107,9 +107,10 @@ export async function listEventsForLeadPage(
     `select e.id, e.event_type, e.occurred_at, e.attributes, p.comment_text, p.dm_text, p.username
      from lead_events e left join lead_pii p on p.lead_event_id = e.id and p.deleted_at is null
      where e.tenant_id = $1 and e.lead_id = $2
-       and ($4::timestamptz is null or (e.occurred_at, $5::int, e.id::text) < ($4::timestamptz, $5::int, $6::text))
+       and ($4::timestamptz is null or e.occurred_at < $4::timestamptz
+            or (e.occurred_at = $4::timestamptz and ($5::int < $7::int or ($5::int = $7::int and e.id::text < $6::text))))
      order by e.occurred_at desc, e.id desc limit $3`,
-    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? ""],
+    [tenantId, leadId, limit, cursor?.occurredAt ?? null, sourceRank, cursor?.id ?? "", cursor?.sourceRank ?? sourceRank],
   );
   return result.rows.map((row) => ({
     id: row.id, eventType: row.event_type, occurredAt: row.occurred_at, commentText: row.comment_text,
