@@ -132,7 +132,7 @@ export function AnalyticsPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <h1>Analytics</h1>
       {error && <div className="banner banner-error">{error}</div>}
 
