@@ -839,3 +839,70 @@ button:disabled {
     transition: none;
   }
 }
+
+/* Responsive defaults for dense operational views. Keep controls reachable
+   without forcing tiny inputs or letting long CRM values expand the viewport. */
+.kv {
+  grid-template-columns: minmax(6.5rem, max-content) minmax(0, 1fr);
+}
+
+.kv dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.table th,
+.table td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1rem;
+  }
+
+  .filter-row select,
+  .filter-row input {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inline-form {
+    align-items: stretch;
+  }
+
+  .inline-form > input,
+  .inline-form > textarea {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inline-form > button {
+    min-height: 42px;
+  }
+
+  .kv {
+    grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+  }
+
+  .list-item {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
