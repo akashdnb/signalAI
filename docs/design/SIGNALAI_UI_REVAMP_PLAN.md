@@ -1,6 +1,6 @@
 # SignalAI UI Revamp Plan
 
-**Status:** Implementation in progress — Phase 1 shared foundations; source-reviewed against `main` on 2026-10-10  
+**Status:** Implementation in progress — shared foundation, page layout and Journey Builder explicit-save slice; source-reviewed against `main` on 2026-10-10  
 **Repository:** `akashdnb/signalAI`  
 **Primary branch reviewed:** `main`  
 **Scope:** Frontend visual system and UX consistency across the authenticated SaaS product, with special care for the automation/journey builder. This plan includes a verified current-code delta section; it does not claim runtime/browser QA.
@@ -61,16 +61,18 @@ These are code-level observations from the files inspected, combined with the UI
 
 **Active branch:** `feat/ui-revamp-phase-1`
 
-The first implementation slice now covers shared focus-visible styling and contrast tokens, modal/dialog focus management, toast live announcements, accessible Leads/Inbox search labels, semantic keyboard-operable Automation/Journey tabs, clearer unavailable-state copy, and several truthful AppShell affordances. Client CI now includes lint before build.
+The implementation branch now includes the shared focus-visible styling and contrast-token pass; modal/dialog focus handling; toast live announcements; accessible search/filter labels; semantic keyboard-operable Automation, Journey Builder and inspector tabs; a focus-managed mobile navigation drawer; truthful AppShell affordances; shared page-width/surface conventions; dashboard no-data/all-zero chart states; and a mobile Add Goal action.
 
-This is a starter slice, not a completion claim. Local build/lint and browser interaction checks have not yet been run in this environment. The P0 journey-wide draft/save boundary remains outstanding and must be handled as a dedicated behavior change before the builder revamp is considered safe.
+The highest-risk Journey Builder save change is also implemented in code: graph edits plus goal structure/order/content stage locally and submit through one version-checked, transactional save. Goal inspector “Apply to draft” no longer commits the goal independently; goal loading is guarded before Save; clean canvas-only saves preserve existing goal IDs; new journeys with zero goals remain saveable. Route-level regression coverage has been added for empty-goal saves, adding a goal, preserving IDs on graph-only saves, and rollback of invalid combined drafts.
+
+**Verification remains outstanding.** This environment could inspect and commit source through the repository connection but could not resolve GitHub from the local shell, so build, lint, database-backed tests and browser interaction checks have not run here. Treat the implementation as in progress until CI and manual responsive/keyboard checks confirm it. Existing checklist items below intentionally remain unchecked until they are executed.
 
 
 ---
 
 ### Audit findings to treat as implementation requirements
 
-A source-level audit is documented in [SIGNALAI_UI_UX_AUDIT.md](./SIGNALAI_UI_UX_AUDIT.md). The revamp is not complete until the findings below are addressed and verified. This is code inspection, not a formal WCAG conformance claim; browser, keyboard, assistive-technology and automated accessibility checks still need to be run during implementation.
+A source-level audit is documented in [SIGNALAI_UI_UX_AUDIT.md](./SIGNALAI_UI_UX_AUDIT.md). The findings below are a snapshot of `main` reviewed on 2026-10-10, not a claim that every item remains unimplemented on the active branch. Use the implementation progress above for branch-specific status. This is code inspection, not a formal WCAG conformance claim; browser, keyboard, assistive-technology and automated accessibility checks still need to be run during implementation.
 
 #### P1 — Resolve before calling the journey builder safe
 - **One consistent draft/save boundary.** In the reviewed code, BuilderCanvas keeps node movement and edge connections local, but JourneyBuilder calls the milestone API immediately when goals are added, removed or reordered. The server synchronizes milestone edits into the graph and advances its version. Graph positions, connections, graph structure, goal ordering and goal content must participate in one coherent draft/save model. No journey edit should commit or increment the saved version before the primary explicit Save action.
