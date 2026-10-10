@@ -203,7 +203,7 @@ export function createLeadEventReplyHandler(
     // withheld after the fact. The dm tier's existing mixed-channel history
     // is unchanged.
     const history =
-      campaign.replyMode === "rule_based"
+      campaign.replyMode === "rule_based" || event.restartCampaign
         ? []
         : await getRecentConversationHistory(pool, job.tenantId, job.leadId, job.leadEventId, config.chatHistoryMaxTurns, tier);
     // B10: one guard per event, shared by whichever path below actually
@@ -284,7 +284,10 @@ export function createLeadEventReplyHandler(
         }
       }
     } else {
-      let activeMilestone = lead.activeMilestoneId
+      // A DM that resumes an old conversation after the messaging window
+      // expired is a new journey run: restart at milestone one and start fresh
+      // conversation history, while retaining lead-level captured CRM facts.
+      let activeMilestone = !event.restartCampaign && lead.activeMilestoneId
         ? await getMilestone(pool, job.tenantId, lead.activeMilestoneId)
         : null;
 
