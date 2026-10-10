@@ -7,6 +7,20 @@ import type {
   InstagramApiClient,
 } from "./client.js";
 
+import type {
+  InstagramRichMessageOptions,
+} from "../../lib/instagramMessagePayload.js";
+
+function readData(
+  payload: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (typeof payload.data === "object" && payload.data !== null) {
+    return payload.data as Record<string, unknown>;
+  }
+
+  return null;
+}
+
 function readText(
   payload: Record<string, unknown>,
 ): string | null {
@@ -14,17 +28,29 @@ function readText(
     return payload.text;
   }
 
-  const data = payload.data;
+  const data = readData(payload);
+  return data && typeof data.text === "string" ? data.text : null;
+}
 
-  if (
-    typeof data === "object" &&
-    data !== null &&
-    typeof (data as Record<string, unknown>).text === "string"
-  ) {
-    return (data as Record<string, unknown>).text as string;
-  }
+function readRichMessage(
+  payload: Record<string, unknown>,
+): InstagramRichMessageOptions | undefined {
+  const data = readData(payload);
+  if (!data) return undefined;
 
-  return null;
+  const rich = data.richMessage;
+  if (typeof rich !== "object" || rich === null) return undefined;
+
+  const value = rich as Record<string, unknown>;
+  const options: InstagramRichMessageOptions = {};
+
+  if (typeof value.ctaUrl === "string") options.ctaUrl = value.ctaUrl;
+  if (typeof value.imageUrl === "string") options.imageUrl = value.imageUrl;
+  if (typeof value.title === "string") options.title = value.title;
+  if (typeof value.subtitle === "string") options.subtitle = value.subtitle;
+  if (typeof value.buttonTitle === "string") options.buttonTitle = value.buttonTitle;
+
+  return Object.keys(options).length > 0 ? options : undefined;
 }
 
 export interface InstagramMessageSenderConfig {
@@ -62,6 +88,7 @@ export class InstagramMessageSender
       text: text.trim(),
       idempotencyKey:
         request.idempotencyKey,
+      richMessage: readRichMessage(request.payload),
     });
   }
 }
