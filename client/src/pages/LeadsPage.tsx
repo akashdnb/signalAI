@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
-import { PIPELINE_STAGES, formatDate, formatLastContactVia, handoffLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatDate, formatLastContactVia, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -119,7 +119,10 @@ export function LeadsPage() {
                   <td>
                     <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
                       {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
-                      {lead.username ?? "(unknown)"}
+                      <span className="inline-flex flex-col align-top">
+                        <span>{leadDisplayName(lead.username)}</span>
+                        {!lead.username && <span className="muted small">Username unavailable</span>}
+                      </span>
                     </Link>
                   </td>
                   <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
