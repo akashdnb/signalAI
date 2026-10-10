@@ -34,6 +34,14 @@ export function formatLastContactVia(lastEventType: string | null): string {
   return "—";
 }
 
+/**
+ * Stable fallback for Instagram leads whose profile lookup hasn't produced a
+ * handle yet. The lead remains addressable even while username recovery runs.
+ */
+export function leadDisplayName(username: string | null | undefined): string {
+  return username?.trim() || "Instagram user";
+}
+
 /** Derived from the account's own email, never invented — "priya.shah@x.com" -> "Priya". Falls back to "there" if no session. */
 export function deriveDisplayName(email?: string): string {
   const local = email?.split("@")[0];
