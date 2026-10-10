@@ -133,7 +133,7 @@ export function DashboardPage() {
   const recentLeads = leads?.slice(0, 5) ?? [];
 
   return (
-    <div className="page" style={{ maxWidth: 1080 }}>
+    <div className="page page-wide">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="m-0">
