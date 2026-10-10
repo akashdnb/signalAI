@@ -11,7 +11,7 @@ import {
   type TimelineEntry,
 } from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatRelativeTime, handoffLabel } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 type Tab = "all" | "unread" | "ai" | "qualified" | "attention";
 
@@ -241,10 +241,13 @@ export function InboxPage() {
                   >
                     <div className="flex items-center gap-2">
                       {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
-                      <strong className="truncate">{lead.username ?? "(unknown)"}</strong>
+                      <strong className="truncate" title={lead.username ?? "Instagram username unavailable"}>{leadDisplayName(lead.username)}</strong>
                       <span className="text-subtle ml-auto shrink-0 text-xs">{formatRelativeTime(lead.lastInboundAt)}</span>
                     </div>
-                    <div className="muted small truncate">{lead.lastMessagePreview ?? "No messages yet"}</div>
+                    <div className="muted small truncate">
+                      {!lead.username && <span>Username unavailable · </span>}
+                      {lead.lastMessagePreview ?? "No messages yet"}
+                    </div>
                     <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>
                       {handoffLabel(lead.handoffStatus).text}
                     </span>
