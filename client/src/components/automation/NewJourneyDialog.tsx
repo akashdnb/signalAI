@@ -33,7 +33,7 @@ export function NewJourneyDialog({
   }
 
   return (
-    <BottomSheet title="New Journey" onClose={() => { if (!saving) onClose(); }}>
+    <BottomSheet title="New Journey" onClose={onClose} closeDisabled={saving}>
       <form onSubmit={handleSubmit}>
         <label>
           Journey name
