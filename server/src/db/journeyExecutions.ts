@@ -19,6 +19,7 @@ export interface JourneyExecutionContext {
   executionId: string;
   tenantId: string;
   campaignId: string;
+  instagramAccountId: string | null;
   subjectKey: string;
 }
 
@@ -26,6 +27,7 @@ export interface JourneyExecution {
   id: string;
   tenantId: string;
   campaignId: string;
+  instagramAccountId: string | null;
   publishedJourneyVersionId: string;
   publishedVersion: number;
   subjectKey: string;
@@ -42,6 +44,7 @@ interface JourneyExecutionRow {
   id: string;
   tenant_id: string;
   campaign_id: string;
+  instagram_account_id: string | null;
   published_journey_version_id: string;
   published_version: number;
   subject_key: string;
@@ -59,6 +62,7 @@ function toExecution(row: JourneyExecutionRow): JourneyExecution {
     id: row.id,
     tenantId: row.tenant_id,
     campaignId: row.campaign_id,
+    instagramAccountId: row.instagram_account_id,
     publishedJourneyVersionId: row.published_journey_version_id,
     publishedVersion: row.published_version,
     subjectKey: row.subject_key,
@@ -97,6 +101,7 @@ export async function getJourneyExecutionContext(
        id,
        tenant_id,
        campaign_id,
+       instagram_account_id,
        subject_key
        from journey_executions
       where id = $1`,
@@ -104,15 +109,13 @@ export async function getJourneyExecutionContext(
   );
 
   const row = result.rows[0];
-
-  if (!row) {
-    return null;
-  }
+  if (!row) return null;
 
   return {
     executionId: row.id,
     tenantId: row.tenant_id,
     campaignId: row.campaign_id,
+    instagramAccountId: row.instagram_account_id,
     subjectKey: row.subject_key,
   };
 }
@@ -129,9 +132,7 @@ export async function getJourneyExecutionByIdForUpdate(
     [executionId],
   );
 
-  return result.rows[0]
-    ? toExecution(result.rows[0])
-    : null;
+  return result.rows[0] ? toExecution(result.rows[0]) : null;
 }
 
 export async function getActiveExecutionForSubject(
@@ -139,6 +140,7 @@ export async function getActiveExecutionForSubject(
   tenantId: string,
   campaignId: string,
   subjectKey: string,
+  instagramAccountId?: string | null,
 ): Promise<JourneyExecution | null> {
   const result = await client.query<JourneyExecutionRow>(
     `select *
@@ -146,11 +148,12 @@ export async function getActiveExecutionForSubject(
       where tenant_id = $1
         and campaign_id = $2
         and subject_key = $3
+        and ($4::text is null or instagram_account_id = $4)
         and status in ('running', 'waiting', 'handoff')
       order by updated_at desc
       limit 1
       for update`,
-    [tenantId, campaignId, subjectKey],
+    [tenantId, campaignId, subjectKey, instagramAccountId ?? null],
   );
 
   return result.rows[0] ? toExecution(result.rows[0]) : null;
@@ -163,11 +166,13 @@ export async function createJourneyExecution(
   published: PublishedJourney,
   subjectKey: string,
   startNodeId: string,
+  instagramAccountId?: string | null,
 ): Promise<JourneyExecution> {
   const result = await client.query<JourneyExecutionRow>(
     `insert into journey_executions (
        tenant_id,
        campaign_id,
+       instagram_account_id,
        published_journey_version_id,
        published_version,
        subject_key,
@@ -175,11 +180,12 @@ export async function createJourneyExecution(
        current_node_id,
        context
      )
-     values ($1, $2, $3, $4, $5, 'running', $6, '{}'::jsonb)
+     values ($1, $2, $3, $4, $5, $6, 'running', $7, '{}'::jsonb)
      returning *`,
     [
       tenantId,
       campaignId,
+      instagramAccountId ?? null,
       published.id,
       published.version,
       subjectKey,
@@ -224,20 +230,14 @@ export async function updateJourneyExecution(
     ],
   );
 
-  if (!result.rows[0]) {
-    throw new Error(`journey execution not found: ${executionId}`);
-  }
-
+  if (!result.rows[0]) throw new Error(`journey execution not found: ${executionId}`);
   return toExecution(result.rows[0]);
 }
 
 export async function recordNodeExecution(
   client: PoolClient,
   executionId: string,
-  node: {
-    id: string;
-    type: string;
-  },
+  node: { id: string; type: string },
   status: "started" | "waiting" | "completed" | "failed",
   input: Record<string, unknown> | null,
   output: Record<string, unknown> | null,
@@ -245,38 +245,19 @@ export async function recordNodeExecution(
 ): Promise<void> {
   await client.query(
     `insert into journey_node_executions (
-       execution_id,
-       node_id,
-       node_type,
-       status,
-       input,
-       output,
-       error,
-       completed_at
+       execution_id, node_id, node_type, status, input, output, error, completed_at
      )
      values ($1, $2, $3, $4, $5, $6, $7,
-       case
-         when $4 in ('completed', 'failed') then now()
-         else null
-       end
-     )`,
-    [
-      executionId,
-      node.id,
-      node.type,
-      status,
-      input,
-      output,
-      error,
-    ],
+       case when $4 in ('completed', 'failed') then now() else null end)`,
+    [executionId, node.id, node.type, status, input, output, error],
   );
 }
-
 
 export interface ActiveJourneyExecution {
   id: string;
   tenantId: string;
   campaignId: string;
+  instagramAccountId: string | null;
   subjectKey: string;
   status: string;
   currentNodeId: string | null;
@@ -286,6 +267,7 @@ export async function getActiveExecutionsForSubject(
   pool: Pool,
   tenantId: string,
   subjectKey: string,
+  instagramAccountId?: string | null,
 ): Promise<ActiveJourneyExecution[]> {
   const result = await pool.query(
     `
@@ -293,27 +275,28 @@ export async function getActiveExecutionsForSubject(
         id,
         tenant_id,
         campaign_id,
+        instagram_account_id,
         subject_key,
         status,
         current_node_id
       from journey_executions
       where tenant_id = $1
         and subject_key = $2
+        and ($3::text is null or instagram_account_id = $3)
         and status in ('running', 'waiting', 'handoff')
       order by updated_at desc
     `,
-    [tenantId, subjectKey],
+    [tenantId, subjectKey, instagramAccountId ?? null],
   );
 
   return result.rows.map((row) => ({
     id: String(row.id),
     tenantId: String(row.tenant_id),
     campaignId: String(row.campaign_id),
+    instagramAccountId:
+      row.instagram_account_id == null ? null : String(row.instagram_account_id),
     subjectKey: String(row.subject_key),
     status: String(row.status),
-    currentNodeId:
-      row.current_node_id == null
-        ? null
-        : String(row.current_node_id),
+    currentNodeId: row.current_node_id == null ? null : String(row.current_node_id),
   }));
 }
