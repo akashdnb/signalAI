@@ -257,7 +257,7 @@ export async function resendTenantInvitation(
 }
 
 export async function revokeTenantInvitation(
-  pool: Queryable,
+  pool: Pool,
   tenantId: string,
   invitationId: string,
 ): Promise<boolean> {
