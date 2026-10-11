@@ -250,7 +250,31 @@ workspaceManagementRouter.post("/invitations/:token/accept", async (req, res) =>
   const client = await pool.connect();
   try {
     await client.query("begin");
-    const invitation = await acceptTenantInvitation(client, hashInvitationToken(req.params.token!), session.userId, normalizeEmail(user.email));
+    const tokenHash = hashInvitationToken(req.params.token!);
+    const target = await client.query<{ id: string; tenant_id: string }>(
+      `select id, tenant_id
+         from tenant_invitations
+        where token_hash = $1
+          and lower(email) = lower($2)
+          and accepted_at is null
+          and revoked_at is null
+          and expires_at > now()`,
+      [tokenHash, normalizeEmail(user.email)],
+    );
+    const invitationTarget = target.rows[0];
+    if (!invitationTarget) {
+      await client.query("rollback");
+      return res.status(400).json({ error: "invalid, expired, revoked, or mismatched invitation" });
+    }
+
+    // Acquire the same transaction-level lock used by revoke/accept and the
+    // session-level lock held by resend. This makes the ordering explicit:
+    // whoever wins the invitation lock decides whether the token can be used.
+    await client.query(`select pg_advisory_xact_lock(hashtextextended($1, 0))`, [
+      `${invitationTarget.tenant_id}:${invitationTarget.id}`,
+    ]);
+
+    const invitation = await acceptTenantInvitation(client, tokenHash, session.userId, normalizeEmail(user.email));
     if (!invitation) {
       await client.query("rollback");
       return res.status(400).json({ error: "invalid, expired, revoked, or mismatched invitation" });
