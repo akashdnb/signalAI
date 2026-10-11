@@ -15,6 +15,8 @@ export interface TenantInvitation {
 
 type Queryable = Pool | PoolClient;
 
+type HttpConflictError = Error & { statusCode?: number };
+
 function mapRow(row: Record<string, unknown>): TenantInvitation {
   return {
     id: String(row.id),
@@ -64,7 +66,7 @@ export async function getPendingInvitationForEmail(
 
 /**
  * Creates an invitation while serializing concurrent invitations for the
- * same tenant/email. Expired active rows are revoked under the same lock,
+ * same tenant/email. Expired invitations are revoked under the same lock,
  * allowing a new invitation without weakening the database unique index.
  */
 export async function createTenantInvitation(
@@ -121,6 +123,20 @@ export async function createTenantInvitation(
     } catch {
       // Preserve the original database error.
     }
+
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "23505"
+    ) {
+      const conflict = new Error(
+        "an invitation is already pending for this email",
+      ) as HttpConflictError;
+      conflict.statusCode = 409;
+      throw conflict;
+    }
+
     throw error;
   } finally {
     client.release();
@@ -171,8 +187,11 @@ export async function acceptTenantInvitation(
   );
 
   if (existingMember.rows[0]) {
-    await client.query("rollback");
-    throw new Error("user is already a member of this tenant");
+    const conflict = new Error(
+      "user is already a member of this tenant",
+    ) as HttpConflictError;
+    conflict.statusCode = 409;
+    throw conflict;
   }
 
   await client.query(
