@@ -15,11 +15,6 @@ export async function upsertToken(
   const key = keyring.get(keyVersion)!;
   const { ciphertext } = encryptToken(params.accessToken, key, keyVersion);
 
-  // R5-01: conflict target is the account alone, not (tenant_id,
-  // instagram_account_id) — one Instagram account can only ever belong to
-  // one tenant, so `tenant_id` is included in the SET to correct a stale
-  // row if a caller ever resolves the wrong tenant, but it must never be
-  // possible for the same account to hold two rows under different tenants.
   await pool.query(
     `insert into meta_tokens (tenant_id, instagram_account_id, encrypted_token, key_version, expires_at)
      values ($1, $2, $3, $4, $5)
@@ -43,13 +38,6 @@ export interface TokenHealthRow {
   status: "healthy" | "error";
 }
 
-/**
- * Tokens due for a refresh attempt (Account Health Monitoring). A
- * long-lived token can only be refreshed once it's at least 24h old, so
- * this only ever returns tokens both nearing expiry AND old enough to
- * refresh — a token connected minutes ago never shows up here even if its
- * expiry window is somehow already close.
- */
 export async function listTokensDueForRefresh(pool: Pool, withinDays: number): Promise<TokenHealthRow[]> {
   const result = await pool.query<{
     tenant_id: string;
@@ -86,8 +74,7 @@ export async function markTokenError(
 
 /**
  * Legacy compatibility only. Account-less executions may use this fallback
- * only when the tenant has exactly one connected Instagram account. A
- * multi-account tenant must pin the account on the journey execution.
+ * only when the tenant has exactly one healthy connected Instagram account.
  */
 export async function getSoleConnectedAccount(
   pool: Pool,
@@ -97,6 +84,7 @@ export async function getSoleConnectedAccount(
     `select instagram_account_id
        from meta_tokens
       where tenant_id = $1
+        and status = 'healthy'
       order by created_at
       limit 2`,
     [tenantId],
@@ -114,7 +102,6 @@ export interface AccountHealth {
   expiresAt: Date | null;
 }
 
-/** BUI: the "visible Account Health status" the roadmap calls for on the connect screen — never returns the token itself. */
 export async function getAccountHealth(pool: Pool, tenantId: string): Promise<AccountHealth | null> {
   const result = await pool.query<{
     instagram_account_id: string;
@@ -139,8 +126,8 @@ export async function getAccountHealth(pool: Pool, tenantId: string): Promise<Ac
 }
 
 /**
- * Decrypts on the way out — the plaintext token should only ever exist in
- * memory for the duration of the Graph API call that needs it.
+ * Decrypts on the way out — plaintext exists only for the provider call.
+ * Disconnected/error accounts cannot be used for outbound sends.
  */
 export async function getDecryptedToken(
   pool: Pool,
@@ -150,7 +137,9 @@ export async function getDecryptedToken(
 ): Promise<string | null> {
   const result = await pool.query<{ encrypted_token: Buffer; key_version: string }>(
     `select encrypted_token, key_version from meta_tokens
-     where tenant_id = $1 and instagram_account_id = $2`,
+     where tenant_id = $1
+       and instagram_account_id = $2
+       and status = 'healthy'`,
     [tenantId, instagramAccountId],
   );
   const row = result.rows[0];
@@ -164,14 +153,6 @@ export async function getDecryptedToken(
   return decryptToken(row.encrypted_token, key);
 }
 
-/**
- * Disconnect: drops the tenant's stored token(s). The token is the whole
- * connection — inbound webhooks resolve their tenant through meta_tokens
- * (db/accounts.ts) and the send path reads it through the pinned account,
- * so removing the row stops both directions at once. Leads and their
- * history are deliberately left intact; this is a channel disconnect, not
- * a data deletion (that's lib/deletionService.ts).
- */
 export async function deleteTokensForTenant(pool: Pool, tenantId: string): Promise<number> {
   const result = await pool.query(`delete from meta_tokens where tenant_id = $1`, [tenantId]);
   return result.rowCount ?? 0;
