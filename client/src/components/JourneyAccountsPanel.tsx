@@ -55,6 +55,9 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
   }
 
   const assignedCount = bindings.filter((binding) => binding.enabled).length;
+  const healthyAccountIds = new Set(accounts.filter((account) => account.status === "healthy").map((account) => account.id));
+  const healthyAssignedCount = bindings.filter((binding) => binding.enabled && healthyAccountIds.has(binding.accountId)).length;
+  const unavailableAssignedCount = assignedCount - healthyAssignedCount;
   const healthyAccounts = accounts.filter((account) => account.status === "healthy");
 
   return (
@@ -64,8 +67,8 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
           <h2 style={{ marginBottom: 2 }}>Connected Instagram accounts</h2>
           <p className="muted small m-0">This journey is reusable. Attach it to any healthy accounts that should run it.</p>
         </div>
-        <span className={assignedCount > 0 ? "pill pill-ok" : "pill pill-error"} style={{ marginLeft: 0 }}>
-          {assignedCount} assigned
+        <span className={healthyAssignedCount > 0 ? "pill pill-ok" : "pill pill-error"} style={{ marginLeft: 0 }}>
+          {healthyAssignedCount} healthy assigned{unavailableAssignedCount > 0 ? ` · ${unavailableAssignedCount} unavailable` : ""}
         </span>
       </div>
 
@@ -80,6 +83,11 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
           {healthyAccounts.length === 0 && (
             <div className="banner banner-error mt-3" role="alert">
               No healthy Instagram account is available. Reconnect an account from Integrations before enabling this journey.
+            </div>
+          )}
+          {unavailableAssignedCount > 0 && (
+            <div className="banner banner-error mt-3" role="alert">
+              {unavailableAssignedCount} assigned account{unavailableAssignedCount === 1 ? " is" : "s are"} currently unavailable. Reconnect {unavailableAssignedCount === 1 ? "it" : "them"} from Integrations before enabling this journey.
             </div>
           )}
           <div className="flex flex-wrap gap-2" style={{ marginTop: "0.75rem" }}>
