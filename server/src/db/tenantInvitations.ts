@@ -29,6 +29,56 @@ function mapRow(row: Record<string, unknown>): TenantInvitation {
   };
 }
 
+function invitationLockKey(tenantId: string, invitationId: string): string {
+  return `${tenantId}:${invitationId}`;
+}
+
+/**
+ * Holds a session-level advisory lock on an invitation until the caller
+ * explicitly releases it. This is intentionally used by resend because the
+ * critical section includes the external email delivery call.
+ */
+export async function acquireTenantInvitationLock(
+  pool: Pool,
+  tenantId: string,
+  invitationId: string,
+): Promise<PoolClient> {
+  const client = await pool.connect();
+  try {
+    await client.query(`select pg_advisory_lock(hashtextextended($1, 0))`, [
+      invitationLockKey(tenantId, invitationId),
+    ]);
+    return client;
+  } catch (error) {
+    client.release();
+    throw error;
+  }
+}
+
+export async function releaseTenantInvitationLock(
+  client: PoolClient,
+  tenantId: string,
+  invitationId: string,
+): Promise<void> {
+  try {
+    await client.query(`select pg_advisory_unlock(hashtextextended($1, 0))`, [
+      invitationLockKey(tenantId, invitationId),
+    ]);
+  } finally {
+    client.release();
+  }
+}
+
+async function lockTenantInvitationInTransaction(
+  client: PoolClient,
+  tenantId: string,
+  invitationId: string,
+): Promise<void> {
+  await client.query(`select pg_advisory_xact_lock(hashtextextended($1, 0))`, [
+    invitationLockKey(tenantId, invitationId),
+  ]);
+}
+
 export async function listTenantInvitations(
   pool: Queryable,
   tenantId: string,
@@ -143,12 +193,12 @@ export async function createTenantInvitation(
 }
 
 /**
- * Rotates an active invitation only after the replacement token has been
- * successfully delivered. If delivery fails, the existing invitation remains
- * valid and the caller can safely retry with a newly generated token.
+ * Rotates an active invitation on the caller's already-locked connection.
+ * The caller must hold acquireTenantInvitationLock() for the invitation for
+ * the full delivery/rotation critical section.
  */
 export async function resendTenantInvitation(
-  pool: Pool,
+  client: PoolClient,
   input: {
     tenantId: string;
     invitationId: string;
@@ -156,11 +206,8 @@ export async function resendTenantInvitation(
     expiresAt: Date;
   },
 ): Promise<TenantInvitation | null> {
-  const client = await pool.connect();
-
+  await client.query("begin");
   try {
-    await client.query("begin");
-
     const current = await client.query<{
       email: string;
       role: TenantInvitationRole;
@@ -183,11 +230,6 @@ export async function resendTenantInvitation(
     }
 
     await client.query(
-      `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
-      [`${input.tenantId}:${row.email.toLowerCase()}`],
-    );
-
-    await client.query(
       `update tenant_invitations
           set revoked_at = now(), updated_at = now()
         where id = $1 and tenant_id = $2 and accepted_at is null and revoked_at is null`,
@@ -199,14 +241,7 @@ export async function resendTenantInvitation(
         (tenant_id, email, role, token_hash, invited_by, expires_at)
        values ($1, $2, $3, $4, $5, $6)
        returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
-      [
-        input.tenantId,
-        row.email,
-        row.role,
-        input.tokenHash,
-        row.invited_by,
-        input.expiresAt,
-      ],
+      [input.tenantId, row.email, row.role, input.tokenHash, row.invited_by, input.expiresAt],
     );
 
     await client.query("commit");
@@ -218,8 +253,6 @@ export async function resendTenantInvitation(
       // Preserve the original database error.
     }
     throw error;
-  } finally {
-    client.release();
   }
 }
 
@@ -228,13 +261,28 @@ export async function revokeTenantInvitation(
   tenantId: string,
   invitationId: string,
 ): Promise<boolean> {
-  const result = await pool.query(
-    `update tenant_invitations
-        set revoked_at = coalesce(revoked_at, now()), updated_at = now()
-      where id = $1 and tenant_id = $2 and accepted_at is null`,
-    [invitationId, tenantId],
-  );
-  return (result.rowCount ?? 0) > 0;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await lockTenantInvitationInTransaction(client, tenantId, invitationId);
+    const result = await client.query(
+      `update tenant_invitations
+          set revoked_at = coalesce(revoked_at, now()), updated_at = now()
+        where id = $1 and tenant_id = $2 and accepted_at is null`,
+      [invitationId, tenantId],
+    );
+    await client.query("commit");
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // Preserve the original error.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function getMemberManagementContext(
@@ -324,16 +372,31 @@ export async function acceptTenantInvitation(
   userId: string,
   email: string,
 ): Promise<TenantInvitation | null> {
-  const result = await client.query(
-    `update tenant_invitations
-        set accepted_at = now(), updated_at = now()
+  const invitationResult = await client.query<{ id: string }>(
+    `select id
+       from tenant_invitations
       where token_hash = $1
         and lower(email) = lower($2)
         and accepted_at is null
         and revoked_at is null
         and expires_at > now()
-      returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
+      for update`,
     [tokenHash, email],
+  );
+  const invitationId = invitationResult.rows[0]?.id;
+  if (!invitationId) return null;
+
+  await lockTenantInvitationInTransaction(client, String((await client.query(`select tenant_id from tenant_invitations where id = $1`, [invitationId])).rows[0].tenant_id), invitationId);
+
+  const result = await client.query(
+    `update tenant_invitations
+        set accepted_at = now(), updated_at = now()
+      where id = $1
+        and accepted_at is null
+        and revoked_at is null
+        and expires_at > now()
+      returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
+    [invitationId],
   );
 
   const invitation = result.rows[0] ? mapRow(result.rows[0]) : null;
