@@ -12,6 +12,8 @@ import {
   listTenantInvitations,
   revokeTenantInvitation,
   resendTenantInvitation,
+  acquireTenantInvitationLock,
+  releaseTenantInvitationLock,
   updateTenantMemberRole,
   removeTenantMember,
   acceptTenantInvitation,
@@ -133,39 +135,55 @@ workspaceManagementRouter.post(
   requireTenantRole("owner", "admin"),
   async (req, res) => {
     const pool = getPool();
-    const current = await getPendingInvitation(pool, req.params.tenantId!, req.params.invitationId!);
-    if (!current) return res.status(404).json({ error: "pending invitation not found" });
+    const client = await acquireTenantInvitationLock(
+      pool,
+      req.params.tenantId!,
+      req.params.invitationId!,
+    );
 
-    const inviter = await getUserById(pool, req.tenantSession!.userId);
-    const tenant = await getTenant(pool, req.params.tenantId!);
-    if (!inviter || !tenant) return res.status(404).json({ error: "tenant or inviter not found" });
-
-    const invitationToken = randomBytes(32).toString("base64url");
-    const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(invitationToken)}`;
-
-    // Keep the existing invitation valid until delivery succeeds. A failed
-    // provider call therefore never strands the recipient without a usable
-    // invitation; a subsequent retry simply generates another replacement.
     try {
-      await sendTenantInvitationEmail(current.email, tenant.name, inviter.email, inviteUrl);
-    } catch (error) {
-      console.error("Failed to resend workspace invitation email:", error);
-      return res.status(202).json({ invitation: current, delivery: "failed" });
-    }
+      const currentResult = await client.query(
+        `select id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at
+           from tenant_invitations
+          where id = $1
+            and tenant_id = $2
+            and accepted_at is null
+            and revoked_at is null
+            and expires_at > now()`,
+        [req.params.invitationId, req.params.tenantId],
+      );
+      const current = currentResult.rows[0];
+      if (!current) return res.status(404).json({ error: "pending invitation not found" });
 
-    const invitation = await resendTenantInvitation(pool, {
-      tenantId: req.params.tenantId!,
-      invitationId: req.params.invitationId!,
-      tokenHash: hashInvitationToken(invitationToken),
-      expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
-    });
-    if (!invitation) {
-      // The invitation may have been accepted/revoked while the provider call
-      // was in flight. Never restore or mutate an already-consumed invitation.
-      return res.status(409).json({ error: "invitation is no longer pending" });
-    }
+      const inviter = await getUserById(pool, req.tenantSession!.userId);
+      const tenant = await getTenant(pool, req.params.tenantId!);
+      if (!inviter || !tenant) return res.status(404).json({ error: "tenant or inviter not found" });
 
-    return res.status(200).json({ invitation, delivery: "sent" });
+      const invitationToken = randomBytes(32).toString("base64url");
+      const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(invitationToken)}`;
+
+      // The invitation lock is held on this dedicated connection through the
+      // provider call. A concurrent resend, revoke, or accept therefore cannot
+      // change the invitation between the delivery and token rotation steps.
+      try {
+        await sendTenantInvitationEmail(current.email, tenant.name, inviter.email, inviteUrl);
+      } catch (error) {
+        console.error("Failed to resend workspace invitation email:", error);
+        return res.status(202).json({ invitation: current, delivery: "failed" });
+      }
+
+      const invitation = await resendTenantInvitation(client, {
+        tenantId: req.params.tenantId!,
+        invitationId: req.params.invitationId!,
+        tokenHash: hashInvitationToken(invitationToken),
+        expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+      });
+      if (!invitation) return res.status(409).json({ error: "invitation is no longer pending" });
+
+      return res.status(200).json({ invitation, delivery: "sent" });
+    } finally {
+      await releaseTenantInvitationLock(client, req.params.tenantId!, req.params.invitationId!);
+    }
   },
 );
 
