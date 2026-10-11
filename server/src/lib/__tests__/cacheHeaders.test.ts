@@ -56,7 +56,7 @@ describe("dashboardReadCacheHeaders", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers["cache-control"]).toBeUndefined();
-    expect(res.headers.vary).not.toContain("Authorization");
+    expect(res.headers.vary).toBeUndefined();
   });
 
   it("never stores account health responses", async () => {
@@ -71,6 +71,6 @@ describe("dashboardReadCacheHeaders", () => {
 
     expect(res.status).toBe(404);
     expect(res.headers["cache-control"]).toBeUndefined();
-    expect(res.headers.vary).not.toContain("Authorization");
+    expect(res.headers.vary).toBeUndefined();
   });
 });
