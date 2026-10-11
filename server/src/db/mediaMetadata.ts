@@ -109,8 +109,8 @@ export async function recordMediaMetadataRefreshFailure(
 
   await pool.query(
     `insert into media_metadata
-       (tenant_id, media_id, refresh_failure_count, refresh_retry_at)
-     values ($1, $2, 1, $3)
+       (tenant_id, media_id, fetched_at, refresh_failure_count, refresh_retry_at)
+     values ($1, $2, null, 1, $3)
      on conflict (tenant_id, media_id)
      where instagram_account_id is null
      do update set
