@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { advanceSequence, isSequenceStale } from "../db/leads.js";
 import { recordDeadLetterEvent } from "../db/deadLetterEvents.js";
 import { LEAD_EVENTS_DLQ, LEAD_EVENTS_QUEUE, type LeadEventJob } from "./leadEventsQueue.js";
-import { BACKGROUND_POLL, FAST_POLL } from "./boss.js";
+import { BACKGROUND_POLL, INTERACTIVE_POLL } from "./boss.js";
 
 /**
  * B9: a handler can finish a turn without the event's work actually being
@@ -43,7 +43,7 @@ export function startLeadEventsWorker(
   const { batchSize = 1, localConcurrency = 1 } = options;
   return boss.work<LeadEventJob>(
     LEAD_EVENTS_QUEUE,
-    { batchSize, localConcurrency, ...FAST_POLL },
+    { batchSize, localConcurrency, ...INTERACTIVE_POLL },
     async (jobs: Job<LeadEventJob>[]) => {
       await Promise.all(
         jobs.map(async (job) => {
@@ -106,11 +106,11 @@ export function startDeadLetterWatcher(
 }
 
 /**
- * R3-08 fix, second half: unblocking a wedged key depends on the DLQ
- * worker having been running when the source job failed. If it was down
+ * R3-08 fix, second half: unblocking a wedged key depends on the DLQ worker
+ * having been running when the source job failed. If it was down
  * (crash, redeploy mid-outage), pg-boss's own maintenance still moves the
- * job to the dead-letter queue on its own schedule, but nothing deletes
- * the source row until a DLQ worker is listening again — meaning a lead
+ * job to the dead-letter queue on its own schedule, but nothing deletes the
+ * source row until a DLQ worker is listening again — meaning a lead
  * can sit wedged for however long that gap lasts. Run once at boot: any
  * source-queue job already sitting at state='failed' whose dead-letter
  * counterpart already exists is safe to record-and-delete immediately,
