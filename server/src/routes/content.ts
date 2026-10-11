@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
-import { listKnownMediaForTenant, upsertMediaMetadata } from "../db/mediaMetadata.js";
+import {
+  listKnownMediaForTenant,
+  recordMediaMetadataRefreshFailure,
+  upsertMediaMetadata,
+} from "../db/mediaMetadata.js";
 import { listConnectedInstagramAccounts } from "../db/connectedAccounts.js";
 import { getDecryptedToken } from "../db/tokens.js";
 import { fetchMediaMetadata } from "../lib/instagramMedia.js";
@@ -10,6 +14,17 @@ import { Sentry } from "../lib/sentry.js";
 
 const METADATA_REFRESH_AFTER_MS = 6 * 60 * 60 * 1000;
 const MAX_METADATA_REFRESHES_PER_REQUEST = 20;
+const MAX_METADATA_REFRESH_FAILURES = 3;
+const METADATA_REFRESH_RETRY_DELAYS_MS = [
+  5 * 60 * 1000,
+  30 * 60 * 1000,
+  6 * 60 * 60 * 1000,
+] as const;
+
+function retryDelayForFailure(failureCount: number): number {
+  const boundedFailureCount = Math.min(Math.max(failureCount, 1), MAX_METADATA_REFRESH_FAILURES);
+  return METADATA_REFRESH_RETRY_DELAYS_MS[boundedFailureCount - 1];
+}
 
 export const contentRouter = Router();
 
@@ -30,7 +45,12 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
 
   const needsRefresh = media.filter((entry) => {
     const fetchedAt = entry.fetchedAt?.getTime() ?? 0;
-    return !fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS;
+    const retryAt = entry.refreshRetryAt?.getTime() ?? 0;
+
+    return (
+      (!fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS) &&
+      retryAt <= now
+    );
   });
 
   if (needsRefresh.length > 0) {
@@ -70,6 +90,12 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
       if (enriched) {
         refreshed += 1;
       } else if (lastError) {
+        const failureCount = Math.min(
+          entry.refreshFailureCount + 1,
+          MAX_METADATA_REFRESH_FAILURES,
+        );
+        const retryAt = new Date(Date.now() + retryDelayForFailure(failureCount));
+        await recordMediaMetadataRefreshFailure(pool, tenantId, entry.mediaId, retryAt);
         Sentry.captureException(lastError);
       }
     }
