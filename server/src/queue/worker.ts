@@ -106,11 +106,11 @@ export function startDeadLetterWatcher(
 }
 
 /**
- * R3-08 fix, second half: unblocking a wedged key depends on the DLQ worker
- * having been running when the source job failed. If it was down
+ * R3-08 fix, second half: unblocking a wedged key depends on the DLQ
+ * worker having been running when the source job failed. If it was down
  * (crash, redeploy mid-outage), pg-boss's own maintenance still moves the
- * job to the dead-letter queue on its own schedule, but nothing deletes the
- * source row until a DLQ worker is listening again — meaning a lead
+ * job to the dead-letter queue on its own schedule, but nothing deletes
+ * the source row until a DLQ worker is listening again — meaning a lead
  * can sit wedged for however long that gap lasts. Run once at boot: any
  * source-queue job already sitting at state='failed' whose dead-letter
  * counterpart already exists is safe to record-and-delete immediately,
