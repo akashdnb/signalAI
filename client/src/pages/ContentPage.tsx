@@ -142,14 +142,13 @@ export function ContentPage() {
             const hasPreview = Boolean(m.thumbnailUrl) && !failedPreviews.has(m.mediaId);
             return (
               <div key={m.mediaId} className="card mb-0 overflow-hidden p-0">
-                <button
-                  type="button"
-                  className="relative block aspect-square w-full cursor-pointer border-0 bg-chip p-0 text-left"
-                  onClick={() => hasPreview && setPreviewMedia(m)}
-                  disabled={!hasPreview}
-                  aria-label={hasPreview ? `Open ${mediaPreviewLabel(m.mediaType)}` : "Preview unavailable"}
-                >
-                  {hasPreview ? (
+                {hasPreview ? (
+                  <button
+                    type="button"
+                    className="relative block aspect-square w-full cursor-pointer border-0 bg-chip p-0 text-left"
+                    onClick={() => setPreviewMedia(m)}
+                    aria-label={`Open ${mediaPreviewLabel(m.mediaType)}`}
+                  >
                     <img
                       src={m.thumbnailUrl!}
                       alt={m.caption ? m.caption.split("\n")[0] : "Instagram post preview"}
@@ -157,34 +156,31 @@ export function ContentPage() {
                       loading="lazy"
                       onError={() => markPreviewFailed(m.mediaId)}
                     />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm text-subtle">
-                      <span>No preview</span>
-                      {m.thumbnailUrl && (
-                        <button
-                          type="button"
-                          className="link-button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setReloadCount((count) => count + 1);
-                          }}
-                        >
-                          Refresh
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {m.mediaType === "VIDEO" && hasPreview && (
-                    <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white shadow-sm">
-                      <PlayIcon className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                  {m.mediaType === "CAROUSEL_ALBUM" && hasPreview && (
-                    <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[11px] font-medium text-white">
-                      Carousel
-                    </span>
-                  )}
-                </button>
+                    {m.mediaType === "VIDEO" && (
+                      <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white shadow-sm">
+                        <PlayIcon className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                    {m.mediaType === "CAROUSEL_ALBUM" && (
+                      <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[11px] font-medium text-white">
+                        Carousel
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-chip text-sm text-subtle">
+                    <span>No preview</span>
+                    {m.thumbnailUrl && (
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => setReloadCount((count) => count + 1)}
+                      >
+                        Refresh
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="p-3">
                   <p className="m-0 line-clamp-2 min-h-[2.5em] text-sm text-ink">
                     {m.caption ? m.caption.split("\n")[0] : <span className="text-subtle">No caption</span>}
