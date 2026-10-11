@@ -31,8 +31,7 @@ export function dashboardReadCacheHeaders(req: Request, res: Response, next: Nex
 
   const eligible =
     REVALIDATABLE_DASHBOARD_PATHS.has(req.path) || REVALIDATABLE_CAMPAIGN_PATH.test(req.path);
-
-  if (eligible) {
+  if (eligible && req.get("Authorization")) {
     res.setHeader("Cache-Control", "private, no-cache");
     res.vary("Authorization");
   }
