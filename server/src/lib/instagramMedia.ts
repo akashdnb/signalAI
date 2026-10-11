@@ -12,7 +12,10 @@
  */
 const GRAPH_BASE_URL = "https://graph.instagram.com";
 const FETCH_TIMEOUT_MS = 8000;
-const MEDIA_FIELDS = "caption,media_type,thumbnail_url,permalink,timestamp";
+// thumbnail_url is only populated by the Graph API for VIDEO media; IMAGE
+// and CAROUSEL_ALBUM posts carry their preview image in media_url instead.
+// Both are requested so every media type resolves to a usable preview.
+const MEDIA_FIELDS = "caption,media_type,thumbnail_url,media_url,permalink,timestamp";
 // A creator's own media list, worst case — bounds a synchronous
 // user-initiated "add by URL" request to a fixed number of round trips
 // rather than paging through years of posts.
@@ -33,6 +36,7 @@ interface MediaApiItem {
   caption?: string;
   media_type?: string;
   thumbnail_url?: string;
+  media_url?: string;
   permalink?: string;
   timestamp?: string;
 }
@@ -42,7 +46,7 @@ function toRawMetadata(item: MediaApiItem): RawMediaMetadata {
     mediaId: item.id,
     caption: item.caption ?? null,
     mediaType: item.media_type ?? null,
-    thumbnailUrl: item.thumbnail_url ?? null,
+    thumbnailUrl: item.thumbnail_url ?? item.media_url ?? null,
     permalink: item.permalink ?? null,
     postedAt: item.timestamp ? new Date(item.timestamp) : null,
   };
