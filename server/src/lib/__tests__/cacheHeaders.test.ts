@@ -7,8 +7,8 @@ describe("dashboardReadCacheHeaders", () => {
   function createTestApp() {
     const app = express();
     app.use("/tenants/:tenantId", dashboardReadCacheHeaders);
-    app.get("/tenants/:tenantId/leads", (_req, res) => {
-      res.json({ leads: ["lead-1"] });
+    app.get("/tenants/:tenantId/leads", (req, res) => {
+      res.json({ leads: [req.get("Authorization") ?? "anonymous"] });
     });
     app.get("/tenants/:tenantId/account", (_req, res) => {
       res.json({ connected: true });
@@ -36,7 +36,7 @@ describe("dashboardReadCacheHeaders", () => {
     expect(second.text).toBe("");
   });
 
-  it("partitions personalized responses by Authorization", async () => {
+  it("does not reuse a personalized representation after the Authorization changes", async () => {
     const app = createTestApp();
     const first = await request(app)
       .get("/tenants/t1/leads")
@@ -48,6 +48,7 @@ describe("dashboardReadCacheHeaders", () => {
       .set("If-None-Match", first.headers.etag);
 
     expect(second.status).toBe(200);
+    expect(second.body).toEqual({ leads: ["Bearer token-b"] });
   });
 
   it("never stores account health responses", async () => {
