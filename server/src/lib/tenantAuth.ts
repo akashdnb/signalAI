@@ -5,6 +5,8 @@ import { getPool } from "../db/pool.js";
 import { getUserSessionVersion } from "../db/users.js";
 import { isTenantMember } from "../db/tenantMembers.js";
 
+export type TenantRole = "owner" | "admin" | "member";
+
 export interface AuthenticatedSession {
   userId: string;
 }
@@ -40,22 +42,12 @@ export async function verifyBearerSession(req: Request): Promise<AuthenticatedSe
   const payload = verifySessionToken(config.sessionSecret, token);
   if (!payload) return null;
 
-  // Requires the token's sessionVersion to match the user's CURRENT value.
-  // Without this, the only way to invalidate one leaked 30-day token was
-  // rotating SESSION_SECRET, which signs out every user at once.
   const currentVersion = await getUserSessionVersion(getPool(), payload.userId);
   if (currentVersion === null || payload.sessionVersion !== currentVersion) return null;
 
   return { userId: payload.userId };
 }
 
-/**
- * Gates every route that reads or writes one tenant's data. Verifies the
- * bearer session, then checks `tenant_members` for `:tenantId` — a valid
- * session for a user who is not a member of that tenant is rejected
- * exactly like one with no session at all, never silently rescoped to a
- * tenant the caller IS a member of.
- */
 export async function requireTenantSession(req: Request, res: Response, next: NextFunction) {
   const session = await verifyBearerSession(req);
   if (!session) {
@@ -68,4 +60,36 @@ export async function requireTenantSession(req: Request, res: Response, next: Ne
 
   req.tenantSession = session;
   return next();
+}
+
+/**
+ * Role-aware variant for administrative workspace actions.
+ * Membership is checked against the same tenant route parameter before the
+ * role is evaluated, so a caller can never use a valid role on another
+ * workspace to cross the tenant boundary.
+ */
+export function requireTenantRole(...allowedRoles: TenantRole[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const session = await verifyBearerSession(req);
+    if (!session) {
+      return res.status(401).json({ error: "missing or invalid session" });
+    }
+
+    const result = await getPool().query<{ role: TenantRole }>(
+      `select role from tenant_members where tenant_id = $1 and user_id = $2 limit 1`,
+      [req.params.tenantId, session.userId],
+    );
+
+    const role = result.rows[0]?.role;
+    if (!role) {
+      return res.status(403).json({ error: "not a member of this tenant" });
+    }
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ error: "insufficient tenant role" });
+    }
+
+    req.tenantSession = session;
+    return next();
+  };
 }
