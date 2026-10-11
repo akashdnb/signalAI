@@ -56,7 +56,7 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
           if (!token) continue;
 
           const metadata = await fetchMediaMetadata(token, entry.mediaId);
-          await upsertMediaMetadata(pool, tenantId, metadata);
+          await upsertMediaMetadata(pool, tenantId, metadata, account.instagramAccountId);
           enriched = true;
           break;
         } catch (err) {
