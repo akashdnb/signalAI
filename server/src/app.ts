@@ -18,6 +18,7 @@ import { authRouter } from "./routes/auth.js";
 import { authEmailRouter } from "./routes/authEmail.js";
 import { paginationRouter } from "./routes/pagination.js";
 import { campaignsRouter } from "./routes/campaigns.js";
+import { contentRouter } from "./routes/content.js";
 import { journeyRuntimeRouter } from "./routes/journeyRuntime.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
@@ -81,6 +82,10 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(workspaceManagementRouter);
 
   app.use(paginationRouter);
+  // Content media enrichment is registered before the legacy campaigns
+  // implementation so the shared observed-media endpoint uses the
+  // multi-account-safe metadata refresh path.
+  app.use(contentRouter);
   app.use(campaignsRouter);
   app.use(journeyRuntimeRouter);
   app.use(billingRouter);
