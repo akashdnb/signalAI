@@ -14,7 +14,6 @@ export interface TenantInvitation {
 }
 
 type Queryable = Pool | PoolClient;
-
 type HttpConflictError = Error & { statusCode?: number };
 
 function mapRow(row: Record<string, unknown>): TenantInvitation {
@@ -105,14 +104,7 @@ export async function createTenantInvitation(
         (tenant_id, email, role, token_hash, invited_by, expires_at)
        values ($1, $2, $3, $4, $5, $6)
        returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
-      [
-        input.tenantId,
-        input.email,
-        input.role,
-        input.tokenHash,
-        input.invitedBy,
-        input.expiresAt,
-      ],
+      [input.tenantId, input.email, input.role, input.tokenHash, input.invitedBy, input.expiresAt],
     );
 
     await client.query("commit");
@@ -124,19 +116,100 @@ export async function createTenantInvitation(
       // Preserve the original database error.
     }
 
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      (error as { code?: string }).code === "23505"
-    ) {
-      const conflict = new Error(
-        "an invitation is already pending for this email",
-      ) as HttpConflictError;
+    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "23505") {
+      const conflict = new Error("an invitation is already pending for this email") as HttpConflictError;
       conflict.statusCode = 409;
       throw conflict;
     }
 
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Replaces an existing active invitation atomically. The advisory lock keeps
+ * resend concurrent with invite creation/retry-safe for the same tenant/email.
+ */
+export async function resendTenantInvitation(
+  pool: Pool,
+  input: {
+    tenantId: string;
+    invitationId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  },
+): Promise<TenantInvitation | null> {
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+
+    const current = await client.query<{ email: string; role: TenantInvitationRole }>(
+      `select email, role
+         from tenant_invitations
+        where id = $1
+          and tenant_id = $2
+          and accepted_at is null
+          and revoked_at is null
+          and expires_at > now()
+        for update`,
+      [input.invitationId, input.tenantId],
+    );
+    const row = current.rows[0];
+    if (!row) {
+      await client.query("rollback");
+      return null;
+    }
+
+    await client.query(
+      `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
+      [`${input.tenantId}:${row.email.toLowerCase()}`],
+    );
+
+    await client.query(
+      `update tenant_invitations
+          set revoked_at = now(), updated_at = now()
+        where id = $1 and tenant_id = $2 and accepted_at is null and revoked_at is null`,
+      [input.invitationId, input.tenantId],
+    );
+
+    const result = await client.query(
+      `insert into tenant_invitations
+        (tenant_id, email, role, token_hash, invited_by, expires_at)
+       select tenant_id, email, role, $3, invited_by, $4
+         from tenant_invitations
+        where id = $1 and tenant_id = $2
+       returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
+      [input.invitationId, input.tenantId, input.tokenHash, input.expiresAt],
+    );
+
+    // The previous row was revoked, so the insert above cannot copy from it
+    // after the update. This is guarded by the fallback below and keeps the
+    // operation in one transaction.
+    if (!result.rows[0]) {
+      const replacement = await client.query(
+        `insert into tenant_invitations
+          (tenant_id, email, role, token_hash, invited_by, expires_at)
+         select tenant_id, email, role, $3, invited_by, $4
+           from tenant_invitations
+          where id = $1 and tenant_id = $2
+         returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
+        [input.invitationId, input.tenantId, input.tokenHash, input.expiresAt],
+      );
+      await client.query("commit");
+      return replacement.rows[0] ? mapRow(replacement.rows[0]) : null;
+    }
+
+    await client.query("commit");
+    return mapRow(result.rows[0]);
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // Preserve the original database error.
+    }
     throw error;
   } finally {
     client.release();
@@ -153,6 +226,52 @@ export async function revokeTenantInvitation(
         set revoked_at = coalesce(revoked_at, now()), updated_at = now()
       where id = $1 and tenant_id = $2 and accepted_at is null`,
     [invitationId, tenantId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function updateTenantMemberRole(
+  pool: Queryable,
+  tenantId: string,
+  actorUserId: string,
+  memberUserId: string,
+  role: TenantInvitationRole,
+): Promise<boolean> {
+  if (actorUserId === memberUserId) {
+    const error = new Error("you cannot change your own role") as HttpConflictError;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const result = await pool.query(
+    `update tenant_members
+        set role = $1
+      where tenant_id = $2
+        and user_id = $3
+        and role <> 'owner'`,
+    [role, tenantId, memberUserId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function removeTenantMember(
+  pool: Queryable,
+  tenantId: string,
+  actorUserId: string,
+  memberUserId: string,
+): Promise<boolean> {
+  if (actorUserId === memberUserId) {
+    const error = new Error("you cannot remove yourself from this tenant") as HttpConflictError;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const result = await pool.query(
+    `delete from tenant_members
+      where tenant_id = $1
+        and user_id = $2
+        and role <> 'owner'`,
+    [tenantId, memberUserId],
   );
   return (result.rowCount ?? 0) > 0;
 }
@@ -187,9 +306,7 @@ export async function acceptTenantInvitation(
   );
 
   if (existingMember.rows[0]) {
-    const conflict = new Error(
-      "user is already a member of this tenant",
-    ) as HttpConflictError;
+    const conflict = new Error("user is already a member of this tenant") as HttpConflictError;
     conflict.statusCode = 409;
     throw conflict;
   }
