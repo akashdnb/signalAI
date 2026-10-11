@@ -146,8 +146,12 @@ export async function resendTenantInvitation(
   try {
     await client.query("begin");
 
-    const current = await client.query<{ email: string; role: TenantInvitationRole }>(
-      `select email, role
+    const current = await client.query<{
+      email: string;
+      role: TenantInvitationRole;
+      invited_by: string;
+    }>(
+      `select email, role, invited_by
          from tenant_invitations
         where id = $1
           and tenant_id = $2
@@ -175,35 +179,23 @@ export async function resendTenantInvitation(
       [input.invitationId, input.tenantId],
     );
 
-    const result = await client.query(
+    const replacement = await client.query(
       `insert into tenant_invitations
         (tenant_id, email, role, token_hash, invited_by, expires_at)
-       select tenant_id, email, role, $3, invited_by, $4
-         from tenant_invitations
-        where id = $1 and tenant_id = $2
+       values ($1, $2, $3, $4, $5, $6)
        returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
-      [input.invitationId, input.tenantId, input.tokenHash, input.expiresAt],
+      [
+        input.tenantId,
+        row.email,
+        row.role,
+        input.tokenHash,
+        row.invited_by,
+        input.expiresAt,
+      ],
     );
 
-    // The previous row was revoked, so the insert above cannot copy from it
-    // after the update. This is guarded by the fallback below and keeps the
-    // operation in one transaction.
-    if (!result.rows[0]) {
-      const replacement = await client.query(
-        `insert into tenant_invitations
-          (tenant_id, email, role, token_hash, invited_by, expires_at)
-         select tenant_id, email, role, $3, invited_by, $4
-           from tenant_invitations
-          where id = $1 and tenant_id = $2
-         returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
-        [input.invitationId, input.tenantId, input.tokenHash, input.expiresAt],
-      );
-      await client.query("commit");
-      return replacement.rows[0] ? mapRow(replacement.rows[0]) : null;
-    }
-
     await client.query("commit");
-    return mapRow(result.rows[0]);
+    return mapRow(replacement.rows[0]);
   } catch (error) {
     try {
       await client.query("rollback");
