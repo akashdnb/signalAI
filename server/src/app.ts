@@ -84,12 +84,6 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(campaignsRouter);
   app.use(journeyRuntimeRouter);
   app.use(billingRouter);
-  app.use(leadsRouter);
-  app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
-  app.use(guardrailsConfigRouter);
-  app.use(leadScoringRulesRouter);
-  app.use(fieldDefinitionsRouter);
-  app.use(onboardingRouter);
 
   // Dashboard reads are personalized tenant data. Limit browser revalidation
   // to this authenticated dashboard surface instead of applying cache headers
@@ -107,6 +101,13 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
     next();
   });
   app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
+
+  app.use(leadsRouter);
+  app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
+  app.use(guardrailsConfigRouter);
+  app.use(leadScoringRulesRouter);
+  app.use(fieldDefinitionsRouter);
+  app.use(onboardingRouter);
 
   // Last middleware = error handler.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
