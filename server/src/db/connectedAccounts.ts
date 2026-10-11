@@ -30,9 +30,9 @@ function mapRow(row: Record<string, unknown>): ConnectedInstagramAccount {
 
 /**
  * `meta_tokens` is currently the canonical credential store for connected
- * Instagram accounts. Keep this repository as the account abstraction so
- * callers stop depending directly on token storage and the underlying table
- * can be migrated later without changing route/runtime consumers.
+ * Instagram accounts. The row is durable account identity; disconnecting an
+ * account changes its health state rather than deleting the row so journey
+ * bindings and historical execution identity survive credential revocation.
  */
 export async function listConnectedInstagramAccounts(
   pool: Queryable,
@@ -73,8 +73,14 @@ export async function deleteConnectedInstagramAccount(
   accountId: string,
 ): Promise<boolean> {
   const result = await pool.query(
-    `delete from meta_tokens
-      where tenant_id = $1 and id = $2`,
+    `update meta_tokens
+        set status = 'error',
+            last_error = 'Instagram account disconnected',
+            last_checked_at = now(),
+            updated_at = now()
+      where tenant_id = $1
+        and id = $2
+        and status <> 'error'`,
     [tenantId, accountId],
   );
 
