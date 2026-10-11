@@ -68,7 +68,7 @@ export async function getConnectedInstagramAccount(
 }
 
 export async function deleteConnectedInstagramAccount(
-  pool: Queryable,
+  pool: Pool,
   tenantId: string,
   accountId: string,
 ): Promise<boolean> {
