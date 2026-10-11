@@ -7,6 +7,14 @@ function formatRole(role: WorkspaceMember["role"]): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
+function isPendingInvitation(invitation: WorkspaceInvitation): boolean {
+  return (
+    !invitation.acceptedAt &&
+    !invitation.revokedAt &&
+    new Date(invitation.expiresAt).getTime() > Date.now()
+  );
+}
+
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
@@ -53,7 +61,9 @@ export function TeamPage() {
       setInviteEmail("");
       setInviteRole("member");
       if (result.delivery === "failed") {
-        setError("Invitation was created, but the email could not be delivered. You can resend it later.");
+        setError(
+          "Invitation was created, but the email could not be delivered. Cancel the invitation and create a new one after fixing the delivery issue.",
+        );
       }
       await load();
     } catch (err) {
@@ -74,6 +84,8 @@ export function TeamPage() {
   }
 
   if (!tenantId) return null;
+
+  const pendingInvitations = invitations.filter(isPendingInvitation);
 
   return (
     <div className="page page-wide">
@@ -137,11 +149,11 @@ export function TeamPage() {
         )}
       </section>
 
-      {invitations.length > 0 && (
+      {pendingInvitations.length > 0 && (
         <section className="card">
           <h2>Pending invitations</h2>
           <ul className="list">
-            {invitations.filter((invitation) => !invitation.acceptedAt && !invitation.revokedAt).map((invitation) => (
+            {pendingInvitations.map((invitation) => (
               <li key={invitation.id} className="list-item">
                 <span className="min-w-0 flex-1">
                   <strong>{invitation.email}</strong>
