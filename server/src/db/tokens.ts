@@ -75,15 +75,17 @@ export async function markTokenError(
   instagramAccountId: string,
   error: string,
 ): Promise<void> {
-  await pool.query("begin");
+  const client = await pool.connect();
   try {
-    await pool.query(
+    await client.query("begin");
+
+    await client.query(
       `update meta_tokens set status = 'error', last_error = $3, last_checked_at = now()
        where tenant_id = $1 and instagram_account_id = $2`,
       [tenantId, instagramAccountId, error],
     );
 
-    await pool.query(
+    await client.query(
       `update campaign_instagram_accounts cia
           set enabled = false, updated_at = now()
          from meta_tokens mt
@@ -93,14 +95,16 @@ export async function markTokenError(
       [tenantId, instagramAccountId],
     );
 
-    await pool.query("commit");
+    await client.query("commit");
   } catch (error) {
     try {
-      await pool.query("rollback");
+      await client.query("rollback");
     } catch {
       // Preserve the original error.
     }
     throw error;
+  } finally {
+    client.release();
   }
 }
 
