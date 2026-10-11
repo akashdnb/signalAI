@@ -18,9 +18,9 @@ contentRouter.use("/tenants/:tenantId", requireTenantSession);
 /**
  * Content is backed by the same observed-media set used by campaign
  * targeting, but this route owns presentation metadata enrichment. It never
- * assumes a tenant has exactly one Instagram account: a missing/stale
- * thumbnail is resolved using the tenant's healthy connected accounts until
- * one credential can read the media.
+ * assumes a tenant has exactly one Instagram account: stale metadata is
+ * resolved using the tenant's healthy connected accounts until one credential
+ * can read the media.
  */
 contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const pool = getPool();
@@ -30,7 +30,7 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
 
   const needsRefresh = media.filter((entry) => {
     const fetchedAt = entry.fetchedAt?.getTime() ?? 0;
-    return !entry.thumbnailUrl || now - fetchedAt >= METADATA_REFRESH_AFTER_MS;
+    return !fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS;
   });
 
   if (needsRefresh.length > 0) {
@@ -44,6 +44,7 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
       if (refreshed >= MAX_METADATA_REFRESHES_PER_REQUEST || accountsToTry.length === 0) break;
 
       let enriched = false;
+      let lastError: unknown = null;
       for (const account of accountsToTry) {
         try {
           const token = await getDecryptedToken(
@@ -62,11 +63,15 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
           // A media id belongs to one connected account. A failed lookup on
           // one account is therefore expected when a workspace has multiple
           // accounts; try the next account before giving up.
-          Sentry.captureException(err);
+          lastError = err;
         }
       }
 
-      if (enriched) refreshed += 1;
+      if (enriched) {
+        refreshed += 1;
+      } else if (lastError) {
+        Sentry.captureException(lastError);
+      }
     }
 
     if (refreshed > 0) {
