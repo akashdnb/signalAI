@@ -56,6 +56,7 @@ export async function attachCampaignToInstagramAccount(
         and c.tenant_id = $3
         and mt.id = $2
         and mt.tenant_id = $3
+        and mt.status = 'healthy'
      on conflict (campaign_id, meta_token_id)
      do update set enabled = true, updated_at = now()
      returning campaign_id, meta_token_id, enabled`,
@@ -63,7 +64,7 @@ export async function attachCampaignToInstagramAccount(
   );
 
   if (!result.rows[0]) {
-    throw new Error("campaign or Instagram account not found in tenant");
+    throw new Error("campaign or healthy Instagram account not found in tenant");
   }
 
   const row = await pool.query(
@@ -115,6 +116,7 @@ export async function listCampaignsForInstagramAccount(
       where c.tenant_id = $1
         and mt.id = $2
         and mt.tenant_id = $1
+        and mt.status = 'healthy'
         and cia.enabled = true
       order by c.created_at asc`,
     [tenantId, accountId],
