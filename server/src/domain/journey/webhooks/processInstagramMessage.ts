@@ -80,16 +80,19 @@ export async function processPersistedInstagramInboundEvent(
   }
 
   try {
+    // The inbound event is already pinned to the receiving Meta token.
+    // Never resume an execution belonging to another connected account.
     const executions =
       await getActiveExecutionsForSubject(
         pool,
         event.tenantId,
         event.instagramUserId,
+        event.instagramAccountId,
       );
 
     /*
      * We deliberately don't guess when multiple campaigns are active
-     * for the same Instagram subject.
+     * for the same Instagram subject on this account.
      */
     if (executions.length === 0) {
       const ignoredClient =
@@ -122,12 +125,20 @@ export async function processPersistedInstagramInboundEvent(
 
     if (executions.length > 1) {
       throw new Error(
-        `Multiple active journey executions for tenant=${event.tenantId} subject=${event.instagramUserId}`,
+        `Multiple active journey executions for tenant=${event.tenantId} account=${event.instagramAccountId} subject=${event.instagramUserId}`,
       );
     }
 
     const execution =
       executions[0];
+
+    if (
+      execution.instagramAccountId !== event.instagramAccountId
+    ) {
+      throw new Error(
+        `Journey execution account mismatch: execution=${execution.id} eventAccount=${event.instagramAccountId}`,
+      );
+    }
 
     const resumed =
       await runtime.resumeFromEvent({
@@ -141,6 +152,7 @@ export async function processPersistedInstagramInboundEvent(
           event.eventType,
         payload: {
           provider: "instagram",
+          instagramAccountId: event.instagramAccountId,
           messageText: event.messageText,
           instagramUserId: event.instagramUserId,
           receivedAt: event.eventAt,
