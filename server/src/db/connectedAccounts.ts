@@ -72,19 +72,47 @@ export async function deleteConnectedInstagramAccount(
   tenantId: string,
   accountId: string,
 ): Promise<boolean> {
-  const result = await pool.query(
-    `update meta_tokens
-        set status = 'error',
-            last_error = 'Instagram account disconnected',
-            last_checked_at = now(),
-            updated_at = now()
-      where tenant_id = $1
-        and id = $2
-        and status <> 'error'`,
-    [tenantId, accountId],
-  );
+  const client = await pool.connect();
 
-  return (result.rowCount ?? 0) > 0;
+  try {
+    await client.query("begin");
+
+    const result = await client.query(
+      `update meta_tokens
+          set status = 'error',
+              last_error = 'Instagram account disconnected',
+              last_checked_at = now(),
+              updated_at = now()
+        where tenant_id = $1
+          and id = $2
+          and status <> 'error'`,
+      [tenantId, accountId],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      await client.query("rollback");
+      return false;
+    }
+
+    await client.query(
+      `update campaign_instagram_accounts
+          set enabled = false, updated_at = now()
+        where meta_token_id = $1`,
+      [accountId],
+    );
+
+    await client.query("commit");
+    return true;
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // Preserve the original error.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getConnectedInstagramAccountByProviderId(
