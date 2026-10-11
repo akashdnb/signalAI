@@ -57,14 +57,14 @@ workspaceManagementRouter.get(
       [req.params.tenantId],
     );
 
-    return res.json({
-      members: result.rows.map((row) => ({
+    return res.json(
+      result.rows.map((row) => ({
         userId: row.user_id,
         email: row.email,
         role: row.role,
         createdAt: row.created_at,
       })),
-    });
+    );
   },
 );
 
