@@ -59,10 +59,12 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   // forcing validation on reuse. Express already emits ETags by default, so
   // unchanged responses become tiny 304s instead of retransmitting JSON.
   // This is intentionally `private`: tenant/user data must never be shared
-  // through an intermediary cache.
+  // through an intermediary cache. Vary by bearer token so two users sharing
+  // a browser profile can never reuse one another's cached API response.
   app.use((req, res, next) => {
     if (req.method === "GET" || req.method === "HEAD") {
       res.setHeader("Cache-Control", "private, no-cache");
+      res.vary("Authorization");
     }
     next();
   });
