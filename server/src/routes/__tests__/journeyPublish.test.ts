@@ -97,13 +97,13 @@ describe("journey publishing", () => {
       .patch(`/tenants/${tenant.id}/campaigns/${campaignId}/enabled`)
       .set(authHeader)
       .send({ enabled: true });
-    expect(activate.status).toBe(200);
-    expect(activate.body.enabled).toBe(true);
+    expect(activate.status).toBe(409);
+    expect(activate.body.error).toContain("healthy Instagram account");
 
     const activatedCampaign = await request(app)
       .get(`/tenants/${tenant.id}/campaigns/${campaignId}`)
       .set(authHeader);
-    expect(activatedCampaign.body.enabled).toBe(true);
+    expect(activatedCampaign.body.enabled).toBe(false);
 
     const published = await request(app)
       .get(
