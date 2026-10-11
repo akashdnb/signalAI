@@ -84,12 +84,9 @@ export async function processPersistedInstagramInboundEvent(
       executionAccountId,
     );
 
-    /*
-     * Backward compatibility for account-less executions created before
-     * runtime account pinning. Only allow this fallback while the tenant has
-     * exactly one connected account; a multi-account tenant must use an
-     * account-pinned execution.
-     */
+    // Legacy account-less executions are only eligible when this tenant has
+    // exactly one connected account. Multi-account tenants must use pinned
+    // execution state and never fall back across accounts.
     if (executions.length === 0) {
       const soleAccount = await getSoleConnectedAccount(
         pool,
@@ -150,10 +147,16 @@ export async function processPersistedInstagramInboundEvent(
       executionId: execution.id,
       eventId: event.providerEventId,
       eventType: event.eventType,
-      instagramAccountId: execution.instagramAccountId ?? executionAccountId,
+      // Account-pinned executions are explicitly validated by runtime.
+      // Legacy account-less executions were admitted above only for a tenant
+      // with exactly one connected account, so omit the provider id here and
+      // let the legacy dispatcher fallback use that sole account.
+      instagramAccountId: execution.instagramAccountId,
       payload: {
         provider: "instagram",
-        instagramAccountId: executionAccountId,
+        ...(execution.instagramAccountId
+          ? { instagramAccountId: executionAccountId }
+          : {}),
         messageText: event.messageText,
         instagramUserId: event.instagramUserId,
         receivedAt: event.eventAt,
