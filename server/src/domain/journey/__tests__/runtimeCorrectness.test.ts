@@ -17,6 +17,15 @@ async function ids() {
     pool,
     `journey-runtime-test-${randomUUID()}`,
   );
+  await pool.query(
+    `insert into meta_tokens (
+       tenant_id,
+       instagram_account_id,
+       encrypted_token,
+       key_version
+     ) values ($1, $2, $3, $4)`,
+    [tenant.id, `runtime-account-${randomUUID()}`, Buffer.from("test"), "test"],
+  );
 
   return {
     tenantId: tenant.id,
@@ -179,6 +188,14 @@ async function cleanup(tenantId: string): Promise<void> {
   await pool.query(
     `
       delete from campaigns
+       where tenant_id = $1
+    `,
+    [tenantId],
+  );
+
+  await pool.query(
+    `
+      delete from meta_tokens
        where tenant_id = $1
     `,
     [tenantId],

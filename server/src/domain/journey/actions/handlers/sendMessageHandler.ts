@@ -17,6 +17,7 @@ export class SendMessageHandler implements JourneyActionHandler {
       subjectKey: input.execution.subjectKey,
       executionId: input.execution.executionId,
       actionId: input.action.id,
+      instagramAccountId: input.execution.instagramAccountId,
       payload: input.action.payload,
     });
   }

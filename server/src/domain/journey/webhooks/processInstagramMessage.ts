@@ -12,6 +12,14 @@ import {
   getActiveExecutionsForSubject,
 } from "../../../db/journeyExecutions.js";
 
+import {
+  getConnectedInstagramAccount,
+} from "../../../db/connectedAccounts.js";
+
+import {
+  getSoleConnectedAccount,
+} from "../../../db/tokens.js";
+
 import { JourneyRuntime } from "../runtime.js";
 
 import {
@@ -31,78 +39,76 @@ export interface ProcessInstagramInboundResult {
   executionId: string | null;
 }
 
-/**
- * Process an event that is already durably persisted.
- *
- * This is the worker path. It intentionally does NOT attempt to insert
- * the inbound event again — the webhook request already did that.
- */
 export async function processPersistedInstagramInboundEvent(
   dependencies: ProcessInstagramMessageDependencies,
   eventId: string,
 ): Promise<ProcessInstagramInboundResult> {
-  const {
-    pool,
-    runtime,
-  } = dependencies;
+  const { pool, runtime } = dependencies;
 
-  const event =
-    await getInstagramInboundEventById(
-      pool,
-      eventId,
-    );
+  const event = await getInstagramInboundEventById(pool, eventId);
 
   if (!event) {
-    throw new Error(
-      `Instagram inbound event not found: ${eventId}`,
-    );
+    throw new Error(`Instagram inbound event not found: ${eventId}`);
   }
 
-  /*
-   * pg-boss may retry a job after a worker/process interruption.
-   * Terminal inbound states are idempotent no-ops.
-   */
-  if (
-    event.status === "processed" ||
-    event.status === "ignored"
-  ) {
+  if (event.status === "processed" || event.status === "ignored") {
     return {
-      providerEventId:
-        event.providerEventId,
+      providerEventId: event.providerEventId,
       duplicate: true,
-      status:
-        event.status === "processed"
-          ? "processed"
-          : "ignored",
-      executionId:
-        event.journeyExecutionId,
+      status: event.status === "processed" ? "processed" : "ignored",
+      executionId: event.journeyExecutionId,
     };
   }
 
   try {
-    const executions =
-      await getActiveExecutionsForSubject(
+    // The inbound-event table stores the internal meta_tokens row id. Resolve
+    // it to the provider Instagram account id before touching execution state.
+    const connectedAccount = await getConnectedInstagramAccount(
+      pool,
+      event.tenantId,
+      event.instagramAccountId,
+    );
+
+    if (!connectedAccount) {
+      throw new Error(
+        `Connected Instagram account not found: ${event.instagramAccountId}`,
+      );
+    }
+
+    const executionAccountId = connectedAccount.instagramAccountId;
+
+    let executions = await getActiveExecutionsForSubject(
+      pool,
+      event.tenantId,
+      event.instagramUserId,
+      executionAccountId,
+    );
+
+    // Legacy account-less executions are only eligible when this tenant has
+    // exactly one connected account. Multi-account tenants must use pinned
+    // execution state and never fall back across accounts.
+    if (executions.length === 0) {
+      const soleAccount = await getSoleConnectedAccount(
         pool,
         event.tenantId,
-        event.instagramUserId,
       );
 
-    /*
-     * We deliberately don't guess when multiple campaigns are active
-     * for the same Instagram subject.
-     */
+      if (soleAccount?.instagramAccountId === executionAccountId) {
+        executions = await getActiveExecutionsForSubject(
+          pool,
+          event.tenantId,
+          event.instagramUserId,
+          null,
+        );
+      }
+    }
+
     if (executions.length === 0) {
-      const ignoredClient =
-        await pool.connect();
+      const ignoredClient = await pool.connect();
 
       try {
         await ignoredClient.query("begin");
-
-        await markInstagramInboundEventIgnored(
-          ignoredClient,
-          event.id,
-        );
-
+        await markInstagramInboundEventIgnored(ignoredClient, event.id);
         await ignoredClient.query("commit");
       } catch (error) {
         await ignoredClient.query("rollback");
@@ -112,8 +118,7 @@ export async function processPersistedInstagramInboundEvent(
       }
 
       return {
-        providerEventId:
-          event.providerEventId,
+        providerEventId: event.providerEventId,
         duplicate: false,
         status: "ignored",
         executionId: null,
@@ -122,46 +127,54 @@ export async function processPersistedInstagramInboundEvent(
 
     if (executions.length > 1) {
       throw new Error(
-        `Multiple active journey executions for tenant=${event.tenantId} subject=${event.instagramUserId}`,
+        `Multiple active journey executions for tenant=${event.tenantId} account=${executionAccountId} subject=${event.instagramUserId}`,
       );
     }
 
-    const execution =
-      executions[0];
+    const execution = executions[0];
 
-    const resumed =
-      await runtime.resumeFromEvent({
-        tenantId:
-          event.tenantId,
-        executionId:
-          execution.id,
-        eventId:
-          event.providerEventId,
-        eventType:
-          event.eventType,
-        payload: {
-          provider: "instagram",
-          messageText: event.messageText,
-          instagramUserId: event.instagramUserId,
-          receivedAt: event.eventAt,
-          ...(readInstagramInteraction(event.payload)
-            ? { interaction: readInstagramInteraction(event.payload) }
-            : {}),
-        },
-      });
+    if (
+      execution.instagramAccountId !== null &&
+      execution.instagramAccountId !== executionAccountId
+    ) {
+      throw new Error(
+        `Journey execution account mismatch: execution=${execution.id} eventAccount=${executionAccountId}`,
+      );
+    }
 
-    const processedClient =
-      await pool.connect();
+    const resumed = await runtime.resumeFromEvent({
+      tenantId: event.tenantId,
+      executionId: execution.id,
+      eventId: event.providerEventId,
+      eventType: event.eventType,
+      // Account-pinned executions are explicitly validated by runtime.
+      // Legacy account-less executions were admitted above only for a tenant
+      // with exactly one connected account, so omit the provider id here and
+      // let the legacy dispatcher fallback use that sole account.
+      instagramAccountId: execution.instagramAccountId,
+      payload: {
+        provider: "instagram",
+        ...(execution.instagramAccountId
+          ? { instagramAccountId: executionAccountId }
+          : {}),
+        messageText: event.messageText,
+        instagramUserId: event.instagramUserId,
+        receivedAt: event.eventAt,
+        ...(readInstagramInteraction(event.payload)
+          ? { interaction: readInstagramInteraction(event.payload) }
+          : {}),
+      },
+    });
+
+    const processedClient = await pool.connect();
 
     try {
       await processedClient.query("begin");
-
       await markInstagramInboundEventProcessed(
         processedClient,
         event.id,
         resumed.execution.id,
       );
-
       await processedClient.query("commit");
     } catch (error) {
       await processedClient.query("rollback");
@@ -171,25 +184,17 @@ export async function processPersistedInstagramInboundEvent(
     }
 
     return {
-      providerEventId:
-        event.providerEventId,
+      providerEventId: event.providerEventId,
       duplicate: false,
       status: "processed",
-      executionId:
-        resumed.execution.id,
+      executionId: resumed.execution.id,
     };
   } catch (error) {
-    const failedClient =
-      await pool.connect();
+    const failedClient = await pool.connect();
 
     try {
       await failedClient.query("begin");
-
-      await markInstagramInboundEventFailed(
-        failedClient,
-        event.id,
-      );
-
+      await markInstagramInboundEventFailed(failedClient, event.id);
       await failedClient.query("commit");
     } catch {
       await failedClient.query("rollback");
@@ -202,12 +207,9 @@ export async function processPersistedInstagramInboundEvent(
 }
 
 /**
- * Backward-compatible synchronous entry point used by the existing
- * direct-processing tests/integrations.
- *
- * New production webhook traffic should use:
- *
- *   claim -> enqueue -> worker -> processPersisted...
+ * Backward-compatible synchronous entry point used by existing direct
+ * processing tests/integrations. New production webhook traffic uses the
+ * durable claim -> enqueue -> worker -> processPersisted path.
  */
 export async function processInstagramMessage(
   dependencies: ProcessInstagramMessageDependencies,
@@ -217,48 +219,28 @@ export async function processInstagramMessage(
     event: InstagramInboundMessage;
   },
 ): Promise<ProcessInstagramInboundResult> {
-  const {
-    pool,
-  } = dependencies;
-
-  const client =
-    await pool.connect();
+  const { pool } = dependencies;
+  const client = await pool.connect();
 
   try {
     await client.query("begin");
 
-    const claim =
-      await claimInstagramInboundEvent(
-        client,
-        {
-          tenantId:
-            input.tenantId,
-          instagramAccountId:
-            input.instagramAccountId,
-          providerEventId:
-            input.event.providerEventId,
-          instagramUserId:
-            input.event.instagramUserId,
-          eventType:
-            input.event.eventType,
-          messageText:
-            input.event.messageText,
-          eventAt:
-            input.event.eventAt,
-          payload:
-            input.event.raw,
-        },
-      );
+    const claim = await claimInstagramInboundEvent(client, {
+      tenantId: input.tenantId,
+      instagramAccountId: input.instagramAccountId,
+      providerEventId: input.event.providerEventId,
+      instagramUserId: input.event.instagramUserId,
+      eventType: input.event.eventType,
+      messageText: input.event.messageText,
+      eventAt: input.event.eventAt,
+      payload: input.event.raw,
+    });
 
     await client.query("commit");
 
-    if (
-      !claim.claimed ||
-      !claim.event
-    ) {
+    if (!claim.claimed || !claim.event) {
       return {
-        providerEventId:
-          input.event.providerEventId,
+        providerEventId: input.event.providerEventId,
         duplicate: true,
         status: "ignored",
         executionId: null,

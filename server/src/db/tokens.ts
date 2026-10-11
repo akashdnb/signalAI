@@ -15,11 +15,6 @@ export async function upsertToken(
   const key = keyring.get(keyVersion)!;
   const { ciphertext } = encryptToken(params.accessToken, key, keyVersion);
 
-  // R5-01: conflict target is the account alone, not (tenant_id,
-  // instagram_account_id) — one Instagram account can only ever belong to
-  // one tenant, so `tenant_id` is included in the SET to correct a stale
-  // row if a caller ever resolves the wrong tenant, but it must never be
-  // possible for the same account to hold two rows under different tenants.
   await pool.query(
     `insert into meta_tokens (tenant_id, instagram_account_id, encrypted_token, key_version, expires_at)
      values ($1, $2, $3, $4, $5)
@@ -34,6 +29,16 @@ export async function upsertToken(
                     updated_at = now()`,
     [params.tenantId, params.instagramAccountId, ciphertext, keyVersion, params.expiresAt ?? null],
   );
+
+  await pool.query(
+    `update campaign_instagram_accounts cia
+        set enabled = true, updated_at = now()
+       from meta_tokens mt
+      where cia.meta_token_id = mt.id
+        and mt.tenant_id = $1
+        and mt.instagram_account_id = $2`,
+    [params.tenantId, params.instagramAccountId],
+  );
 }
 
 export interface TokenHealthRow {
@@ -43,13 +48,6 @@ export interface TokenHealthRow {
   status: "healthy" | "error";
 }
 
-/**
- * Tokens due for a refresh attempt (Account Health Monitoring). A
- * long-lived token can only be refreshed once it's at least 24h old, so
- * this only ever returns tokens both nearing expiry AND old enough to
- * refresh — a token connected minutes ago never shows up here even if its
- * expiry window is somehow already close.
- */
 export async function listTokensDueForRefresh(pool: Pool, withinDays: number): Promise<TokenHealthRow[]> {
   const result = await pool.query<{
     tenant_id: string;
@@ -77,27 +75,59 @@ export async function markTokenError(
   instagramAccountId: string,
   error: string,
 ): Promise<void> {
-  await pool.query(
-    `update meta_tokens set status = 'error', last_error = $3, last_checked_at = now()
-     where tenant_id = $1 and instagram_account_id = $2`,
-    [tenantId, instagramAccountId, error],
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    await client.query(
+      `update meta_tokens set status = 'error', last_error = $3, last_checked_at = now()
+       where tenant_id = $1 and instagram_account_id = $2`,
+      [tenantId, instagramAccountId, error],
+    );
+
+    await client.query(
+      `update campaign_instagram_accounts cia
+          set enabled = false, updated_at = now()
+         from meta_tokens mt
+        where cia.meta_token_id = mt.id
+          and mt.tenant_id = $1
+          and mt.instagram_account_id = $2`,
+      [tenantId, instagramAccountId],
+    );
+
+    await client.query("commit");
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // Preserve the original error.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**
- * Phase 1 assumes one connected Instagram account per tenant (no
- * multi-account support yet) — this is how the send path resolves "which
- * account is this lead's conversation with" from just a tenantId.
+ * Legacy compatibility only. Account-less executions may use this fallback
+ * only when the tenant has exactly one healthy connected Instagram account.
  */
 export async function getSoleConnectedAccount(
   pool: Pool,
   tenantId: string,
 ): Promise<{ instagramAccountId: string } | null> {
   const result = await pool.query<{ instagram_account_id: string }>(
-    `select instagram_account_id from meta_tokens where tenant_id = $1 order by created_at limit 1`,
+    `select instagram_account_id
+       from meta_tokens
+      where tenant_id = $1
+        and status = 'healthy'
+      order by created_at
+      limit 2`,
     [tenantId],
   );
-  return result.rows[0] ? { instagramAccountId: result.rows[0].instagram_account_id } : null;
+
+  if (result.rows.length !== 1) return null;
+  return { instagramAccountId: result.rows[0]!.instagram_account_id };
 }
 
 export interface AccountHealth {
@@ -108,7 +138,6 @@ export interface AccountHealth {
   expiresAt: Date | null;
 }
 
-/** BUI: the "visible Account Health status" the roadmap calls for on the connect screen — never returns the token itself. */
 export async function getAccountHealth(pool: Pool, tenantId: string): Promise<AccountHealth | null> {
   const result = await pool.query<{
     instagram_account_id: string;
@@ -133,8 +162,8 @@ export async function getAccountHealth(pool: Pool, tenantId: string): Promise<Ac
 }
 
 /**
- * Decrypts on the way out — the plaintext token should only ever exist in
- * memory for the duration of the Graph API call that needs it.
+ * Decrypts on the way out — plaintext exists only for the provider call.
+ * Disconnected/error accounts cannot be used for outbound sends.
  */
 export async function getDecryptedToken(
   pool: Pool,
@@ -144,7 +173,9 @@ export async function getDecryptedToken(
 ): Promise<string | null> {
   const result = await pool.query<{ encrypted_token: Buffer; key_version: string }>(
     `select encrypted_token, key_version from meta_tokens
-     where tenant_id = $1 and instagram_account_id = $2`,
+     where tenant_id = $1
+       and instagram_account_id = $2
+       and status = 'healthy'`,
     [tenantId, instagramAccountId],
   );
   const row = result.rows[0];
@@ -158,18 +189,6 @@ export async function getDecryptedToken(
   return decryptToken(row.encrypted_token, key);
 }
 
-/**
- * Disconnect: drops the tenant's stored token(s). The token is the whole
- * connection — inbound webhooks resolve their tenant through meta_tokens
- * (db/accounts.ts) and the send path reads it through
- * getSoleConnectedAccount, so removing the row stops both directions at
- * once. Leads and their history are deliberately left intact; this is a
- * channel disconnect, not a data deletion (that's lib/deletionService.ts).
- * Meta exposes no server-side revoke for Instagram Login tokens, so the
- * creator also removes the app from their Instagram settings if they want
- * the grant itself gone. Returns how many rows went away so the caller can
- * tell "disconnected" from "wasn't connected".
- */
 export async function deleteTokensForTenant(pool: Pool, tenantId: string): Promise<number> {
   const result = await pool.query(`delete from meta_tokens where tenant_id = $1`, [tenantId]);
   return result.rowCount ?? 0;

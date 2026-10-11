@@ -112,6 +112,8 @@ async function mockTenantApi(
       };
     } else if (path === `${tenantPath}/account`) {
       data = { connected: false, status: "healthy" };
+    } else if (path === `${tenantPath}/connected-accounts`) {
+      data = { accounts: [] };
     } else if (path === `${tenantPath}/usage`) {
       data = {
         planTier: "trial",
@@ -171,6 +173,8 @@ async function mockTenantApi(
       data = { nodes: [], edges: [], version: 0 };
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/milestones`) {
       data = [];
+    } else if (path === `${tenantPath}/campaigns/smoke-campaign/connected-accounts`) {
+      data = { accounts: [] };
     } else if (path === `${tenantPath}/members`) {
       data = [{ userId: "smoke-owner", email: "owner@example.com", role: "owner" }];
     } else if (path === `${tenantPath}/leads`) {

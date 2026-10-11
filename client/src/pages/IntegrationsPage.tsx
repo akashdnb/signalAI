@@ -1,47 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api, type AccountHealth } from "../api";
+import { ApiError, api } from "../api";
+import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
 
-/**
- * Only Instagram is a real, connectable channel today (see server/env.example
- * — no WhatsApp or CRM config exists). WhatsApp and CRM are shown as
- * "Coming soon" rather than as dead connect buttons.
- */
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
-
-  const [account, setAccount] = useState<AccountHealth | null>(null);
+  const [accounts, setAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reloadCount, setReloadCount] = useState(0);
   const [connecting, setConnecting] = useState(false);
-  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  async function loadAccounts() {
+    if (!tenantId) return;
+    try {
+      setAccounts(await workspaceApi.listConnectedAccounts(tenantId));
+      setError(null);
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401 || status === 403) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to load Instagram accounts");
+    }
+  }
 
   useEffect(() => {
-    if (!tenantId) return;
-    let cancelled = false;
-    api
-      .getAccountHealth(tenantId)
-      .then((a) => {
-        if (!cancelled) {
-          setAccount(a);
-          setError(null);
-        }
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-          navigate("/login", { replace: true });
-          return;
-        }
-        setError(err instanceof Error ? err.message : "Failed to load integrations");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId, navigate, reloadCount]);
+    void loadAccounts();
+  }, [tenantId]);
 
   async function handleConnect() {
     if (!tenantId) return;
@@ -56,18 +49,18 @@ export function IntegrationsPage() {
     }
   }
 
-  async function handleDisconnect() {
+  async function handleDisconnect(accountId: string) {
     if (!tenantId) return;
-    setDisconnecting(true);
+    setDisconnectingId(accountId);
     setError(null);
     try {
-      const next = await api.disconnectInstagram(tenantId);
-      setAccount(next);
-      setConfirmingDisconnect(false);
+      await workspaceApi.disconnectAccount(tenantId, accountId);
+      setConfirmingId(null);
+      await loadAccounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't disconnect Instagram");
     } finally {
-      setDisconnecting(false);
+      setDisconnectingId(null);
     }
   }
 
@@ -75,73 +68,70 @@ export function IntegrationsPage() {
 
   return (
     <div className="page page-wide">
-      <h1>Integrations</h1>
-      <p className="muted">Channels signalAI can send and receive messages through.</p>
-
-      {error && (
-        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
-          <span>{error}</span>
-          {account === null && (
-            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
-              Retry connection check
-            </button>
-          )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1>Integrations</h1>
+          <p className="muted">Connect the channels signalAI can send and receive messages through.</p>
         </div>
-      )}
-
-      <section className="card flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">
-            <InstagramMarkIcon className="h-6 w-6" />
+        <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting}>
+          <span className="inline-flex items-center gap-1.5">
+            <InstagramMarkIcon className="h-4 w-4" />
+            {connecting ? "Redirecting…" : "Add Instagram account"}
           </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="m-0">Instagram</h3>
-              {account?.connected && account.status !== "error" && (
-                <span className="pill pill-ok">
-                  <span className="mr-1">●</span>Connected
-                </span>
-              )}
-              {account?.connected && account.status === "error" && <span className="pill pill-error">Needs attention</span>}
-            </div>
-            <p className="muted small mt-1">
-              {account === null
-                ? "Checking connection…"
-                : account.connected
-                  ? `Replying to comments and DMs on ${account.instagramAccountId ?? "your connected account"}.`
-                  : "Connect your Instagram Business account to start replying to comments and DMs automatically."}
-            </p>
-            {account?.connected && account.status === "error" && account.lastError && (
-              <p className="banner banner-error mt-2" style={{ marginBottom: 0 }}>
-                {account.lastError}
-              </p>
-            )}
-          </div>
-        </div>
-        {account?.connected ? (
-          <button className="btn-secondary btn-small shrink-0" onClick={() => setConfirmingDisconnect(true)} disabled={confirmingDisconnect}>
-            Disconnect
-          </button>
-        ) : (
-          <button className="btn-primary btn-small shrink-0" onClick={handleConnect} disabled={connecting || account === null}>
-            {connecting ? "Redirecting…" : "Connect"}
-          </button>
-        )}
+        </button>
+      </div>
 
-        {confirmingDisconnect && (
-          <div className="banner w-full">
-            <p className="m-0">
-              Disconnect Instagram? signalAI will stop replying to comments and DMs straight away. Your leads and their
-              conversation history are kept, and you can reconnect any time.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button className="btn-primary btn-small" onClick={handleDisconnect} disabled={disconnecting}>
-                {disconnecting ? "Disconnecting…" : "Yes, disconnect"}
-              </button>
-              <button className="btn-secondary btn-small" onClick={() => setConfirmingDisconnect(false)} disabled={disconnecting}>
-                Cancel
-              </button>
-            </div>
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
+
+      <section className="card">
+        <div className="flex items-center justify-between gap-3">
+          <h2 style={{ marginBottom: 0 }}>Instagram accounts</h2>
+          <span className="muted small">{accounts?.length ?? 0} connected</span>
+        </div>
+
+        {accounts === null ? (
+          <p className="muted">Checking connections…</p>
+        ) : accounts.length === 0 ? (
+          <div className="banner">
+            <p className="m-0">No Instagram accounts are connected yet. Add one to start automating comments and DMs.</p>
+          </div>
+        ) : (
+          <div className="list" style={{ marginTop: "1rem" }}>
+            {accounts.map((account) => (
+              <div key={account.id} className="list-item" style={{ alignItems: "flex-start" }}>
+                <span className="flex min-w-0 flex-1 items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">
+                    <InstagramMarkIcon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <strong>@{account.instagramAccountId}</strong>
+                      <span className={account.status === "healthy" ? "pill pill-ok" : "pill pill-error"}>
+                        {account.status === "healthy" ? "Connected" : "Needs attention"}
+                      </span>
+                    </span>
+                    {account.status === "error" && account.lastError && (
+                      <span className="banner banner-error small mt-2" style={{ display: "block" }}>{account.lastError}</span>
+                    )}
+                  </span>
+                </span>
+
+                {confirmingId === account.id ? (
+                  <span className="flex shrink-0 gap-2">
+                    <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
+                      {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                    </button>
+                    <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button className="btn-secondary btn-small shrink-0" onClick={() => setConfirmingId(account.id)}>
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -151,12 +141,7 @@ export function IntegrationsPage() {
           <WhatsAppMarkIcon className="h-6 w-6" />
         </span>
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="m-0">WhatsApp</h3>
-            <span className="pill" style={{ marginLeft: 0 }}>
-              Coming soon
-            </span>
-          </div>
+          <div className="flex items-center gap-2"><h3 className="m-0">WhatsApp</h3><span className="pill" style={{ marginLeft: 0 }}>Coming soon</span></div>
           <p className="muted small mt-1">Hand off qualified leads to WhatsApp for your sales team to take over.</p>
         </div>
       </section>
@@ -166,12 +151,7 @@ export function IntegrationsPage() {
           <CrmMarkIcon className="h-6 w-6" />
         </span>
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="m-0">CRM sync</h3>
-            <span className="pill" style={{ marginLeft: 0 }}>
-              Coming soon
-            </span>
-          </div>
+          <div className="flex items-center gap-2"><h3 className="m-0">CRM sync</h3><span className="pill" style={{ marginLeft: 0 }}>Coming soon</span></div>
           <p className="muted small mt-1">Push qualified leads straight into your CRM as they're handed over.</p>
         </div>
       </section>

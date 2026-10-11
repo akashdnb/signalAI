@@ -21,6 +21,10 @@ journeyRuntimeRouter.post(
         tenantId,
         campaignId,
         subjectKey: String(req.body.subjectKey),
+        instagramAccountId:
+          typeof req.body.instagramAccountId === "string"
+            ? req.body.instagramAccountId
+            : undefined,
         context: req.body.context ?? {},
       });
 
@@ -65,6 +69,10 @@ journeyRuntimeRouter.post(
           executionId,
           eventId,
           eventType: req.body.eventType,
+          instagramAccountId:
+            typeof req.body.instagramAccountId === "string"
+              ? req.body.instagramAccountId
+              : undefined,
           payload: req.body.payload ?? {},
         });
 
