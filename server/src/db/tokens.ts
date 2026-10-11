@@ -30,9 +30,6 @@ export async function upsertToken(
     [params.tenantId, params.instagramAccountId, ciphertext, keyVersion, params.expiresAt ?? null],
   );
 
-  // Reconnection restores previously configured journey/account bindings.
-  // The binding rows are durable configuration; `enabled` only reflects
-  // whether the referenced connection is currently usable.
   await pool.query(
     `update campaign_instagram_accounts cia
         set enabled = true, updated_at = now()
@@ -78,11 +75,33 @@ export async function markTokenError(
   instagramAccountId: string,
   error: string,
 ): Promise<void> {
-  await pool.query(
-    `update meta_tokens set status = 'error', last_error = $3, last_checked_at = now()
-     where tenant_id = $1 and instagram_account_id = $2`,
-    [tenantId, instagramAccountId, error],
-  );
+  await pool.query("begin");
+  try {
+    await pool.query(
+      `update meta_tokens set status = 'error', last_error = $3, last_checked_at = now()
+       where tenant_id = $1 and instagram_account_id = $2`,
+      [tenantId, instagramAccountId, error],
+    );
+
+    await pool.query(
+      `update campaign_instagram_accounts cia
+          set enabled = false, updated_at = now()
+         from meta_tokens mt
+        where cia.meta_token_id = mt.id
+          and mt.tenant_id = $1
+          and mt.instagram_account_id = $2`,
+      [tenantId, instagramAccountId],
+    );
+
+    await pool.query("commit");
+  } catch (error) {
+    try {
+      await pool.query("rollback");
+    } catch {
+      // Preserve the original error.
+    }
+    throw error;
+  }
 }
 
 /**
