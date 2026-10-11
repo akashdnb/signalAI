@@ -44,6 +44,7 @@ export interface JourneyRuntimeInput {
   tenantId: string;
   campaignId: string;
   subjectKey: string;
+  instagramAccountId?: string | null;
   context?: Record<string, unknown>;
 }
 
@@ -52,6 +53,7 @@ export interface JourneyRuntimeEventInput {
   executionId: string;
   eventId: string;
   eventType: string;
+  instagramAccountId?: string | null;
   payload?: Record<string, unknown>;
 }
 
@@ -157,6 +159,41 @@ function nodeAwaitsInstagramInteraction(node: JourneyNode): boolean {
   return hasJourneyTargetInteraction(node.data.richMessage as InstagramRichMessageOptions);
 }
 
+async function assertJourneyAccountBinding(
+  client: PoolClient,
+  tenantId: string,
+  campaignId: string,
+  instagramAccountId: string,
+): Promise<void> {
+  const result = await client.query(
+    `select 1
+       from campaign_instagram_accounts cia
+       join campaigns c on c.id = cia.campaign_id
+       join meta_tokens mt on mt.id = cia.meta_token_id
+      where cia.campaign_id = $1
+        and c.tenant_id = $2
+        and mt.tenant_id = $2
+        and mt.instagram_account_id = $3
+        and cia.enabled = true
+      limit 1`,
+    [campaignId, tenantId, instagramAccountId],
+  );
+
+  if (!result.rows[0]) {
+    throw new Error(
+      `Instagram account ${instagramAccountId} is not assigned to journey ${campaignId}`,
+    );
+  }
+}
+
+function readInstagramAccountId(
+  payload: Record<string, unknown> | undefined,
+): string | null {
+  return typeof payload?.instagramAccountId === "string"
+    ? payload.instagramAccountId
+    : null;
+}
+
 /**
  * IMPORTANT:
  *
@@ -205,12 +242,22 @@ export class JourneyRuntime {
         );
       }
 
+      if (input.instagramAccountId) {
+        await assertJourneyAccountBinding(
+          client,
+          input.tenantId,
+          input.campaignId,
+          input.instagramAccountId,
+        );
+      }
+
       const existing =
         await getActiveExecutionForSubject(
           client,
           input.tenantId,
           input.campaignId,
           input.subjectKey,
+          input.instagramAccountId,
         );
 
       if (existing) {
@@ -232,6 +279,7 @@ export class JourneyRuntime {
           published,
           input.subjectKey,
           trigger.id,
+          input.instagramAccountId,
         );
       } catch (error) {
         /*
@@ -275,12 +323,6 @@ export class JourneyRuntime {
     }
   }
 
-  /**
-   * Process an external event exactly once.
-   *
-   * The event id is claimed inside the same transaction that mutates
-   * the journey execution.
-   */
   async resumeFromEvent(
     input: JourneyRuntimeEventInput,
   ): Promise<JourneyRuntimeResult> {
@@ -304,6 +346,19 @@ export class JourneyRuntime {
         );
       }
 
+      const eventAccountId =
+        input.instagramAccountId ??
+        readInstagramAccountId(input.payload);
+
+      if (
+        eventAccountId &&
+        execution.instagramAccountId !== eventAccountId
+      ) {
+        throw new Error(
+          `Journey execution account mismatch: execution=${execution.id} executionAccount=${execution.instagramAccountId ?? "none"} eventAccount=${eventAccountId}`,
+        );
+      }
+
       const event = await claimJourneyEvent(
         client,
         {
@@ -316,12 +371,6 @@ export class JourneyRuntime {
       );
 
       if (!event) {
-        /*
-         * Event was already processed.
-         *
-         * Because the event claim and execution mutation happen in
-         * the same transaction, this is safe under concurrent delivery.
-         */
         const current = await getExecution(
           this.pool,
           input.tenantId,
@@ -342,14 +391,6 @@ export class JourneyRuntime {
           duplicateEvent: true,
         };
       }
-
-      /*
-       * journey_actions is the source of truth for outbound actions.
-       *
-       * An inbound event must never acknowledge an outbound action.
-       * Only the worker may acknowledge an action after the external
-       * provider confirms success.
-       */
 
       const context = mergeContext(
         execution.context,
@@ -381,10 +422,6 @@ export class JourneyRuntime {
               )
             : undefined;
 
-          // Only a configured button/quick-reply payload that targets a
-          // direct outgoing edge can advance an interaction-waiting node.
-          // Unrelated text, forged ids, and stale clicks are acknowledged
-          // idempotently without jumping to arbitrary journey nodes.
           if (!allowedTarget) {
             await client.query("commit");
             return {
@@ -422,25 +459,6 @@ export class JourneyRuntime {
     }
   }
 
-  /**
-   * Complete one externally-dispatched action and continue the journey.
-   *
-   * Exactly-once progression is enforced by:
-   *
-   *   1. locking the execution first,
-   *   2. locking the action second,
-   *   3. only transitioning a processing action,
-   *   4. acknowledging the action and advancing the execution
-   *      in the same PostgreSQL transaction.
-   *
-   * If the same action is completed again after a successful transition,
-   * the second caller observes status='acknowledged' and becomes a no-op.
-   *
-   * The external provider call happens BEFORE this method is invoked.
-   * Therefore a database failure after provider success leaves the action
-   * recoverable as processing; the worker can retry using the same
-   * idempotency key.
-   */
   async completeAction(
     actionId: string,
   ): Promise<JourneyRuntimeResult> {
@@ -449,12 +467,6 @@ export class JourneyRuntime {
     try {
       await client.query("begin");
 
-      /*
-       * Read the execution id first, then lock the execution before
-       * locking the action. This establishes a single lock ordering
-       * for action completion and prevents concurrent completions
-       * from advancing the same execution twice.
-       */
       const referenceResult = await client.query<{
         execution_id: string;
       }>(
@@ -499,12 +511,6 @@ export class JourneyRuntime {
         );
       }
 
-      /*
-       * Idempotent duplicate completion.
-       *
-       * A previous worker already completed this action and advanced
-       * the execution. Do not traverse the graph again.
-       */
       if (action.status === "acknowledged") {
         await client.query("commit");
 
@@ -533,17 +539,6 @@ export class JourneyRuntime {
         );
       }
 
-      /*
-       * nodeExecutionId is the UUID of a journey_node_executions row.
-       * currentNodeId is the graph node id.
-       *
-       * Validate the relationship through the node execution row:
-       *
-       * journey_actions.node_execution_id
-       *        -> journey_node_executions.id
-       *        -> journey_node_executions.node_id
-       *        -> journey_executions.current_node_id
-       */
       const nodeExecutionResult = await client.query<{
         execution_id: string;
         node_id: string;
@@ -577,11 +572,6 @@ export class JourneyRuntime {
         );
       }
 
-      /*
-       * Keep the graph version pinned to the journey execution.
-       * Loading it with the same transaction guarantees that the
-       * acknowledgement and graph transition are committed together.
-       */
       const published =
         await getPublishedJourneyWithClient(
           client,
@@ -607,13 +597,6 @@ export class JourneyRuntime {
           node.id,
         )[0];
 
-      /*
-       * The action succeeded externally, so mark the node execution
-       * completed in the same transaction as the action acknowledgement.
-       *
-       * Node execution history is append-only, so create a completed
-       * record rather than mutating the previous waiting record.
-       */
       await recordNodeExecution(
         client,
         execution.id,
@@ -631,10 +614,6 @@ export class JourneyRuntime {
         action.id,
       );
 
-      // A message with a configured journey-target postback/quick reply is
-      // a user-waiting step. A successful send acknowledges the outbound
-      // action but deliberately keeps the execution at this message node;
-      // the later, verified interaction selects a direct outgoing edge.
       if (nodeAwaitsInstagramInteraction(node)) {
         const waitingExecution = await updateJourneyExecution(
           client,
@@ -677,10 +656,6 @@ export class JourneyRuntime {
         };
       }
 
-      /*
-       * Move to the next graph node and let the normal runtime
-       * advance logic create the next durable action if required.
-       */
       const resumedExecution =
         await updateJourneyExecution(
           client,
