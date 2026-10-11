@@ -125,7 +125,7 @@ workspaceManagementRouter.post(
       expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
     });
 
-    const inviteUrl = `${config.appBaseUrl}/invite?token=${encodeURIComponent(token)}`;
+    const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(token)}`;
 
     try {
       await sendTenantInvitationEmail(email, tenant.name, inviter.email, inviteUrl);
