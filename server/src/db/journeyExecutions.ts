@@ -19,7 +19,7 @@ export interface JourneyExecutionContext {
   executionId: string;
   tenantId: string;
   campaignId: string;
-  instagramAccountId: string | null;
+  instagramAccountId?: string | null;
   subjectKey: string;
 }
 
