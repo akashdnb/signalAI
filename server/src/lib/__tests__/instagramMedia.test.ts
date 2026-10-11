@@ -40,6 +40,25 @@ describe("fetchMediaMetadata", () => {
     expect(options.headers.Authorization).toBe("Bearer token-1");
   });
 
+  it("falls back to media_url for a preview when thumbnail_url is absent (IMAGE/CAROUSEL_ALBUM)", async () => {
+    // The Graph API only returns thumbnail_url for VIDEO media — IMAGE and
+    // CAROUSEL_ALBUM posts carry their preview in media_url instead.
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "media-2",
+        caption: "a photo post",
+        media_type: "IMAGE",
+        media_url: "https://x/photo.jpg",
+        permalink: "https://www.instagram.com/p/def/",
+        timestamp: "2026-01-01T00:00:00+0000",
+      }),
+    });
+
+    const result = await fetchMediaMetadata("token-1", "media-2");
+    expect(result.thumbnailUrl).toBe("https://x/photo.jpg");
+  });
+
   it("throws on a Graph API error", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
