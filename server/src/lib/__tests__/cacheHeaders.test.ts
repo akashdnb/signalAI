@@ -57,4 +57,12 @@ describe("dashboardReadCacheHeaders", () => {
     expect(res.status).toBe(200);
     expect(res.headers["cache-control"]).toBe("no-store");
   });
+
+  it("does not apply cache headers to an unlisted tenant endpoint", async () => {
+    const res = await request(createTestApp()).get("/tenants/t1/not-a-dashboard-read");
+
+    expect(res.status).toBe(404);
+    expect(res.headers["cache-control"]).toBeUndefined();
+    expect(res.headers.vary).not.toContain("Authorization");
+  });
 });
