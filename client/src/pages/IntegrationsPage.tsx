@@ -55,7 +55,7 @@ export function IntegrationsPage() {
     setReconnectingId(accountId);
     setError(null);
     try {
-      const { url } = await api.startInstagramConnect(tenantId);
+      const { url } = await workspaceApi.startInstagramReconnect(tenantId, accountId);
       window.location.href = url;
     } catch (err) {
       setReconnectingId(null);
