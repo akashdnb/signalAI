@@ -139,9 +139,6 @@ async function mockTenantApi(
         planTierLabel: "Trial",
         quotas: { dmsPerMonth: 100, connectedAccounts: 1, campaigns: 5, tokenAllowance: 10000 },
         trialEndsAt: null,
-        isTrialExpired: false,
-        isEntitled: true,
-        trialEndsAt: null,
         availableTiers: [],
       };
     } else if (path === `${tenantPath}/analytics`) {
@@ -386,11 +383,49 @@ test.describe("responsive route smoke checks", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("main navigation remains keyboard accessible", async ({ page }) => {
+  test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page, { failFirstLeadsLoad: true });
+    await page.goto("/dashboard/smoke-tenant/leads");
+
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("Temporary test outage");
+    await page.getByRole("button", { name: "Retry" }).click();
+    await expect(page.locator("tbody")).toContainText("smoke_creator_handle_example_01");
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("mobile navigation exposes modal state and closes with Escape", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockTenantApi(page);
     await page.goto("/dashboard/smoke-tenant/leads");
-    await expect(page.getByRole("link", { name: "Leads" })).toBeVisible();
+
+    const openMenu = page.getByRole("button", { name: "Open menu" });
+    await openMenu.click();
+    await expect(openMenu).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("dialog", { name: "Primary navigation" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(openMenu).toHaveAttribute("aria-expanded", "false");
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("Leads has no critical axe accessibility violations", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/leads");
+    await expect(page.getByRole("heading", { name: "Leads", exact: true })).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const critical = results.violations.filter((violation) => violation.impact === "critical");
+    expect(
+      critical.map((violation) => ({
+        id: violation.id,
+        description: violation.description,
+        nodes: violation.nodes.map((node) => node.target),
+      })),
+    ).toEqual([]);
   });
 });
