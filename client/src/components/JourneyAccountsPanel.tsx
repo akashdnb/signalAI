@@ -35,6 +35,8 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
   }, [tenantId, campaignId]);
 
   async function toggle(account: ConnectedInstagramAccount) {
+    if (account.status !== "healthy") return;
+
     const bound = bindings.some((binding) => binding.accountId === account.id && binding.enabled);
     setSavingId(account.id);
     setError(null);
@@ -52,14 +54,19 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
     }
   }
 
+  const assignedCount = bindings.filter((binding) => binding.enabled).length;
+  const healthyAccounts = accounts.filter((account) => account.status === "healthy");
+
   return (
     <section className="card" style={{ marginBottom: "0.75rem" }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 style={{ marginBottom: 2 }}>Connected Instagram accounts</h2>
-          <p className="muted small m-0">This journey is reusable. Attach it to any accounts that should run it.</p>
+          <p className="muted small m-0">This journey is reusable. Attach it to any healthy accounts that should run it.</p>
         </div>
-        <span className="pill" style={{ marginLeft: 0 }}>{bindings.filter((binding) => binding.enabled).length} assigned</span>
+        <span className={assignedCount > 0 ? "pill pill-ok" : "pill pill-error"} style={{ marginLeft: 0 }}>
+          {assignedCount} assigned
+        </span>
       </div>
 
       {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
@@ -69,23 +76,34 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
       ) : accounts.length === 0 ? (
         <p className="muted small">No Instagram accounts are connected. Connect an account from Integrations first.</p>
       ) : (
-        <div className="flex flex-wrap gap-2" style={{ marginTop: "0.75rem" }}>
-          {accounts.map((account) => {
-            const bound = bindings.some((binding) => binding.accountId === account.id && binding.enabled);
-            return (
-              <button
-                key={account.id}
-                type="button"
-                className={bound ? "btn-primary btn-small" : "btn-secondary btn-small"}
-                onClick={() => void toggle(account)}
-                disabled={savingId === account.id}
-                aria-pressed={bound}
-              >
-                {savingId === account.id ? "Saving…" : `${bound ? "✓ " : ""}@${account.instagramAccountId}`}
-              </button>
-            );
-          })}
-        </div>
+        <>
+          {healthyAccounts.length === 0 && (
+            <div className="banner banner-error mt-3" role="alert">
+              No healthy Instagram account is available. Reconnect an account from Integrations before enabling this journey.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2" style={{ marginTop: "0.75rem" }}>
+            {accounts.map((account) => {
+              const bound = bindings.some((binding) => binding.accountId === account.id && binding.enabled);
+              const healthy = account.status === "healthy";
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  className={bound ? "btn-primary btn-small" : "btn-secondary btn-small"}
+                  onClick={() => void toggle(account)}
+                  disabled={!healthy || savingId === account.id}
+                  aria-pressed={bound}
+                  title={healthy ? undefined : "Reconnect this Instagram account before assigning it to a journey"}
+                >
+                  {savingId === account.id
+                    ? "Saving…"
+                    : `${bound ? "✓ " : ""}@${account.instagramAccountId}${healthy ? "" : " · Needs attention"}`}
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
     </section>
   );
