@@ -46,11 +46,12 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const needsRefresh = media.filter((entry) => {
     const fetchedAt = entry.fetchedAt?.getTime() ?? 0;
     const retryAt = entry.refreshRetryAt?.getTime() ?? 0;
+    const isStale = !fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS;
+    const retryIsDue = retryAt <= now;
 
-    return (
-      (!fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS) &&
-      retryAt <= now
-    );
+    // A retry record is media-level state. It must not be masked by a newer
+    // legacy/account-specific presentation row with a fresh fetched_at.
+    return retryIsDue && (isStale || entry.refreshFailureCount > 0);
   });
 
   if (needsRefresh.length > 0) {
