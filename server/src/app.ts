@@ -10,6 +10,7 @@ import express from "express";
 import { config } from "./config.js";
 import { getPool } from "./db/pool.js";
 import { Sentry } from "./lib/sentry.js";
+import { dashboardReadCacheHeaders } from "./lib/cacheHeaders.js";
 import { healthRouter } from "./routes/health.js";
 import { legalRouter } from "./routes/legal.js";
 import { dataDeletionRouter } from "./routes/dataDeletion.js";
@@ -88,18 +89,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   // Dashboard reads are personalized tenant data. Limit browser revalidation
   // to this authenticated dashboard surface instead of applying cache headers
   // globally to auth, webhooks, health, legal, and other sensitive endpoints.
-  // Account health is deliberately never retained by the browser.
-  app.use("/tenants/:tenantId", (req, res, next) => {
-    if (req.method === "GET" || req.method === "HEAD") {
-      if (req.path === "/account") {
-        res.setHeader("Cache-Control", "no-store");
-      } else {
-        res.setHeader("Cache-Control", "private, no-cache");
-        res.vary("Authorization");
-      }
-    }
-    next();
-  });
+  app.use("/tenants/:tenantId", dashboardReadCacheHeaders);
   app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
 
   app.use(leadsRouter);
