@@ -54,6 +54,19 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
     next();
   });
 
+  // API GETs are personalized but frequently re-requested by the dashboard
+  // (notably Inbox polling). Keep them in the browser's private cache while
+  // forcing validation on reuse. Express already emits ETags by default, so
+  // unchanged responses become tiny 304s instead of retransmitting JSON.
+  // This is intentionally `private`: tenant/user data must never be shared
+  // through an intermediary cache.
+  app.use((req, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD") {
+      res.setHeader("Cache-Control", "private, no-cache");
+    }
+    next();
+  });
+
   app.use(express.urlencoded({ extended: false }));
 
   app.use(
