@@ -93,8 +93,23 @@ export const workspaceApi = {
       { method: "POST", body: JSON.stringify({ email, role }) },
     ),
 
+  resendInvitation: (tenantId: string, invitationId: string) =>
+    request<{ invitation: WorkspaceInvitation; delivery: "sent" | "failed" }>(
+      `/tenants/${tenantId}/invitations/${invitationId}/resend`,
+      { method: "POST" },
+    ),
+
   revokeInvitation: (tenantId: string, invitationId: string) =>
     request<void>(`/tenants/${tenantId}/invitations/${invitationId}/revoke`, { method: "POST" }),
+
+  updateMemberRole: (tenantId: string, memberId: string, role: "admin" | "member") =>
+    request<{ member: WorkspaceMember }>(`/tenants/${tenantId}/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+
+  removeMember: (tenantId: string, memberId: string) =>
+    request<void>(`/tenants/${tenantId}/members/${memberId}`, { method: "DELETE" }),
 
   acceptInvitation: (token: string) =>
     request<{ tenantId: string; role: "admin" | "member" }>(`/invitations/${encodeURIComponent(token)}/accept`, {

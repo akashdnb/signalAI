@@ -98,6 +98,19 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
     Sentry.captureException(err);
     console.error("Unhandled route error:", err);
     if (res.headersSent) return;
+
+    const isObject = err !== null && typeof err === "object";
+    const statusCode =
+      isObject && "statusCode" in err && typeof (err as { statusCode?: unknown }).statusCode === "number"
+        ? (err as { statusCode: number }).statusCode
+        : 500;
+    const expose = isObject && "expose" in err && (err as { expose?: unknown }).expose === true;
+    const safeStatusCode = statusCode >= 400 && statusCode < 500 ? statusCode : 500;
+
+    if (expose && safeStatusCode < 500 && err instanceof Error) {
+      return res.status(safeStatusCode).json({ error: err.message });
+    }
+
     res.status(500).json({ error: "internal server error" });
   });
 
