@@ -19,6 +19,7 @@ import { LeadsPage } from "./pages/LeadsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
+import { InvitationAcceptPage } from "./pages/InvitationAcceptPage";
 import { loadSession } from "./api";
 
 function HomeRedirect() {
@@ -34,6 +35,7 @@ export default function App() {
       <Route path="/docs/*" element={<DocsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/connect" element={<ConnectPage />} />
+      <Route path="/invite" element={<InvitationAcceptPage />} />
       <Route path="/dashboard/:tenantId" element={<AppShell />}>
         <Route index element={<DashboardPage />} />
         <Route path="settings" element={<SettingsPage />} />
