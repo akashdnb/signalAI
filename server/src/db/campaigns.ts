@@ -66,6 +66,7 @@ function toCampaign(row: CampaignRow): Campaign {
     ctaLink: row.cta_link,
     targetMediaIds: row.target_media_ids,
     replyChannel: row.reply_channel,
+    triggerSource: row.trigger_source,
     tone: row.tone,
     language: row.language,
     useKnowledgeBase: row.use_knowledge_base,
@@ -102,184 +103,52 @@ export async function createCampaign(
        coalesce($10, 'comment'),
        coalesce($11, true))
      returning *`,
-    [
-      tenantId,
-      name,
-      keywords,
-      options?.replyMode ?? null,
-      options?.replyTemplates ?? null,
-      options?.defaultReplyTemplate ?? null,
-      options?.ctaLink ?? null,
-      options?.targetMediaIds ?? null,
-      options?.replyChannel ?? null,
-      options?.triggerSource ?? null,
-      options?.enabled ?? true,
-    ],
+    [tenantId, name, keywords, options?.replyMode ?? null, options?.replyTemplates ?? null, options?.defaultReplyTemplate ?? null, options?.ctaLink ?? null, options?.targetMediaIds ?? null, options?.replyChannel ?? null, options?.triggerSource ?? null, options?.enabled ?? true],
   );
   return toCampaign(result.rows[0]!);
 }
 
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
-  const result = await pool.query<CampaignRow>(
-    `select campaigns.*,
-            exists (
-              select 1 from campaign_journey_versions published
-               where published.tenant_id = campaigns.tenant_id
-                 and published.campaign_id = campaigns.id
-            ) as published
-       from campaigns
-      where campaigns.tenant_id = $1
-      order by campaigns.created_at desc`,
-    [tenantId],
-  );
+  const result = await pool.query<CampaignRow>(`select campaigns.*, exists (select 1 from campaign_journey_versions published where published.tenant_id = campaigns.tenant_id and published.campaign_id = campaigns.id) as published from campaigns where campaigns.tenant_id = $1 order by campaigns.created_at desc`, [tenantId]);
   return result.rows.map(toCampaign);
 }
 
 export async function getCampaign(pool: Pool, tenantId: string, campaignId: string): Promise<Campaign | null> {
-  const result = await pool.query<CampaignRow>(
-    `select campaigns.*,
-            exists (
-              select 1 from campaign_journey_versions published
-               where published.tenant_id = campaigns.tenant_id
-                 and published.campaign_id = campaigns.id
-            ) as published
-       from campaigns
-      where campaigns.id = $1 and campaigns.tenant_id = $2`,
-    [campaignId, tenantId],
-  );
+  const result = await pool.query<CampaignRow>(`select campaigns.*, exists (select 1 from campaign_journey_versions published where published.tenant_id = campaigns.tenant_id and published.campaign_id = campaigns.id) as published from campaigns where campaigns.id = $1 and campaigns.tenant_id = $2`, [campaignId, tenantId]);
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-export async function listActiveCampaignKeywords(
-  pool: Queryable,
-  tenantId: string,
-): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
-  const result = await pool.query<{
-    id: string;
-    keywords: string[];
-    target_media_ids: string[];
-    trigger_source: TriggerSource;
-    reply_channel: ReplyChannel;
-  }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [tenantId]);
-  return result.rows.map((row) => ({
-    id: row.id,
-    keywords: row.keywords,
-    targetMediaIds: row.target_media_ids,
-    triggerSource: row.trigger_source,
-    replyChannel: row.reply_channel,
-  }));
+export async function listActiveCampaignKeywords(pool: Queryable, tenantId: string): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
+  const result = await pool.query<{ id: string; keywords: string[]; target_media_ids: string[]; trigger_source: TriggerSource; reply_channel: ReplyChannel }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [tenantId]);
+  return result.rows.map((row) => ({ id: row.id, keywords: row.keywords, targetMediaIds: row.target_media_ids, triggerSource: row.trigger_source, replyChannel: row.reply_channel }));
 }
 
-export async function setCampaignTargetMediaIds(
-  pool: Pool,
-  tenantId: string,
-  campaignId: string,
-  targetMediaIds: string[],
-): Promise<Campaign | null> {
-  const result = await pool.query<CampaignRow>(
-    `update campaigns set target_media_ids = $3, updated_at = now() where id = $1 and tenant_id = $2 returning *`,
-    [campaignId, tenantId, targetMediaIds],
-  );
+export async function setCampaignTargetMediaIds(pool: Pool, tenantId: string, campaignId: string, targetMediaIds: string[]): Promise<Campaign | null> {
+  const result = await pool.query<CampaignRow>(`update campaigns set target_media_ids = $3, updated_at = now() where id = $1 and tenant_id = $2 returning *`, [campaignId, tenantId, targetMediaIds]);
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-export async function setCampaignReplyTemplates(
-  pool: Pool,
-  tenantId: string,
-  campaignId: string,
-  replyTemplates: string[],
-): Promise<Campaign | null> {
-  const result = await pool.query<CampaignRow>(
-    `update campaigns set reply_templates = $3, updated_at = now() where id = $1 and tenant_id = $2 returning *`,
-    [campaignId, tenantId, replyTemplates],
-  );
+export async function setCampaignReplyTemplates(pool: Pool, tenantId: string, campaignId: string, replyTemplates: string[]): Promise<Campaign | null> {
+  const result = await pool.query<CampaignRow>(`update campaigns set reply_templates = $3, updated_at = now() where id = $1 and tenant_id = $2 returning *`, [campaignId, tenantId, replyTemplates]);
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
-export async function setCampaignEnabled(
-  pool: Pool,
-  tenantId: string,
-  campaignId: string,
-  enabled: boolean,
-): Promise<boolean> {
-  const result = await pool.query(
-    `update campaigns
-        set enabled = $3, updated_at = now()
-      where id = $1
-        and tenant_id = $2
-        and ($3 = false or (
-          exists (
-            select 1 from campaign_journey_versions published
-             where published.tenant_id = campaigns.tenant_id
-               and published.campaign_id = campaigns.id
-          )
-          and exists (
-            select 1
-              from campaign_instagram_accounts cia
-              join meta_tokens mt on mt.id = cia.meta_token_id
-             where cia.campaign_id = campaigns.id
-               and cia.enabled = true
-               and mt.tenant_id = campaigns.tenant_id
-               and mt.status = 'healthy'
-          )
-        ))`,
-    [campaignId, tenantId, enabled],
-  );
-  return result.rowCount === 1;
+export async function setCampaignEnabled(pool: Pool, tenantId: string, campaignId: string, enabled: boolean): Promise<boolean> {
+  const result = await pool.query(`update campaigns set enabled = $3, updated_at = now() where id = $1 and tenant_id = $2 and ($3 = false or (exists (select 1 from campaign_journey_versions published where published.tenant_id = campaigns.tenant_id and published.campaign_id = campaigns.id) and exists (select 1 from campaign_instagram_accounts cia join meta_tokens mt on mt.id = cia.meta_token_id where cia.campaign_id = campaigns.id and cia.enabled = true and mt.tenant_id = campaigns.tenant_id and mt.status = 'healthy')))` , [campaignId, tenantId, enabled]);
+  if (result.rowCount === 1) return true;
+  if (enabled) {
+    const campaign = await pool.query("select 1 from campaigns where id = $1 and tenant_id = $2", [campaignId, tenantId]);
+    if (campaign.rowCount === 1) {
+      const error = new Error("journey must be published and have at least one healthy Instagram account assigned before it can be enabled") as Error & { statusCode?: number; expose?: boolean };
+      error.statusCode = 409;
+      error.expose = true;
+      throw error;
+    }
+  }
+  return false;
 }
 
-export async function updateCampaignReplyConfig(
-  pool: Pool,
-  tenantId: string,
-  campaignId: string,
-  updates: {
-    replyMode?: ReplyMode;
-    ctaLink?: string | null;
-    defaultReplyTemplate?: string;
-    replyChannel?: ReplyChannel;
-    triggerSource?: TriggerSource;
-    tone?: CampaignTone;
-    language?: CampaignLanguage;
-    useKnowledgeBase?: boolean;
-    keywords?: string[];
-    name?: string;
-    description?: string | null;
-  },
-): Promise<Campaign | null> {
-  const result = await pool.query<CampaignRow>(
-    `update campaigns set
-       reply_mode = coalesce($3, reply_mode),
-       cta_link = case when $4::boolean then $5 else cta_link end,
-       default_reply_template = coalesce($6, default_reply_template),
-       reply_channel = coalesce($7, reply_channel),
-       trigger_source = coalesce($8, trigger_source),
-       tone = coalesce($9, tone),
-       language = coalesce($10, language),
-       use_knowledge_base = case when $11::boolean then $12 else use_knowledge_base end,
-       keywords = coalesce($13, keywords),
-       name = coalesce($14, name),
-       description = case when $15::boolean then $16 else description end,
-       updated_at = now()
-     where id = $1 and tenant_id = $2
-     returning *`,
-    [
-      campaignId,
-      tenantId,
-      updates.replyMode ?? null,
-      updates.ctaLink !== undefined,
-      updates.ctaLink ?? null,
-      updates.defaultReplyTemplate ?? null,
-      updates.replyChannel ?? null,
-      updates.triggerSource ?? null,
-      updates.tone ?? null,
-      updates.language ?? null,
-      updates.useKnowledgeBase !== undefined,
-      updates.useKnowledgeBase ?? null,
-      updates.keywords ?? null,
-      updates.name ?? null,
-      updates.description !== undefined,
-      updates.description ?? null,
-    ],
-  );
+export async function updateCampaignReplyConfig(pool: Pool, tenantId: string, campaignId: string, updates: { replyMode?: ReplyMode; ctaLink?: string | null; defaultReplyTemplate?: string; replyChannel?: ReplyChannel; triggerSource?: TriggerSource; tone?: CampaignTone; language?: CampaignLanguage; useKnowledgeBase?: boolean; keywords?: string[]; name?: string; description?: string | null }): Promise<Campaign | null> {
+  const result = await pool.query<CampaignRow>(`update campaigns set reply_mode = coalesce($3, reply_mode), cta_link = case when $4::boolean then $5 else cta_link end, default_reply_template = coalesce($6, default_reply_template), reply_channel = coalesce($7, reply_channel), trigger_source = coalesce($8, trigger_source), tone = coalesce($9, tone), language = coalesce($10, language), use_knowledge_base = case when $11::boolean then $12 else use_knowledge_base end, keywords = coalesce($13, keywords), name = coalesce($14, name), description = case when $15::boolean then $16 else description end, updated_at = now() where id = $1 and tenant_id = $2 returning *`, [campaignId, tenantId, updates.replyMode ?? null, updates.ctaLink !== undefined, updates.ctaLink ?? null, updates.defaultReplyTemplate ?? null, updates.replyChannel ?? null, updates.triggerSource ?? null, updates.tone ?? null, updates.language ?? null, updates.useKnowledgeBase !== undefined, updates.useKnowledgeBase ?? null, updates.keywords ?? null, updates.name ?? null, updates.description !== undefined, updates.description ?? null]);
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
