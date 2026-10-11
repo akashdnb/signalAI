@@ -13,6 +13,7 @@ export interface MessageSendRequest {
   subjectKey: string;
   executionId: string;
   actionId: string;
+  instagramAccountId?: string | null;
   payload: Record<string, unknown>;
 }
 
