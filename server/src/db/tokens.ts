@@ -29,6 +29,19 @@ export async function upsertToken(
                     updated_at = now()`,
     [params.tenantId, params.instagramAccountId, ciphertext, keyVersion, params.expiresAt ?? null],
   );
+
+  // Reconnection restores previously configured journey/account bindings.
+  // The binding rows are durable configuration; `enabled` only reflects
+  // whether the referenced connection is currently usable.
+  await pool.query(
+    `update campaign_instagram_accounts cia
+        set enabled = true, updated_at = now()
+       from meta_tokens mt
+      where cia.meta_token_id = mt.id
+        and mt.tenant_id = $1
+        and mt.instagram_account_id = $2`,
+    [params.tenantId, params.instagramAccountId],
+  );
 }
 
 export interface TokenHealthRow {
