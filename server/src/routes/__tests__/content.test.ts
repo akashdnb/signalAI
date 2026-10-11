@@ -71,8 +71,8 @@ describe("content observed-media route", () => {
          (tenant_id, instagram_account_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
           fetched_at, refresh_failure_count, refresh_retry_at)
        values ($1, 'acct-1', 'media-retry', 'Cached caption', 'IMAGE',
-               'https://x/cached.jpg', 'https://www.instagram.com/p/cached/', now() - interval '7 hours',
-               0, null)`,
+               'https://x/cached.jpg', 'https://www.instagram.com/p/cached/', now() - interval '8 hours',
+               now() - interval '7 hours', 0, null)`,
       [tenant.id],
     );
 
@@ -161,8 +161,8 @@ describe("content observed-media route", () => {
          (tenant_id, instagram_account_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
           fetched_at, refresh_failure_count, refresh_retry_at)
        values ($1, 'acct-1', 'media-refresh', 'Old caption', 'IMAGE',
-               'https://x/old.jpg', 'https://www.instagram.com/p/old/', now() - interval '7 hours',
-               2, now() - interval '1 minute')`,
+               'https://x/old.jpg', 'https://www.instagram.com/p/old/', now() - interval '8 hours',
+               now() - interval '7 hours', 2, now() - interval '1 minute')`,
       [tenant.id],
     );
 
