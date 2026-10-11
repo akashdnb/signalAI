@@ -139,6 +139,88 @@ describe("content observed-media route", () => {
     expect(global.fetch).toHaveBeenCalledTimes(4);
   });
 
+  it("uses media-level retry state when account and legacy rows disagree", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "content-mixed-retry");
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "token-1",
+    });
+    const app = createApp();
+
+    await pool.query(`insert into leads (tenant_id, instagram_user_id) values ($1, 'u1')`, [tenant.id]);
+    const lead = (await pool.query(`select id from leads where tenant_id = $1`, [tenant.id])).rows[0];
+    await pool.query(
+      `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
+       values ($1, $2, 'evt-mixed', 'comment', now(), 1, '{"mediaId":"media-mixed"}')`,
+      [tenant.id, lead.id],
+    );
+    await pool.query(
+      `insert into media_metadata
+         (tenant_id, instagram_account_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
+          fetched_at, refresh_failure_count, refresh_retry_at)
+       values ($1, 'acct-1', 'media-mixed', 'Account cached', 'IMAGE',
+               'https://x/account.jpg', 'https://www.instagram.com/p/account/', now() - interval '8 hours',
+               now() - interval '7 hours', 2, now() + interval '30 minutes')`,
+      [tenant.id],
+    );
+    await pool.query(
+      `insert into media_metadata
+         (tenant_id, instagram_account_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
+          fetched_at, refresh_failure_count, refresh_retry_at)
+       values ($1, null, 'media-mixed', 'Legacy cached', 'IMAGE',
+               'https://x/legacy.jpg', 'https://www.instagram.com/p/legacy/', now() - interval '7 hours',
+               now() - interval '1 hour', 0, null)`,
+      [tenant.id],
+    );
+
+    vi.mocked(global.fetch).mockRejectedValue(new Error("Graph API unavailable"));
+
+    const getMedia = () => request(app).get(`/tenants/${tenant.id}/observed-media`).set(authHeader);
+    const first = await getMedia();
+
+    expect(first.status).toBe(200);
+    expect(first.body[0]).toMatchObject({
+      mediaId: "media-mixed",
+      caption: "Legacy cached",
+      thumbnailUrl: "https://x/legacy.jpg",
+      refreshFailureCount: 2,
+    });
+    expect(new Date(first.body[0].refreshRetryAt).getTime()).toBeGreaterThan(Date.now());
+    expect(global.fetch).toHaveBeenCalledTimes(0);
+
+    await pool.query(
+      `update media_metadata
+          set refresh_retry_at = now() - interval '1 second'
+        where tenant_id = $1 and media_id = 'media-mixed'`,
+      [tenant.id],
+    );
+
+    const second = await getMedia();
+    expect(second.body[0]).toMatchObject({
+      mediaId: "media-mixed",
+      caption: "Legacy cached",
+      thumbnailUrl: "https://x/legacy.jpg",
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const normalized = await pool.query(
+      `select refresh_failure_count, refresh_retry_at
+         from media_metadata
+        where tenant_id = $1 and media_id = 'media-mixed'
+        order by instagram_account_id nulls first`,
+      [tenant.id],
+    );
+    expect(normalized.rows).toHaveLength(2);
+    expect(normalized.rows.map((row) => row.refresh_failure_count)).toEqual([3, 3]);
+    expect(normalized.rows[0].refresh_retry_at.getTime()).toBeGreaterThan(Date.now());
+    expect(normalized.rows[1].refresh_retry_at.getTime()).toBeGreaterThan(Date.now());
+
+    await getMedia();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("refreshes stale metadata successfully and clears previous retry state", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "content-refresh");
