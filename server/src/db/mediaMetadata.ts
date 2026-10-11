@@ -13,6 +13,8 @@ export interface KnownMedia {
   permalink: string | null;
   postedAt: Date | null;
   fetchedAt: Date | null;
+  refreshRetryAt: Date | null;
+  refreshFailureCount: number;
 }
 
 export async function upsertMediaMetadata(
@@ -24,8 +26,9 @@ export async function upsertMediaMetadata(
   if (instagramAccountId) {
     await pool.query(
       `insert into media_metadata
-         (tenant_id, instagram_account_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)
+         (tenant_id, instagram_account_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
+          refresh_failure_count, refresh_retry_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 0, null)
        on conflict (tenant_id, instagram_account_id, media_id)
        where instagram_account_id is not null
        do update set
@@ -34,8 +37,19 @@ export async function upsertMediaMetadata(
          thumbnail_url = excluded.thumbnail_url,
          permalink = excluded.permalink,
          posted_at = excluded.posted_at,
-         fetched_at = now()`,
-      [tenantId, instagramAccountId, metadata.mediaId, metadata.caption, metadata.mediaType, metadata.thumbnailUrl, metadata.permalink, metadata.postedAt],
+         fetched_at = now(),
+         refresh_failure_count = 0,
+         refresh_retry_at = null`,
+      [
+        tenantId,
+        instagramAccountId,
+        metadata.mediaId,
+        metadata.caption,
+        metadata.mediaType,
+        metadata.thumbnailUrl,
+        metadata.permalink,
+        metadata.postedAt,
+      ],
     );
     return;
   }
@@ -44,8 +58,10 @@ export async function upsertMediaMetadata(
   // which credential supplied the metadata. Keep those rows in the legacy
   // nullable-account bucket until a connected account resolves them.
   await pool.query(
-    `insert into media_metadata (tenant_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at)
-     values ($1, $2, $3, $4, $5, $6, $7)
+    `insert into media_metadata
+       (tenant_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
+        refresh_failure_count, refresh_retry_at)
+     values ($1, $2, $3, $4, $5, $6, $7, 0, null)
      on conflict (tenant_id, media_id)
      where instagram_account_id is null
      do update set
@@ -54,8 +70,53 @@ export async function upsertMediaMetadata(
        thumbnail_url = excluded.thumbnail_url,
        permalink = excluded.permalink,
        posted_at = excluded.posted_at,
-       fetched_at = now()`,
-    [tenantId, metadata.mediaId, metadata.caption, metadata.mediaType, metadata.thumbnailUrl, metadata.permalink, metadata.postedAt],
+       fetched_at = now(),
+       refresh_failure_count = 0,
+       refresh_retry_at = null`,
+    [
+      tenantId,
+      metadata.mediaId,
+      metadata.caption,
+      metadata.mediaType,
+      metadata.thumbnailUrl,
+      metadata.permalink,
+      metadata.postedAt,
+    ],
+  );
+}
+
+/**
+ * Record a failed enrichment without touching `fetched_at` or any cached
+ * presentation fields. If the media has only been observed via a comment,
+ * create a metadata placeholder so the retry state is durable across requests
+ * while the existing bare media entry remains visible.
+ */
+export async function recordMediaMetadataRefreshFailure(
+  pool: Queryable,
+  tenantId: string,
+  mediaId: string,
+  retryAt: Date,
+): Promise<void> {
+  const result = await pool.query(
+    `update media_metadata
+        set refresh_failure_count = least(refresh_failure_count + 1, 3),
+            refresh_retry_at = $3
+      where tenant_id = $1 and media_id = $2`,
+    [tenantId, mediaId, retryAt],
+  );
+
+  if ((result.rowCount ?? 0) > 0) return;
+
+  await pool.query(
+    `insert into media_metadata
+       (tenant_id, media_id, refresh_failure_count, refresh_retry_at)
+     values ($1, $2, 1, $3)
+     on conflict (tenant_id, media_id)
+     where instagram_account_id is null
+     do update set
+       refresh_failure_count = least(media_metadata.refresh_failure_count + 1, 3),
+       refresh_retry_at = excluded.refresh_retry_at`,
+    [tenantId, mediaId, retryAt],
   );
 }
 
@@ -79,6 +140,8 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
     permalink: string | null;
     posted_at: Date | null;
     fetched_at: Date | null;
+    refresh_retry_at: Date | null;
+    refresh_failure_count: number;
   }>(
     `with media_ids as (
        select attributes->>'mediaId' as media_id from lead_events
@@ -94,11 +157,13 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
      )
      select mi.media_id, m.instagram_account_id,
             coalesce(c.comment_count, 0) as comment_count, c.last_seen_at,
-            m.caption, m.media_type, m.thumbnail_url, m.permalink, m.posted_at, m.fetched_at
+            m.caption, m.media_type, m.thumbnail_url, m.permalink, m.posted_at, m.fetched_at,
+            m.refresh_retry_at, coalesce(m.refresh_failure_count, 0) as refresh_failure_count
      from media_ids mi
      left join counts c on c.media_id = mi.media_id
      left join lateral (
-       select instagram_account_id, caption, media_type, thumbnail_url, permalink, posted_at, fetched_at
+       select instagram_account_id, caption, media_type, thumbnail_url, permalink, posted_at, fetched_at,
+              refresh_retry_at, refresh_failure_count
        from media_metadata
        where tenant_id = $1 and media_id = mi.media_id
        order by fetched_at desc nulls last, id desc
@@ -118,5 +183,7 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
     permalink: row.permalink,
     postedAt: row.posted_at,
     fetchedAt: row.fetched_at,
+    refreshRetryAt: row.refresh_retry_at,
+    refreshFailureCount: Number(row.refresh_failure_count),
   }));
 }
