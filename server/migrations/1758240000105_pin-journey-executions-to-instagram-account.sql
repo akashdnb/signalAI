@@ -26,11 +26,14 @@ where je.instagram_account_id is null
 
 drop index journey_executions_active_subject_unique;
 
+-- PostgreSQL UNIQUE indexes treat NULL values as distinct. Use a normalized
+-- expression so legacy account-less executions retain the original one-active-
+-- execution invariant, while account-specific executions remain isolated.
 create unique index journey_executions_active_subject_unique
   on journey_executions (
     tenant_id,
     campaign_id,
-    instagram_account_id,
+    coalesce(instagram_account_id, ''),
     subject_key
   )
   where status in ('running', 'waiting', 'handoff');
