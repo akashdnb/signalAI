@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getQueueConfig } from "../boss.js";
 
 const ORIGINAL_ENV = {
   QUEUE_USE_LISTEN_NOTIFY: process.env.QUEUE_USE_LISTEN_NOTIFY,
@@ -16,10 +15,12 @@ afterEach(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
+  vi.resetModules();
 });
 
 describe("queue configuration", () => {
-  it("defaults LISTEN/NOTIFY off and keeps interactive work faster than background work", () => {
+  it("defaults LISTEN/NOTIFY off and keeps interactive work faster than background work", async () => {
+    const { getQueueConfig } = await import("../boss.js");
     const config = getQueueConfig({});
 
     expect(config.useListenNotify).toBe(false);
@@ -31,7 +32,8 @@ describe("queue configuration", () => {
     expect(config.backgroundPoll.notifyPollingIntervalSeconds).toBe(600);
   });
 
-  it("honors explicit queue environment overrides", () => {
+  it("honors explicit queue environment overrides", async () => {
+    const { getQueueConfig } = await import("../boss.js");
     const config = getQueueConfig({
       QUEUE_USE_LISTEN_NOTIFY: "true",
       QUEUE_INTERACTIVE_POLL_SECONDS: "7",
@@ -48,20 +50,35 @@ describe("queue configuration", () => {
     expect(config.backgroundPoll).toEqual({ pollingIntervalSeconds: 120, notifyPollingIntervalSeconds: 240 });
   });
 
-  it("updates an existing queue's notify setting to match the LISTEN/NOTIFY mode", async () => {
+  it("sets existing queues to notify=false by default", async () => {
+    delete process.env.QUEUE_USE_LISTEN_NOTIFY;
+    vi.resetModules();
+    const { ensureNotifyQueue, QUEUE_USE_LISTEN_NOTIFY } = await import("../boss.js");
     const boss = {
       createQueue: vi.fn().mockResolvedValue(undefined),
       updateQueue: vi.fn().mockResolvedValue(undefined),
     };
 
-    const { ensureNotifyQueue, QUEUE_USE_LISTEN_NOTIFY } = await import("../boss.js");
     await ensureNotifyQueue(boss as never, "instagram-inbound");
 
-    expect(boss.createQueue).toHaveBeenCalledWith("instagram-inbound", {
-      notify: QUEUE_USE_LISTEN_NOTIFY,
-    });
-    expect(boss.updateQueue).toHaveBeenCalledWith("instagram-inbound", {
-      notify: QUEUE_USE_LISTEN_NOTIFY,
-    });
+    expect(QUEUE_USE_LISTEN_NOTIFY).toBe(false);
+    expect(boss.createQueue).toHaveBeenCalledWith("instagram-inbound", { notify: false });
+    expect(boss.updateQueue).toHaveBeenCalledWith("instagram-inbound", { notify: false });
+  });
+
+  it("sets existing queues to notify=true when LISTEN/NOTIFY is explicitly enabled", async () => {
+    process.env.QUEUE_USE_LISTEN_NOTIFY = "true";
+    vi.resetModules();
+    const { ensureNotifyQueue, QUEUE_USE_LISTEN_NOTIFY } = await import("../boss.js");
+    const boss = {
+      createQueue: vi.fn().mockResolvedValue(undefined),
+      updateQueue: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await ensureNotifyQueue(boss as never, "instagram-inbound");
+
+    expect(QUEUE_USE_LISTEN_NOTIFY).toBe(true);
+    expect(boss.createQueue).toHaveBeenCalledWith("instagram-inbound", { notify: true });
+    expect(boss.updateQueue).toHaveBeenCalledWith("instagram-inbound", { notify: true });
   });
 });
