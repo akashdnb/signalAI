@@ -49,7 +49,7 @@ describe("content observed-media route", () => {
     await closePool();
   });
 
-  it("backs off failed metadata refreshes and keeps the cached preview untouched", async () => {
+  it("backs off repeated failures, caps the retry budget, and keeps the cached preview untouched", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "content-retry");
     await upsertToken(pool, keyring, {
@@ -78,17 +78,21 @@ describe("content observed-media route", () => {
 
     vi.mocked(global.fetch).mockRejectedValue(new Error("Graph API unavailable"));
 
-    const first = await request(app)
-      .get(`/tenants/${tenant.id}/observed-media`)
-      .set(authHeader);
+    const getMedia = () => request(app).get(`/tenants/${tenant.id}/observed-media`).set(authHeader);
+    const clearRetry = () =>
+      pool.query(
+        `update media_metadata set refresh_retry_at = now() - interval '1 second'
+          where tenant_id = $1 and media_id = 'media-retry'`,
+        [tenant.id],
+      );
+
+    const first = await getMedia();
     expect(first.status).toBe(200);
-    expect(first.body).toEqual([
-      expect.objectContaining({
-        mediaId: "media-retry",
-        caption: "Cached caption",
-        thumbnailUrl: "https://x/cached.jpg",
-      }),
-    ]);
+    expect(first.body[0]).toMatchObject({
+      mediaId: "media-retry",
+      caption: "Cached caption",
+      thumbnailUrl: "https://x/cached.jpg",
+    });
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     const stateAfterFirstFailure = await pool.query(
@@ -99,19 +103,40 @@ describe("content observed-media route", () => {
     );
     expect(stateAfterFirstFailure.rows[0].fetched_at).toBeInstanceOf(Date);
     expect(stateAfterFirstFailure.rows[0].refresh_failure_count).toBe(1);
-    expect(stateAfterFirstFailure.rows[0].refresh_retry_at).toBeInstanceOf(Date);
     expect((stateAfterFirstFailure.rows[0].refresh_retry_at as Date).getTime()).toBeGreaterThan(Date.now());
 
-    const second = await request(app)
-      .get(`/tenants/${tenant.id}/observed-media`)
-      .set(authHeader);
-    expect(second.status).toBe(200);
-    expect(second.body[0]).toMatchObject({
-      mediaId: "media-retry",
-      caption: "Cached caption",
-      thumbnailUrl: "https://x/cached.jpg",
-    });
+    const second = await getMedia();
+    expect(second.body[0]).toMatchObject({ mediaId: "media-retry", thumbnailUrl: "https://x/cached.jpg" });
     expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    await clearRetry();
+    await getMedia();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(
+      (await pool.query(
+        `select refresh_failure_count from media_metadata where tenant_id = $1 and media_id = 'media-retry'`,
+        [tenant.id],
+      )).rows[0].refresh_failure_count,
+    ).toBe(2);
+
+    await clearRetry();
+    await getMedia();
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+
+    await clearRetry();
+    await getMedia();
+    const cappedState = await pool.query(
+      `select refresh_failure_count, refresh_retry_at
+         from media_metadata
+        where tenant_id = $1 and media_id = 'media-retry'`,
+      [tenant.id],
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+    expect(cappedState.rows[0].refresh_failure_count).toBe(3);
+    expect((cappedState.rows[0].refresh_retry_at as Date).getTime()).toBeGreaterThan(Date.now());
+
+    await getMedia();
+    expect(global.fetch).toHaveBeenCalledTimes(4);
   });
 
   it("refreshes stale metadata successfully and clears previous retry state", async () => {
