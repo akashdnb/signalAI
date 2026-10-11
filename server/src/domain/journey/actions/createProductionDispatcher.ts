@@ -78,7 +78,7 @@ class TenantAwareInstagramMessageSender
       throw new Error(
         request.instagramAccountId
           ? `Instagram account ${request.instagramAccountId} is not connected for tenant ${request.tenantId}`
-          : `No sole connected Instagram account for tenant ${request.tenantId}`,
+          : `No connected Instagram account for tenant ${request.tenantId}`,
       );
     }
 
