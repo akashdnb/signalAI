@@ -99,19 +99,19 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
     console.error("Unhandled route error:", err);
     if (res.headersSent) return;
 
+    const isObject = err !== null && typeof err === "object";
     const statusCode =
-      err && typeof err === "object" && "statusCode" in err &&
-      typeof (err as { statusCode?: unknown }).statusCode === "number"
+      isObject && "statusCode" in err && typeof (err as { statusCode?: unknown }).statusCode === "number"
         ? (err as { statusCode: number }).statusCode
         : 500;
-    const message =
-      statusCode >= 500
-        ? "internal server error"
-        : err instanceof Error
-          ? err.message
-          : "request failed";
+    const expose = isObject && "expose" in err && (err as { expose?: unknown }).expose === true;
+    const safeStatusCode = statusCode >= 400 && statusCode < 500 ? statusCode : 500;
 
-    res.status(statusCode).json({ error: message });
+    if (expose && safeStatusCode < 500 && err instanceof Error) {
+      return res.status(safeStatusCode).json({ error: err.message });
+    }
+
+    res.status(500).json({ error: "internal server error" });
   });
 
   return app;
