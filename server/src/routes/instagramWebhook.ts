@@ -189,8 +189,12 @@ export function createInstagramWebhookRouter(
                 {
                   tenantId:
                     account.tenantId,
+                  // Persist the provider's Instagram account id. The
+                  // journey execution account column is keyed by this value;
+                  // account.id is the internal meta_tokens row id and must not
+                  // be mixed with the provider account identifier.
                   instagramAccountId:
-                    account.id,
+                    event.instagramAccountId,
                   providerEventId:
                     event.providerEventId,
                   instagramUserId:
