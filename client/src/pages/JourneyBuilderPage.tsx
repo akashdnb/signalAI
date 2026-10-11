@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Campaign } from "../api";
+import { JourneyAccountsPanel } from "../components/JourneyAccountsPanel";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
 
 export function JourneyBuilderPage() {
@@ -28,8 +29,6 @@ export function JourneyBuilderPage() {
     }
   }, [tenantId, campaignId]);
 
-  // Refresh only the campaign document. Keep the builder mounted while
-  // inspector saves update campaign metadata.
   const refreshCampaign = useCallback(async () => {
     if (!tenantId || !campaignId) return;
 
@@ -74,6 +73,7 @@ export function JourneyBuilderPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-56px)] flex-col px-3 py-3 md:px-4 md:py-3">
+      <JourneyAccountsPanel tenantId={tenantId} campaignId={campaignId} />
       <JourneyBuilder
         tenantId={tenantId}
         campaign={campaign}
