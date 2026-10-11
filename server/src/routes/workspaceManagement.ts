@@ -47,9 +47,8 @@ workspaceManagementRouter.get(
       user_id: string;
       email: string;
       role: "owner" | "admin" | "member";
-      created_at: Date;
     }>(
-      `select tm.user_id, u.email, tm.role, tm.created_at
+      `select tm.user_id, u.email, tm.role
          from tenant_members tm
          join users u on u.id = tm.user_id
         where tm.tenant_id = $1
@@ -57,12 +56,13 @@ workspaceManagementRouter.get(
       [req.params.tenantId],
     );
 
+    // Keep the existing /members response contract stable. The Team UI does not
+    // need membership timestamps, and older consumers/tests expect these fields only.
     return res.json(
       result.rows.map((row) => ({
         userId: row.user_id,
         email: row.email,
         role: row.role,
-        createdAt: row.created_at,
       })),
     );
   },
