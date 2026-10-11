@@ -8,6 +8,7 @@ import { getTenant } from "../db/tenants.js";
 import {
   createTenantInvitation,
   getPendingInvitationForEmail,
+  getPendingInvitation,
   listTenantInvitations,
   revokeTenantInvitation,
   resendTenantInvitation,
@@ -85,36 +86,25 @@ workspaceManagementRouter.post(
     const emailValue = req.body?.email;
     const roleValue = req.body?.role ?? "member";
 
-    if (!isValidEmail(emailValue)) {
-      return res.status(400).json({ error: "a valid email is required" });
-    }
-    if (!isInvitationRole(roleValue)) {
-      return res.status(400).json({ error: "role must be admin or member" });
-    }
+    if (!isValidEmail(emailValue)) return res.status(400).json({ error: "a valid email is required" });
+    if (!isInvitationRole(roleValue)) return res.status(400).json({ error: "role must be admin or member" });
 
     const email = normalizeEmail(emailValue);
     const pool = getPool();
-
     const member = await pool.query(
       `select 1 from tenant_members tm join users u on u.id = tm.user_id
         where tm.tenant_id = $1 and u.email = $2 limit 1`,
       [req.params.tenantId, email],
     );
-    if (member.rowCount) {
-      return res.status(409).json({ error: "user is already a member of this tenant" });
-    }
+    if (member.rowCount) return res.status(409).json({ error: "user is already a member of this tenant" });
 
     const existing = await getPendingInvitationForEmail(pool, req.params.tenantId!, email);
-    if (existing) {
-      return res.status(409).json({ error: "an invitation is already pending for this email" });
-    }
+    if (existing) return res.status(409).json({ error: "an invitation is already pending for this email" });
 
     const inviterId = req.tenantSession!.userId;
     const inviter = await getUserById(pool, inviterId);
     const tenant = await getTenant(pool, req.params.tenantId!);
-    if (!inviter || !tenant) {
-      return res.status(404).json({ error: "tenant or inviter not found" });
-    }
+    if (!inviter || !tenant) return res.status(404).json({ error: "tenant or inviter not found" });
 
     const token = randomBytes(32).toString("base64url");
     const invitation = await createTenantInvitation(pool, {
@@ -127,7 +117,6 @@ workspaceManagementRouter.post(
     });
 
     const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(token)}`;
-
     try {
       await sendTenantInvitationEmail(email, tenant.name, inviter.email, inviteUrl);
     } catch (error) {
@@ -144,26 +133,36 @@ workspaceManagementRouter.post(
   requireTenantRole("owner", "admin"),
   async (req, res) => {
     const pool = getPool();
+    const current = await getPendingInvitation(pool, req.params.tenantId!, req.params.invitationId!);
+    if (!current) return res.status(404).json({ error: "pending invitation not found" });
+
+    const inviter = await getUserById(pool, req.tenantSession!.userId);
+    const tenant = await getTenant(pool, req.params.tenantId!);
+    if (!inviter || !tenant) return res.status(404).json({ error: "tenant or inviter not found" });
+
     const invitationToken = randomBytes(32).toString("base64url");
+    const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(invitationToken)}`;
+
+    // Keep the existing invitation valid until delivery succeeds. A failed
+    // provider call therefore never strands the recipient without a usable
+    // invitation; a subsequent retry simply generates another replacement.
+    try {
+      await sendTenantInvitationEmail(current.email, tenant.name, inviter.email, inviteUrl);
+    } catch (error) {
+      console.error("Failed to resend workspace invitation email:", error);
+      return res.status(202).json({ invitation: current, delivery: "failed" });
+    }
+
     const invitation = await resendTenantInvitation(pool, {
       tenantId: req.params.tenantId!,
       invitationId: req.params.invitationId!,
       tokenHash: hashInvitationToken(invitationToken),
       expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
     });
-
-    if (!invitation) return res.status(404).json({ error: "pending invitation not found" });
-
-    const inviter = await getUserById(pool, req.tenantSession!.userId);
-    const tenant = await getTenant(pool, req.params.tenantId!);
-    if (!inviter || !tenant) return res.status(404).json({ error: "tenant or inviter not found" });
-
-    const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(invitationToken)}`;
-    try {
-      await sendTenantInvitationEmail(invitation.email, tenant.name, inviter.email, inviteUrl);
-    } catch (error) {
-      console.error("Failed to resend workspace invitation email:", error);
-      return res.status(202).json({ invitation, delivery: "failed" });
+    if (!invitation) {
+      // The invitation may have been accepted/revoked while the provider call
+      // was in flight. Never restore or mutate an already-consumed invitation.
+      return res.status(409).json({ error: "invitation is no longer pending" });
     }
 
     return res.status(200).json({ invitation, delivery: "sent" });
@@ -174,11 +173,7 @@ workspaceManagementRouter.post(
   "/tenants/:tenantId/invitations/:invitationId/revoke",
   requireTenantRole("owner", "admin"),
   async (req, res) => {
-    const revoked = await revokeTenantInvitation(
-      getPool(),
-      req.params.tenantId!,
-      req.params.invitationId!,
-    );
+    const revoked = await revokeTenantInvitation(getPool(), req.params.tenantId!, req.params.invitationId!);
     if (!revoked) return res.status(404).json({ error: "invitation not found" });
     return res.status(204).send();
   },
@@ -189,9 +184,7 @@ workspaceManagementRouter.patch(
   requireTenantRole("owner", "admin"),
   async (req, res) => {
     const role = req.body?.role;
-    if (!isInvitationRole(role)) {
-      return res.status(400).json({ error: "role must be admin or member" });
-    }
+    if (!isInvitationRole(role)) return res.status(400).json({ error: "role must be admin or member" });
 
     const updated = await updateTenantMemberRole(
       getPool(),
@@ -239,18 +232,11 @@ workspaceManagementRouter.post("/invitations/:token/accept", async (req, res) =>
   const client = await pool.connect();
   try {
     await client.query("begin");
-    const invitation = await acceptTenantInvitation(
-      client,
-      hashInvitationToken(req.params.token!),
-      session.userId,
-      normalizeEmail(user.email),
-    );
-
+    const invitation = await acceptTenantInvitation(client, hashInvitationToken(req.params.token!), session.userId, normalizeEmail(user.email));
     if (!invitation) {
       await client.query("rollback");
       return res.status(400).json({ error: "invalid, expired, revoked, or mismatched invitation" });
     }
-
     await client.query("commit");
     return res.status(200).json({ tenantId: invitation.tenantId, role: invitation.role });
   } catch (error) {
@@ -274,11 +260,7 @@ workspaceManagementRouter.delete(
   "/tenants/:tenantId/connected-accounts/:accountId",
   requireTenantRole("owner", "admin"),
   async (req, res) => {
-    const deleted = await deleteConnectedInstagramAccount(
-      getPool(),
-      req.params.tenantId!,
-      req.params.accountId!,
-    );
+    const deleted = await deleteConnectedInstagramAccount(getPool(), req.params.tenantId!, req.params.accountId!);
     if (!deleted) return res.status(404).json({ error: "connected account not found" });
     return res.status(204).send();
   },
@@ -288,11 +270,7 @@ workspaceManagementRouter.get(
   "/tenants/:tenantId/campaigns/:campaignId/connected-accounts",
   requireTenantRole("owner", "admin", "member"),
   async (req, res) => {
-    const accounts = await listCampaignInstagramAccounts(
-      getPool(),
-      req.params.tenantId!,
-      req.params.campaignId!,
-    );
+    const accounts = await listCampaignInstagramAccounts(getPool(), req.params.tenantId!, req.params.campaignId!);
     return res.json({ accounts });
   },
 );
@@ -301,12 +279,7 @@ workspaceManagementRouter.post(
   "/tenants/:tenantId/campaigns/:campaignId/connected-accounts/:accountId",
   requireTenantRole("owner", "admin"),
   async (req, res) => {
-    const binding = await attachCampaignToInstagramAccount(
-      getPool(),
-      req.params.tenantId!,
-      req.params.campaignId!,
-      req.params.accountId!,
-    );
+    const binding = await attachCampaignToInstagramAccount(getPool(), req.params.tenantId!, req.params.campaignId!, req.params.accountId!);
     return res.status(201).json({ account: binding });
   },
 );
@@ -315,12 +288,7 @@ workspaceManagementRouter.delete(
   "/tenants/:tenantId/campaigns/:campaignId/connected-accounts/:accountId",
   requireTenantRole("owner", "admin"),
   async (req, res) => {
-    const deleted = await detachCampaignFromInstagramAccount(
-      getPool(),
-      req.params.tenantId!,
-      req.params.campaignId!,
-      req.params.accountId!,
-    );
+    const deleted = await detachCampaignFromInstagramAccount(getPool(), req.params.tenantId!, req.params.campaignId!, req.params.accountId!);
     if (!deleted) return res.status(404).json({ error: "journey/account binding not found" });
     return res.status(204).send();
   },
