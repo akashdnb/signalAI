@@ -66,7 +66,6 @@ function toCampaign(row: CampaignRow): Campaign {
     ctaLink: row.cta_link,
     targetMediaIds: row.target_media_ids,
     replyChannel: row.reply_channel,
-    triggerSource: row.trigger_source,
     tone: row.tone,
     language: row.language,
     useKnowledgeBase: row.use_knowledge_base,
@@ -208,10 +207,21 @@ export async function setCampaignEnabled(
         set enabled = $3, updated_at = now()
       where id = $1
         and tenant_id = $2
-        and ($3 = false or exists (
-          select 1 from campaign_journey_versions published
-           where published.tenant_id = campaigns.tenant_id
-             and published.campaign_id = campaigns.id
+        and ($3 = false or (
+          exists (
+            select 1 from campaign_journey_versions published
+             where published.tenant_id = campaigns.tenant_id
+               and published.campaign_id = campaigns.id
+          )
+          and exists (
+            select 1
+              from campaign_instagram_accounts cia
+              join meta_tokens mt on mt.id = cia.meta_token_id
+             where cia.campaign_id = campaigns.id
+               and cia.enabled = true
+               and mt.tenant_id = campaigns.tenant_id
+               and mt.status = 'healthy'
+          )
         ))`,
     [campaignId, tenantId, enabled],
   );
