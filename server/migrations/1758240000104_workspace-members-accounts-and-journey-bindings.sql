@@ -30,10 +30,6 @@ create index tenant_invitations_tenant_idx
 create index tenant_invitations_email_idx
   on tenant_invitations (tenant_id, email);
 
-create unique index tenant_invitations_pending_email_idx
-  on tenant_invitations (tenant_id, email)
-  where accepted_at is null and revoked_at is null and expires_at > now();
-
 create table campaign_instagram_accounts (
   campaign_id uuid not null references campaigns(id) on delete cascade,
   meta_token_id uuid not null references meta_tokens(id) on delete cascade,
@@ -58,5 +54,4 @@ on conflict (campaign_id, meta_token_id) do nothing;
 -- Down Migration
 
 drop table campaign_instagram_accounts;
-drop index if exists tenant_invitations_pending_email_idx;
 drop table tenant_invitations;
