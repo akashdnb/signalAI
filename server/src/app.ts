@@ -54,21 +54,6 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
     next();
   });
 
-  // API GETs are personalized but frequently re-requested by the dashboard
-  // (notably Inbox polling). Keep them in the browser's private cache while
-  // forcing validation on reuse. Express already emits ETags by default, so
-  // unchanged responses become tiny 304s instead of retransmitting JSON.
-  // This is intentionally `private`: tenant/user data must never be shared
-  // through an intermediary cache. Vary by bearer token so two users sharing
-  // a browser profile can never reuse one another's cached API response.
-  app.use((req, res, next) => {
-    if (req.method === "GET" || req.method === "HEAD") {
-      res.setHeader("Cache-Control", "private, no-cache");
-      res.vary("Authorization");
-    }
-    next();
-  });
-
   app.use(express.urlencoded({ extended: false }));
 
   app.use(
@@ -99,13 +84,29 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(campaignsRouter);
   app.use(journeyRuntimeRouter);
   app.use(billingRouter);
-  app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
   app.use(leadsRouter);
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);
   app.use(leadScoringRulesRouter);
   app.use(fieldDefinitionsRouter);
   app.use(onboardingRouter);
+
+  // Dashboard reads are personalized tenant data. Limit browser revalidation
+  // to this authenticated dashboard surface instead of applying cache headers
+  // globally to auth, webhooks, health, legal, and other sensitive endpoints.
+  // Account health is deliberately never retained by the browser.
+  app.use("/tenants/:tenantId", (req, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD") {
+      if (req.path === "/account") {
+        res.setHeader("Cache-Control", "no-store");
+      } else {
+        res.setHeader("Cache-Control", "private, no-cache");
+        res.vary("Authorization");
+      }
+    }
+    next();
+  });
+  app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
 
   // Last middleware = error handler.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
