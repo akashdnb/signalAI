@@ -1,25 +1,58 @@
 import { PgBoss } from "pg-boss";
 
-// Render Free currently uses Neon's pooled endpoint. LISTEN/NOTIFY is not
-// available through that pooler, so pg-boss repeatedly attempts to register a
-// listener and falls back to polling anyway. Keep LISTEN opt-in for a future
-// paid/direct-database deployment, but avoid the failed listener connection
-// and its heartbeat traffic on the free-tier deployment.
-export const QUEUE_USE_LISTEN_NOTIFY =
-  process.env.QUEUE_USE_LISTEN_NOTIFY === "true";
+export type QueueConfig = {
+  useListenNotify: boolean;
+  interactivePoll: {
+    pollingIntervalSeconds: number;
+    notifyPollingIntervalSeconds: number;
+  };
+  fastPoll: {
+    pollingIntervalSeconds: number;
+    notifyPollingIntervalSeconds: number;
+  };
+  backgroundPoll: {
+    pollingIntervalSeconds: number;
+    notifyPollingIntervalSeconds: number;
+  };
+};
 
-// Every idle poll is a round-trip to the external (Neon) database and counts
-// as billable egress. With LISTEN disabled on the pooled endpoint, these are
-// the actual worker wake-up intervals. Free-tier defaults deliberately favor
-// bandwidth over sub-second queue latency; Render env vars can override them.
-export const FAST_POLL = {
-  pollingIntervalSeconds: Number(process.env.QUEUE_FAST_POLL_SECONDS ?? "30"),
-  notifyPollingIntervalSeconds: Number(process.env.QUEUE_FAST_NOTIFY_POLL_SECONDS ?? "60"),
-};
-export const BACKGROUND_POLL = {
-  pollingIntervalSeconds: Number(process.env.QUEUE_BACKGROUND_POLL_SECONDS ?? "300"),
-  notifyPollingIntervalSeconds: Number(process.env.QUEUE_BACKGROUND_NOTIFY_POLL_SECONDS ?? "600"),
-};
+/**
+ * Render Free currently uses Neon's pooled endpoint. LISTEN/NOTIFY is not
+ * available through that pooler, so pg-boss repeatedly attempts to register a
+ * listener and falls back to polling anyway. Keep LISTEN opt-in for a future
+ * paid/direct-database deployment, but avoid the failed listener connection
+ * and its heartbeat traffic on the free-tier deployment.
+ *
+ * Interactive queues get a tighter polling interval because they sit directly
+ * on the Instagram webhook -> AI reply path. Background work can tolerate the
+ * slower interval and saves more database egress while the free-tier limit is
+ * tight.
+ */
+export function getQueueConfig(env: NodeJS.ProcessEnv = process.env): QueueConfig {
+  const useListenNotify = env.QUEUE_USE_LISTEN_NOTIFY === "true";
+  return {
+    useListenNotify,
+    interactivePoll: {
+      pollingIntervalSeconds: Number(env.QUEUE_INTERACTIVE_POLL_SECONDS ?? "10"),
+      notifyPollingIntervalSeconds: Number(env.QUEUE_INTERACTIVE_NOTIFY_POLL_SECONDS ?? "10"),
+    },
+    fastPoll: {
+      pollingIntervalSeconds: Number(env.QUEUE_FAST_POLL_SECONDS ?? "30"),
+      notifyPollingIntervalSeconds: Number(env.QUEUE_FAST_NOTIFY_POLL_SECONDS ?? "60"),
+    },
+    backgroundPoll: {
+      pollingIntervalSeconds: Number(env.QUEUE_BACKGROUND_POLL_SECONDS ?? "300"),
+      notifyPollingIntervalSeconds: Number(env.QUEUE_BACKGROUND_NOTIFY_POLL_SECONDS ?? "600"),
+    },
+  };
+}
+
+const QUEUE_CONFIG = getQueueConfig();
+
+export const QUEUE_USE_LISTEN_NOTIFY = QUEUE_CONFIG.useListenNotify;
+export const INTERACTIVE_POLL = QUEUE_CONFIG.interactivePoll;
+export const FAST_POLL = QUEUE_CONFIG.fastPoll;
+export const BACKGROUND_POLL = QUEUE_CONFIG.backgroundPoll;
 
 /**
  * createQueue is a no-op for an existing queue, so updateQueue backfills the
