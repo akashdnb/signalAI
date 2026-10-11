@@ -10,6 +10,9 @@ import {
   getPendingInvitationForEmail,
   listTenantInvitations,
   revokeTenantInvitation,
+  resendTenantInvitation,
+  updateTenantMemberRole,
+  removeTenantMember,
   acceptTenantInvitation,
 } from "../db/tenantInvitations.js";
 import {
@@ -56,8 +59,6 @@ workspaceManagementRouter.get(
       [req.params.tenantId],
     );
 
-    // Keep the existing /members response contract stable. The Team UI does not
-    // need membership timestamps, and older consumers/tests expect these fields only.
     return res.json(
       result.rows.map((row) => ({
         userId: row.user_id,
@@ -139,6 +140,37 @@ workspaceManagementRouter.post(
 );
 
 workspaceManagementRouter.post(
+  "/tenants/:tenantId/invitations/:invitationId/resend",
+  requireTenantRole("owner", "admin"),
+  async (req, res) => {
+    const pool = getPool();
+    const invitationToken = randomBytes(32).toString("base64url");
+    const invitation = await resendTenantInvitation(pool, {
+      tenantId: req.params.tenantId!,
+      invitationId: req.params.invitationId!,
+      tokenHash: hashInvitationToken(invitationToken),
+      expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+    });
+
+    if (!invitation) return res.status(404).json({ error: "pending invitation not found" });
+
+    const inviter = await getUserById(pool, req.tenantSession!.userId);
+    const tenant = await getTenant(pool, req.params.tenantId!);
+    if (!inviter || !tenant) return res.status(404).json({ error: "tenant or inviter not found" });
+
+    const inviteUrl = `${config.webAppOrigin}/invite?token=${encodeURIComponent(invitationToken)}`;
+    try {
+      await sendTenantInvitationEmail(invitation.email, tenant.name, inviter.email, inviteUrl);
+    } catch (error) {
+      console.error("Failed to resend workspace invitation email:", error);
+      return res.status(202).json({ invitation, delivery: "failed" });
+    }
+
+    return res.status(200).json({ invitation, delivery: "sent" });
+  },
+);
+
+workspaceManagementRouter.post(
   "/tenants/:tenantId/invitations/:invitationId/revoke",
   requireTenantRole("owner", "admin"),
   async (req, res) => {
@@ -148,6 +180,50 @@ workspaceManagementRouter.post(
       req.params.invitationId!,
     );
     if (!revoked) return res.status(404).json({ error: "invitation not found" });
+    return res.status(204).send();
+  },
+);
+
+workspaceManagementRouter.patch(
+  "/tenants/:tenantId/members/:memberId",
+  requireTenantRole("owner", "admin"),
+  async (req, res) => {
+    const role = req.body?.role;
+    if (!isInvitationRole(role)) {
+      return res.status(400).json({ error: "role must be admin or member" });
+    }
+
+    const updated = await updateTenantMemberRole(
+      getPool(),
+      req.params.tenantId!,
+      req.tenantSession!.userId,
+      req.params.memberId!,
+      role,
+    );
+    if (!updated) return res.status(404).json({ error: "member not found or cannot be changed" });
+
+    const member = await getPool().query(
+      `select tm.user_id, u.email, tm.role
+         from tenant_members tm
+         join users u on u.id = tm.user_id
+        where tm.tenant_id = $1 and tm.user_id = $2`,
+      [req.params.tenantId, req.params.memberId],
+    );
+    return res.json({ member: member.rows[0] });
+  },
+);
+
+workspaceManagementRouter.delete(
+  "/tenants/:tenantId/members/:memberId",
+  requireTenantRole("owner", "admin"),
+  async (req, res) => {
+    const removed = await removeTenantMember(
+      getPool(),
+      req.params.tenantId!,
+      req.tenantSession!.userId,
+      req.params.memberId!,
+    );
+    if (!removed) return res.status(404).json({ error: "member not found or cannot be removed" });
     return res.status(204).send();
   },
 );
