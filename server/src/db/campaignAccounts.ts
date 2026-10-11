@@ -29,8 +29,10 @@ export async function listCampaignInstagramAccounts(
             cia.enabled,
             mt.instagram_account_id
        from campaign_instagram_accounts cia
+       join campaigns c on c.id = cia.campaign_id
        join meta_tokens mt on mt.id = cia.meta_token_id
       where cia.campaign_id = $1
+        and c.tenant_id = $2
         and mt.tenant_id = $2
       order by mt.created_at asc`,
     [campaignId, tenantId],
@@ -47,9 +49,12 @@ export async function attachCampaignToInstagramAccount(
 ): Promise<CampaignInstagramAccountBinding> {
   const result = await pool.query(
     `insert into campaign_instagram_accounts (campaign_id, meta_token_id)
-     select $1, mt.id
-       from meta_tokens mt
-      where mt.id = $2
+     select c.id, mt.id
+       from campaigns c
+       join meta_tokens mt on mt.tenant_id = c.tenant_id
+      where c.id = $1
+        and c.tenant_id = $3
+        and mt.id = $2
         and mt.tenant_id = $3
      on conflict (campaign_id, meta_token_id)
      do update set enabled = true, updated_at = now()
@@ -64,8 +69,12 @@ export async function attachCampaignToInstagramAccount(
   const row = await pool.query(
     `select cia.campaign_id, cia.meta_token_id, cia.enabled, mt.instagram_account_id
        from campaign_instagram_accounts cia
+       join campaigns c on c.id = cia.campaign_id
        join meta_tokens mt on mt.id = cia.meta_token_id
-      where cia.campaign_id = $1 and cia.meta_token_id = $2 and mt.tenant_id = $3`,
+      where cia.campaign_id = $1
+        and cia.meta_token_id = $2
+        and c.tenant_id = $3
+        and mt.tenant_id = $3`,
     [campaignId, accountId, tenantId],
   );
 
@@ -80,10 +89,12 @@ export async function detachCampaignFromInstagramAccount(
 ): Promise<boolean> {
   const result = await pool.query(
     `delete from campaign_instagram_accounts cia
-      using meta_tokens mt
+      using campaigns c, meta_tokens mt
       where cia.campaign_id = $1
         and cia.meta_token_id = $2
+        and c.id = cia.campaign_id
         and mt.id = cia.meta_token_id
+        and c.tenant_id = $3
         and mt.tenant_id = $3`,
     [campaignId, accountId, tenantId],
   );
