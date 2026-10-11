@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPool, closePool } from "../pool.js";
+import { closePool, getPool } from "../pool.js";
 import { createTenant } from "../tenants.js";
-import { getDecryptedToken, upsertToken } from "../tokens.js";
+import { getDecryptedToken, markTokenError, upsertToken } from "../tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
 describe("token vault repository", () => {
@@ -76,11 +76,6 @@ describe("token vault repository", () => {
     expect(await getDecryptedToken(pool, keyring, tenant.id, "acct-1")).toBe("second-token");
   });
 
-  // R5-01: the unique index moved from (tenant_id, instagram_account_id) to
-  // instagram_account_id alone — one Instagram account can only ever
-  // belong to one tenant. Without this, two tenants could each hold a row
-  // for the same account and findTenantByInstagramAccountId would resolve
-  // to an arbitrary one of them.
   it("re-upserting the same account under a different tenant reassigns it rather than creating a second row", async () => {
     const pool = getPool();
     const tenantA = await createTenant(pool, "creator-a");
@@ -96,6 +91,26 @@ describe("token vault repository", () => {
     expect(rows.rows[0].tenant_id).toBe(tenantB.id);
     expect(await getDecryptedToken(pool, keyring, tenantA.id, "acct-shared")).toBeNull();
     expect(await getDecryptedToken(pool, keyring, tenantB.id, "acct-shared")).toBe("t2");
+  });
+
+  it("rejects outbound token lookup after the connected account becomes unhealthy", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-1",
+      accessToken: "healthy-token",
+    });
+
+    await markTokenError(pool, tenant.id, "acct-1", "Instagram token revoked");
+
+    expect(await getDecryptedToken(pool, keyring, tenant.id, "acct-1")).toBeNull();
+    const binding = await pool.query(
+      "select enabled from campaign_instagram_accounts cia join meta_tokens mt on mt.id = cia.meta_token_id where mt.tenant_id = $1 and mt.instagram_account_id = 'acct-1'",
+      [tenant.id],
+    );
+    expect(binding.rows.every((row) => row.enabled === false)).toBe(true);
   });
 
   it("returns null for an account with no stored token", async () => {

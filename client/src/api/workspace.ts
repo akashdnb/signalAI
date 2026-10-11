@@ -122,6 +122,12 @@ export const workspaceApi = {
   disconnectAccount: (tenantId: string, accountId: string) =>
     request<void>(`/tenants/${tenantId}/connected-accounts/${accountId}`, { method: "DELETE" }),
 
+  startInstagramReconnect: (tenantId: string, accountId: string) =>
+    request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, {
+      method: "POST",
+      body: JSON.stringify({ accountId }),
+    }),
+
   listJourneyAccounts: (tenantId: string, campaignId: string) =>
     request<{ accounts: JourneyAccountBinding[] }>(`/tenants/${tenantId}/campaigns/${campaignId}/connected-accounts`).then((r) => r.accounts),
 

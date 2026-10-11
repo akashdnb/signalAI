@@ -11,6 +11,7 @@ export function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   async function loadAccounts() {
@@ -49,6 +50,19 @@ export function IntegrationsPage() {
     }
   }
 
+  async function handleReconnect(accountId: string) {
+    if (!tenantId) return;
+    setReconnectingId(accountId);
+    setError(null);
+    try {
+      const { url } = await workspaceApi.startInstagramReconnect(tenantId, accountId);
+      window.location.href = url;
+    } catch (err) {
+      setReconnectingId(null);
+      setError(err instanceof Error ? err.message : "Couldn't start the Instagram reconnect");
+    }
+  }
+
   async function handleDisconnect(accountId: string) {
     if (!tenantId) return;
     setDisconnectingId(accountId);
@@ -73,7 +87,7 @@ export function IntegrationsPage() {
           <h1>Integrations</h1>
           <p className="muted">Connect the channels signalAI can send and receive messages through.</p>
         </div>
-        <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting}>
+        <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
           <span className="inline-flex items-center gap-1.5">
             <InstagramMarkIcon className="h-4 w-4" />
             {connecting ? "Redirecting…" : "Add Instagram account"}
@@ -113,23 +127,36 @@ export function IntegrationsPage() {
                     {account.status === "error" && account.lastError && (
                       <span className="banner banner-error small mt-2" style={{ display: "block" }}>{account.lastError}</span>
                     )}
+                    {account.status === "error" && (
+                      <p className="muted small mt-2 mb-0">Reconnect this Instagram account to refresh its credential and restore its journey assignments.</p>
+                    )}
                   </span>
                 </span>
 
-                {confirmingId === account.id ? (
-                  <span className="flex shrink-0 gap-2">
-                    <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
-                      {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                <span className="flex shrink-0 gap-2">
+                  {account.status === "error" ? (
+                    <button
+                      className="btn-primary btn-small"
+                      onClick={() => void handleReconnect(account.id)}
+                      disabled={reconnectingId === account.id || connecting}
+                    >
+                      {reconnectingId === account.id ? "Redirecting…" : "Reconnect"}
                     </button>
-                    <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
-                      Cancel
+                  ) : confirmingId === account.id ? (
+                    <>
+                      <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
+                        {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                      </button>
+                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
+                      Disconnect
                     </button>
-                  </span>
-                ) : (
-                  <button className="btn-secondary btn-small shrink-0" onClick={() => setConfirmingId(account.id)}>
-                    Disconnect
-                  </button>
-                )}
+                  )}
+                </span>
               </div>
             ))}
           </div>
