@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createHash, randomBytes } from "node:crypto";
+import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { requireTenantRole, verifyBearerSession } from "../lib/tenantAuth.js";
 import { normalizeEmail, getUserById } from "../db/users.js";
@@ -124,18 +125,13 @@ workspaceManagementRouter.post(
       expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
     });
 
-    const inviteUrl = `${process.env.APP_BASE_URL ?? ""}/invite?token=${encodeURIComponent(token)}`;
+    const inviteUrl = `${config.appBaseUrl}/invite?token=${encodeURIComponent(token)}`;
 
     try {
       await sendTenantInvitationEmail(email, tenant.name, inviter.email, inviteUrl);
     } catch (error) {
-      // The invitation remains valid so an administrator can retry delivery.
-      // Do not expose the provider error to the browser.
       console.error("Failed to send workspace invitation email:", error);
-      return res.status(202).json({
-        invitation,
-        delivery: "failed",
-      });
+      return res.status(202).json({ invitation, delivery: "failed" });
     }
 
     return res.status(201).json({ invitation, delivery: "sent" });
