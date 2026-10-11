@@ -26,7 +26,7 @@ export function TeamPage() {
         workspaceApi.listInvitations(tenantId),
       ]);
       setMembers(nextMembers);
-      setInvitations(nextInvitations);
+      setInvitations(nextInvitations ?? []);
       setError(null);
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
