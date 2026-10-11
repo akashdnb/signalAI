@@ -51,45 +51,55 @@ export async function upsertMediaMetadata(
         metadata.postedAt,
       ],
     );
-    return;
+  } else {
+    // Legacy callers such as the URL-based campaign picker do not yet know
+    // which credential supplied the metadata. Keep those rows in the legacy
+    // nullable-account bucket until a connected account resolves them.
+    await pool.query(
+      `insert into media_metadata
+         (tenant_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
+          refresh_failure_count, refresh_retry_at)
+       values ($1, $2, $3, $4, $5, $6, $7, 0, null)
+       on conflict (tenant_id, media_id)
+       where instagram_account_id is null
+       do update set
+         caption = excluded.caption,
+         media_type = excluded.media_type,
+         thumbnail_url = excluded.thumbnail_url,
+         permalink = excluded.permalink,
+         posted_at = excluded.posted_at,
+         fetched_at = now(),
+         refresh_failure_count = 0,
+         refresh_retry_at = null`,
+      [
+        tenantId,
+        metadata.mediaId,
+        metadata.caption,
+        metadata.mediaType,
+        metadata.thumbnailUrl,
+        metadata.permalink,
+        metadata.postedAt,
+      ],
+    );
   }
 
-  // Legacy callers such as the URL-based campaign picker do not yet know
-  // which credential supplied the metadata. Keep those rows in the legacy
-  // nullable-account bucket until a connected account resolves them.
+  // Retry state is a property of the media item, not of whichever account
+  // row happened to resolve it. A successful refresh therefore clears the
+  // shared retry state on every row for this tenant/media pair.
   await pool.query(
-    `insert into media_metadata
-       (tenant_id, media_id, caption, media_type, thumbnail_url, permalink, posted_at,
-        refresh_failure_count, refresh_retry_at)
-     values ($1, $2, $3, $4, $5, $6, $7, 0, null)
-     on conflict (tenant_id, media_id)
-     where instagram_account_id is null
-     do update set
-       caption = excluded.caption,
-       media_type = excluded.media_type,
-       thumbnail_url = excluded.thumbnail_url,
-       permalink = excluded.permalink,
-       posted_at = excluded.posted_at,
-       fetched_at = now(),
-       refresh_failure_count = 0,
-       refresh_retry_at = null`,
-    [
-      tenantId,
-      metadata.mediaId,
-      metadata.caption,
-      metadata.mediaType,
-      metadata.thumbnailUrl,
-      metadata.permalink,
-      metadata.postedAt,
-    ],
+    `update media_metadata
+        set refresh_failure_count = 0,
+            refresh_retry_at = null
+      where tenant_id = $1 and media_id = $2`,
+    [tenantId, metadata.mediaId],
   );
 }
 
 /**
  * Record a failed enrichment without touching `fetched_at` or any cached
- * presentation fields. If the media has only been observed via a comment,
- * create a metadata placeholder so the retry state is durable across requests
- * while the existing bare media entry remains visible.
+ * presentation fields. Retry state is normalized across every account-scoped
+ * and legacy row for the media item so the next request cannot depend on
+ * which metadata row wins the presentation ordering.
  */
 export async function recordMediaMetadataRefreshFailure(
   pool: Queryable,
@@ -98,10 +108,17 @@ export async function recordMediaMetadataRefreshFailure(
   retryAt: Date,
 ): Promise<void> {
   const result = await pool.query(
-    `update media_metadata
-        set refresh_failure_count = least(refresh_failure_count + 1, 3),
+    `update media_metadata m
+        set refresh_failure_count = least(
+              (
+                select coalesce(max(refresh_failure_count), 0) + 1
+                from media_metadata
+                where tenant_id = $1 and media_id = $2
+              ),
+              3
+            ),
             refresh_retry_at = $3
-      where tenant_id = $1 and media_id = $2`,
+      where m.tenant_id = $1 and m.media_id = $2`,
     [tenantId, mediaId, retryAt],
   );
 
@@ -126,7 +143,8 @@ export async function recordMediaMetadataRefreshFailure(
  * ingested events, no Graph API call needed) or (b) has explicitly added
  * by URL (`media_metadata` with no matching comment yet) — unioned so
  * neither source hides the other. Caption/thumbnail/permalink come from
- * the most recently fetched account-scoped metadata row.
+ * the most recently fetched account-scoped metadata row. Retry state is
+ * aggregated separately at the media-item level.
  */
 export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Promise<KnownMedia[]> {
   const result = await pool.query<{
@@ -154,21 +172,29 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
        from lead_events
        where tenant_id = $1 and event_type = 'comment' and attributes->>'mediaId' is not null
        group by attributes->>'mediaId'
+     ),
+     refresh_state as (
+       select media_id,
+              least(max(refresh_failure_count), 3) as refresh_failure_count,
+              max(refresh_retry_at) as refresh_retry_at
+       from media_metadata
+       where tenant_id = $1
+       group by media_id
      )
      select mi.media_id, m.instagram_account_id,
             coalesce(c.comment_count, 0) as comment_count, c.last_seen_at,
             m.caption, m.media_type, m.thumbnail_url, m.permalink, m.posted_at, m.fetched_at,
-            m.refresh_retry_at, coalesce(m.refresh_failure_count, 0) as refresh_failure_count
+            rs.refresh_retry_at, coalesce(rs.refresh_failure_count, 0) as refresh_failure_count
      from media_ids mi
      left join counts c on c.media_id = mi.media_id
      left join lateral (
-       select instagram_account_id, caption, media_type, thumbnail_url, permalink, posted_at, fetched_at,
-              refresh_retry_at, refresh_failure_count
+       select instagram_account_id, caption, media_type, thumbnail_url, permalink, posted_at, fetched_at
        from media_metadata
        where tenant_id = $1 and media_id = mi.media_id
        order by fetched_at desc nulls last, id desc
        limit 1
      ) m on true
+     left join refresh_state rs on rs.media_id = mi.media_id
      order by c.last_seen_at desc nulls last, m.posted_at desc nulls last`,
     [tenantId],
   );
