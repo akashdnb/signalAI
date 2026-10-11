@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { advanceSequence, isSequenceStale } from "../db/leads.js";
 import { recordDeadLetterEvent } from "../db/deadLetterEvents.js";
 import { LEAD_EVENTS_DLQ, LEAD_EVENTS_QUEUE, type LeadEventJob } from "./leadEventsQueue.js";
-import { BACKGROUND_POLL, FAST_POLL } from "./boss.js";
+import { BACKGROUND_POLL, INTERACTIVE_POLL } from "./boss.js";
 
 /**
  * B9: a handler can finish a turn without the event's work actually being
@@ -43,7 +43,7 @@ export function startLeadEventsWorker(
   const { batchSize = 1, localConcurrency = 1 } = options;
   return boss.work<LeadEventJob>(
     LEAD_EVENTS_QUEUE,
-    { batchSize, localConcurrency, ...FAST_POLL },
+    { batchSize, localConcurrency, ...INTERACTIVE_POLL },
     async (jobs: Job<LeadEventJob>[]) => {
       await Promise.all(
         jobs.map(async (job) => {
