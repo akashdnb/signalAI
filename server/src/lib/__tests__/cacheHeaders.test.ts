@@ -51,6 +51,14 @@ describe("dashboardReadCacheHeaders", () => {
     expect(second.body).toEqual({ leads: ["Bearer token-b"] });
   });
 
+  it("does not cache an eligible dashboard response before authorization", async () => {
+    const res = await request(createTestApp()).get("/tenants/t1/leads");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBeUndefined();
+    expect(res.headers.vary).not.toContain("Authorization");
+  });
+
   it("never stores account health responses", async () => {
     const res = await request(createTestApp()).get("/tenants/t1/account");
 
