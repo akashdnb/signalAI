@@ -14,7 +14,7 @@ export interface TenantInvitation {
 }
 
 type Queryable = Pool | PoolClient;
-type HttpConflictError = Error & { statusCode?: number };
+type HttpConflictError = Error & { statusCode?: number; expose?: boolean };
 
 function mapRow(row: Record<string, unknown>): TenantInvitation {
   return {
@@ -63,11 +63,24 @@ export async function getPendingInvitationForEmail(
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
-/**
- * Creates an invitation while serializing concurrent invitations for the
- * same tenant/email. Expired invitations are revoked under the same lock,
- * allowing a new invitation without weakening the database unique index.
- */
+export async function getPendingInvitation(
+  pool: Queryable,
+  tenantId: string,
+  invitationId: string,
+): Promise<TenantInvitation | null> {
+  const result = await pool.query(
+    `select id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at
+       from tenant_invitations
+      where id = $1
+        and tenant_id = $2
+        and accepted_at is null
+        and revoked_at is null
+        and expires_at > now()`,
+    [invitationId, tenantId],
+  );
+  return result.rows[0] ? mapRow(result.rows[0]) : null;
+}
+
 export async function createTenantInvitation(
   pool: Pool,
   input: {
@@ -119,6 +132,7 @@ export async function createTenantInvitation(
     if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "23505") {
       const conflict = new Error("an invitation is already pending for this email") as HttpConflictError;
       conflict.statusCode = 409;
+      conflict.expose = true;
       throw conflict;
     }
 
@@ -129,8 +143,9 @@ export async function createTenantInvitation(
 }
 
 /**
- * Replaces an existing active invitation atomically. The advisory lock keeps
- * resend concurrent with invite creation/retry-safe for the same tenant/email.
+ * Rotates an active invitation only after the replacement token has been
+ * successfully delivered. If delivery fails, the existing invitation remains
+ * valid and the caller can safely retry with a newly generated token.
  */
 export async function resendTenantInvitation(
   pool: Pool,
@@ -222,6 +237,29 @@ export async function revokeTenantInvitation(
   return (result.rowCount ?? 0) > 0;
 }
 
+async function getMemberManagementContext(
+  pool: Queryable,
+  tenantId: string,
+  actorUserId: string,
+  memberUserId: string,
+): Promise<{ actorRole: "owner" | "admin" | "member"; targetRole: "owner" | "admin" | "member" } | null> {
+  const result = await pool.query<{
+    user_id: string;
+    role: "owner" | "admin" | "member";
+  }>(
+    `select user_id, role
+       from tenant_members
+      where tenant_id = $1
+        and user_id in ($2, $3)`,
+    [tenantId, actorUserId, memberUserId],
+  );
+
+  const actor = result.rows.find((row) => row.user_id === actorUserId);
+  const target = result.rows.find((row) => row.user_id === memberUserId);
+  if (!actor || !target) return null;
+  return { actorRole: actor.role, targetRole: target.role };
+}
+
 export async function updateTenantMemberRole(
   pool: Queryable,
   tenantId: string,
@@ -232,7 +270,13 @@ export async function updateTenantMemberRole(
   if (actorUserId === memberUserId) {
     const error = new Error("you cannot change your own role") as HttpConflictError;
     error.statusCode = 409;
+    error.expose = true;
     throw error;
+  }
+
+  const context = await getMemberManagementContext(pool, tenantId, actorUserId, memberUserId);
+  if (!context || context.targetRole === "owner" || (context.actorRole === "admin" && context.targetRole === "admin")) {
+    return false;
   }
 
   const result = await pool.query(
@@ -255,7 +299,13 @@ export async function removeTenantMember(
   if (actorUserId === memberUserId) {
     const error = new Error("you cannot remove yourself from this tenant") as HttpConflictError;
     error.statusCode = 409;
+    error.expose = true;
     throw error;
+  }
+
+  const context = await getMemberManagementContext(pool, tenantId, actorUserId, memberUserId);
+  if (!context || context.targetRole === "owner" || (context.actorRole === "admin" && context.targetRole === "admin")) {
+    return false;
   }
 
   const result = await pool.query(
@@ -300,6 +350,7 @@ export async function acceptTenantInvitation(
   if (existingMember.rows[0]) {
     const conflict = new Error("user is already a member of this tenant") as HttpConflictError;
     conflict.statusCode = 409;
+    conflict.expose = true;
     throw conflict;
   }
 
