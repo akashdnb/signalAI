@@ -67,15 +67,18 @@ class TenantAwareInstagramMessageSender
   async send(
     request: MessageSendRequest,
   ): Promise<void> {
-    const account =
-      await getSoleConnectedAccount(
-        this.dependencies.pool,
-        request.tenantId,
-      );
+    const account = request.instagramAccountId
+      ? { instagramAccountId: request.instagramAccountId }
+      : await getSoleConnectedAccount(
+          this.dependencies.pool,
+          request.tenantId,
+        );
 
     if (!account) {
       throw new Error(
-        `No connected Instagram account for tenant ${request.tenantId}`,
+        request.instagramAccountId
+          ? `Instagram account ${request.instagramAccountId} is not connected for tenant ${request.tenantId}`
+          : `No sole connected Instagram account for tenant ${request.tenantId}`,
       );
     }
 
