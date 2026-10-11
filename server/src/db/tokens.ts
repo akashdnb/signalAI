@@ -85,19 +85,25 @@ export async function markTokenError(
 }
 
 /**
- * Phase 1 assumes one connected Instagram account per tenant (no
- * multi-account support yet) — this is how the send path resolves "which
- * account is this lead's conversation with" from just a tenantId.
+ * Legacy compatibility only. Account-less executions may use this fallback
+ * only when the tenant has exactly one connected Instagram account. A
+ * multi-account tenant must pin the account on the journey execution.
  */
 export async function getSoleConnectedAccount(
   pool: Pool,
   tenantId: string,
 ): Promise<{ instagramAccountId: string } | null> {
   const result = await pool.query<{ instagram_account_id: string }>(
-    `select instagram_account_id from meta_tokens where tenant_id = $1 order by created_at limit 1`,
+    `select instagram_account_id
+       from meta_tokens
+      where tenant_id = $1
+      order by created_at
+      limit 2`,
     [tenantId],
   );
-  return result.rows[0] ? { instagramAccountId: result.rows[0].instagram_account_id } : null;
+
+  if (result.rows.length !== 1) return null;
+  return { instagramAccountId: result.rows[0]!.instagram_account_id };
 }
 
 export interface AccountHealth {
@@ -161,14 +167,10 @@ export async function getDecryptedToken(
 /**
  * Disconnect: drops the tenant's stored token(s). The token is the whole
  * connection — inbound webhooks resolve their tenant through meta_tokens
- * (db/accounts.ts) and the send path reads it through
- * getSoleConnectedAccount, so removing the row stops both directions at
- * once. Leads and their history are deliberately left intact; this is a
- * channel disconnect, not a data deletion (that's lib/deletionService.ts).
- * Meta exposes no server-side revoke for Instagram Login tokens, so the
- * creator also removes the app from their Instagram settings if they want
- * the grant itself gone. Returns how many rows went away so the caller can
- * tell "disconnected" from "wasn't connected".
+ * (db/accounts.ts) and the send path reads it through the pinned account,
+ * so removing the row stops both directions at once. Leads and their
+ * history are deliberately left intact; this is a channel disconnect, not
+ * a data deletion (that's lib/deletionService.ts).
  */
 export async function deleteTokensForTenant(pool: Pool, tenantId: string): Promise<number> {
   const result = await pool.query(`delete from meta_tokens where tenant_id = $1`, [tenantId]);
