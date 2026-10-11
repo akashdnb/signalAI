@@ -51,7 +51,7 @@ export async function getPendingInvitationForEmail(
     `select id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at
        from tenant_invitations
       where tenant_id = $1
-        and email = $2
+        and lower(email) = lower($2)
         and accepted_at is null
         and revoked_at is null
         and expires_at > now()
@@ -62,8 +62,13 @@ export async function getPendingInvitationForEmail(
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
+/**
+ * Creates an invitation while serializing concurrent invitations for the
+ * same tenant/email. Expired active rows are revoked under the same lock,
+ * allowing a new invitation without weakening the database unique index.
+ */
 export async function createTenantInvitation(
-  pool: Queryable,
+  pool: Pool,
   input: {
     tenantId: string;
     email: string;
@@ -73,21 +78,53 @@ export async function createTenantInvitation(
     expiresAt: Date;
   },
 ): Promise<TenantInvitation> {
-  const result = await pool.query(
-    `insert into tenant_invitations
-      (tenant_id, email, role, token_hash, invited_by, expires_at)
-     values ($1, $2, $3, $4, $5, $6)
-     returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
-    [
-      input.tenantId,
-      input.email,
-      input.role,
-      input.tokenHash,
-      input.invitedBy,
-      input.expiresAt,
-    ],
-  );
-  return mapRow(result.rows[0]);
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    await client.query(
+      `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
+      [`${input.tenantId}:${input.email.toLowerCase()}`],
+    );
+
+    await client.query(
+      `update tenant_invitations
+          set revoked_at = now(), updated_at = now()
+        where tenant_id = $1
+          and lower(email) = lower($2)
+          and accepted_at is null
+          and revoked_at is null
+          and expires_at <= now()`,
+      [input.tenantId, input.email],
+    );
+
+    const result = await client.query(
+      `insert into tenant_invitations
+        (tenant_id, email, role, token_hash, invited_by, expires_at)
+       values ($1, $2, $3, $4, $5, $6)
+       returning id, tenant_id, email, role, expires_at, accepted_at, revoked_at, created_at`,
+      [
+        input.tenantId,
+        input.email,
+        input.role,
+        input.tokenHash,
+        input.invitedBy,
+        input.expiresAt,
+      ],
+    );
+
+    await client.query("commit");
+    return mapRow(result.rows[0]);
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // Preserve the original database error.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function revokeTenantInvitation(
@@ -114,7 +151,7 @@ export async function acceptTenantInvitation(
     `update tenant_invitations
         set accepted_at = now(), updated_at = now()
       where token_hash = $1
-        and email = $2
+        and lower(email) = lower($2)
         and accepted_at is null
         and revoked_at is null
         and expires_at > now()
@@ -125,11 +162,22 @@ export async function acceptTenantInvitation(
   const invitation = result.rows[0] ? mapRow(result.rows[0]) : null;
   if (!invitation) return null;
 
+  const existingMember = await client.query<{ role: "owner" | "admin" | "member" }>(
+    `select role
+       from tenant_members
+      where tenant_id = $1 and user_id = $2
+      for update`,
+    [invitation.tenantId, userId],
+  );
+
+  if (existingMember.rows[0]) {
+    await client.query("rollback");
+    throw new Error("user is already a member of this tenant");
+  }
+
   await client.query(
     `insert into tenant_members (tenant_id, user_id, role)
-     values ($1, $2, $3)
-     on conflict (tenant_id, user_id)
-     do update set role = excluded.role`,
+     values ($1, $2, $3)`,
     [invitation.tenantId, userId, invitation.role],
   );
 
