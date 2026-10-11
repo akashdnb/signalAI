@@ -11,6 +11,7 @@ export interface KnownMedia {
   thumbnailUrl: string | null;
   permalink: string | null;
   postedAt: Date | null;
+  fetchedAt: Date | null;
 }
 
 export async function upsertMediaMetadata(pool: Queryable, tenantId: string, metadata: RawMediaMetadata): Promise<void> {
@@ -47,6 +48,7 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
     thumbnail_url: string | null;
     permalink: string | null;
     posted_at: Date | null;
+    fetched_at: Date | null;
   }>(
     `with media_ids as (
        select attributes->>'mediaId' as media_id from lead_events
@@ -61,7 +63,7 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
        group by attributes->>'mediaId'
      )
      select mi.media_id, coalesce(c.comment_count, 0) as comment_count, c.last_seen_at,
-            m.caption, m.media_type, m.thumbnail_url, m.permalink, m.posted_at
+            m.caption, m.media_type, m.thumbnail_url, m.permalink, m.posted_at, m.fetched_at
      from media_ids mi
      left join counts c on c.media_id = mi.media_id
      left join media_metadata m on m.tenant_id = $1 and m.media_id = mi.media_id
@@ -77,5 +79,6 @@ export async function listKnownMediaForTenant(pool: Pool, tenantId: string): Pro
     thumbnailUrl: row.thumbnail_url,
     permalink: row.permalink,
     postedAt: row.posted_at,
+    fetchedAt: row.fetched_at,
   }));
 }
