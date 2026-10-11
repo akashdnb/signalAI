@@ -48,7 +48,6 @@ export interface WorkspaceMember {
   userId: string;
   email: string;
   role: WorkspaceRole;
-  createdAt: string;
 }
 
 export interface WorkspaceInvitation {
