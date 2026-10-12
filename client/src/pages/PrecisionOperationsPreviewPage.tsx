@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen } from "./PrecisionOperationsFullScreens";
 import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
@@ -148,17 +148,149 @@ function FlowNode({ node, selected, onClick, index }: { node: (typeof builderNod
   return <div className="po-flow-node-wrap">{index > 0 && <div className="po-flow-connector" aria-hidden="true"><span /></div>}<button type="button" className={"po-flow-node" + (selected ? " is-selected" : "")} onClick={onClick} aria-pressed={selected}><span className={"po-flow-node-icon po-flow-node-icon--" + node.key}><Icon /></span><span className="po-flow-node-content"><span className="po-flow-node-kicker">{node.number} / {node.kind}</span><strong>{node.title}</strong><span>{node.summary}</span><small>{node.detail}</small></span><span className="po-flow-node-end" aria-hidden="true">↗</span></button></div>;
 }
 
-function StepInspector({ nodeKey, onSelect }: { nodeKey: BuilderNodeKey; onSelect: (key: BuilderNodeKey) => void }) {
+function StepInspector({ nodeKey, onSelect, onDirty }: { nodeKey: BuilderNodeKey; onSelect: (key: BuilderNodeKey) => void; onDirty: () => void }) {
   const selected = builderNodes.find((node) => node.key === nodeKey) ?? builderNodes[0]!;
   const Icon = selected.icon;
+  const sections = nodeKey === "trigger"
+    ? [{ key: "basic", label: "Basic" }, { key: "advanced", label: "Advanced" }, { key: "ai", label: "AI Settings" }]
+    : nodeKey === "goal"
+      ? [{ key: "basic", label: "Basic" }, { key: "capture", label: "Capture Fields" }, { key: "validation", label: "Validation" }, { key: "success", label: "Success Message" }]
+      : [{ key: "basic", label: "Basic" }, { key: "presentation", label: "Presentation" }, { key: "ai", label: "AI Settings" }];
+  const [tab, setTab] = useState("basic");
+  const [triggerType, setTriggerType] = useState("both");
+  const [keywords, setKeywords] = useState("price\nquote\ndetails");
+  const [alsoStory, setAlsoStory] = useState(false);
+  const [caseInsensitive, setCaseInsensitive] = useState(true);
+  const [alsoDm, setAlsoDm] = useState(true);
+  const [messageText, setMessageText] = useState("Thanks for reaching out. I can help you find the right option. What are you looking for?");
+  const [presentation, setPresentation] = useState("text");
+  const [buttons, setButtons] = useState([{ title: "View details", action: "Open website", url: "https://example.com/details" }]);
+  const [cards, setCards] = useState([{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "" }]);
+  const [quickReplies, setQuickReplies] = useState(["Pricing", "More information"]);
+  const [tone, setTone] = useState("Friendly and helpful");
+  const [useKnowledge, setUseKnowledge] = useState(true);
+  const [goalTitle, setGoalTitle] = useState("What the person needs");
+  const [captureFields, setCaptureFields] = useState(["Interest", "Preferred timeline"]);
+  const [showCreateField, setShowCreateField] = useState(false);
+  const [fieldKey, setFieldKey] = useState("");
+  const [fieldLabel, setFieldLabel] = useState("");
+  const [fieldType, setFieldType] = useState("text");
+  const [localError, setLocalError] = useState("");
+  const [applyNotice, setApplyNotice] = useState("");
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [showVariableMenu, setShowVariableMenu] = useState(false);
+
+  useEffect(() => {
+    setTab("basic");
+    setEditorDirty(false);
+    setLocalError("");
+    setApplyNotice("");
+    setShowCreateField(false);
+  }, [nodeKey]);
+
+  const edit = () => {
+    setEditorDirty(true);
+    setLocalError("");
+    setApplyNotice("");
+    onDirty();
+  };
+  const addButton = () => { setButtons(previous => previous.concat({ title: "", action: "Open website", url: "" })); edit(); };
+  const addCard = () => { setCards(previous => previous.concat({ title: "New option", subtitle: "", imageUrl: "" })); edit(); };
+  const applyToPreview = () => {
+    setLocalError("");
+    if (nodeKey === "trigger" && !keywords.trim()) {
+      setLocalError("Add at least one keyword before applying this trigger.");
+      return;
+    }
+    if (nodeKey === "reply" || nodeKey === "followup") {
+      if (presentation === "buttons") {
+        if (!messageText.trim()) { setLocalError("Add message text before adding buttons."); return; }
+        if (buttons.length === 0) { setLocalError("Add at least one button."); return; }
+        if (buttons.some(button => !button.title.trim())) { setLocalError("Every button needs a label."); return; }
+      }
+      if (presentation === "quick_replies" && (!messageText.trim() || quickReplies.some(label => !label.trim()))) {
+        setLocalError("Add message text and a label for each quick reply.");
+        return;
+      }
+      if ((presentation === "card" || presentation === "gallery") && cards.some(card => !card.title.trim())) {
+        setLocalError("Every card needs a title.");
+        return;
+      }
+    }
+    if (nodeKey === "goal" && !goalTitle.trim()) {
+      setLocalError("Goal title cannot be empty.");
+      return;
+    }
+    setEditorDirty(false);
+    setApplyNotice("Changes applied to this local preview draft. Use Save changes in the header to mark the draft saved.");
+  };
+  const resetEditor = () => {
+    if (nodeKey === "trigger") { setTriggerType("both"); setKeywords("price\nquote\ndetails"); setAlsoStory(false); setCaseInsensitive(true); setAlsoDm(true); }
+    if (nodeKey === "reply" || nodeKey === "followup") { setMessageText("Thanks for reaching out. I can help you find the right option. What are you looking for?"); setPresentation("text"); setButtons([{ title: "View details", action: "Open website", url: "https://example.com/details" }]); setCards([{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "" }]); setQuickReplies(["Pricing", "More information"]); setTone("Friendly and helpful"); setUseKnowledge(true); }
+    if (nodeKey === "goal") { setGoalTitle("What the person needs"); setCaptureFields(["Interest", "Preferred timeline"]); }
+    setEditorDirty(false); setLocalError(""); setApplyNotice("Local editor values reset to the example configuration.");
+  };
+
+  const tabNavigation = <div className="po-inspector-tabs po-inspector-tabs--sections" role="tablist" aria-label="Node editor sections">
+    {sections.map(section => <button type="button" role="tab" aria-selected={tab === section.key} className={tab === section.key ? "is-active" : ""} key={section.key} onClick={() => setTab(section.key)}>{section.label}</button>)}
+  </div>;
+
   return <aside className="po-inspector" aria-label="Step settings">
-    <div className="po-inspector-tabs"><button type="button" className="is-active">Step</button><button type="button" onClick={() => onSelect("reply")}>Reply preview</button></div>
+    {tabNavigation}
     <div className="po-inspector-title"><span className={"po-inspector-icon po-flow-node-icon--" + selected.key}><Icon /></span><div><span className="po-eyebrow">{selected.kind}</span><h2>{selected.title}</h2><p>{selected.summary}</p></div></div>
-    {nodeKey === "trigger" && <div className="po-inspector-fields"><label>Start when<span className="po-readonly-field">A comment or DM matches a keyword <ChevronDownIcon className="po-icon-small" /></span></label><label>Keywords <span className="po-field-meta">One phrase per line</span><textarea readOnly rows={4} value={"price\nquote\ndetails"} aria-label="Sample trigger keywords" /></label><label>Match type<span className="po-readonly-field">Contains <ChevronDownIcon className="po-icon-small" /></span></label><p className="po-help">Only matching comments and messages start the automation.</p></div>}
-    {nodeKey === "reply" && <div className="po-inspector-fields"><label>Reply goal<span className="po-readonly-field">Answer the first question <ChevronDownIcon className="po-icon-small" /></span></label><label>Instructions<textarea readOnly rows={5} value={"Answer clearly using the configured knowledge base when available. If the answer is unclear, ask one short follow-up question."} aria-label="Sample AI reply instructions" /></label><div className="po-inspector-option"><span className="po-option-check"><CheckCircleIcon /></span><span><strong>Use knowledge base</strong><small>Ground replies in configured business information.</small></span><Tag tone="success">On</Tag></div><p className="po-help">No AI response is generated in this preview.</p></div>}
-    {nodeKey === "goal" && <div className="po-inspector-fields"><label>Question<span className="po-readonly-field">What are you looking for help with?</span></label><label>Captured details</label><div className="po-check-list"><span><i />Interest</span><span><i />Preferred timeline</span></div><p className="po-help">Example fields only; they are not configured on a real automation.</p></div>}
-    {nodeKey === "followup" && <div className="po-inspector-fields"><label>Message<textarea readOnly rows={5} value={"Thanks for sharing that. I'll help you find the right next step. Is there anything else you'd like us to know?"} aria-label="Sample follow-up message" /></label><p className="po-help">Review message wording before publishing a real automation.</p></div>}
-    <div className="po-inspector-footer"><span>Preview settings are read-only</span><button type="button" disabled className="po-button po-button--secondary">Update step</button></div>
+
+    {nodeKey === "trigger" && tab === "basic" && <div className="po-inspector-fields">
+      <label>Trigger type<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);edit();}}><option value="comment">Instagram comments</option><option value="message">Direct messages</option><option value="both">Comments and direct messages</option></select></label>
+      <label>Matching words or phrases <span className="po-field-meta">One phrase per line</span><textarea rows={4} value={keywords} onChange={e=>{setKeywords(e.target.value);edit();}} aria-label="Sample trigger keywords"/></label>
+      <label>Match type<select defaultValue="contains" onChange={edit}><option value="contains">Contains</option><option value="exact">Exact match</option></select></label>
+      <label className="po-toggle-row"><span><strong>Also trigger on story replies</strong><small>Include replies to Instagram stories.</small></span><input type="checkbox" checked={alsoStory} onChange={e=>{setAlsoStory(e.target.checked);edit();}}/></label>
+      <label className="po-toggle-row"><span><strong>Case insensitive matching</strong><small>“PRICE” matches “price”.</small></span><input type="checkbox" checked={caseInsensitive} onChange={e=>{setCaseInsensitive(e.target.checked);edit();}}/></label>
+      <label className="po-toggle-row"><span><strong>Also trigger on direct messages</strong><small>Include DMs alongside the selected trigger.</small></span><input type="checkbox" checked={alsoDm} onChange={e=>{setAlsoDm(e.target.checked);edit();}}/></label>
+      <p className="po-help">Only matching comments and messages start this automation.</p>
+    </div>}
+    {nodeKey === "trigger" && (tab === "advanced" || tab === "ai") && <div className="po-inspector-fields">
+      <Tag>Coming soon</Tag><h3 className="po-editor-subtitle">{tab === "advanced" ? "Advanced trigger settings" : "Trigger AI settings"}</h3>
+      <p className="po-help">Additional trigger controls will appear here as they become available. This matches the current product scope; there are no editable settings in this section yet.</p>
+    </div>}
+
+    {(nodeKey === "reply" || nodeKey === "followup") && tab === "basic" && <div className="po-inspector-fields">
+      <label>Message <span className="po-field-meta">This is an example, not a live reply.</span><textarea rows={5} value={messageText} onChange={e=>{setMessageText(e.target.value);edit();}} maxLength={640} aria-label="Sample Instagram message"/></label>
+      <div className="po-character-count">{messageText.length} / 640 characters</div>
+      <button type="button" className="po-button po-button--secondary" onClick={()=>setShowVariableMenu(v=>!v)}>{showVariableMenu ? "Hide variables" : "{ } Insert variable"}</button>
+      {showVariableMenu && <div className="po-variable-menu">{[["First name","{{lead.first_name}}"],["Lead interest","{{lead.interest}}"],["Business name","{{workspace.name}}"]].map(([label,value])=><button type="button" key={value} onClick={()=>{setMessageText(previous=>previous+value);setShowVariableMenu(false);edit();}}><strong>{label}</strong><code>{value}</code></button>)}</div>}
+      <p className="po-help">Cards and galleries use each card’s title and subtitle instead of a separate message caption.</p>
+    </div>}
+    {(nodeKey === "reply" || nodeKey === "followup") && tab === "presentation" && <div className="po-inspector-fields">
+      <h3 className="po-editor-subtitle">Instagram message layout</h3><p className="po-help">Choose the native Instagram presentation for this journey step.</p>
+      <label>Layout<select value={presentation} onChange={e=>{setPresentation(e.target.value);edit();}}><option value="text">Plain text</option><option value="buttons">Text + buttons</option><option value="card">Single card</option><option value="gallery">Gallery / carousel</option><option value="quick_replies">Quick replies</option></select></label>
+      {presentation === "buttons" && <div className="po-editor-group"><div className="po-editor-group-heading"><strong>Buttons</strong><button type="button" className="po-text-action" disabled={buttons.length>=3} onClick={addButton}>+ Add button</button></div>{buttons.map((button,index)=><div className="po-editor-item" key={index}><label>Button label<input maxLength={20} value={button.title} onChange={e=>{setButtons(previous=>previous.map((item,i)=>i===index?{...item,title:e.target.value}:item));edit();}} placeholder="View details"/></label><label>Action<select value={button.action} onChange={e=>{setButtons(previous=>previous.map((item,i)=>i===index?{...item,action:e.target.value}:item));edit();}}><option>Open website</option><option>Continue journey</option></select></label>{button.action==="Open website"&&<label>HTTPS URL<input value={button.url} onChange={e=>{setButtons(previous=>previous.map((item,i)=>i===index?{...item,url:e.target.value}:item));edit();}} placeholder="https://example.com"/></label>}<button type="button" className="po-text-action" disabled={buttons.length===1} onClick={()=>{setButtons(previous=>previous.filter((_,i)=>i!==index));edit();}}>Remove button</button></div>)}</div>}
+      {(presentation==="card"||presentation==="gallery")&&<div className="po-editor-group"><div className="po-editor-group-heading"><strong>{presentation==="gallery"?"Gallery cards":"Card content"}</strong>{presentation==="gallery"&&<button type="button" className="po-text-action" disabled={cards.length>=10} onClick={addCard}>+ Add card</button>}</div>{(presentation==="gallery"?cards:cards.slice(0,1)).map((card,index)=><div className="po-editor-item" key={index}><div className="po-editor-group-heading"><strong>Card {index+1}</strong><Tag>{presentation==="gallery"?"Carousel item":"Single card"}</Tag></div><label>Title<input value={card.title} maxLength={80} onChange={e=>{setCards(previous=>previous.map((item,i)=>i===index?{...item,title:e.target.value}:item));edit();}} placeholder="Your offer"/></label><label>Subtitle (optional)<input value={card.subtitle} maxLength={80} onChange={e=>{setCards(previous=>previous.map((item,i)=>i===index?{...item,subtitle:e.target.value}:item));edit();}} placeholder="A short description"/></label><label>Image URL (optional)<input value={card.imageUrl} onChange={e=>{setCards(previous=>previous.map((item,i)=>i===index?{...item,imageUrl:e.target.value}:item));edit();}} placeholder="https://example.com/image.jpg"/></label>{presentation==="gallery"&&cards.length>2&&<button type="button" className="po-text-action" onClick={()=>{setCards(previous=>previous.filter((_,i)=>i!==index));edit();}}>Remove card</button>}</div>)}</div>}
+      {presentation==="quick_replies"&&<div className="po-editor-group"><div className="po-editor-group-heading"><strong>Quick replies</strong><button type="button" className="po-text-action" disabled={quickReplies.length>=13} onClick={()=>{setQuickReplies(previous=>previous.concat(""));edit();}}>+ Add quick reply</button></div>{quickReplies.map((reply,index)=><div className="po-editor-item" key={index}><label>Label<input maxLength={20} value={reply} onChange={e=>{setQuickReplies(previous=>previous.map((item,i)=>i===index?e.target.value:item));edit();}} placeholder="Pricing"/></label><button type="button" className="po-text-action" disabled={quickReplies.length===1} onClick={()=>{setQuickReplies(previous=>previous.filter((_,i)=>i!==index));edit();}}>Remove quick reply</button></div>)}</div>}
+    </div>}
+    {(nodeKey === "reply" || nodeKey === "followup") && tab === "ai" && <div className="po-inspector-fields">
+      <div className="po-inspector-option"><span className="po-option-check"><CheckCircleIcon/></span><span><strong>AI Settings</strong><small>Choose how AI writes text for this journey step.</small></span></div>
+      <label>Tone<select value={tone} onChange={e=>{setTone(e.target.value);edit();}}><option>Friendly and helpful</option><option>Professional</option><option>Concise</option><option>Warm and conversational</option></select></label>
+      <label className="po-toggle-row"><span><strong>Use knowledge base for context</strong><small>Ground claims in configured business sources.</small></span><input type="checkbox" checked={useKnowledge} onChange={e=>{setUseKnowledge(e.target.checked);edit();}}/></label>
+      <p className="po-help">No model call or live reply is made by this preview.</p>
+    </div>}
+
+    {nodeKey === "goal" && tab === "basic" && <div className="po-inspector-fields">
+      <label>Goal title<input value={goalTitle} onChange={e=>{setGoalTitle(e.target.value);edit();}} aria-label="Goal title"/></label>
+      <div><span className="po-field-heading">Description</span><p className="po-help">Conversational goal the AI works toward.</p></div>
+    </div>}
+    {nodeKey === "goal" && tab === "capture" && <div className="po-inspector-fields">
+      <h3 className="po-editor-subtitle">Captured fields</h3><p className="po-help">Structured values this goal should capture.</p>
+      {captureFields.length===0&&<div className="po-empty-detail"><strong>No captured fields yet</strong><span>Add a field when this goal needs structured information.</span></div>}
+      {captureFields.map(field=><div className="po-inspector-option" key={field}><span><strong>{field}</strong><small>{field==="Interest"?"Text":field==="Preferred timeline"?"Text":"Sample field"}</small></span><button type="button" className="po-text-action" onClick={()=>{setCaptureFields(previous=>previous.filter(item=>item!==field));edit();}}>Remove</button></div>)}
+      {["Interest","Preferred timeline","Email","Phone number","Budget range"].filter(field=>!captureFields.includes(field)).length>0&&<label>Add field<select value="" onChange={e=>{if(e.target.value){setCaptureFields(previous=>previous.concat(e.target.value));edit();}}}><option value="">+ Add field</option>{["Interest","Preferred timeline","Email","Phone number","Budget range"].filter(field=>!captureFields.includes(field)).map(field=><option key={field}>{field}</option>)}</select></label>}
+      <button type="button" className="po-button po-button--secondary" onClick={()=>setShowCreateField(v=>!v)}>{showCreateField?"Cancel":"Create field"}</button>
+      {showCreateField&&<div className="po-editor-item"><label>Field key<input value={fieldKey} onChange={e=>setFieldKey(e.target.value)} placeholder="automation_interest"/></label><label>Label<input value={fieldLabel} onChange={e=>setFieldLabel(e.target.value)} placeholder="Automation interest"/></label><label>Value type<select value={fieldType} onChange={e=>setFieldType(e.target.value)}>{["text","email","phone","country","number","date"].map(value=><option key={value}>{value}</option>)}</select></label><button type="button" className="po-button po-button--secondary" disabled={!fieldKey.trim()||!fieldLabel.trim()} onClick={()=>{setCaptureFields(previous=>previous.concat(fieldLabel.trim()));setShowCreateField(false);setFieldKey("");setFieldLabel("");edit();}}>Add field to preview</button></div>}
+    </div>}
+    {nodeKey === "goal" && tab === "validation" && <div className="po-inspector-fields"><h3 className="po-editor-subtitle">Validation</h3><p className="po-help">No validation rules are configured for this goal.</p><Tag>Not configured</Tag></div>}
+    {nodeKey === "goal" && tab === "success" && <div className="po-inspector-fields"><h3 className="po-editor-subtitle">Success message</h3><p className="po-help">No success message is configured for this goal.</p><Tag>Not configured</Tag></div>}
+    {localError&&<div className="po-inline-notice po-inline-notice--error" role="alert">{localError}</div>}
+    {applyNotice&&<div className="po-inline-notice" role="status">{applyNotice}</div>}
+    <div className="po-inspector-footer"><span>{editorDirty?"Unsaved changes in node editor":"Preview settings · local only"}</span><div className="po-inspector-footer-actions"><button type="button" className="po-button po-button--quiet" onClick={resetEditor}>Reset</button><button type="button" className="po-button po-button--secondary" disabled={!editorDirty} onClick={applyToPreview}>Apply to preview</button></div></div>
   </aside>;
 }
 
@@ -179,7 +311,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   const switchTab = (tab: string) => setSubTab(tab);
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}<div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
-    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{builderNodes.map((node, index) => <FlowNode key={node.key} node={node} index={index} selected={selectedNode === node.key} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); }} />)}<button type="button" className="po-add-step" onClick={() => { setSelectedNode("followup"); onSelectNode("followup"); onDirty(); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>4 steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section><StepInspector nodeKey={selectedNode} onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /></div>}
+    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{builderNodes.map((node, index) => <FlowNode key={node.key} node={node} index={index} selected={selectedNode === node.key} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); }} />)}<button type="button" className="po-add-step" onClick={() => { setSelectedNode("followup"); onSelectNode("followup"); onDirty(); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>4 steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section><StepInspector nodeKey={selectedNode} onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} onDirty={onDirty} /></div>}
     {subTab === "Setup" && <div className="po-builder-setup">
       <div className="po-setup-main"><div className="po-step-section"><span className="po-step-number">01</span><div className="po-step-section-body"><span className="po-eyebrow">BASICS</span><h2>Name and purpose</h2><p>A clear name makes the automation easy to find and identify later.</p><label className="po-field-block">Automation name<input value={draftName} onChange={e=>{setDraftName(e.target.value);onDirty();}} maxLength={100}/></label><label className="po-field-block">Description<textarea rows={3} value={description} onChange={e=>{setDescription(e.target.value);onDirty();}}/></label></div></div>
       <div className="po-step-section"><span className="po-step-number">02</span><div className="po-step-section-body"><span className="po-eyebrow">START CONDITION</span><h2>When should it start?</h2><p>Choose which inbound interaction can trigger this automation.</p><label className="po-field-block">Trigger source<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);onDirty();}}><option>Comment</option><option>Direct message</option><option>Comment or direct message</option></select></label><label className="po-field-block">Keywords<textarea rows={3} value={keywords} onChange={e=>{setKeywords(e.target.value);onDirty();}}/><span className="po-help">Separate phrases with commas. Matching behavior depends on the configured trigger rules.</span></label></div></div>
