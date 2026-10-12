@@ -329,7 +329,20 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
 }
 
 function WalkthroughDialog({ onClose }: { onClose: () => void }) {
-  return <div className="po-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="po-modal" role="dialog" aria-modal="true" aria-labelledby="po-walkthrough-title"><div className="po-modal-top"><span className="po-modal-icon"><PlayIcon /></span><button type="button" className="po-icon-button" aria-label="Close walkthrough" onClick={onClose}>×</button></div><span className="po-eyebrow">SAMPLE WALKTHROUGH</span><h2 id="po-walkthrough-title">See how the flow is meant to work</h2><p>This preview demonstrates the order of steps. It does not execute an automation or send a real Instagram reply.</p><ol className="po-walkthrough-steps"><li><span>1</span><div><strong>Match a comment or DM</strong><small>Example keyword: “price”</small></div><Tag tone="success">Matched</Tag></li><li><span>2</span><div><strong>Draft a relevant reply</strong><small>Use configured knowledge when available</small></div><Tag>Preview</Tag></li><li><span>3</span><div><strong>Ask a qualification question</strong><small>Capture the person's stated interest</small></div><Tag>Preview</Tag></li></ol><div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={onClose}>Close preview</button></div></section></div>;
+  const [started,setStarted]=useState(false);
+  const [step,setStep]=useState(0);
+  const steps=[
+    {title:"Match the trigger",description:"Example inbound comment contains the keyword “price”.",actor:"Instagram event",text:"Do you have pricing for 1:1 coaching?"},
+    {title:"Prepare a reply",description:"The configured reply style and knowledge sources guide the sample answer.",actor:"AI reply",text:"Thanks for reaching out. I can help you compare options based on what you need."},
+    {title:"Ask the qualification goal",description:"Ask a focused question and capture the answer as structured lead data.",actor:"Goal",text:"Are you looking for one-to-one coaching or a group plan?"},
+    {title:"Capture the answer",description:"The lead record is updated in this illustrative flow; no backend record is written.",actor:"Lead record",text:"Interest: 1:1 coaching · Timeline: not yet captured"},
+  ];
+  const finished=step>=steps.length;
+  return <div className="po-modal-backdrop" role="presentation" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section className="po-modal po-walkthrough-dialog" role="dialog" aria-modal="true" aria-labelledby="po-walkthrough-title">
+    <div className="po-modal-top"><span className="po-modal-icon"><PlayIcon/></span><button type="button" className="po-icon-button" aria-label="Close walkthrough" onClick={onClose}>×</button></div>
+    <span className="po-eyebrow">SAMPLE WALKTHROUGH</span><h2 id="po-walkthrough-title">Test the journey logic without sending a message</h2><p>This is a guided demonstration of the configured step order, not a live Instagram test. It uses local sample values only.</p>
+    {!started?<div className="po-walkthrough-intro"><div className="po-readiness-list"><span><CheckCircleIcon/> Trigger keyword: <strong>price</strong></span><span><CheckCircleIcon/> Reply uses the sample knowledge setting</span><span><CheckCircleIcon/> Qualification answer maps to a sample lead field</span></div><div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={onClose}>Cancel</button><button type="button" className="po-button po-button--primary" onClick={()=>setStarted(true)}>Start sample walkthrough</button></div></div>:<><div className="po-walkthrough-progress"><span>STEP {Math.min(step+1,steps.length)} OF {steps.length}</span><div><span style={{width:(finished?100:step/steps.length*100)+"%"}}/></div></div>{!finished?<><div className="po-walkthrough-current"><div className="po-walkthrough-step-label"><span>{String(step+1).padStart(2,"0")}</span><div><strong>{steps[step]!.title}</strong><small>{steps[step]!.description}</small></div></div><div className="po-sample-transcript-card"><span className="po-eyebrow">{steps[step]!.actor.toUpperCase()}</span><p>{steps[step]!.text}</p></div></div><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>setStep(v=>Math.max(0,v-1))} disabled={step===0}>Previous step</button><button type="button" className="po-button po-button--primary" onClick={()=>setStep(v=>v+1)}>{step===steps.length-1?"Finish walkthrough":"Next step →"}</button></div></>:<><div className="po-test-result" role="status"><Tag tone="success">Sample complete</Tag><div><strong>Journey steps displayed</strong><p>No external service was called, no lead was saved, and no Instagram message was sent.</p></div></div><div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={()=>{setStep(0);setStarted(false);}}>Run again</button><button type="button" className="po-button po-button--primary" onClick={onClose}>Close preview</button></div></>}</>}
+  </section></div>;
 }
 
 function PublishDialog({ onClose }: { onClose: () => void }) {
@@ -405,7 +418,30 @@ function LeadsScreen({ onOpenLead }: { onOpenLead: (name: string) => void }) {
 }
 
 function MessagePreviewDialog({ automationName, onClose }: { automationName: string; onClose: () => void }) {
-  return <div className="po-modal-backdrop" role="presentation" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section className="po-modal po-message-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="po-message-preview-title"><div className="po-modal-top"><span className="po-eyebrow">MESSAGE PREVIEW · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close message preview" onClick={onClose}>×</button></div><h2 id="po-message-preview-title">How the reply could appear</h2><p>Preview the customer-facing message before you publish. This is illustrative content; no real Instagram thread or knowledge retrieval is connected.</p><div className="po-preview-simulated-thread"><div className="po-simulated-account"><InstagramMarkIcon/><span><strong>@creatorstudio</strong><small>Instagram DM · sample</small></span></div><div className="po-simulated-incoming">Hi! Do you have pricing for 1:1 coaching?</div><div className="po-simulated-reply"><span className="po-eyebrow">{automationName.toUpperCase()} · EXAMPLE AI REPLY</span><p>Thanks for reaching out! I can help you find the right option. Are you looking for one-to-one coaching or a group plan?</p><small>Illustrative reply · review tone and claims before publishing</small></div></div><div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={onClose}>Close preview</button></div></section></div>;
+  const [sampleText,setSampleText]=useState("How much does 1:1 coaching cost?");
+  const [result,setResult]=useState<null|{ruleBased:string;aiGenerated:string;handoff:boolean}>(null);
+  const [error,setError]=useState("");
+  function runPreview() {
+    const text=sampleText.trim();
+    if(!text){setError("Enter a sample customer message to preview a response.");setResult(null);return;}
+    const needsHuman=/human|person|refund|complaint|angry|cancel/i.test(text);
+    const pricing=/price|pricing|cost|how much/i.test(text);
+    setResult({
+      ruleBased:pricing?"An example rule may match the pricing question. No exact price is configured in this preview.":"No sample rule is defined for this message.",
+      aiGenerated:needsHuman?"This message may need a teammate. A safe system should explain the next step and route it for human review.":pricing?"I can help you compare the available options. Are you looking for one-to-one coaching or a group plan?":"Thanks for reaching out. I can help with that. Could you share a little more detail so I can guide you to the right next step?",
+      handoff:needsHuman,
+    });
+    setError("");
+  }
+  return <div className="po-modal-backdrop" role="presentation" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section className="po-modal po-message-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="po-message-preview-title">
+    <div className="po-modal-top"><span className="po-eyebrow">PREVIEW REPLY · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close message preview" onClick={onClose}>×</button></div>
+    <h2 id="po-message-preview-title">Preview a sample Instagram conversation</h2><p>Try different customer messages to inspect the rule-match and AI-response areas. This is a local simulation, not the production preview API.</p>
+    <label className="po-field-block">Sample customer message<textarea rows={3} value={sampleText} onChange={e=>{setSampleText(e.target.value);setResult(null);setError("");}} placeholder="e.g. How much does 1:1 coaching cost?"/></label>
+    <div className="po-preview-controls"><button type="button" className="po-button po-button--primary" disabled={!sampleText.trim()} onClick={runPreview}>Preview conversation</button><span>No message is sent. No model or rule engine is called.</span></div>
+    {error&&<div className="po-inline-notice po-inline-notice--error" role="alert">{error}</div>}
+    {result&&<div className="po-preview-results" role="status"><div className="po-preview-result-heading"><span className="po-eyebrow">{automationName.toUpperCase()}</span>{result.handoff&&<Tag tone="warning">Human review suggested</Tag>}</div><div className="po-sample-transcript-card"><span className="po-eyebrow">CUSTOMER · SAMPLE</span><p>{sampleText}</p></div><div className="po-sample-transcript-card"><span className="po-eyebrow">RULE-BASED RESULT · ILLUSTRATIVE</span><p>{result.ruleBased}</p></div><div className="po-simulated-reply"><span className="po-eyebrow">AI-GENERATED RESULT · ILLUSTRATIVE</span><p>{result.aiGenerated}</p></div>{result.handoff&&<div className="po-warning-note"><span>!</span><span><strong>Potential handoff</strong><small>A production journey should show the human owner or the unassigned review queue here.</small></span></div>}</div>}
+    <div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={onClose}>Close preview</button></div>
+  </section></div>;
 }
 
 function LifecycleDialog({ action, onClose, onConfirm }: { action: "pause"|"activate"; onClose: () => void; onConfirm: () => void }) {
