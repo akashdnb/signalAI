@@ -892,3 +892,9 @@
 @media (max-width: 1080px) {
   .po-preview-app .po-inspector { max-height: none; overflow: visible; }
 }
+
+.po-preview-app .po-system-state-mark svg { width: 18px; height: 18px; }
+.po-preview-app .po-system-state-mark.is-success { border-color: #cde9d8; background: var(--po-green-soft); color: var(--po-green); }
+.po-preview-app .po-system-state-picker { max-width: 360px; margin: 16px 0; }
+.po-preview-app .po-auth-inline-error { margin: 7px 0 0; color: #9b2c28; font-size: 10px; }
+.po-preview-app.is-dark .po-auth-inline-error { color: #ffaaa4; }
