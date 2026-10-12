@@ -51,6 +51,34 @@ function describeCampaign(campaign: Campaign): string {
   return `Starts when ${kind} mentions one of ${phraseCount}`;
 }
 
+function automationStatus(campaign: Campaign): { label: string; title: string; className: string } {
+  if (!campaign.published) {
+    return campaign.enabled
+      ? {
+          label: "Needs publishing",
+          title: "This automation is not responding to Instagram conversations yet. Publish it to make it live.",
+          className: "bg-[#FEF3C7] text-[#92400E]",
+        }
+      : {
+          label: "Draft",
+          title: "This is a draft and will not respond to Instagram conversations until published.",
+          className: "bg-[#E2E8F0] text-[#475569]",
+        };
+  }
+
+  return campaign.enabled
+    ? {
+        label: "Live",
+        title: "This automation is published and running.",
+        className: "bg-[#D1FAE5] text-[#047857]",
+      }
+    : {
+        label: "Paused",
+        title: "This automation is published but paused.",
+        className: "bg-[#FEF3C7] text-[#92400E]",
+      };
+}
+
 export function JourneyBuilder({
   tenantId,
   campaign,
@@ -417,7 +445,13 @@ export function JourneyBuilder({
     selectNode({ type: "milestone", milestoneIndex: target });
   }
 
+  const canEnableAutomation =
+    campaign.published === true &&
+    accountReadiness.status === "ready" &&
+    accountReadiness.healthyAssignedCount > 0;
+
   async function handleToggleEnabled() {
+    if (!campaign.enabled && !canEnableAutomation) return;
     await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
     setMenuOpen(false);
     await onChanged();
@@ -577,7 +611,7 @@ export function JourneyBuilder({
                         setShowTestJourney(true);
                       }}
                     >
-                      Test Journey
+                      Sample walkthrough
                     </button>
                     <button
                       type="button"
@@ -589,10 +623,34 @@ export function JourneyBuilder({
                     </button>
                     <button
                       type="button"
-                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip"
+                      disabled={publishing || (!campaign.enabled && !canEnableAutomation)}
+                      title={
+                        campaign.enabled
+                          ? "Pause this published automation or turn off its draft state."
+                          : !campaign.published
+                            ? "Publish this automation before activating it."
+                            : accountReadiness.status === "loading"
+                              ? "Checking Instagram account readiness."
+                              : accountReadiness.status === "error"
+                                ? "Check the Instagram account status before activating."
+                                : accountReadiness.healthyAssignedCount === 0
+                                  ? "Assign at least one healthy Instagram account before activating."
+                                  : "Activate this published automation."
+                      }
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => void handleToggleEnabled()}
                     >
-                      {campaign.enabled ? "Disable automation" : "Enable automation"}
+                      {campaign.enabled
+                        ? "Pause automation"
+                        : !campaign.published
+                          ? "Publish before activating"
+                          : accountReadiness.status === "loading"
+                            ? "Checking account readiness…"
+                            : accountReadiness.status === "error"
+                              ? "Check account status first"
+                              : accountReadiness.healthyAssignedCount === 0
+                                ? "Assign an Instagram account first"
+                                : "Activate automation"}
                     </button>
                   </div>
                 </>
@@ -607,14 +665,11 @@ export function JourneyBuilder({
               </h1>
 
               <span
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                  campaign.enabled
-                    ? "bg-[#D1FAE5] text-[#047857]"
-                    : "bg-[#E2E8F0] text-[#475569]"
-                }`}
+                title={automationStatus(campaign).title}
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${automationStatus(campaign).className}`}
               >
-                <span className="mr-1">●</span>
-                {campaign.enabled ? "Active" : "Inactive"}
+                <span className="mr-1" aria-hidden="true">●</span>
+                {automationStatus(campaign).label}
               </span>
             </div>
 
@@ -646,6 +701,8 @@ export function JourneyBuilder({
                     if (nextIndex !== null) {
                       event.preventDefault();
                       subTabRefs.current[nextIndex]?.focus();
+                      // Automatic activation keeps the focused tab and its panel aligned.
+                      requestSubTabChange(TABS[nextIndex]!.key);
                     }
                   }}
                   onClick={() => requestSubTabChange(tab.key)}
