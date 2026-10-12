@@ -54,6 +54,14 @@ export function JourneyBuilderPage() {
   }, [tenantId, campaignId]);
 
   useEffect(() => {
+    setAccountReadiness({
+      status: "loading",
+      healthyAssignedCount: 0,
+      unavailableAssignedCount: 0,
+    });
+  }, [tenantId, campaignId]);
+
+  useEffect(() => {
     void loadCampaign();
   }, [loadCampaign]);
 
