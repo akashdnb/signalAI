@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
@@ -5,7 +6,10 @@ import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { AutomationPage } from "./pages/AutomationPage";
-import { JourneyBuilderPage } from "./pages/JourneyBuilderPage";
+const JourneyBuilderPage = lazy(async () => {
+  const module = await import("./pages/JourneyBuilderPage");
+  return { default: module.JourneyBuilderPage };
+});
 import { BillingPage } from "./pages/BillingPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { ContentPage } from "./pages/ContentPage";
@@ -43,7 +47,23 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="automation" element={<AutomationPage />} />
-        <Route path="automation/journeys/:campaignId" element={<JourneyBuilderPage />} />
+        <Route
+          path="automation/journeys/:campaignId"
+          element={
+            <Suspense
+              fallback={
+                <div
+                  role="status"
+                  className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4 text-sm text-subtle"
+                >
+                  Loading automation builder…
+                </div>
+              }
+            >
+              <JourneyBuilderPage />
+            </Suspense>
+          }
+        />
         <Route path="content" element={<ContentPage />} />
         <Route path="knowledge" element={<KnowledgePage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
