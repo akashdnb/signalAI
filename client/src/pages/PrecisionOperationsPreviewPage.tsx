@@ -224,7 +224,7 @@ function InboxScreen() {
     return textMatches && filterMatches;
   });
   const current = conversations[selected] ?? conversations[0]!;
-  const human = humanMode || current.human;
+  const human = humanMode;
   function selectConversation(index: number) {
     setSelected(index);
     setHumanMode(conversations[index]!.human);
