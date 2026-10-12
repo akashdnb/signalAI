@@ -21,12 +21,15 @@ export interface LeadListFilters {
 
 export interface CampaignListFilters {
   q?: string;
-  status?: "all" | "active" | "inactive";
+  status?: "all" | "live" | "paused" | "draft" | "needs_publishing";
   trigger?: "all" | "comment" | "message" | "both";
   sort?: "updated_desc" | "updated_asc" | "name_asc" | "name_desc";
 }
 
-async function getPage<T>(path: string): Promise<T> {
+async function getPage<T>(
+  path: string,
+  adaptLegacyArray?: (items: unknown[]) => T,
+): Promise<T> {
   const session = loadSession();
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -53,6 +56,7 @@ async function getPage<T>(path: string): Promise<T> {
   // Keep the paginated contract as the primary path, while tolerating legacy
   // list responses from older deployments and fixtures during rollout.
   if (Array.isArray(body)) {
+    if (adaptLegacyArray) return adaptLegacyArray(body);
     return {
       items: body,
       page: 1,
@@ -108,6 +112,66 @@ export function getCampaignsPage(
       trigger: filters.trigger,
       sort: filters.sort,
     })}`,
+    (items) => {
+      // Older server deployments return the full campaign array and ignore
+      // query parameters. Apply the same list controls locally for that
+      // response shape, while preserving the server-paginated path above.
+      const query = filters.q?.trim().toLocaleLowerCase();
+      let campaigns = items as Campaign[];
+
+      if (query) {
+        campaigns = campaigns.filter((campaign) =>
+          [
+            campaign.name,
+            campaign.description ?? "",
+            ...campaign.keywords,
+          ].some((value) => value.toLocaleLowerCase().includes(query)),
+        );
+      }
+
+      if (filters.status && filters.status !== "all") {
+        campaigns = campaigns.filter((campaign) => {
+          switch (filters.status) {
+            case "live":
+              return campaign.published === true && campaign.enabled;
+            case "paused":
+              return campaign.published === true && !campaign.enabled;
+            case "draft":
+              return campaign.published !== true && !campaign.enabled;
+            case "needs_publishing":
+              return campaign.published !== true && campaign.enabled;
+          }
+        });
+      }
+
+      if (filters.trigger && filters.trigger !== "all") {
+        campaigns = campaigns.filter((campaign) => campaign.triggerSource === filters.trigger);
+      }
+
+      const sort = filters.sort ?? "updated_desc";
+      campaigns = [...campaigns].sort((a, b) => {
+        if (sort === "name_asc" || sort === "name_desc") {
+          const compared = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+          return sort === "name_asc" ? compared : -compared;
+        }
+        const aTime = Date.parse(a.updatedAt) || 0;
+        const bTime = Date.parse(b.updatedAt) || 0;
+        return sort === "updated_asc" ? aTime - bTime : bTime - aTime;
+      });
+
+      const total = campaigns.length;
+      const totalPages = Math.ceil(total / pageSize);
+      const safePage = totalPages === 0 ? 1 : Math.min(Math.max(1, page), totalPages);
+      const start = (safePage - 1) * pageSize;
+
+      return {
+        items: campaigns.slice(start, start + pageSize),
+        page: safePage,
+        pageSize,
+        total,
+        totalPages,
+      };
+    },
   );
 }
 
