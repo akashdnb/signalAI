@@ -14,13 +14,7 @@ const sampleConversations = [
   { handle:"@studio_owner", preview:"Can you share the class schedule?", time:"12m", status:"Needs review", tone:"amber", initial:"SO" },
   { handle:"@maya_runs", preview:"Is this available for beginners?", time:"27m", status:"AI handling", tone:"purple", initial:"MR" },
 ];
-const sampleLeads = [
-  { name:"Morgan Lee", handle:"@morgan.sample", stage:"New", source:"Comment", activity:"2m ago", owner:"Needs assignment" },
-  { name:"Casey Rivera", handle:"@casey.sample", stage:"Contacted", source:"DM", activity:"12m ago", owner:"Alex Morgan" },
-  { name:"Taylor Kim", handle:"@taylor.sample", stage:"Qualified", source:"Comment", activity:"27m ago", owner:"Sam Taylor" },
-  { name:"Jordan Patel", handle:"@jordan.sample", stage:"New", source:"DM", activity:"1h ago", owner:"Needs assignment" },
-  { name:"Riley Chen", handle:"@riley.sample", stage:"Qualified", source:"DM", activity:"3h ago", owner:"Alex Morgan" },
-];
+
 
 export function OverviewScreen({ onNavigate }: { onNavigate: Go }) {
   const [period, setPeriod] = useState("Last 7 days");
