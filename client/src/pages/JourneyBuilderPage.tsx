@@ -23,7 +23,7 @@ export function JourneyBuilderPage() {
       setCampaign(current);
     } catch (err) {
       setCampaign(null);
-      setError(err instanceof ApiError ? err.message : "Failed to load journey");
+      setError(err instanceof ApiError ? err.message : "Failed to load automation");
     } finally {
       setLoading(false);
     }
@@ -37,7 +37,7 @@ export function JourneyBuilderPage() {
       setCampaign(current);
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to refresh journey");
+      setError(err instanceof ApiError ? err.message : "Failed to refresh automation");
     }
   }, [tenantId, campaignId]);
 
@@ -50,7 +50,7 @@ export function JourneyBuilderPage() {
   if (loading) {
     return (
       <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-        <span className="text-sm text-subtle">Loading journey…</span>
+        <span className="text-sm text-subtle">Loading automation…</span>
       </div>
     );
   }
@@ -58,14 +58,14 @@ export function JourneyBuilderPage() {
   if (!campaign) {
     return (
       <div className="flex min-h-[calc(100vh-56px)] flex-col items-center justify-center gap-3 px-4 text-center">
-        <h1 className="m-0 text-lg font-semibold text-ink">Journey not found</h1>
-        <p className="muted m-0">{error ?? "This journey is no longer available."}</p>
+        <h1 className="m-0 text-lg font-semibold text-ink">Automation not found</h1>
+        <p className="muted m-0">{error ?? "This automation is no longer available."}</p>
         <button
           type="button"
           className="btn-secondary"
           onClick={() => navigate(`/dashboard/${tenantId}/automation`)}
         >
-          Back to Journeys
+          Back to automations
         </button>
       </div>
     );
