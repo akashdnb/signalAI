@@ -8,15 +8,6 @@ import { JourneyTablePaginated } from "../components/automation/JourneyTablePagi
 import { NewJourneyDialog } from "../components/automation/NewJourneyDialog";
 import { ToastStack, useToasts } from "../components/Toast";
 
-const AUTOMATION_TAB_LABEL: Record<AutomationTab, string> = {
-  journeys: "Journeys",
-  templates: "Templates",
-  keywords: "Keywords",
-  quickReplies: "Quick Replies",
-  handoffRules: "Handoff Rules",
-  settings: "Settings",
-};
-
 export function AutomationPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
@@ -31,7 +22,7 @@ export function AutomationPage() {
     if (!tenantId) return;
     const created = await api.createCampaign(tenantId, name, keywords, { enabled: false });
     setShowNewJourney(false);
-    push("Draft journey created");
+    push("Draft created. Review it before publishing.");
     navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
   }
 
@@ -44,28 +35,21 @@ export function AutomationPage() {
       if (!campaignId) {
         const created = await api.createCampaign(tenantId, template.name, template.keywords, { enabled: false });
         campaignId = created.id;
-        // Retain the campaign id before making any subsequent provisioning
-        // calls. If configuration or milestones fail, the next retry resumes
-        // this draft instead of creating a duplicate campaign.
         setTemplateDraftIds((current) => ({ ...current, [template.id]: campaignId! }));
       }
-
       const { milestones: presetMilestones, ...replyConfig } = template.preset;
       await api.updateReplyConfig(tenantId, campaignId, { ...replyConfig, keywords: template.keywords });
       if (presetMilestones) await api.setMilestones(tenantId, campaignId, presetMilestones);
-
       setTemplateDraftIds((current) => {
         const next = { ...current };
         delete next[template.id];
         return next;
       });
-      push(`${template.name} draft created`);
+      push(`${template.name} draft created. Review it before publishing.`);
       navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Failed to create journey from preset";
+      const message = err instanceof ApiError ? err.message : "Failed to create automation draft";
       setError(message);
-      // Keep the template details dialog open. If a campaign was already
-      // created, templateDraftIds makes retry idempotent for this template.
       throw new Error(message);
     } finally {
       setCreatingTemplate(false);
@@ -81,20 +65,18 @@ export function AutomationPage() {
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
       {activeTab === "templates" ? (
         <AutomationTemplates onUse={handleUseTemplate} />
-      ) : activeTab !== "journeys" ? (
-        <div id="automation-tabpanel" role="tabpanel" aria-labelledby={`automation-tab-${activeTab}`} tabIndex={0} className="mt-6 flex min-h-[300px] flex-1 items-center justify-center rounded-2xl border border-dashed border-line px-5 md:min-h-[520px]">
-          <div className="max-w-md text-center">
-            <p className="m-0 text-sm font-semibold text-ink">{AUTOMATION_TAB_LABEL[activeTab]} is not available yet</p>
-            <p className="muted mb-0 mt-1 text-sm">This section is still in development. Journeys are available now.</p>
-          </div>
-        </div>
       ) : (
         <div id="automation-tabpanel" role="tabpanel" aria-labelledby="automation-tab-journeys" tabIndex={0} className="min-w-0 flex-1">
-          <JourneyTablePaginated
-            tenantId={tenantId}
-            onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)}
-            onNewJourney={() => setShowNewJourney(true)}
-          />
+          <div className="mt-5 rounded-2xl border border-accent/15 bg-gradient-to-r from-accent/5 via-card to-card p-4 md:p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="m-0 text-[15px] font-semibold text-ink">Start with the outcome you want</p>
+                <p className="muted m-0 mt-1 max-w-2xl text-xs leading-5">Pick a ready-made automation and customize only the parts that matter. Your changes stay in draft until you explicitly publish.</p>
+              </div>
+              <button type="button" className="btn-primary shrink-0" onClick={() => setActiveTab("templates")}>Choose a template</button>
+            </div>
+          </div>
+          <JourneyTablePaginated tenantId={tenantId} onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)} onNewJourney={() => setShowNewJourney(true)} />
         </div>
       )}
       {showNewJourney && <NewJourneyDialog onClose={() => setShowNewJourney(false)} onCreate={handleCreateJourney} />}
