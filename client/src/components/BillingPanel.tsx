@@ -106,7 +106,9 @@ export function BillingPanel({ tenantId }: { tenantId: string }) {
 
           {usage && !usage.isEntitled && (
             <div className="banner banner-error mt-4" role="alert">
-              Your trial has ended. Upgrade below to keep campaigns running.
+              {billing.billingConfigured
+                ? "Your trial has ended. Choose a paid plan below to keep campaigns running."
+                : "Your current usage allowance has been exhausted. Paid billing is not enabled yet, so there is no upgrade or checkout action available in this beta workspace."}
             </div>
           )}
 
