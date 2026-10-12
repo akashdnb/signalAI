@@ -922,3 +922,42 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Flagship audit: give dense CRM data a stable rhythm and prevent labels
+   from fragmenting when the table is viewed in the available workspace width. */
+.leads-data-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+.leads-data-table th,
+.leads-data-table td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.leads-data-table th:first-child,
+.leads-data-table td:first-child {
+  min-width: 150px;
+  white-space: normal;
+}
+
+.leads-data-table th:nth-child(3),
+.leads-data-table td:nth-child(3) {
+  min-width: 150px;
+}
+
+.leads-data-table th:nth-child(6),
+.leads-data-table td:nth-child(6) {
+  min-width: 140px;
+}
+
+@media (max-width: 640px) {
+  .leads-data-table th,
+  .leads-data-table td {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}

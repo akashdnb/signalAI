@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Funnel, type RevenueByCurrency, type TopKeyword, type TopPost } from "../api";
 
-const FUNNEL_COLORS = ["--funnel-1", "--funnel-2", "--funnel-3", "--funnel-4", "--funnel-5", "--funnel-6"];
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
 function formatMoney(currency: string, total: number): string {
@@ -11,40 +10,60 @@ function formatMoney(currency: string, total: number): string {
   return symbol ? `${symbol}${amount}` : `${currency} ${amount}`;
 }
 
-function FunnelChart({ funnel }: { funnel: Funnel }) {
-  const barHeight = 24;
-  const gap = 12;
-  const labelWidth = 160;
-  const chartWidth = 420;
-  const height = funnel.stages.length * (barHeight + gap);
-  const barMax = Math.max(...funnel.stages.map((s) => s.count), 1);
-  const pctBase = funnel.stages.find((s) => s.key === "leads")?.count || funnel.stages[0]?.count || 1;
-  const pctLabel = funnel.stages.find((s) => s.key === "leads")?.label ?? "Leads";
+function ActivityVolume({ funnel }: { funnel: Funnel }) {
+  const activity = funnel.stages.filter((stage) => stage.key === "comments" || stage.key === "dms");
+  const maxCount = Math.max(1, ...activity.map((stage) => stage.count));
+
+  return (
+    <div className="space-y-5">
+      <p className="muted small">Total events recorded. Comments and DMs can include repeated activity from the same person, so these are not conversion rates.</p>
+      {activity.map((stage) => (
+        <div key={stage.key} className="space-y-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm font-medium text-ink">{stage.label}</span>
+            <strong className="text-sm tabular-nums text-ink">{stage.count.toLocaleString()}</strong>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-chip" role="presentation">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${(stage.count / maxCount) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PipelineProgression({ funnel }: { funnel: Funnel }) {
+  const stages = funnel.stages.filter((stage) => !["comments", "dms"].includes(stage.key));
+  const leadCount = stages.find((stage) => stage.key === "leads")?.count ?? 0;
 
   return (
     <div>
-      <svg width="100%" viewBox={`0 0 ${labelWidth + chartWidth + 70} ${height}`} role="img" aria-label="Conversion funnel">
-        {funnel.stages.map((stage, i) => {
-          const width = Math.max((stage.count / barMax) * chartWidth, stage.count > 0 ? 4 : 0);
-          const y = i * (barHeight + gap);
-          const pct = Math.round((stage.count / pctBase) * 100);
+      <p className="muted small mb-4">Current pipeline snapshot, not a historical cohort. Percentages use all leads as the denominator and show the share currently at or beyond each pipeline stage.</p>
+      <div className="space-y-4">
+        {stages.map((stage) => {
+          const pct = leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0;
           return (
-            <g key={stage.key}>
-              <text x={labelWidth - 10} y={y + barHeight / 2 + 4} textAnchor="end" fontSize="13" fill="var(--text)">{stage.label}</text>
-              <rect x={labelWidth} y={y} width={2} height={barHeight} fill="var(--bg)" />
-              <rect x={labelWidth + 2} y={y} width={width} height={barHeight} rx={4} fill={`var(${FUNNEL_COLORS[i] ?? "--funnel-6"})`}>
-                <title>{stage.label}: {stage.count} ({pct}% of {pctLabel})</title>
-              </rect>
-              <text x={labelWidth + width + 12} y={y + barHeight / 2 + 4} fontSize="13" fill="var(--text)">{stage.count} ({pct}%)</text>
-            </g>
+            <div key={stage.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
+              <div className="min-w-0 text-sm font-medium text-ink">{stage.label}</div>
+              <div className="whitespace-nowrap text-right text-sm tabular-nums text-subtle">{stage.count.toLocaleString()} <span className="text-xs">({pct}%)</span></div>
+              <div className="col-span-2 h-2.5 overflow-hidden rounded-full bg-chip" role="presentation">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
           );
         })}
-      </svg>
-
+      </div>
       <div className="analytics-table-scroll">
-        <table className="table" style={{ marginTop: "1rem" }}>
-          <thead><tr><th>Stage</th><th>Count</th><th>% of {pctLabel}</th></tr></thead>
-          <tbody>{funnel.stages.map((stage) => <tr key={stage.key}><td>{stage.label}</td><td>{stage.count}</td><td>{Math.round((stage.count / pctBase) * 100)}%</td></tr>)}</tbody>
+        <table className="table mt-4">
+          <caption className="sr-only">Current pipeline counts and share of all leads at or beyond each stage</caption>
+          <thead><tr><th>Pipeline stage</th><th>Leads</th><th>Share of leads</th></tr></thead>
+          <tbody>{stages.map((stage) => (
+            <tr key={stage.key}>
+              <td>{stage.label}</td>
+              <td className="tabular-nums">{stage.count.toLocaleString()}</td>
+              <td className="tabular-nums">{leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0}%</td>
+            </tr>
+          ))}</tbody>
         </table>
       </div>
     </div>
@@ -85,7 +104,7 @@ export function AnalyticsPage() {
 
   return (
     <div className="page page-wide page-analytics">
-      <h1>Analytics</h1>
+      <div className="mb-6"><p className="mb-1 text-xs font-semibold uppercase tracking-widest text-accent">Performance</p><h1>Analytics</h1><p className="muted mt-1">See the conversations you’re generating and how leads are moving through your pipeline.</p></div>
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
           <span>{error}</span>
@@ -93,20 +112,25 @@ export function AnalyticsPage() {
         </div>
       )}
 
-      <section className="card">
-        <h2>Conversion Funnel</h2>
-        {funnel === null ? <p className="muted" role="status">{error ? "Analytics could not be loaded." : "Loading analytics…"}</p> : <><FunnelChart funnel={funnel} /><p className="muted small" style={{ marginTop: "0.75rem" }}>Based on each lead's current stage, not a historical cohort funnel — a lead marked Lost no longer counts toward later stages even if it reached them first.</p></>}
-      </section>
+      {funnel === null ? (
+        <section className="card"><p className="muted" role="status">{error ? "Analytics could not be loaded." : "Loading analytics…"}</p></section>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <section className="card mb-0"><h2>Activity volume</h2><ActivityVolume funnel={funnel} /></section>
+            <section className="card mb-0"><h2>Pipeline progression</h2><PipelineProgression funnel={funnel} /></section>
+          </div>
+          <div className="stat-grid mt-4" style={{ marginBottom: "1.25rem" }}>
+            <div className="stat"><div className="stat-value">{funnel.openWithNoOutcome.toLocaleString()}</div><div className="stat-label">Leads with no final outcome</div></div>
+            {revenue === null ? <div className="stat"><div className="stat-value">…</div><div className="stat-label">Revenue</div></div> : revenue.length === 0 ? <div className="stat"><div className="stat-value">—</div><div className="stat-label">Revenue (no won deals yet)</div></div> : revenue.map((r) => <div className="stat" key={r.currency}><div className="stat-value">{formatMoney(r.currency, r.total)}</div><div className="stat-label">Revenue ({r.currency}, won deals)</div></div>)}
+          </div>
+        </>
+      )}
 
-      <div className="stat-grid" style={{ marginBottom: "1.25rem" }}>
-        {funnel !== null && <div className="stat"><div className="stat-value">{funnel.openWithNoOutcome}</div><div className="stat-label">Leads still open (no outcome yet)</div></div>}
-        {revenue === null ? <div className="stat"><div className="stat-value">…</div><div className="stat-label">Revenue</div></div> : revenue.length === 0 ? <div className="stat"><div className="stat-value">—</div><div className="stat-label">Revenue (no won deals yet)</div></div> : revenue.map((r) => <div className="stat" key={r.currency}><div className="stat-value">{formatMoney(r.currency, r.total)}</div><div className="stat-label">Revenue ({r.currency}, won deals)</div></div>)}
-      </div>
-
       <section className="card">
-        <h2>Top Performing Posts</h2>
+        <h2>Top performing posts</h2>
         {topPosts === null ? <p className="muted">Loading…</p> : topPosts.length === 0 ? <p className="muted">No comments yet.</p> : <div className="-mx-2 overflow-x-auto sm:mx-0"><table className="table min-w-[420px]"><thead><tr><th>Post</th><th>Comments</th></tr></thead><tbody>{topPosts.map((p) => <tr key={p.mediaId}><td>{p.permalink ? <a href={p.permalink} target="_blank" rel="noreferrer">{p.caption ?? p.mediaId}</a> : p.caption ?? p.mediaId}</td><td>{p.commentCount}</td></tr>)}</tbody></table></div>}
-        {topKeywords && topKeywords.length > 0 && <><h3 style={{ marginTop: "1.25rem" }}>Top Trigger Keywords</h3><div>{topKeywords.map((k) => <span className="tag-chip" key={k.keyword}>{k.keyword} ({k.matchCount})</span>)}</div></>}
+        {topKeywords && topKeywords.length > 0 && <><h3 style={{ marginTop: "1.25rem" }}>Top trigger keywords</h3><div>{topKeywords.map((k) => <span className="tag-chip" key={k.keyword}>{k.keyword} ({k.matchCount})</span>)}</div></>}
       </section>
     </div>
   );

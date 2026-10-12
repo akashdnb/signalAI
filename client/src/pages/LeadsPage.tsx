@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
-import { PIPELINE_STAGES, formatDate, formatLastContactVia, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatLastContactVia, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -108,8 +108,8 @@ export function LeadsPage() {
           <p className="muted">No leads match this view yet.</p>
         ) : (
           <>
-            <div className="-mx-2 overflow-x-auto sm:mx-0">
-              <table className="table min-w-[780px]">
+            <div className="-mx-2 overflow-x-auto sm:mx-0" aria-label="Scrollable leads table">
+              <table className="table leads-data-table min-w-[980px]">
                 <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
                 <tbody>
                   {leads.map((lead) => (
@@ -125,10 +125,10 @@ export function LeadsPage() {
                       </td>
                       <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
                       <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
-                      <td>{formatDate(lead.lastInboundAt)}</td>
+                      <td><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "—"}</time></td>
                       <td>{formatLastContactVia(lead.lastEventType)}</td>
                       <td>{lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? <span className="pill pill-ok">open</span> : <span className="pill">closed</span>}</td>
-                      <td>{formatDate(lead.createdAt)}</td>
+                      <td><time dateTime={lead.createdAt} title={new Date(lead.createdAt).toLocaleString()}>{formatRelativeTime(lead.createdAt)}</time></td>
                     </tr>
                   ))}
                 </tbody>
