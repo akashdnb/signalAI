@@ -15,11 +15,22 @@ function isPendingInvitation(invitation: WorkspaceInvitation): boolean {
   );
 }
 
+function invitationState(invitation: WorkspaceInvitation): string {
+  if (invitation.acceptedAt) return "Accepted";
+  if (invitation.revokedAt) return "Cancelled";
+  if (new Date(invitation.expiresAt).getTime() <= Date.now()) return "Expired";
+  return "Pending";
+}
+
 function formatExpiry(iso: string): string {
   const expiry = new Date(iso);
   const days = Math.ceil((expiry.getTime() - Date.now()) / 86_400_000);
   if (days <= 1) return `Expires ${expiry.toLocaleString()}`;
   return `Expires in ${days} days`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString();
 }
 
 export function TeamPage() {
@@ -132,6 +143,7 @@ export function TeamPage() {
   if (!tenantId) return null;
 
   const pendingInvitations = invitations.filter(isPendingInvitation);
+  const resolvedInvitations = invitations.filter((invitation) => !isPendingInvitation(invitation));
 
   return (
     <div className="page page-wide">
@@ -260,6 +272,25 @@ export function TeamPage() {
                 </li>
               );
             })}
+          </ul>
+        </section>
+      )}
+
+      {resolvedInvitations.length > 0 && (
+        <section className="card">
+          <h2>Invitation history</h2>
+          <p className="muted small">Resolved invitations stay visible so you can tell whether a teammate accepted, was cancelled, or let the invitation expire.</p>
+          <ul className="list">
+            {resolvedInvitations.map((invitation) => (
+              <li key={invitation.id} className="list-item">
+                <span className="min-w-0 flex-1">
+                  <strong>{invitation.email}</strong>
+                  <span className="muted small" style={{ marginLeft: 8 }}>{formatRole(invitation.role)}</span>
+                  <span className="muted small block mt-1">Created {formatDate(invitation.createdAt)}</span>
+                </span>
+                <span className="pill">{invitationState(invitation)}</span>
+              </li>
+            ))}
           </ul>
         </section>
       )}
