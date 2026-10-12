@@ -307,11 +307,27 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     <section className="mt-4">
       <div className="flex flex-wrap items-end justify-between gap-4"><h2 className="m-0 text-[21px] font-semibold tracking-[-0.015em] text-ink">{data === null ? "My automations" : `My automations (${data.total})`}</h2><button type="button" className="btn-primary flex h-10 items-center gap-2 px-4 text-sm whitespace-nowrap" onClick={onNewJourney}>Create draft</button></div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(200px,1fr)_150px_200px_150px]">
-        <div className="relative"><SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" /><input type="search" aria-label="Search automations" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search automations..." className="!m-0 !h-11 !rounded-xl !bg-card !pl-10 !pr-14 !text-sm" />{search && <button type="button" aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-1 text-xs font-semibold text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setSearch("")}>Clear</button>}</div>
-        <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by status"><option value="all">All statuses</option><option value="live">Live</option><option value="paused">Paused</option><option value="draft">Draft</option><option value="needs_publishing">Needs publishing</option></select>
-        <select value={trigger} onChange={(event) => setTrigger(event.target.value as TriggerFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by what starts it"><option value="all">All start conditions</option><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment + DM</option></select>
-        <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort automations"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option></select>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_165px_220px_195px]">
+        <div className="min-w-0">
+          <label htmlFor="automation-search" className="mb-1.5 block text-xs font-medium text-subtle">Search</label>
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+            <input id="automation-search" type="search" aria-label="Search automations" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search automations..." className="!m-0 !h-11 !w-full !rounded-xl !bg-card !pl-10 !pr-14 !text-sm" />
+            {search && <button type="button" aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-1 text-xs font-semibold text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setSearch("")}>Clear</button>}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <label htmlFor="automation-status-filter" className="mb-1.5 block text-xs font-medium text-subtle">Status</label>
+          <select id="automation-status-filter" value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="!m-0 !h-11 !w-full !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by status"><option value="all">All statuses</option><option value="live">Live</option><option value="paused">Paused</option><option value="draft">Draft</option><option value="needs_publishing">Needs publishing</option></select>
+        </div>
+        <div className="min-w-0">
+          <label htmlFor="automation-trigger-filter" className="mb-1.5 block text-xs font-medium text-subtle">Start condition</label>
+          <select id="automation-trigger-filter" value={trigger} onChange={(event) => setTrigger(event.target.value as TriggerFilter)} className="!m-0 !h-11 !w-full !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by what starts it"><option value="all">All start conditions</option><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment + DM</option></select>
+        </div>
+        <div className="min-w-0">
+          <label htmlFor="automation-sort" className="mb-1.5 block text-xs font-medium text-subtle">Sort by</label>
+          <select id="automation-sort" value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !w-full !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort automations"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A–Z</option><option value="name_desc">Name Z–A</option></select>
+        </div>
       </div>
 
       {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
