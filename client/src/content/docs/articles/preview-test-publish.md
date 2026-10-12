@@ -1,7 +1,7 @@
 ---
 title: Preview, Test & Publish
 slug: preview-test-publish
-group: Journey Builder
+group: Automation
 description: Check replies and the qualification path before an automation handles real Instagram traffic.
 order: 11
 related: journey-builder, rich-media-messages, troubleshooting, quick-start
