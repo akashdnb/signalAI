@@ -1,0 +1,77 @@
+# Precision Operations Studio — Full Preview Guide
+
+**Branch:** `feat/precision-operations-product-ui`  
+**Separate preview deployment:** https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations  
+**Scope:** design exploration only; no live workspace is connected.
+
+Every screen uses illustrative content. The preview does not read customer data, send Instagram messages, start OAuth, create invitations, write lead/automation records, consume AI tokens, or change production state. Buttons that represent a consequential live operation explain or simulate the outcome locally.
+
+## Screen index
+
+Use the direct URLs below to open a screen from a fresh page load.
+
+| Screen | Preview |
+|---|---|
+| Overview | [Open overview](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=overview) |
+| Automation list | [Open automations](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=automations) |
+| Builder — Flow | [Open flow canvas](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=builder&builderTab=Flow) |
+| Builder — Setup | [Open setup/readiness](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=builder&builderTab=Setup) |
+| Builder — Results | [Open results](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=builder&builderTab=Results) |
+| Builder — Leads | [Open journey leads](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=builder&builderTab=Leads) |
+| Inbox | [Open inbox](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=inbox) |
+| Leads list | [Open leads](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=leads) |
+| Lead detail — Overview | [Open lead profile](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=lead-detail&leadTab=Overview) |
+| Lead detail — Conversation | [Open lead conversation](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=lead-detail&leadTab=Conversation) |
+| Lead detail — Activities | [Open activity history](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=lead-detail&leadTab=Activities) |
+| Lead detail — Notes | [Open team notes](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=lead-detail&leadTab=Notes) |
+| Knowledge Base | [Open knowledge](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=knowledge) |
+| Content | [Open content](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=content) |
+| Analytics — Activity | [Open activity analytics](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=analytics&analyticsTab=Activity) |
+| Analytics — Conversion | [Open lead conversion](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=analytics&analyticsTab=Conversion) |
+| Integrations | [Open integrations](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=integrations) |
+| Team | [Open team](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=team) |
+| Billing & usage | [Open billing](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=billing) |
+| Settings — Fields | [Open fields](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=settings&settingsSection=Fields) |
+| Settings — AI behavior | [Open AI behavior](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=settings&settingsSection=AI%20behavior) |
+| Settings — Forbidden topics | [Open forbidden topics](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=settings&settingsSection=Forbidden%20topics) |
+| Settings — Escalation | [Open escalation](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=settings&settingsSection=Escalation) |
+| Settings — Scoring | [Open scoring](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=settings&settingsSection=Scoring) |
+| Documentation | [Open documentation preview](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=docs) |
+| Sign-in | [Open sign-in](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=login) |
+| Instagram connection recovery | [Open connection states](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=connect-error&state=invalid_state) |
+| Invitation recovery | [Open invitation states](https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=invite&state=expired) |
+
+For recovery screens, change the **Preview state** selector to inspect all available variants: missing parameters/token, expired or reused state/invitation, session mismatch, wrong email, revoked invitation, connection failure, and success.
+
+## Coverage details
+
+- **Overview:** four KPI roles; reporting-period selector; distinct inbound activity chart; reconciled 24-lead stage distribution; actionable work queue; recent conversations; metric definitions.
+- **Automation list:** 11 illustrative rows; name/search, status, start-condition and sort controls; create-draft form; template selection; row actions with preview-only outcomes.
+- **Builder:** Flow / Setup / Results / Leads tabs; trigger, AI reply, goal and message nodes; node settings; trigger Basic/Advanced/AI Settings; message text and presentation options (plain text, buttons, card, gallery, quick replies); destination settings; goal/captured-field, validation and success-message sections; local validation; visible unsaved state; save-and-leave decision; preview reply; sample walkthrough; publish, pause and activation confirmation states. Condition, Delay, and a dedicated Handoff node remain unavailable to add because the current product explicitly marks them as coming soon.
+- **Inbox:** production-aligned All / Unread / AI Handling / Qualified / Needs Attention filters; username search; unread indicators; example conversation transcript; human takeover/return; lead stage, owner, messaging window, last-contact channel; local reply composer and empty-filter state.
+- **Leads:** all seven production table concepts (Username, Stage, Handoff, Last contact, Via, Messaging window, First seen); search; stage/handoff filters; sort; sample pagination; links to a contextual profile.
+- **Lead detail:** Overview / Conversation / Activities / Notes; stage and owner; handoff responsibility; captured facts, tags, intelligence explanation and deals.
+- **Knowledge Base:** ready, needs-review, processing and failed sources; metadata/content preview; upload affordance; retrieval test state.
+- **Content:** All media / Image / Carousel / Video filters; keyword search; designed thumbnail fallback art; metadata, sync status, post preview.
+- **Analytics:** Activity volume and Lead conversion are separate; event counts are not presented as conversion rates; current-stage counts reconcile; reporting period, top posts and trigger keywords.
+- **Integrations:** sample account identity, permission/webhook/token status, account assignment, technical detail disclosure, connection-check/disconnect warnings, unavailable provider states.
+- **Team:** member and pending-invitation rows; invite form; role-permission matrix; preview-only resend/cancel/manage results.
+- **Billing:** Trial state, token/DM usage, missing billing/reset/renewal information and quota-policy explanation.
+- **Settings:** Fields, AI behavior, Forbidden topics, Escalation, and Scoring; business-facing copy, technical field keys, local-only edits.
+- **Auth and recovery:** OTP entry, invalid/expired/rate-limited code examples, unavailable SSO messaging, OAuth state cases, invitation state cases, redacted technical details.
+
+## Review checklist
+
+- [ ] Review the screens at desktop width; note any hierarchy, density or terminology that does not match the intended product.
+- [ ] Open Builder Setup, Results, and Leads from their direct links; check that Save, Preview, Sample walkthrough, Publish and lifecycle controls are distinct.
+- [ ] Inspect the message editor's buttons, card/gallery, and quick-reply presentation settings.
+- [ ] Search/filter Inbox, Leads, Automations, Knowledge, and Content; inspect empty states.
+- [ ] Inspect lead handoff/owner mismatch and the messaging-window context.
+- [ ] Review Activity vs Conversion analytics and the explanatory metric copy.
+- [ ] Review light/dark theme using the global theme control.
+- [ ] Review all recovery variants using their Preview state selectors.
+- [ ] Check tablet/mobile widths in the browser before approving a direction for implementation.
+
+## Important boundary
+
+This is a high-fidelity, navigable design preview, not yet a 1:1 implementation of every API-backed production interaction. The internal app components have deliberately not been replaced. Preview-side save, sending, upload, invitation, integration, scoring, and publish actions are local simulations. The next phase must wait for design approval and a separate implementation plan; real API behavior and accessibility must be verified in real screens before production rollout.
