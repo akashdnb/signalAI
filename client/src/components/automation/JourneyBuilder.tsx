@@ -107,6 +107,7 @@ export function JourneyBuilder({
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showTestJourney, setShowTestJourney] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
@@ -131,6 +132,18 @@ export function JourneyBuilder({
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
   const journeyDirty = canvasDirty || milestonesDirty;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   const registerCanvasActions = useCallback((actions: BuilderCanvasActions | null) => {
     canvasActionsRef.current = actions;
@@ -576,9 +589,13 @@ export function JourneyBuilder({
               </button>
 
               <button
+                ref={menuButtonRef}
                 type="button"
                 aria-label="More actions"
-                className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+                aria-haspopup="true"
+                aria-expanded={menuOpen}
+                aria-controls="journey-builder-actions"
+                className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => setMenuOpen((value) => !value)}
               >
                 <DotsVerticalIcon className="h-5 w-5" />
@@ -592,7 +609,7 @@ export function JourneyBuilder({
                     className="fixed inset-0 z-40 cursor-default"
                     onClick={() => setMenuOpen(false)}
                   />
-                  <div className="absolute right-5 top-12 z-50 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl">
+                  <div id="journey-builder-actions" className="absolute right-5 top-12 z-50 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl">
                     <button
                       type="button"
                       className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip md:hidden"
