@@ -508,11 +508,16 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
               </label>
             </div>
             <div>
-              <div className="mb-1 text-sm">Status after publishing</div>
+              <div className="mb-1 text-sm">Reply status</div>
               <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line px-3.5">
                 <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="!w-auto" />
                 {draft.enabled ? "Enabled" : "Paused"}
               </label>
+              <p className="muted m-0 mt-1 text-xs leading-5">
+                {campaign.published
+                  ? "This takes effect immediately for the live automation."
+                  : "This draft won't reply until published. Publishing turns replies on."}
+              </p>
             </div>
           </div>
         </Card>
