@@ -447,6 +447,13 @@ test.describe("responsive route smoke checks", () => {
 
     const title = page.getByRole("button", { name: "Product enquiry journey" });
     await expect(title).toBeVisible();
+    await expect(page.getByText("Search", { exact: true })).toBeVisible();
+    await expect(page.getByText("Status", { exact: true })).toBeVisible();
+    await expect(page.getByText("Start condition", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sort by", { exact: true })).toBeVisible();
+    // Keep the result-count footer, but avoid disabled paging controls for one page.
+    await expect(page.getByText("Showing 1–1 of 1 automations")).toBeVisible();
+    await expect(page.getByRole("group", { name: "Pagination controls" })).toHaveCount(0);
     const row = page.getByRole("row", { name: /Product enquiry journey/ });
     await expect(row).not.toHaveAttribute("role", "button");
     await expect(row.getByText("Draft", { exact: true })).toBeVisible();
