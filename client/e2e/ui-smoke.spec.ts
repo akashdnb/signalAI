@@ -30,6 +30,7 @@ async function mockTenantApi(
     journeyEditor?: boolean;
     automationList?: boolean;
     legacyCampaignList?: boolean;
+    legacyStatusContract?: boolean;
     publishedCampaign?: boolean;
     healthyAssignedAccount?: boolean;
     campaignEnabled?: boolean;
@@ -110,6 +111,74 @@ async function mockTenantApi(
         status: 503,
         contentType: "application/json",
         body: JSON.stringify({ error: "Temporary timeline outage" }),
+      });
+      return;
+    }
+
+    if (
+      options.legacyStatusContract &&
+      path === `${tenantPath}/campaigns` &&
+      route.request().method() === "GET"
+    ) {
+      const requestedStatus = url.searchParams.get("status") ?? "all";
+      if (!["all", "active", "inactive"].includes(requestedStatus)) {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "status must be all, active or inactive" }),
+        });
+        return;
+      }
+
+      const campaigns = [
+        campaignFixture,
+        {
+          ...campaignFixture,
+          id: "smoke-live-campaign",
+          name: "Zebra product launch",
+          description: "Comment-to-DM launch automation",
+          keywords: ["launch", "product"],
+          enabled: true,
+          published: true,
+          triggerSource: "comment",
+          updatedAt: "2026-10-12T09:00:00.000Z",
+        },
+        {
+          ...campaignFixture,
+          id: "smoke-paused-campaign",
+          name: "Paused sample automation",
+          enabled: false,
+          published: true,
+          updatedAt: "2026-10-11T09:00:00.000Z",
+        },
+        {
+          ...campaignFixture,
+          id: "smoke-needs-publishing-campaign",
+          name: "Needs publishing sample",
+          enabled: true,
+          published: false,
+          triggerSource: "both",
+          updatedAt: "2026-10-11T10:00:00.000Z",
+        },
+      ];
+      const serverFiltered = campaigns.filter((campaign) => {
+        if (requestedStatus === "active") return campaign.enabled;
+        if (requestedStatus === "inactive") return !campaign.enabled;
+        return true;
+      });
+      const pageNumber = Math.max(1, Number(url.searchParams.get("page")) || 1);
+      const pageSize = Math.max(1, Number(url.searchParams.get("pageSize")) || 50);
+      const totalPages = Math.ceil(serverFiltered.length / pageSize);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: serverFiltered.slice((pageNumber - 1) * pageSize, pageNumber * pageSize),
+          page: pageNumber,
+          pageSize,
+          total: serverFiltered.length,
+          totalPages,
+        }),
       });
       return;
     }
@@ -415,6 +484,30 @@ test.describe("responsive route smoke checks", () => {
     await page.getByPlaceholder("Search automations...").fill("launch");
     await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
+  });
+
+  test("status filters map to the legacy active/inactive API contract when sorting", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { legacyStatusContract: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("live");
+    await page.getByRole("combobox", { name: "Sort automations" }).selectOption("name_asc");
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
+    await expect(page.getByRole("alert")).not.toContainText("status must be all, active or inactive");
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("paused");
+    await expect(page.getByRole("button", { name: "Paused sample automation" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("needs_publishing");
+    await expect(page.getByRole("button", { name: "Needs publishing sample" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Paused sample automation" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("draft");
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Needs publishing sample" })).toHaveCount(0);
   });
 
   test("automation filters fit a tablet viewport without horizontal overflow", async ({ page }) => {
