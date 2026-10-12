@@ -21,6 +21,11 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const MAX_REQUESTS_PER_EMAIL = 5;
 const MAX_REQUESTS_PER_IP = 20;
 
+// Development/test-only login fixture. It is deliberately disabled in
+// production so these credentials can never become a production backdoor.
+const TEST_LOGIN_EMAIL = "signalai.test@gmail.com";
+const TEST_LOGIN_OTP = "123456";
+
 // Deliberately generic and identical for every outcome except a malformed
 // request or a rate limit — see the request handler below for why.
 const GENERIC_RESPONSE = { message: "If an account exists for that email, we've sent a sign-in code." };
@@ -31,6 +36,10 @@ function isValidEmail(value: unknown): value is string {
 
 function isValidCode(value: unknown): value is string {
   return typeof value === "string" && /^\d{6}$/.test(value.trim());
+}
+
+function isTestLogin(email: string): boolean {
+  return config.nodeEnv !== "production" && normalizeEmail(email) === TEST_LOGIN_EMAIL;
 }
 
 /**
@@ -52,6 +61,13 @@ authEmailRouter.post("/auth/email/request", async (req, res) => {
   const pool = getPool();
   const normalized = normalizeEmail(email);
   const ip = req.ip ?? null;
+
+  // The test identity is provisioned through the same user path as a normal
+  // login, but does not require Resend or a database OTP record.
+  if (isTestLogin(normalized)) {
+    await findOrCreateUserByEmail(pool, normalized);
+    return res.status(200).json(GENERIC_RESPONSE);
+  }
 
   const [emailCount, ipCount] = await Promise.all([
     countRecentCodesForEmail(pool, normalized, RATE_LIMIT_WINDOW_MS),
@@ -93,8 +109,14 @@ authEmailRouter.post("/auth/email/verify", async (req, res) => {
 
   const pool = getPool();
   const normalized = normalizeEmail(email);
+  const normalizedCode = code.trim();
 
-  const spent = await trySpendOtpCode(pool, config.sessionSecret, normalized, code.trim());
+  // Development/test fixture: only the exact test email and OTP are accepted,
+  // and only when the server is not running in production.
+  const spent = isTestLogin(normalized) && normalizedCode === TEST_LOGIN_OTP
+    ? true
+    : await trySpendOtpCode(pool, config.sessionSecret, normalized, normalizedCode);
+
   if (!spent) {
     const attemptResult = await recordFailedOtpAttempt(pool, normalized);
     if (attemptResult === "locked") {
