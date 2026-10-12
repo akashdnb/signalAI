@@ -115,11 +115,17 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
 
   return (
     <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="m-0 text-[16px] font-semibold text-ink">Leads progressing through this automation</h2>
+        <p className="muted m-0 mt-1 text-xs leading-5">
+          This view shows leads currently linked to one of this automation’s goals. Leads that have finished or left the goal sequence may not appear here.
+        </p>
+      </div>
       <div className="stat-grid">
-        <StatTile value={totalCount} label="Total leads" />
-        <StatTile value={qualifiedCount} label="Qualified" />
-        <StatTile value={meetingCount} label="Meetings scheduled" />
-        <StatTile value={wonCount} label="Closed / Won" />
+        <StatTile value={totalCount} label="Progressing now" />
+        <StatTile value={qualifiedCount} label="Qualified in active goals" />
+        <StatTile value={meetingCount} label="Meetings scheduled in active goals" />
+        <StatTile value={wonCount} label="Won in active goals" />
       </div>
 
       <div className="filter-row">
@@ -204,7 +210,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
             <thead>
               <tr>
                 <th>Lead</th>
-                <th>Captured Milestone</th>
+                <th>Current goal</th>
                 <th>Status</th>
                 <th>Assignee</th>
                 <th>Last Activity</th>
