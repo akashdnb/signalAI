@@ -237,13 +237,29 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
       }
       if (failed > 0 || blockedUnpublished > 0) {
         const updated = results.length - failed;
-        setError(
-          enabled && blockedUnpublished > 0
-            ? `${updated} automation${updated === 1 ? "" : "s"} activated; ${blockedUnpublished} draft automation${blockedUnpublished === 1 ? "" : "s"} skipped. Publish drafts first.`
-            : failed === results.length
-              ? "Couldn't update the selected automations. Please try again."
-              : `${updated} automation${updated === 1 ? "" : "s"} updated; ${failed} failed. The list has been refreshed.`,
-        );
+        if (enabled) {
+          const messages: string[] = [];
+          if (updated > 0) {
+            messages.push(`${updated} automation${updated === 1 ? "" : "s"} activated.`);
+          }
+          if (failed > 0) {
+            messages.push(
+              `${failed} couldn't be activated. Check that each published automation has at least one healthy Instagram account assigned.`,
+            );
+          }
+          if (blockedUnpublished > 0) {
+            messages.push(
+              `${blockedUnpublished} draft automation${blockedUnpublished === 1 ? "" : "s"} skipped. Publish drafts before activating them.`,
+            );
+          }
+          setError(messages.join(" "));
+        } else {
+          setError(
+            failed === results.length
+              ? "Couldn't pause the selected automations. Please try again."
+              : `${updated} automation${updated === 1 ? "" : "s"} paused; ${failed} couldn't be updated. The list has been refreshed.`,
+          );
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update automations");
