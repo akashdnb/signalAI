@@ -11,13 +11,23 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
   );
 }
 
-function FunnelBar({ label, count, of }: { label: string; count: number; of: number }) {
+function FunnelBar({
+  label,
+  count,
+  of,
+  denominatorLabel = "matched comments and messages",
+}: {
+  label: string;
+  count: number;
+  of: number;
+  denominatorLabel?: string;
+}) {
   const pct = of > 0 ? Math.round((count / of) * 100) : 0;
   return (
     <div>
       <div className="flex justify-between text-xs text-subtle">
         <span>{label}</span>
-        <span>
+        <span title={`${count.toLocaleString()} out of ${of.toLocaleString()} ${denominatorLabel}`}>
           {count.toLocaleString()} <span className="text-subtle">({pct}%)</span>
         </span>
       </div>
