@@ -39,7 +39,7 @@ export function BillingPanel({ tenantId }: { tenantId: string }) {
     setError(null);
     try {
       const { url } = await api.startCheckout(tenantId, tier);
-      window.location.href = url;
+      window.location.assign(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start checkout");
       setStartingTier(null);
