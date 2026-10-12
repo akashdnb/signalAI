@@ -78,7 +78,7 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
       await onToggle();
       setOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't update journey status");
+      setError(err instanceof Error ? err.message : "Couldn't update automation status");
     } finally {
       setSaving(false);
     }
@@ -95,7 +95,7 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
           <button type="button" disabled={saving || (!campaign.enabled && !canActivate)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>
-            {saving ? "Saving…" : campaign.enabled ? "Pause journey" : canActivate ? "Activate journey" : "Publish first"}
+            {saving ? "Saving…" : campaign.enabled ? "Pause automation" : canActivate ? "Activate automation" : "Publish before activating"}
           </button>
         </div>
       </>}
@@ -109,15 +109,15 @@ function RenameJourney({ campaign, onClose, onSaved }: { campaign: Campaign; onC
   const [error, setError] = useState<string | null>(null);
   async function save() {
     const nextName = name.trim();
-    if (!nextName) { setError("Journey name cannot be empty."); return; }
+    if (!nextName) { setError("Automation name cannot be empty."); return; }
     setSaving(true); setError(null);
     try { await api.updateReplyConfig(campaign.tenantId, campaign.id, { name: nextName }); onSaved(); onClose(); }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed to rename journey"); }
+    catch (err) { setError(err instanceof Error ? err.message : "Failed to rename automation"); }
     finally { setSaving(false); }
   }
   return (
-    <BottomSheet title="Rename Journey" onClose={onClose}>
-      <label>Journey name<input type="text" value={name} onChange={(event) => setName(event.target.value)} autoFocus /></label>
+    <BottomSheet title="Rename automation" onClose={onClose}>
+      <label>Automation name<input type="text" value={name} onChange={(event) => setName(event.target.value)} autoFocus /></label>
       {error && <div className="banner banner-error">{error}</div>}
       <div className="mt-3 flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="btn-primary" onClick={() => void save()} disabled={!name.trim() || saving}>{saving ? "Saving…" : "Save changes"}</button></div>
     </BottomSheet>
@@ -152,7 +152,7 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
       .catch((err) => {
         if (!cancelled) {
           setData(null);
-          setError(err instanceof Error ? err.message : "Failed to load journeys");
+          setError(err instanceof Error ? err.message : "Failed to load automations");
         }
       });
     return () => { cancelled = true; };
@@ -191,10 +191,10 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
         const updated = results.length - failed;
         setError(
           enabled && blockedUnpublished > 0
-            ? `${updated} journey(s) activated; ${blockedUnpublished} draft journey(s) were skipped. Publish them first.`
+            ? `${updated} automation(s) activated; ${blockedUnpublished} draft automation(s) were skipped. Publish them first.`
             : failed === results.length
               ? "Couldn't update the selected journeys. Please try again."
-              : `${updated} journey(s) updated; ${failed} failed. The list has been refreshed.`,
+              : `${updated} automation(s) updated; ${failed} failed. The list has been refreshed.`,
         );
       }
     } catch (err) {
@@ -208,12 +208,12 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
 
   return (
     <section className="mt-4">
-      <div className="flex flex-wrap items-end justify-between gap-4"><h2 className="m-0 text-[21px] font-semibold tracking-[-0.015em] text-ink">Journeys ({data?.total ?? 0})</h2><button type="button" className="btn-primary flex h-10 items-center gap-2 px-4 text-sm whitespace-nowrap" onClick={onNewJourney}>+ New Journey</button></div>
+      <div className="flex flex-wrap items-end justify-between gap-4"><h2 className="m-0 text-[21px] font-semibold tracking-[-0.015em] text-ink">{data === null ? "My automations" : `My automations (${data.total})`}</h2><button type="button" className="btn-primary flex h-10 items-center gap-2 px-4 text-sm whitespace-nowrap" onClick={onNewJourney}>Create draft</button></div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(280px,1fr)_190px_250px_190px]">
-        <div className="relative"><SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" /><input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search journeys..." className="!m-0 !h-11 !rounded-xl !bg-card !pl-10 !text-sm" /></div>
+        <div className="relative"><SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" /><input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search automations..." className="!m-0 !h-11 !rounded-xl !bg-card !pl-10 !text-sm" /></div>
         <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by status"><option value="all">All status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
-        <select value={trigger} onChange={(event) => setTrigger(event.target.value as TriggerFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by trigger"><option value="all">All triggers</option><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment + DM</option></select>
+        <select value={trigger} onChange={(event) => setTrigger(event.target.value as TriggerFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by what starts it"><option value="all">All start conditions</option><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment + DM</option></select>
         <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort journeys"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option></select>
       </div>
 
@@ -223,13 +223,13 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
 
       <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
         <div className="overflow-x-auto">
-          {data === null && !error ? <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-chip" />)}</div> : error && data === null ? <div className="p-5"><div className="banner banner-error" role="alert">{error}</div><button type="button" className="link-button mt-3" onClick={() => setReloadToken((value) => value + 1)}>Retry</button></div> : data?.total === 0 ? <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center"><h3 className="m-0 text-lg font-semibold text-ink">{hasFilters ? "No journeys match your filters" : "No journeys yet"}</h3><p className="muted m-0 mt-2 max-w-md text-sm">{hasFilters ? "Try changing your search or filters." : "Create your first AI-powered journey to automate conversations."}</p>{!hasFilters && <button type="button" className="btn-primary mt-5" onClick={onNewJourney}>+ New Journey</button>}</div> : (
-            <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible journeys" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Trigger</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
+          {data === null && !error ? <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-chip" />)}</div> : error && data === null ? <div className="p-5"><div className="banner banner-error" role="alert">{error}</div><button type="button" className="link-button mt-3" onClick={() => setReloadToken((value) => value + 1)}>Retry</button></div> : data?.total === 0 ? <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center"><h3 className="m-0 text-lg font-semibold text-ink">{hasFilters ? "No automations match your filters" : "No automations yet"}</h3><p className="muted m-0 mt-2 max-w-md text-sm">{hasFilters ? "Try changing your search or filters." : "Choose a template for your first automation, or create a draft from scratch."}</p>{!hasFilters && <button type="button" className="btn-primary mt-5" onClick={onNewJourney}>+ New Journey</button>}</div> : (
+            <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible journeys" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Starts when</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
               {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} tabIndex={0} aria-pressed={selected} role="button" onClick={() => onSelect(campaign.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(campaign.id); } }} className={`cursor-pointer border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"} focus:bg-chip/35 focus:outline-none`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><div className="text-[15px] font-semibold leading-5 text-ink">{campaign.name}</div><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} keyword${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><JourneyStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
             </tbody></table>
           )}
         </div>
-        {data && data.total > 0 && <Pagination page={data.page} totalPages={data.totalPages} total={data.total} pageSize={data.pageSize} onPageChange={setPage} label="journeys" />}
+        {data && data.total > 0 && <Pagination page={data.page} totalPages={data.totalPages} total={data.total} pageSize={data.pageSize} onPageChange={setPage} label="automations" />}
       </div>
 
       {renameCampaign && <RenameJourney campaign={renameCampaign} onClose={() => setRenameCampaign(null)} onSaved={() => setReloadToken((value) => value + 1)} />}
