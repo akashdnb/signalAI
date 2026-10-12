@@ -466,6 +466,14 @@ export function JourneyBuilder({
     accountReadiness.status === "ready" &&
     accountReadiness.healthyAssignedCount > 0;
 
+  // Publishing a paused/draft automation only stores an immutable version.
+  // Publishing an enabled automation updates the version used by real traffic,
+  // so that path must verify account readiness before proceeding.
+  const publishAffectsLiveAutomation = campaign.enabled;
+  const canPublishCurrentVersion =
+    !publishAffectsLiveAutomation ||
+    (accountReadiness.status === "ready" && accountReadiness.healthyAssignedCount > 0);
+
   async function handleToggleEnabled() {
     if (!campaign.enabled && !canEnableAutomation) return;
     setTogglingEnabled(true);
@@ -927,9 +935,19 @@ export function JourneyBuilder({
           }}
         >
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
-            <p className="m-0 text-sm font-semibold">Publishing turns this automation on immediately.</p>
+            <p className="m-0 text-sm font-semibold">
+              {campaign.enabled
+                ? campaign.published
+                  ? "This automation is live. Publishing will update the version used for new matching conversations."
+                  : "This automation is enabled. Publishing its first version will make it live."
+                : campaign.published
+                  ? "This automation is paused. Publishing saves an updated version but keeps it paused."
+                  : "This saves a published version, but the automation stays paused until you activate it."}
+            </p>
             <p className="m-0 mt-1 text-xs leading-5">
-              After publishing, SignalAI can respond to real Instagram conversations that match this setup.
+              {campaign.enabled
+                ? "Matching Instagram conversations may use these changes as soon as you publish."
+                : "No automated replies will start until you explicitly activate this automation after assigning a healthy Instagram account."}
             </p>
           </div>
 
@@ -1001,7 +1019,9 @@ export function JourneyBuilder({
               {accountReadiness.status === "ready" &&
                 accountReadiness.healthyAssignedCount === 0 && (
                   <p className="m-0 mt-1 text-xs leading-5 text-amber-800">
-                    Publishing will turn the automation on, but it cannot handle conversations until a healthy Instagram account is assigned.
+                    {campaign.enabled
+                      ? "This automation is enabled. Assign at least one healthy Instagram account before publishing a live version."
+                      : "No healthy account is assigned. You can still publish this paused version; assign a healthy account before activating it."}
                   </p>
                 )}
               {accountReadiness.status === "ready" && accountReadiness.unavailableAssignedCount > 0 && (
@@ -1023,7 +1043,9 @@ export function JourneyBuilder({
 
           {accountReadiness.status === "error" && (
             <div className="banner banner-error mt-3" role="alert">
-              Couldn't verify the connected Instagram accounts. Refresh the page and check account status before publishing.
+              {campaign.enabled
+                ? "Couldn't verify connected accounts. Refresh the page and check account status before publishing a live version."
+                : "Couldn't verify connected accounts. This automation will remain paused after publishing; check account readiness before activating it."}
             </div>
           )}
           {accountReadiness.status === "ready" && accountReadiness.healthyAssignedCount === 0 && (
@@ -1033,7 +1055,9 @@ export function JourneyBuilder({
           )}
 
           <p className="muted mt-3 text-xs leading-5">
-            Version v{builderVersion ?? "—"} will become live. If this automation already has a live version, it stays active until this update is published.
+            {campaign.enabled
+              ? `Version v${builderVersion ?? "—"} will be published to an active automation. New matching conversations may use it immediately.`
+              : `Version v${builderVersion ?? "—"} will be published, but this automation will remain inactive until you activate it.`}
           </p>
 
           <div className="mt-5 flex justify-end gap-2">
@@ -1051,16 +1075,21 @@ export function JourneyBuilder({
               className="btn-primary"
               disabled={
                 publishing ||
-                accountReadiness.status !== "ready" ||
-                accountReadiness.healthyAssignedCount === 0
+                !canPublishCurrentVersion
               }
               onClick={() => void handlePublish()}
             >
               {publishing
                 ? "Publishing…"
-                : accountReadiness.status !== "ready" || accountReadiness.healthyAssignedCount === 0
+                : !canPublishCurrentVersion
                   ? "Check Instagram account"
-                  : "Publish and activate"}
+                  : campaign.enabled
+                    ? campaign.published
+                      ? "Publish update"
+                      : "Publish and go live"
+                    : campaign.published
+                      ? "Publish update (stay paused)"
+                      : "Publish draft"}
             </button>
           </div>
         </BottomSheet>

@@ -32,6 +32,7 @@ async function mockTenantApi(
     legacyCampaignList?: boolean;
     publishedCampaign?: boolean;
     healthyAssignedAccount?: boolean;
+    campaignEnabled?: boolean;
   } = {},
 ) {
   const activeLead = options.unknownUsername
@@ -43,7 +44,7 @@ async function mockTenantApi(
     name: "Product enquiry journey",
     description: null,
     keywords: ["price"],
-    enabled: false,
+    enabled: options.campaignEnabled ?? false,
     published: options.publishedCampaign ?? false,
     replyMode: "ai_generated",
     replyTemplates: [],
@@ -514,6 +515,41 @@ test.describe("responsive route smoke checks", () => {
     await expect(page.getByRole("heading", { name: "No automations match your filters" })).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
+  });
+
+  test("publishing an inactive draft does not require an account and does not activate it", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true });
+    let publishRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/journey/publish")) publishRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Publish automation" });
+    await expect(dialog).toContainText("automation stays paused until you activate it");
+    const publishDraft = dialog.getByRole("button", { name: "Publish draft", exact: true });
+    await expect(publishDraft).toBeEnabled();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    expect(publishRequests).toBe(0);
+  });
+
+  test("publishing an enabled automation is blocked while account readiness is unhealthy", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true, campaignEnabled: true });
+    let publishRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/journey/publish")) publishRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Publish automation" });
+    await expect(dialog).toContainText("Publishing its first version will make it live");
+    const checkAccount = dialog.getByRole("button", { name: "Check Instagram account", exact: true });
+    await expect(checkAccount).toBeDisabled();
+    expect(publishRequests).toBe(0);
   });
 
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
