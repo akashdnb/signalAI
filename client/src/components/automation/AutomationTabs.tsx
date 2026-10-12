@@ -25,6 +25,9 @@ export function AutomationTabs({
     if (nextIndex !== null) {
       event.preventDefault();
       tabRefs.current[nextIndex]?.focus();
+      // These tabs use automatic activation: moving with the arrow keys also
+      // changes the visible panel, keeping focus and aria-selected in sync.
+      onChange(TABS[nextIndex]!.key);
     }
   }
 
