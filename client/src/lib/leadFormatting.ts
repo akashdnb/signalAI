@@ -34,6 +34,20 @@ export function formatLastContactVia(lastEventType: string | null): string {
   return "—";
 }
 
+/** Explain how much of the Instagram messaging window remains, with the exact expiry available as the title. */
+export function formatMessagingWindow(windowOpenUntil: string | null | undefined): { label: string; title?: string; open: boolean } {
+  if (!windowOpenUntil) return { label: "Closed", open: false };
+  const expiry = new Date(windowOpenUntil);
+  const remainingMs = expiry.getTime() - Date.now();
+  if (remainingMs <= 0) return { label: "Closed", title: `Expired ${expiry.toLocaleString()}`, open: false };
+
+  const remainingMinutes = Math.ceil(remainingMs / 60000);
+  const label = remainingMinutes < 60
+    ? `Open · ${remainingMinutes}m left`
+    : `Open · ${Math.ceil(remainingMinutes / 60)}h left`;
+  return { label, title: `Open until ${expiry.toLocaleString()}`, open: true };
+}
+
 /**
  * Stable fallback for Instagram leads whose profile lookup hasn't produced a
  * handle yet. The lead remains addressable even while username recovery runs.
