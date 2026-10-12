@@ -55,16 +55,18 @@ export function JourneyBuilder({
   tenantId,
   campaign,
   accountReadiness,
+  startOnSetup = false,
   onChanged,
   onBack,
 }: {
   tenantId: string;
   campaign: Campaign;
   accountReadiness: JourneyAccountReadiness;
+  startOnSetup?: boolean;
   onChanged: () => Promise<void> | void;
   onBack: () => void;
 }) {
-  const [subTab, setSubTab] = useState<BuilderTab>("builder");
+  const [subTab, setSubTab] = useState<BuilderTab>(() => startOnSetup ? "details" : "builder");
   const subTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const savedMilestonesRef = useRef<Milestone[]>([]);
