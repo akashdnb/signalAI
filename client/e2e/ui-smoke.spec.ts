@@ -39,7 +39,8 @@ async function mockTenantApi(
     name: "Product enquiry journey",
     description: null,
     keywords: ["price"],
-    enabled: true,
+    enabled: false,
+    published: false,
     replyMode: "ai_generated",
     replyTemplates: [],
     defaultReplyTemplate: "Here's the information you asked for.",
@@ -324,14 +325,14 @@ test.describe("responsive route smoke checks", () => {
     await expect(page.getByText("Image card", { exact: true })).toBeVisible();
 
     const aiPreferences = page.getByRole("button", { name: "AI reply preferences" });
-    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
+    const toneSelect = aiPreferences.locator("xpath=..").locator("select").first();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
     await expect(aiPreferences).toHaveAttribute("aria-expanded", "true");
     await expect(toneSelect).toBeVisible();
     await aiPreferences.click();
     await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
     await expect(toneSelect).toBeHidden();
-    await aiPreferences.click();
-    await expect(toneSelect).toBeVisible();
 
     const ctaHelp = page.getByText(/An HTTPS link becomes an Instagram button/);
     const ctaBox = await ctaInput.boundingBox();
@@ -355,18 +356,18 @@ test.describe("responsive route smoke checks", () => {
     await mockTenantApi(page, { journeyEditor: true });
     await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
 
-    const detailsTab = page.getByRole("tab", { name: "Details" });
-    await expect(detailsTab).toBeVisible();
-    await detailsTab.click();
+    const setupTab = page.getByRole("tab", { name: "Setup" });
+    await expect(setupTab).toBeVisible();
+    await setupTab.click();
 
-    const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
-    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
-    await aiBehaviour.click();
+    const aiPreferences = page.getByRole("button", { name: "AI reply preferences" });
+    const toneSelect = aiPreferences.locator("xpath=..").locator("select").first();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
     await expect(aiPreferences).toHaveAttribute("aria-expanded", "true");
     await expect(toneSelect).toBeVisible();
-    await aiBehaviour.click();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
     await expect(toneSelect).toBeHidden();
 
     const postTargeting = page.getByRole("button", { name: "Which posts should it respond to?" });
@@ -377,8 +378,36 @@ test.describe("responsive route smoke checks", () => {
     await conversationGoals.click();
     await expect(page.getByRole("button", { name: "+ Add goal" })).toBeVisible();
 
+    // The inert Danger Zone / Delete placeholder was removed from Setup.
     await expect(page.getByRole("button", { name: /Danger Zone|Delete journey/ })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("builder tabs activate with arrow keys and keep the selected panel in sync", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    const flowTab = page.getByRole("tab", { name: "Flow" });
+    const setupTab = page.getByRole("tab", { name: "Setup" });
+    await expect(flowTab).toHaveAttribute("aria-selected", "true");
+    await flowTab.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(setupTab).toBeFocused();
+    await expect(setupTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#journey-tabpanel")).toHaveAttribute("aria-labelledby", "journey-tab-details");
+  });
+
+  test("builder actions explain why an unpublished draft cannot be activated", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    await expect(page.getByText("Draft", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "More actions" }).click();
+    const activate = page.getByRole("button", { name: "Publish before activating" });
+    await expect(activate).toBeVisible();
+    await expect(activate).toBeDisabled();
   });
 
   test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {
