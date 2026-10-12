@@ -178,6 +178,7 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [renameCampaign, setRenameCampaign] = useState<Campaign | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [showBulkActivateConfirm, setShowBulkActivateConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -204,6 +205,9 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
 
   const campaigns = data?.items ?? [];
   const allVisibleSelected = campaigns.length > 0 && campaigns.every((campaign) => selectedIds.has(campaign.id));
+  const selectedCampaigns = campaigns.filter((campaign) => selectedIds.has(campaign.id));
+  const selectedPublishedCount = selectedCampaigns.filter((campaign) => campaign.published).length;
+  const selectedDraftCount = selectedCampaigns.length - selectedPublishedCount;
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -263,7 +267,7 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
 
       {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
 
-      {selectedIds.size > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-soft bg-chip px-4 py-2.5"><span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span><div className="flex items-center gap-2"><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(true)}>Activate</button><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(false)}>Pause</button><button type="button" className="text-xs font-semibold text-subtle hover:text-ink" onClick={() => setSelectedIds(new Set())}>Clear</button></div></div>}
+      {selectedIds.size > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-soft bg-chip px-4 py-2.5"><span className="text-sm font-semibold text-ink">{selectedIds.size} selected</span><div className="flex items-center gap-2"><button type="button" className="btn-secondary btn-small" disabled={bulkSaving || selectedPublishedCount === 0} onClick={() => setShowBulkActivateConfirm(true)}>Activate</button><button type="button" className="btn-secondary btn-small" disabled={bulkSaving} onClick={() => void bulkToggle(false)}>Pause</button><button type="button" className="text-xs font-semibold text-subtle hover:text-ink" onClick={() => setSelectedIds(new Set())}>Clear</button></div></div>}
 
       <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
         <div className="overflow-x-auto">
@@ -330,6 +334,35 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
       </div>
 
       {renameCampaign && <RenameJourney campaign={renameCampaign} onClose={() => setRenameCampaign(null)} onSaved={() => setReloadToken((value) => value + 1)} />}
+      {showBulkActivateConfirm && (
+        <BottomSheet title="Activate selected automations?" onClose={() => setShowBulkActivateConfirm(false)} closeDisabled={bulkSaving} maxWidth={560} zIndex={70}>
+          <p className="m-0 text-sm leading-6 text-ink">
+            Activating {selectedPublishedCount} published automation{selectedPublishedCount === 1 ? "" : "s"} can start automated replies to real Instagram conversations.
+          </p>
+          {selectedDraftCount > 0 && (
+            <p className="muted m-0 mt-2 text-sm leading-5">
+              {selectedDraftCount} draft automation{selectedDraftCount === 1 ? " is" : "s are"} not eligible for activation and will be skipped. Publish drafts first.
+            </p>
+          )}
+          <p className="muted m-0 mt-2 text-sm leading-5">
+            Each automation must have at least one healthy Instagram account assigned. Any automation that is not ready will stay unchanged and an error will be shown.
+          </p>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="btn-secondary min-h-11" onClick={() => setShowBulkActivateConfirm(false)} disabled={bulkSaving}>Cancel</button>
+            <button
+              type="button"
+              className="btn-primary min-h-11"
+              disabled={bulkSaving || selectedPublishedCount === 0}
+              onClick={() => {
+                setShowBulkActivateConfirm(false);
+                void bulkToggle(true);
+              }}
+            >
+              {bulkSaving ? "Activating…" : `Activate ${selectedPublishedCount} automation${selectedPublishedCount === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
     </section>
   );
 }
