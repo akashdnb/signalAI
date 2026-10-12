@@ -29,6 +29,7 @@ async function mockTenantApi(
     unknownUsername?: boolean;
     journeyEditor?: boolean;
     automationList?: boolean;
+    publishedCampaign?: boolean;
   } = {},
 ) {
   const activeLead = options.unknownUsername
@@ -41,7 +42,7 @@ async function mockTenantApi(
     description: null,
     keywords: ["price"],
     enabled: false,
-    published: false,
+    published: options.publishedCampaign ?? false,
     replyMode: "ai_generated",
     replyTemplates: [],
     defaultReplyTemplate: "Here's the information you asked for.",
@@ -314,6 +315,47 @@ test.describe("responsive route smoke checks", () => {
     await page.goto("/dashboard/smoke-tenant/automation");
     await expect(page.getByRole("heading", { name: /My automations/ })).toBeVisible();
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("single activation requires explicit confirmation before enabling a published automation", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true, publishedCampaign: true });
+    let activationRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/campaigns/smoke-campaign/enabled")) activationRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await page.getByRole("button", { name: "Actions for Product enquiry journey" }).click();
+    await page.getByRole("button", { name: "Activate automation" }).click();
+    const dialog = page.getByRole("dialog", { name: "Activate automation?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("real Instagram conversations");
+    expect(activationRequests).toBe(0);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(activationRequests).toBe(0);
+  });
+
+  test("bulk activation requires confirmation and explains live-reply impact", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true, publishedCampaign: true });
+    let activationRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/campaigns/smoke-campaign/enabled")) activationRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await page.getByRole("checkbox", { name: "Select Product enquiry journey" }).check();
+    await page.getByRole("button", { name: "Activate", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Activate selected automations?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Activating 1 published automation");
+    await expect(dialog).toContainText("real Instagram conversations");
+    expect(activationRequests).toBe(0);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(activationRequests).toBe(0);
   });
 
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
