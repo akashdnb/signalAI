@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { AutomationIcon, InstagramMarkIcon, SearchIcon, PlusIcon, ChevronDownIcon, CheckCircleIcon } from "../components/icons";
+import { AutomationIcon, InstagramMarkIcon, SearchIcon, PlusIcon, ChevronDownIcon, CheckCircleIcon, InboxIcon } from "../components/icons";
+import { Logo } from "../components/Logo";
 
 export type FullPreviewScreen = "overview" | "automations" | "builder" | "inbox" | "leads" | "lead-detail" | "knowledge" | "content" | "analytics" | "integrations" | "team" | "billing" | "settings" | "docs" | "login" | "connect-error" | "invite";
 type Go = (screen: FullPreviewScreen) => void;
@@ -136,23 +137,93 @@ export function DocsScreen() {
   return <section className="po-docs-screen"><div className="po-docs-layout"><aside className="po-doc-sidebar"><label className="po-search"><SearchIcon/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search documentation"/></label><button type="button" className="po-doc-group" onClick={()=>setExpanded(v=>!v)}>Documentation topics <ChevronDownIcon/></button>{expanded&&all.map(([t])=><button type="button" key={t} className={"po-doc-link"+(t===active?.[0]?" is-active":"")} onClick={()=>setDoc(t)}>{t}</button>)}</aside><article className="po-doc-article"><div className="po-breadcrumb"><span>Help</span><span>/</span><strong>{active?.[0]}</strong></div><h2>{active?.[0]}</h2><p className="po-doc-lede">{active?.[1]}</p><div className="po-doc-note"><strong>Preview note</strong><p>This page previews the documentation layout and navigation. Use the published article as the source of truth; this demo copy does not replace it.</p></div><h3>Before you begin</h3><p>Check account health, understand the current draft/live state, and confirm which workspace or lead the action applies to.</p><h3>Recommended workflow</h3><ol><li>Review the state and constraints.</li><li>Make a targeted change in the relevant screen.</li><li>Use a preview or sample test before any live action.</li><li>Save deliberately and verify readiness before activation.</li></ol><h3>Related topics</h3><div className="po-doc-related">{["Automations","Journey Builder","Inbox & Human Handoff","Troubleshooting"].map(t=><button type="button" key={t} onClick={()=>setDoc(t)}>{t} →</button>)}</div><div className="po-doc-prevnext"><button type="button" onClick={()=>setDoc(all[Math.max(0,all.findIndex(v=>v[0]===active?.[0])-1)]?.[0]??"Introduction")}>← Previous article</button><button type="button" onClick={()=>setDoc(all[Math.min(all.length-1,all.findIndex(v=>v[0]===active?.[0])+1)]?.[0]??"Introduction")}>Next article →</button></div></article><aside className="po-doc-outline"><strong>On this page</strong><a href="#po-doc-begin">Before you begin</a><a href="#po-doc-workflow">Recommended workflow</a><a href="#po-doc-related">Related topics</a></aside></div></section>;
 }
 
+function GoogleMark() {
+  return <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.94v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.94A9 9 0 0 0 0 9c0 1.45.35 2.83.94 4.03z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .94 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>;
+}
+
+function MetaMark() {
+  return <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect width="18" height="18" rx="4" fill="#0866FF"/><path fill="#fff" d="M5.1 12.4c0-2.7 1.2-5.2 2.85-5.2 1 0 1.65.85 2.28 2.15.6-1.35 1.24-2.15 2.18-2.15 1.63 0 2.79 2.36 2.79 5.05 0 1.02-.2 1.65-.62 1.65-.5 0-.7-.5-1.36-2.06-.5-1.18-1.02-2.32-1.4-2.32-.34 0-.62.5-1.05 1.55.55 1.1.94 1.98.94 2.5 0 .48-.24.83-.7.83-.6 0-.98-.6-1.6-2.1-.6 1.5-.98 2.1-1.58 2.1-.46 0-.7-.36-.7-.86 0-.5.36-1.3.9-2.4-.42-1.03-.7-1.6-1.04-1.6-.4 0-.9 1.16-1.4 2.4-.6 1.48-.86 2.02-1.36 2.02-.42 0-.67-.5-.67-1.56z"/></svg>;
+}
+
 export function LoginPreviewScreen({onNavigate}:{onNavigate:Go}) {
-  const [step,setStep]=useState<"email"|"code">("email");
+  const [step,setStep]=useState<"method"|"email"|"code">("method");
   const [email,setEmail]=useState("");
   const [code,setCode]=useState("");
-  const [message,setMessage]=useState("");
-  const [verificationOutcome,setVerificationOutcome]=useState("invalid");
-  const validEmail=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-  function verify() {
-    if(code.length!==6){setMessage("Enter all six digits.");return;}
-    if(verificationOutcome==="invalid") setMessage("That code isn't correct. Check the email and try again.");
-    else if(verificationOutcome==="expired") setMessage("This code has expired. Request a new sign-in code.");
-    else if(verificationOutcome==="rate-limit") setMessage("Too many verification attempts. Wait a few minutes before trying again.");
-    else setMessage("This preview can't create an authenticated session. A real sign-in would return you to the authorized workspace.");
+  const [unavailableProvider,setUnavailableProvider]=useState<"google"|"meta"|null>(null);
+  const [error,setError]=useState("");
+  const [showPreviewTools,setShowPreviewTools]=useState(false);
+  const [verificationOutcome,setVerificationOutcome]=useState<"invalid"|"expired"|"too-many"|"accepted">("invalid");
+  const [codeRequested,setCodeRequested]=useState(false);
+
+  function openEmail() {
+    setStep("email");
+    setUnavailableProvider(null);
+    setError("");
   }
-  return <section className="po-auth-layout"><aside className="po-auth-brand"><span className="po-brand-symbol">s</span><h2>Turn conversations into customers.</h2><p>Respond to Instagram conversations, qualify leads, and keep your team in control.</p><ul><li>Auto-reply to comments & DMs</li><li>Qualify leads with AI</li><li>Track leads through the pipeline</li><li>Understand what's converting</li></ul></aside><div className="po-auth-card"><span className="po-eyebrow">SIGN IN TO SIGNALAI</span><h1>{step==="email"?"Welcome back":"Check your inbox"}</h1><p>{step==="email"?"Enter your work email to receive a one-time sign-in code.":"Enter the six-digit code from your email."}</p>
-    {step==="email"?<><button type="button" className="po-auth-provider" onClick={()=>setMessage("Google sign-in isn't enabled in this preview. No OAuth request was started.")}>Continue with Google</button><button type="button" className="po-auth-provider" onClick={()=>setMessage("Meta sign-in isn't enabled in this preview. No OAuth request was started.")}>Continue with Meta</button><div className="po-auth-separator"><span/>or use email<span/></div><label className="po-field-block">Work email<input type="email" autoComplete="email" value={email} onChange={e=>{setEmail(e.target.value);setMessage("");}} placeholder="you@company.com"/></label><button type="button" className="po-button po-button--primary po-full-width" disabled={!validEmail} onClick={()=>{setStep("code");setMessage("Preview only: no email was sent. A sample verification state is now available.");}}>Send sign-in code</button>{email&&!validEmail&&<p className="po-auth-inline-error" role="alert">Enter a valid work email address.</p>}</>:<><label className="po-field-block">6-digit code<input value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,"").slice(0,6));setMessage("");}} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000"/></label><label className="po-field-block">Simulate verification response<select value={verificationOutcome} onChange={e=>{setVerificationOutcome(e.target.value);setMessage("");}}><option value="invalid">Incorrect code</option><option value="expired">Expired code</option><option value="rate-limit">Too many attempts</option><option value="accepted">Valid-code outcome</option></select></label><button type="button" className="po-button po-button--primary po-full-width" disabled={code.length!==6} onClick={verify}>Verify and sign in</button><button type="button" className="po-text-action" onClick={()=>setMessage("Preview only: a new email was not sent. The real product should show the resend cooldown and delivery status.")}>Resend code</button><button type="button" className="po-text-action" onClick={()=>{setStep("email");setCode("");setMessage("");}}>Use a different email</button></>}
-    {message&&<div className="po-inline-notice" role="status">{message}</div>}<p className="po-auth-terms">Access and message controls should be granted only to authorized workspace members.</p><button type="button" className="po-text-action" onClick={()=>onNavigate("docs")}>Read documentation →</button></div></section>;
+  function requestSampleCode() {
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setError("");
+    setCode("");
+    setCodeRequested(true);
+    setStep("code");
+  }
+  function verifySampleCode() {
+    if(code.length!==6) return;
+    if(verificationOutcome==="invalid") setError("That code is incorrect or has expired. Please check your inbox for the latest code.");
+    else if(verificationOutcome==="expired") setError("That code is incorrect or has expired. Please check your inbox for the latest code.");
+    else if(verificationOutcome==="too-many") setError("Too many incorrect attempts for that code. Please request a new one.");
+    else setError("");
+  }
+  const validEmail=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+
+  return <section className="po-auth-layout" aria-label="SignalAI sign-in preview">
+    <div className="po-auth-brand">
+      <Logo size="md"/>
+      <h2>Turn Instagram enquiries into <span>qualified customers</span></h2>
+      <p>AI-powered Instagram automation: reply to comments and DMs, qualify leads, and hand over high-intent customers to your team.</p>
+      <ul>{["Auto-reply to comments & DMs","Qualify leads with AI","Track every lead through your pipeline","See what's converting in Analytics"].map(item=><li key={item}><span className="po-auth-check">✓</span>{item}</li>)}</ul>
+    </div>
+    <div className="po-auth-card">
+      {step==="method"&&<>
+        <h1>Welcome back</h1>
+        <p className="po-auth-subtitle">Sign in to your account</p>
+        <div className="po-auth-methods">
+          <div><button type="button" className="po-auth-provider" onClick={()=>{setUnavailableProvider("google");setError("");}}><GoogleMark/>Continue with Google</button>{unavailableProvider==="google"&&<p className="po-auth-provider-note">Temporarily unavailable — please use email</p>}</div>
+          <div><button type="button" className="po-auth-provider" onClick={()=>{setUnavailableProvider("meta");setError("");}}><MetaMark/>Continue with Meta</button>{unavailableProvider==="meta"&&<p className="po-auth-provider-note">Temporarily unavailable — please use email</p>}</div>
+          <button type="button" className="po-auth-provider" onClick={openEmail}><InboxIcon className="po-auth-provider-icon"/>Continue with Email</button>
+        </div>
+        <p className="po-auth-terms">By continuing, you agree to our <button type="button" onClick={()=>setError("Terms and Privacy content is not opened in this isolated preview.")}>Terms &amp; Privacy Policy</button>.</p>
+        <p className="po-auth-signup">New here? <button type="button" onClick={openEmail}>Create an account</button></p>
+        {error&&<div className="po-inline-notice" role="status">{error}</div>}
+      </>}
+      {step==="email"&&<>
+        <button type="button" className="po-auth-back" onClick={()=>{setStep("method");setError("");}}>← Back</button>
+        <h1>Sign in with email</h1>
+        <p className="po-auth-subtitle">Enter your email to get a 6-digit sign-in code — no password to remember.</p>
+        {error&&<div className="po-auth-error" role="alert">{error}</div>}
+        <form className="po-auth-form" onSubmit={e=>{e.preventDefault();requestSampleCode();}}>
+          <label>Email<input type="email" autoComplete="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} placeholder="you@company.com" required autoFocus/></label>
+          <button type="submit" className="po-auth-primary" disabled={!validEmail}>Send sign-in code</button>
+        </form>
+      </>}
+      {step==="code"&&<>
+        <h1>Enter your code</h1>
+        <p className="po-auth-subtitle">We sent a 6-digit code to <strong>{email.trim()}</strong>. It expires in 10 minutes.</p>
+        {error&&<div className="po-auth-error" role="alert">{error}</div>}
+        <form className="po-auth-form" onSubmit={e=>{e.preventDefault();verifySampleCode();}}>
+          <label>Sign-in code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} autoFocus value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}} placeholder="123456" required/></label>
+          <button type="submit" className="po-auth-primary" disabled={code.length!==6}>Sign in</button>
+        </form>
+        <p className="po-auth-resend">Didn't get it? <button type="button" disabled={codeRequested===false} onClick={()=>{setCode("");setError("Preview only: a new code would be sent. No email was sent.");}}>Send a new code</button> or <button type="button" onClick={()=>{setStep("email");setCode("");setError("");}}>use a different email</button>.</p>
+        {verificationOutcome==="accepted"&&!error&&code.length===6&&<div className="po-auth-success" role="status"><strong>Sample code accepted</strong><p>Authentication is not connected, so no session is created.</p><button type="button" className="po-auth-primary" onClick={()=>onNavigate("overview")}>Open dashboard preview</button></div>}
+        <div className="po-auth-preview-tools"><button type="button" onClick={()=>setShowPreviewTools(v=>!v)}>{showPreviewTools?"Hide preview tools":"Test sign-in states (preview only)"}</button>{showPreviewTools&&<label>Simulated verification result<select value={verificationOutcome} onChange={e=>{setVerificationOutcome(e.target.value as typeof verificationOutcome);setError("");}}><option value="invalid">Incorrect / expired code</option><option value="too-many">Too many attempts</option><option value="accepted">Successful code response</option></select></label>}</div>
+      </>}
+      {step!=="method"&&<p className="po-auth-help-link"><button type="button" onClick={()=>onNavigate("docs")}>Read documentation →</button></p>}
+    </div>
+  </section>;
 }
 
 export function SystemStateScreen({screen,onNavigate}:{screen:"connect-error"|"invite";onNavigate:Go}) {
