@@ -78,6 +78,7 @@ function TriggerBadge({ campaign }: { campaign: Campaign }) {
 function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campaign; onOpen: () => void; onRename: () => void; onToggle: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmActivate, setConfirmActivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const canActivate = campaign.published === true;
@@ -100,6 +101,7 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
     try {
       await onToggle();
       setOpen(false);
+      setConfirmActivate(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't update automation status");
     } finally {
@@ -114,14 +116,33 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
       {open && <>
         <button type="button" tabIndex={-1} aria-label="Close automation actions" className="fixed inset-0 z-20 cursor-default" onClick={(event) => { event.stopPropagation(); setOpen(false); }} />
         <div id={`automation-actions-${campaign.id}`} className="absolute right-0 top-9 z-30 w-52 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
-          {error && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
+          {error && !confirmActivate && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
-          <button type="button" disabled={saving || (!campaign.enabled && !canActivate)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50" onClick={(event) => { event.stopPropagation(); void toggle(); }}>
+          <button type="button" disabled={saving || (!campaign.enabled && !canActivate)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50" onClick={(event) => {
+            event.stopPropagation();
+            if (!campaign.enabled && canActivate) setConfirmActivate(true);
+            else void toggle();
+          }}>
             {saving ? "Saving…" : campaign.enabled ? "Pause automation" : canActivate ? "Activate automation" : "Publish before activating"}
           </button>
         </div>
       </>}
+      {confirmActivate && (
+        <BottomSheet title="Activate automation?" onClose={() => setConfirmActivate(false)} closeDisabled={saving} maxWidth={480} zIndex={70}>
+          <p className="m-0 text-sm leading-6 text-ink">
+            Activating <strong>{campaign.name}</strong> can start automated replies to real Instagram conversations.
+            Only healthy Instagram accounts assigned to this automation can receive replies.
+          </p>
+          {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="btn-secondary min-h-11" onClick={() => { setConfirmActivate(false); setError(null); }} disabled={saving}>Cancel</button>
+            <button type="button" className="btn-primary min-h-11" onClick={() => void toggle()} disabled={saving}>
+              {saving ? "Activating…" : "Activate automation"}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }
