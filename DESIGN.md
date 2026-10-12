@@ -114,3 +114,8 @@ The anti-slop approach here is adapted to SignalAI rather than copied as a third
 - [huyhoangnhh98/anti-ai-design](https://github.com/huyhoangnhh98/anti-ai-design) — consistent direction across screens, reusable tokens, purposeful motion, responsive constraints, and a design self-audit.
 
 SignalAI-specific rules in this document take precedence whenever an upstream pattern conflicts with the existing product, real workflows, established tokens, or accessibility.
+
+
+## Source record and redesign plan
+
+The three upstream projects that informed these guardrails are documented with links, specific adopted principles, and reuse/license notes in [`docs/ANTI_AI_DESIGN_SOURCES.md`](./docs/ANTI_AI_DESIGN_SOURCES.md). The product-specific route-by-route redesign plan is [`docs/FLAGSHIP_REDESIGN_PLAN.md`](./docs/FLAGSHIP_REDESIGN_PLAN.md). Those documents distinguish source-derived methods from SignalAI-specific findings and priorities.
