@@ -59,3 +59,6 @@ Before declaring a frontend change complete, report a short pass/fail summary co
 4. **Verification:** tests/build/lint run and any checks not run.
 
 Be accurate about verification. Never claim a check passed unless it was actually run.
+
+
+For the planned system-level redesign, consult [`docs/FLAGSHIP_REDESIGN_PLAN.md`](./docs/FLAGSHIP_REDESIGN_PLAN.md). Its upstream references and adaptation notes live in [`docs/ANTI_AI_DESIGN_SOURCES.md`](./docs/ANTI_AI_DESIGN_SOURCES.md). A complete redesign may revise brand tokens and component conventions, but make those changes centrally and document the decision; do not quietly override the system on individual screens.
