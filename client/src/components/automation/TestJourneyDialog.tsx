@@ -70,7 +70,7 @@ export function TestJourneyDialog({
     setInput("");
   }
 
-  const finished = started && milestoneIndex >= milestones.length - 1 && milestones.length > 0 && messages.some((m) => m.text.includes("Journey complete"));
+  const finished = started && messages.some((message) => message.from === "system" && message.text.startsWith("Journey complete"));
 
   return (
     <BottomSheet title={`Walk through a sample — ${campaign.name}`} onClose={onClose} maxWidth={520}>
