@@ -296,7 +296,7 @@ export function PrecisionOperationsPreviewPage() {
   const [savedNotice,setSavedNotice] = useState(false);
   const [showWalkthrough,setShowWalkthrough] = useState(false);
   const [showPublish,setShowPublish] = useState(false);
-  const [selectedNode,setSelectedNode] = useState<BuilderNodeKey>("trigger");
+  const [,setSelectedNode] = useState<BuilderNodeKey>("trigger");
   const [automationName,setAutomationName] = useState("Lead qualification");
   const [selectedLeadName,setSelectedLeadName] = useState("Morgan Lee");
   const [theme,setTheme] = useState<"light"|"dark">("light");
