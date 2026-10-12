@@ -6,23 +6,23 @@ import {
   ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, CreditCardIcon,
 } from "../components/icons";
 
-type PreviewScreen = "builder" | "inbox" | "leads";
+type PreviewScreen = "overview" | "automations" | "builder" | "inbox" | "leads" | "lead-detail" | "knowledge" | "content" | "analytics" | "integrations" | "team" | "billing" | "settings" | "login" | "connect-error" | "invite" | "docs";
 type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
 type IconType = ComponentType<{ className?: string }>;
 type NavigationItem = { label: string; icon: IconType; screen?: PreviewScreen; section: "primary" | "workspace" };
 
 const navigation: NavigationItem[] = [
-  { label: "Overview", icon: HomeIcon, section: "primary" },
+  { label: "Overview", icon: HomeIcon, screen: "overview", section: "primary" },
   { label: "Inbox", icon: InboxIcon, screen: "inbox", section: "primary" },
   { label: "Leads", icon: LeadsIcon, screen: "leads", section: "primary" },
-  { label: "Automations", icon: AutomationIcon, screen: "builder", section: "primary" },
-  { label: "Knowledge", icon: BookIcon, section: "primary" },
-  { label: "Content", icon: ContentIcon, section: "primary" },
-  { label: "Analytics", icon: AnalyticsIcon, section: "primary" },
-  { label: "Integrations", icon: IntegrationsIcon, section: "workspace" },
-  { label: "Team", icon: TeamIcon, section: "workspace" },
-  { label: "Billing", icon: CreditCardIcon, section: "workspace" },
-  { label: "Settings", icon: SettingsIcon, section: "workspace" },
+  { label: "Automations", icon: AutomationIcon, screen: "automations", section: "primary" },
+  { label: "Knowledge", icon: BookIcon, screen: "knowledge", section: "primary" },
+  { label: "Content", icon: ContentIcon, screen: "content", section: "primary" },
+  { label: "Analytics", icon: AnalyticsIcon, screen: "analytics", section: "primary" },
+  { label: "Integrations", icon: IntegrationsIcon, screen: "integrations", section: "workspace" },
+  { label: "Team", icon: TeamIcon, screen: "team", section: "workspace" },
+  { label: "Billing", icon: CreditCardIcon, screen: "billing", section: "workspace" },
+  { label: "Settings", icon: SettingsIcon, screen: "settings", section: "workspace" },
 ];
 
 const builderNodes: {
@@ -65,6 +65,7 @@ function PreviewNotice() {
 }
 
 function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (next: PreviewScreen) => void }) {
+  const selectedScreen = screen === "builder" ? "automations" : screen === "lead-detail" ? "leads" : screen;
   return (
     <aside className="po-sidebar" aria-label="Preview navigation">
       <BrandMark />
@@ -74,27 +75,48 @@ function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (n
       <nav className="po-nav">
         <div className="po-nav-section">
           {navigation.filter((item) => item.section === "primary").map((item) => {
-            const active = item.screen === screen;
+            const active = item.screen === selectedScreen;
             const Icon = item.icon;
-            if (item.screen) return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => onNavigate(item.screen!)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">12</span>}</button>;
-            return <div key={item.label} className="po-nav-item is-muted" aria-disabled="true" title="Not included in this concept preview"><Icon className="po-nav-icon" /><span>{item.label}</span></div>;
+            return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">12</span>}</button>;
           })}
         </div>
         <div className="po-nav-divider" /><div className="po-nav-section"><p className="po-nav-label">Workspace</p>
-          {navigation.filter((item) => item.section === "workspace").map((item) => { const Icon = item.icon; return <div key={item.label} className="po-nav-item is-muted" aria-disabled="true" title="Not included in this concept preview"><Icon className="po-nav-icon" /><span>{item.label}</span></div>; })}
+          {navigation.filter((item) => item.section === "workspace").map((item) => { const Icon = item.icon; const active = item.screen === selectedScreen; return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>; })}
         </div>
+        <button type="button" className="po-nav-help" onClick={() => onNavigate("docs")}><BookIcon className="po-nav-icon" /> Help & documentation</button>
       </nav>
-      <div className="po-sidebar-footer"><span className="po-avatar po-avatar--small">CS</span><div><strong>Creator Studio</strong><small>3 connected accounts · sample</small></div><DotsVerticalIcon className="po-icon-small" /></div>
+      <div className="po-sidebar-footer"><span className="po-avatar po-avatar--small">CS</span><div><strong>Creator Studio</strong><small>Sample workspace · review only</small></div><DotsVerticalIcon className="po-icon-small" /></div>
     </aside>
   );
 }
 
-function PageHeader({ screen, dirty, onSave, onTest, onPublish }: { screen: PreviewScreen; dirty: boolean; onSave: () => void; onTest: () => void; onPublish: () => void }) {
-  if (screen === "inbox") return <header className="po-page-header"><div><div className="po-eyebrow">CONVERSATION OPERATIONS</div><h1>Inbox</h1><p>Review Instagram conversations and decide when AI or a person should reply.</p></div><div className="po-header-context"><span className="po-status-dot" /> Sample inbox <ChevronDownIcon className="po-icon-small" /></div></header>;
-  if (screen === "leads") return <header className="po-page-header"><div><div className="po-eyebrow">PIPELINE</div><h1>Leads</h1><p>Track people who have shown interest in your business through Instagram.</p></div><button type="button" className="po-button po-button--secondary" disabled title="Export is not interactive in this preview">Export</button></header>;
-  return <header className="po-page-header po-builder-header">
-    <div className="po-builder-heading"><div className="po-breadcrumb"><span>Automations</span><span aria-hidden="true">/</span><strong>Lead qualification</strong></div><div className="po-title-row"><h1>Lead qualification</h1><Tag tone="warning">Draft · Not live</Tag></div><p>Reply to matching comments and DMs, then collect the details your team needs.</p></div>
+function PageHeader({ screen, dirty, onSave, onTest, onPublish, selectedLeadName }: {
+  screen: PreviewScreen; dirty: boolean; onSave: () => void; onTest: () => void; onPublish: () => void; selectedLeadName: string;
+}) {
+  if (screen === "builder") return <header className="po-page-header po-builder-header">
+    <div className="po-builder-heading"><div className="po-breadcrumb"><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("po-navigate", { detail: "automations" }))}>Automations</button><span aria-hidden="true">/</span><strong>Lead qualification</strong></div><div className="po-title-row"><h1>Lead qualification</h1><Tag tone="warning">Draft · Not live</Tag></div><p>Reply to matching comments and DMs, then collect the details your team needs.</p></div>
     <div className="po-header-actions"><span className={"po-save-status" + (dirty ? " is-dirty" : "")} role="status"><span className="po-save-status-dot" />{dirty ? "Unsaved preview changes" : "Preview marked saved"}</span><button type="button" className="po-button po-button--quiet" onClick={onTest}><PlayIcon className="po-button-icon" /> Sample walkthrough</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button></div>
+  </header>;
+  const configs: Record<string, { eyebrow: string; title: string; description: string }> = {
+    overview: { eyebrow: "WORKSPACE SUMMARY", title: "Overview", description: "A clear view of what needs attention across your Instagram operations." },
+    automations: { eyebrow: "AUTOMATION WORKSPACE", title: "Automations", description: "Build, test, and manage how SignalAI handles conversations." },
+    inbox: { eyebrow: "CONVERSATION OPERATIONS", title: "Inbox", description: "Review Instagram conversations and decide when AI or a person should reply." },
+    leads: { eyebrow: "PIPELINE", title: "Leads", description: "Track people who have shown interest in your business through Instagram." },
+    "lead-detail": { eyebrow: "LEAD PROFILE", title: selectedLeadName, description: "Review context, update ownership, and decide on the next action." },
+    knowledge: { eyebrow: "BUSINESS KNOWLEDGE", title: "Knowledge", description: "Keep the business information your AI replies rely on accurate and testable." },
+    content: { eyebrow: "INSTAGRAM CONTENT", title: "Content", description: "Review posts and reels that drive comments and conversations." },
+    analytics: { eyebrow: "MEASUREMENT", title: "Analytics", description: "Separate conversation activity from lead conversion and explain what each number means." },
+    integrations: { eyebrow: "CONNECTED ACCOUNTS", title: "Integrations", description: "Understand which Instagram accounts are connected and whether they are operationally healthy." },
+    team: { eyebrow: "WORKSPACE ACCESS", title: "Team", description: "Manage who can access the workspace and what they are allowed to do." },
+    billing: { eyebrow: "PLAN & USAGE", title: "Plan & usage", description: "Understand the sample plan state, usage units, and what happens near a limit." },
+    settings: { eyebrow: "WORKSPACE CONFIGURATION", title: "Settings", description: "Configure lead information, AI behavior, escalation, and scoring in business language." },
+    docs: { eyebrow: "GUIDANCE", title: "Help & documentation", description: "Find the steps and explanations needed to operate SignalAI confidently." },
+  };
+  const config = configs[screen] ?? configs.overview!;
+  const isInbox = screen === "inbox";
+  return <header className="po-page-header">
+    <div><div className="po-eyebrow">{config.eyebrow}</div><h1>{config.title}</h1><p>{config.description}</p></div>
+    {isInbox ? <div className="po-header-context"><span className="po-status-dot" /> Sample inbox <ChevronDownIcon className="po-icon-small" /></div> : null}
   </header>;
 }
 
