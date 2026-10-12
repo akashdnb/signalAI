@@ -502,7 +502,7 @@ test.describe("responsive route smoke checks", () => {
     await page.getByRole("combobox", { name: "Sort automations" }).selectOption("name_asc");
     await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
-    await expect(page.getByRole("alert")).not.toContainText("status must be all, active or inactive");
+    await expect(page.getByRole("alert").filter({ hasText: "status must be all, active or inactive" })).toHaveCount(0);
 
     await page.getByRole("combobox", { name: "Filter by status" }).selectOption("paused");
     await expect(page.getByRole("button", { name: "Paused sample automation" })).toBeVisible();
