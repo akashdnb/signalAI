@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { workspaceApi, type ConnectedInstagramAccount, type JourneyAccountBinding } from "../api/workspace";
 
+export type JourneyAccountReadiness = {
+  status: "loading" | "ready" | "error";
+  healthyAssignedCount: number;
+  unavailableAssignedCount: number;
+};
+
 interface Props {
   tenantId: string;
   campaignId: string;
+  onReadinessChange?: (readiness: JourneyAccountReadiness) => void;
 }
 
-export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
+export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }: Props) {
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[]>([]);
   const [bindings, setBindings] = useState<JourneyAccountBinding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +66,14 @@ export function JourneyAccountsPanel({ tenantId, campaignId }: Props) {
   const healthyAssignedCount = bindings.filter((binding) => binding.enabled && healthyAccountIds.has(binding.accountId)).length;
   const unavailableAssignedCount = assignedCount - healthyAssignedCount;
   const healthyAccounts = accounts.filter((account) => account.status === "healthy");
+
+  useEffect(() => {
+    onReadinessChange?.({
+      status: loading ? "loading" : error ? "error" : "ready",
+      healthyAssignedCount,
+      unavailableAssignedCount,
+    });
+  }, [loading, error, healthyAssignedCount, unavailableAssignedCount, onReadinessChange]);
 
   return (
     <section className="card" style={{ marginBottom: "0.75rem" }}>
