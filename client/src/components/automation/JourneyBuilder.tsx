@@ -473,8 +473,8 @@ export function JourneyBuilder({
     try {
       await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
       setMenuOpen(false);
-      setShowActivateConfirm(false);
       await onChanged();
+      setShowActivateConfirm(false);
     } catch (error) {
       setToggleError(
         error instanceof Error
@@ -774,6 +774,8 @@ export function JourneyBuilder({
 
         {publishError && (
           <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{publishError}</div>
+        )}        {toggleError && !showActivateConfirm && (
+          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{toggleError}</div>
         )}
 
         {milestonesLoading && (
