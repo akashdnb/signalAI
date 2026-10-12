@@ -820,7 +820,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 <input
                   type="text"
                   aria-label={`Goal ${i + 1} description`}
-                  placeholder={`Goal ${i + 1}, e.g. "capture their email"`
+                  placeholder={`Goal ${i + 1}, e.g. "capture their email"`}
                   value={m.goalDescription}
                   onChange={(e) => {
                     const next = [...milestones];
