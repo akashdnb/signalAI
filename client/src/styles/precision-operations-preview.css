@@ -839,3 +839,16 @@
   .po-preview-app .po-team-summary, .po-preview-app .po-plan-state { align-items: flex-start; flex-direction: column; }
   .po-preview-app .po-scoring-rule { grid-template-columns: minmax(0,1fr); }
 }
+
+.po-preview-app .po-detail-control { display: inline-flex; max-width: 150px; }
+.po-preview-app .po-detail-control select { width: 100%; max-width: 150px; min-height: 30px; padding: 4px 6px; border: 1px solid var(--po-line); border-radius: 4px; background: var(--po-surface); color: var(--po-ink); font-size: 9px; }
+.po-preview-app .po-ai-composer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--po-line); }
+.po-preview-app .po-ai-composer p { margin: 0; color: var(--po-muted); font-size: 9px; line-height: 1.5; }
+.po-preview-app .po-unread-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--po-primary); }
+.po-preview-app .po-conversation-bottom { flex-wrap: wrap; }
+.po-preview-app.is-dark .po-detail-control select { background: var(--po-surface-muted); color: var(--po-ink); border-color: var(--po-line-strong); }
+.po-preview-app .po-unsaved-actions { flex-wrap: wrap; }
+.po-preview-app .po-unsaved-modal { width: min(100%, 520px); }
+.po-preview-app .po-nav-coming-soon { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 8px 10px; color: #8c9690; font-size: 12px; }
+.po-preview-app .po-nav-coming-soon small { margin-left: auto; padding: 3px 5px; border-radius: 4px; background: #f0eafe; color: #66528a; font-size: 8px; font-weight: 800; letter-spacing: .07em; }
+.po-preview-app.is-dark .po-nav-coming-soon small { background: #302746; color: #d6c6ff; }
