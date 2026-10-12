@@ -138,16 +138,9 @@ function FlowHandles({
 }
 
 function DotsMenu() {
-  return (
-    <button
-      type="button"
-      aria-label="Node actions"
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-subtle hover:bg-chip hover:text-ink"
-      onClick={(event) => event.stopPropagation()}
-    >
-      <DotsVerticalIcon className="h-4 w-4" />
-    </button>
-  );
+  // No node-specific action menu exists yet. Don't render an inert control
+  // that looks actionable; node selection opens the supported inspector.
+  return null;
 }
 
 function MilestoneMenu({
