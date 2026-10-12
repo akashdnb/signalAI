@@ -307,6 +307,20 @@ test.describe("responsive route smoke checks", () => {
     await expect(dialog.getByRole("button", { name: "Create draft" })).toBeEnabled();
   });
 
+  test("qualification template displays human-readable captured fields", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await page.getByRole("tab", { name: "Start from a template" }).click();
+
+    const card = page.locator("article").filter({ hasText: "Qualify new enquiries" });
+    await card.getByRole("button", { name: "Use this starting point" }).click();
+    const dialog = page.getByRole("dialog", { name: "Start with Qualify new enquiries" });
+    await expect(dialog.getByText("For example: Intent, What they need", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("For example: Email address, Phone number", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("For example: intent, need", { exact: true })).toHaveCount(0);
+  });
+
   test("automation list actions are keyboard-dismissable without making the table row a button", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await mockTenantApi(page, { automationList: true });
