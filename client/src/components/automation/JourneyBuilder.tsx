@@ -607,7 +607,7 @@ export function JourneyBuilder({
                     aria-label="Close actions"
                     tabIndex={-1}
                     className="fixed inset-0 z-40 cursor-default"
-                    onClick={() => setMenuOpen(false)}
+                    onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}
                   />
                   <div id="journey-builder-actions" role="group" aria-label="Automation actions" className="absolute right-5 top-12 z-50 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl">
                     <button
