@@ -25,6 +25,7 @@ import { LeadsPanel } from "./LeadsPanel";
 import { NodeInspectorDialog } from "./NodeInspectorDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { TestJourneyDialog } from "./TestJourneyDialog";
+import type { JourneyAccountReadiness } from "../JourneyAccountsPanel";
 
 type BuilderTab = "builder" | "details" | "analytics" | "leads";
 
@@ -53,11 +54,13 @@ function describeCampaign(campaign: Campaign): string {
 export function JourneyBuilder({
   tenantId,
   campaign,
+  accountReadiness,
   onChanged,
   onBack,
 }: {
   tenantId: string;
   campaign: Campaign;
+  accountReadiness: JourneyAccountReadiness;
   onChanged: () => Promise<void> | void;
   onBack: () => void;
 }) {
@@ -804,6 +807,30 @@ export function JourneyBuilder({
                 {campaign.replyMode === "ai_generated" ? "AI-generated replies" : "Prewritten replies"}
               </p>
               <p className="muted m-0 mt-1 text-xs">Fallback reply: {campaign.defaultReplyTemplate?.trim() || "Not configured"}</p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Instagram account</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {accountReadiness.status === "loading"
+                  ? "Checking connected accounts…"
+                  : accountReadiness.status === "error"
+                    ? "Could not verify connected accounts"
+                    : accountReadiness.healthyAssignedCount > 0
+                      ? `${accountReadiness.healthyAssignedCount} healthy account${accountReadiness.healthyAssignedCount === 1 ? "" : "s"} assigned`
+                      : "No healthy account assigned"}
+              </p>
+              {accountReadiness.status === "ready" &&
+                accountReadiness.healthyAssignedCount === 0 && (
+                  <p className="m-0 mt-1 text-xs leading-5 text-amber-800">
+                    Publishing will turn the automation on, but it cannot handle conversations until a healthy Instagram account is assigned.
+                  </p>
+                )}
+              {accountReadiness.unavailableAssignedCount > 0 && (
+                <p className="m-0 mt-1 text-xs leading-5 text-amber-800">
+                  {accountReadiness.unavailableAssignedCount} assigned account{accountReadiness.unavailableAssignedCount === 1 ? " is" : "s are"} unavailable. Reconnect {accountReadiness.unavailableAssignedCount === 1 ? "it" : "them"} before expecting replies.
+                </p>
+              )}
             </div>
 
             <div>
