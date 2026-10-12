@@ -2,6 +2,7 @@ import { BotIcon, HandshakeIcon, InstagramMarkIcon, SendIcon } from "../icons";
 import { useState } from "react";
 import { BottomSheet } from "../BottomSheet";
 import type { CampaignLanguage, CampaignTone, ReplyChannel, TriggerSource } from "../../api";
+import { formatCaptureFieldLabel } from "../../lib/fieldLabels";
 
 export type AutomationTemplate = {
   id: string;
@@ -70,7 +71,7 @@ function TemplateDetailsDialog({ template, onClose, onCreate }: { template: Auto
         <div className="rounded-xl border border-line bg-canvas/50 p-3"><p className="muted m-0 text-[11px] font-semibold uppercase tracking-wide">Reply style</p><p className="m-0 mt-1 text-sm font-medium text-ink">{template.preset.replyMode === "ai_generated" ? "AI writes the reply" : "Use a fixed reply"}</p></div>
       </div>
       <div className="mt-5 rounded-xl border border-line p-3.5"><p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Example reply</p><p className="m-0 mt-2 whitespace-pre-wrap text-sm leading-5 text-ink">{template.preset.defaultReplyTemplate}</p></div>
-      {milestones.length > 0 && <div className="mt-5"><p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">What it can learn</p><ol className="mt-2 space-y-2 pl-5">{milestones.map((milestone) => <li key={milestone.goalDescription} className="pl-1 text-sm text-ink"><span className="font-medium">{milestone.goalDescription}</span>{milestone.captureFields.length > 0 && <p className="muted m-0 mt-0.5 text-xs">For example: {milestone.captureFields.join(", ")}</p>}</li>)}</ol></div>}
+      {milestones.length > 0 && <div className="mt-5"><p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">What it can learn</p><ol className="mt-2 space-y-2 pl-5">{milestones.map((milestone) => <li key={milestone.goalDescription} className="pl-1 text-sm text-ink"><span className="font-medium">{milestone.goalDescription}</span>{milestone.captureFields.length > 0 && <p className="muted m-0 mt-0.5 text-xs">For example: {milestone.captureFields.map(formatCaptureFieldLabel).join(", ")}</p>}</li>)}</ol></div>}
       <div className="mt-5 rounded-xl border border-accent/15 bg-accent/5 p-3.5"><p className="m-0 text-xs font-semibold text-ink">Nothing goes live yet</p><p className="muted m-0 mt-1 text-xs leading-5">We’ll create a draft. You can review, edit and test it before publishing.</p></div>
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
       <div className="mt-5 flex justify-end gap-2"><button type="button" className="btn-secondary" disabled={creating} onClick={onClose}>Cancel</button><button type="button" className="btn-primary" disabled={creating} onClick={() => void create()}>{creating ? "Creating…" : "Create draft"}</button></div>
