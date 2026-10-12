@@ -150,10 +150,10 @@ function SectionTabs({
       className={
         orientation === "vertical"
           ? "w-[128px] shrink-0 border-r border-line pr-3"
-          : "w-full shrink-0 overflow-x-auto border-b border-line pb-2"
+          : "w-full shrink-0 border-b border-line pb-2"
       }
     >
-      <div className={orientation === "vertical" ? "space-y-1" : "flex gap-1"}>
+      <div className={orientation === "vertical" ? "space-y-1" : "grid grid-cols-2 gap-1"}>
         {items.map((item, index) => {
           const selected = active === item.key;
 
@@ -170,7 +170,7 @@ function SectionTabs({
               onKeyDown={(event) => handleKeyDown(event, index)}
               onClick={() => onChange(item.key)}
               className={`flex min-h-10 items-center rounded-lg px-3 text-left text-[12px] transition-colors ${
-                orientation === "vertical" ? "w-full" : "w-auto shrink-0"
+                orientation === "vertical" ? "w-full" : "w-full min-w-0 justify-center"
               } ${
                 selected
                   ? "bg-chip font-semibold text-accent"

@@ -11,13 +11,23 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
   );
 }
 
-function FunnelBar({ label, count, of }: { label: string; count: number; of: number }) {
+function FunnelBar({
+  label,
+  count,
+  of,
+  denominatorLabel = "matched comments and messages",
+}: {
+  label: string;
+  count: number;
+  of: number;
+  denominatorLabel?: string;
+}) {
   const pct = of > 0 ? Math.round((count / of) * 100) : 0;
   return (
     <div>
       <div className="flex justify-between text-xs text-subtle">
         <span>{label}</span>
-        <span>
+        <span title={`${count.toLocaleString()} out of ${of.toLocaleString()} ${denominatorLabel}`}>
           {count.toLocaleString()} <span className="text-subtle">({pct}%)</span>
         </span>
       </div>
@@ -150,20 +160,21 @@ export function AnalyticsPanel({ tenantId, campaign }: { tenantId: string; campa
         <StatTile value={analytics.commentsMatched.toLocaleString()} label="Comments matched" />
         <StatTile value={analytics.messagesMatched.toLocaleString()} label="Messages matched" />
         <StatTile value={analytics.conversationsStarted.toLocaleString()} label="Conversations started" />
-        <StatTile value={stageCounts.total.toLocaleString()} label="Leads in journey" />
-        <StatTile value={stageCounts.qualified.toLocaleString()} label="Qualified" />
-        <StatTile value={stageCounts.won.toLocaleString()} label="Won" />
+        <StatTile value={stageCounts.total.toLocaleString()} label="Leads in active goals" />
+        <StatTile value={stageCounts.qualified.toLocaleString()} label="Qualified in active goals" />
+        <StatTile value={stageCounts.won.toLocaleString()} label="Won in active goals" />
       </div>
 
       <section className="card">
-        <h3 className="m-0 mb-3 text-[15px] font-semibold text-ink">Conversion Funnel</h3>
+        <h3 className="m-0 mb-1 text-[15px] font-semibold text-ink">Matched activity to current progress</h3>
+        <p className="muted m-0 mb-3 text-xs leading-5">Percentages are a share of matched comment and DM events, not step-to-step conversion rates. Lead stages below only include leads currently in one of this automation’s goals.</p>
         <div className="flex flex-col gap-2.5">
           <FunnelBar label="Matched (comments + messages)" count={matchedTotal} of={matchedTotal} />
           <FunnelBar label="Conversations started" count={analytics.conversationsStarted} of={matchedTotal} />
-          <FunnelBar label="Leads in journey" count={stageCounts.total} of={matchedTotal} />
-          <FunnelBar label="Qualified" count={stageCounts.qualified} of={matchedTotal} />
-          <FunnelBar label="Meeting scheduled" count={stageCounts.meeting} of={matchedTotal} />
-          <FunnelBar label="Won" count={stageCounts.won} of={matchedTotal} />
+          <FunnelBar label="Leads currently in an active goal" count={stageCounts.total} of={matchedTotal} />
+          <FunnelBar label="Qualified leads in active goals" count={stageCounts.qualified} of={matchedTotal} />
+          <FunnelBar label="Meetings scheduled in active goals" count={stageCounts.meeting} of={matchedTotal} />
+          <FunnelBar label="Won leads in active goals" count={stageCounts.won} of={matchedTotal} />
         </div>
       </section>
 

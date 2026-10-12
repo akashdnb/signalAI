@@ -25,15 +25,15 @@ import { LeadsPanel } from "./LeadsPanel";
 import { NodeInspectorDialog } from "./NodeInspectorDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { TestJourneyDialog } from "./TestJourneyDialog";
+import type { JourneyAccountReadiness } from "../JourneyAccountsPanel";
 
-type BuilderTab = "builder" | "details" | "analytics" | "leads" | "versions";
+type BuilderTab = "builder" | "details" | "analytics" | "leads";
 
 const TABS: { key: BuilderTab; label: string }[] = [
-  { key: "builder", label: "Builder" },
-  { key: "details", label: "Details" },
-  { key: "analytics", label: "Analytics" },
+  { key: "builder", label: "Flow" },
+  { key: "details", label: "Setup" },
+  { key: "analytics", label: "Results" },
   { key: "leads", label: "Leads" },
-  { key: "versions", label: "Versions" },
 ];
 
 function describeCampaign(campaign: Campaign): string {
@@ -42,26 +42,59 @@ function describeCampaign(campaign: Campaign): string {
   const count = campaign.keywords.length;
   const kind =
     campaign.triggerSource === "message"
-      ? "DMs"
+      ? "a direct message"
       : campaign.triggerSource === "both"
-        ? "comments & DMs"
-        : "comments";
+        ? "a comment or direct message"
+        : "a comment";
+  const phraseCount = `${count} phrase${count === 1 ? "" : "s"}`;
 
-  return `Replies to ${kind} matching ${count} keyword${count === 1 ? "" : "s"}`;
+  return `Starts when ${kind} mentions one of ${phraseCount}`;
+}
+
+function automationStatus(campaign: Campaign): { label: string; title: string; className: string } {
+  if (!campaign.published) {
+    return campaign.enabled
+      ? {
+          label: "Needs publishing",
+          title: "This automation is not responding to Instagram conversations yet. Publish it to make it live.",
+          className: "bg-[#FEF3C7] text-[#92400E]",
+        }
+      : {
+          label: "Draft",
+          title: "This is a draft and will not respond to Instagram conversations until published.",
+          className: "bg-[#E2E8F0] text-[#475569]",
+        };
+  }
+
+  return campaign.enabled
+    ? {
+        label: "Live",
+        title: "This automation is published and running.",
+        className: "bg-[#D1FAE5] text-[#047857]",
+      }
+    : {
+        label: "Paused",
+        title: "This automation is published but paused.",
+        className: "bg-[#FEF3C7] text-[#92400E]",
+      };
 }
 
 export function JourneyBuilder({
   tenantId,
   campaign,
+  accountReadiness,
+  startOnSetup = false,
   onChanged,
   onBack,
 }: {
   tenantId: string;
   campaign: Campaign;
+  accountReadiness: JourneyAccountReadiness;
+  startOnSetup?: boolean;
   onChanged: () => Promise<void> | void;
   onBack: () => void;
 }) {
-  const [subTab, setSubTab] = useState<BuilderTab>("builder");
+  const [subTab, setSubTab] = useState<BuilderTab>(() => startOnSetup ? "details" : "builder");
   const subTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const savedMilestonesRef = useRef<Milestone[]>([]);
@@ -74,6 +107,7 @@ export function JourneyBuilder({
   const [selectedNode, setSelectedNode] = useState<SelectedNode>({ type: "trigger" });
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showTestJourney, setShowTestJourney] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
@@ -95,9 +129,24 @@ export function JourneyBuilder({
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [showActivateConfirm, setShowActivateConfirm] = useState(false);
+  const [togglingEnabled, setTogglingEnabled] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
   const journeyDirty = canvasDirty || milestonesDirty;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   const registerCanvasActions = useCallback((actions: BuilderCanvasActions | null) => {
     canvasActionsRef.current = actions;
@@ -156,7 +205,7 @@ export function JourneyBuilder({
   async function saveAndContinue() {
     const saved = await saveCanvasDraft();
     if (!saved) {
-      setUnsavedDialogError("Couldn't save your journey. Your changes are still here; please try again.");
+      setUnsavedDialogError("Couldn't save this automation. Your changes are still here; please try again.");
       return;
     }
 
@@ -412,16 +461,57 @@ export function JourneyBuilder({
     selectNode({ type: "milestone", milestoneIndex: target });
   }
 
+  const canEnableAutomation =
+    campaign.published === true &&
+    accountReadiness.status === "ready" &&
+    accountReadiness.healthyAssignedCount > 0;
+
+  // Publishing a paused/draft automation only stores an immutable version.
+  // Publishing an enabled automation updates the version used by real traffic,
+  // so that path must verify account readiness before proceeding.
+  const publishAffectsLiveAutomation = campaign.enabled;
+  const canPublishCurrentVersion =
+    !publishAffectsLiveAutomation ||
+    (accountReadiness.status === "ready" && accountReadiness.healthyAssignedCount > 0);
+
   async function handleToggleEnabled() {
-    await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
+    if (!campaign.enabled && !canEnableAutomation) return;
+    setTogglingEnabled(true);
+    setToggleError(null);
+    try {
+      await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
+      setMenuOpen(false);
+      await onChanged();
+      setShowActivateConfirm(false);
+    } catch (error) {
+      setToggleError(
+        error instanceof Error
+          ? error.message
+          : campaign.enabled
+            ? "Could not pause this automation. Please try again."
+            : "Could not activate this automation. Check account readiness and try again.",
+      );
+    } finally {
+      setTogglingEnabled(false);
+    }
+  }
+
+  function requestToggleEnabled() {
     setMenuOpen(false);
-    await onChanged();
+    requestNavigation(() => {
+      if (campaign.enabled) {
+        void handleToggleEnabled();
+        return;
+      }
+      setToggleError(null);
+      setShowActivateConfirm(true);
+    });
   }
 
   function requestPublish() {
     requestNavigation(() => {
       if (builderVersion === null) {
-        setPublishError("The journey version is still loading.");
+        setPublishError("The current version is still loading.");
         return;
       }
 
@@ -459,7 +549,7 @@ export function JourneyBuilder({
               className="builder-toolbar-button mt-0.5 flex h-8 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-ink hover:bg-chip"
               onClick={() => requestNavigation(onBack)}
             >
-              ← Back to journeys
+              ← Back to automations
             </button>
 
             <div className="flex shrink-0 items-center gap-1.5">
@@ -496,13 +586,13 @@ export function JourneyBuilder({
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={() => void saveCanvasDraft()}
                 >
-                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading goals…" : "Save changes"}
+                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading setup…" : "Save changes"}
                 </button>
               )}
 
               <Link
                 to="/docs/journey-builder"
-                aria-label="Open Journey Builder documentation"
+                aria-label="Open automation flow documentation"
                 className="builder-toolbar-button hidden h-9 min-w-[72px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink lg:inline-flex"
               >
                 <FileTextIcon className="h-4 w-4 shrink-0" />
@@ -523,7 +613,7 @@ export function JourneyBuilder({
                 className="builder-toolbar-button hidden h-9 min-w-[112px] items-center justify-center rounded-lg bg-chip px-3 text-[13px] font-semibold text-ink md:inline-flex"
                 onClick={() => setShowTestJourney(true)}
               >
-                Test Journey
+                Sample walkthrough
               </button>
 
               <button
@@ -537,9 +627,12 @@ export function JourneyBuilder({
               </button>
 
               <button
+                ref={menuButtonRef}
                 type="button"
                 aria-label="More actions"
-                className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+                aria-expanded={menuOpen}
+                aria-controls={menuOpen ? "journey-builder-actions" : undefined}
+                className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => setMenuOpen((value) => !value)}
               >
                 <DotsVerticalIcon className="h-5 w-5" />
@@ -550,10 +643,11 @@ export function JourneyBuilder({
                   <button
                     type="button"
                     aria-label="Close actions"
+                    tabIndex={-1}
                     className="fixed inset-0 z-40 cursor-default"
-                    onClick={() => setMenuOpen(false)}
+                    onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }}
                   />
-                  <div className="absolute right-5 top-12 z-50 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl">
+                  <div id="journey-builder-actions" role="group" aria-label="Automation actions" className="absolute right-5 top-12 z-50 w-48 rounded-xl border border-line bg-card p-1.5 shadow-xl">
                     <button
                       type="button"
                       className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip md:hidden"
@@ -572,7 +666,7 @@ export function JourneyBuilder({
                         setShowTestJourney(true);
                       }}
                     >
-                      Test Journey
+                      Sample walkthrough
                     </button>
                     <button
                       type="button"
@@ -584,10 +678,36 @@ export function JourneyBuilder({
                     </button>
                     <button
                       type="button"
-                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip"
-                      onClick={() => void handleToggleEnabled()}
+                      disabled={publishing || togglingEnabled || (!campaign.enabled && !canEnableAutomation)}
+                      title={
+                        campaign.enabled
+                          ? "Pause this published automation or turn off its draft state."
+                          : !campaign.published
+                            ? "Publish this automation before activating it."
+                            : accountReadiness.status === "loading"
+                              ? "Checking Instagram account readiness."
+                              : accountReadiness.status === "error"
+                                ? "Check the Instagram account status before activating."
+                                : accountReadiness.healthyAssignedCount === 0
+                                  ? "Assign at least one healthy Instagram account before activating."
+                                  : "Activate this published automation."
+                      }
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={requestToggleEnabled}
                     >
-                      {campaign.enabled ? "Disable journey" : "Enable journey"}
+                      {togglingEnabled
+                        ? "Updating…"
+                        : campaign.enabled
+                        ? "Pause automation"
+                        : !campaign.published
+                          ? "Publish before activating"
+                          : accountReadiness.status === "loading"
+                            ? "Checking account readiness…"
+                            : accountReadiness.status === "error"
+                              ? "Check account status first"
+                              : accountReadiness.healthyAssignedCount === 0
+                                ? "Assign an Instagram account first"
+                                : "Activate automation"}
                     </button>
                   </div>
                 </>
@@ -602,14 +722,11 @@ export function JourneyBuilder({
               </h1>
 
               <span
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                  campaign.enabled
-                    ? "bg-[#D1FAE5] text-[#047857]"
-                    : "bg-[#E2E8F0] text-[#475569]"
-                }`}
+                title={automationStatus(campaign).title}
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${automationStatus(campaign).className}`}
               >
-                <span className="mr-1">●</span>
-                {campaign.enabled ? "Active" : "Inactive"}
+                <span className="mr-1" aria-hidden="true">●</span>
+                {automationStatus(campaign).label}
               </span>
             </div>
 
@@ -619,7 +736,7 @@ export function JourneyBuilder({
             </p>
           </div>
 
-          <div role="tablist" aria-label="Journey sections" className="mt-1.5 flex gap-5 overflow-x-auto md:gap-7">
+          <div role="tablist" aria-label="Automation sections" className="mt-1.5 flex gap-5 overflow-x-auto md:gap-7">
             {TABS.map((tab, index) => {
               const selected = subTab === tab.key;
               return (
@@ -641,6 +758,8 @@ export function JourneyBuilder({
                     if (nextIndex !== null) {
                       event.preventDefault();
                       subTabRefs.current[nextIndex]?.focus();
+                      // Automatic activation keeps the focused tab and its panel aligned.
+                      requestSubTabChange(TABS[nextIndex]!.key);
                     }
                   }}
                   onClick={() => requestSubTabChange(tab.key)}
@@ -663,12 +782,14 @@ export function JourneyBuilder({
 
         {publishError && (
           <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{publishError}</div>
+        )}        {toggleError && !showActivateConfirm && (
+          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{toggleError}</div>
         )}
 
         {milestonesLoading && (
           <div className="mx-4 mt-3 flex items-center gap-2 text-xs text-subtle md:mx-5" role="status">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-            Loading goals and capture fields…
+            Loading automation setup…
           </div>
         )}
         {milestoneLoadError && (
@@ -735,26 +856,6 @@ export function JourneyBuilder({
             </div>
           )}
 
-          {subTab === "versions" && (
-            <div className="h-full overflow-y-auto p-4 md:p-6">
-              <div className="rounded-2xl border border-line bg-card p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="m-0 text-base font-semibold text-ink">
-                      Journey versions
-                    </h2>
-                    <p className="muted m-0 mt-1 text-sm">
-                      Draft and published journey snapshots will appear here.
-                    </p>
-                  </div>
-
-                  <span className="rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-subtle">
-                    v{builderVersion ?? "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -772,18 +873,191 @@ export function JourneyBuilder({
         onSaveMessageConfiguration={saveMessageConfiguration}
       />
 
+      {showActivateConfirm && (
+        <BottomSheet
+          title="Activate automation?"
+          onClose={() => {
+            if (!togglingEnabled) {
+              setShowActivateConfirm(false);
+              setToggleError(null);
+            }
+          }}
+          closeDisabled={togglingEnabled}
+        >
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
+            <p className="m-0 text-sm font-semibold">This can start real Instagram replies.</p>
+            <p className="m-0 mt-1 text-xs leading-5">
+              SignalAI will respond to matching comments or direct messages using this automation&apos;s published version.
+              You can pause it at any time.
+            </p>
+          </div>
+          <div className="mt-4 rounded-xl border border-line p-3.5">
+            <p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Account readiness</p>
+            <p className="m-0 mt-1.5 text-sm text-ink">
+              {accountReadiness.status === "loading"
+                ? "Checking connected Instagram accounts…"
+                : accountReadiness.status === "error"
+                  ? "Could not verify connected accounts."
+                  : accountReadiness.healthyAssignedCount > 0
+                    ? `${accountReadiness.healthyAssignedCount} healthy account${accountReadiness.healthyAssignedCount === 1 ? "" : "s"} assigned.`
+                    : "No healthy Instagram account is assigned."}
+            </p>
+          </div>
+          {toggleError && <div className="banner banner-error mt-3" role="alert">{toggleError}</div>}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className="btn-secondary min-h-11"
+              onClick={() => {
+                setShowActivateConfirm(false);
+                setToggleError(null);
+              }}
+              disabled={togglingEnabled}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary min-h-11"
+              onClick={() => void handleToggleEnabled()}
+              disabled={togglingEnabled || !canEnableAutomation}
+            >
+              {togglingEnabled ? "Activating…" : "Confirm activation"}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
       {showPublishConfirm && (
         <BottomSheet
-          title="Publish changes"
+          title="Publish automation"
           onClose={() => {
             if (!publishing) setShowPublishConfirm(false);
           }}
         >
-          <p className="m-0 text-sm text-ink">
-            v{builderVersion ?? "—"} will become the active version.
-          </p>
-          <p className="muted mt-2 text-xs">
-            Your currently published journey remains active until these changes are published.
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
+            <p className="m-0 text-sm font-semibold">
+              {campaign.enabled
+                ? campaign.published
+                  ? "This automation is live. Publishing will update the version used for new matching conversations."
+                  : "This automation is enabled. Publishing its first version will make it live."
+                : campaign.published
+                  ? "This automation is paused. Publishing saves an updated version but keeps it paused."
+                  : "This saves a published version, but the automation stays paused until you activate it."}
+            </p>
+            <p className="m-0 mt-1 text-xs leading-5">
+              {campaign.enabled
+                ? "Matching Instagram conversations may use these changes as soon as you publish."
+                : "No automated replies will start until you explicitly activate this automation after assigning a healthy Instagram account."}
+            </p>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-line p-3.5">
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Starts when</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {campaign.triggerSource === "message"
+                  ? "Someone sends a direct message"
+                  : campaign.triggerSource === "both"
+                    ? "Someone comments or sends a direct message"
+                    : "Someone comments on a post or Reel"}
+              </p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Matching words or phrases</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {campaign.keywords.length > 0 ? campaign.keywords.map((keyword) => (
+                  <span key={keyword} className="rounded-md bg-chip px-2 py-1 text-xs font-medium text-ink">{keyword}</span>
+                )) : <span className="text-sm text-err-ink">No phrases configured</span>}
+              </div>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Reply destination</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {campaign.replyChannel === "dm"
+                  ? "Private Instagram message"
+                  : campaign.replyChannel === "comment"
+                    ? "Public comment reply"
+                    : "Public comment and private message"}
+              </p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Link to share</p>
+              {campaign.ctaLink?.trim() ? (
+                <p className="m-0 mt-1 break-all text-sm text-ink">{campaign.ctaLink}</p>
+              ) : (
+                <>
+                  <p className="m-0 mt-1 text-sm text-ink">No link configured</p>
+                  <p className="muted m-0 mt-1 text-xs leading-5">
+                    Optional. Add a product, booking or website link in Setup if this reply should direct people somewhere.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Reply style</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {campaign.replyMode === "ai_generated" ? "AI-generated replies" : "Prewritten replies"}
+              </p>
+              <p className="muted m-0 mt-1 text-xs">Fallback reply: {campaign.defaultReplyTemplate?.trim() || "Not configured"}</p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Instagram account</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {accountReadiness.status === "loading"
+                  ? "Checking connected accounts…"
+                  : accountReadiness.status === "error"
+                    ? "Could not verify connected accounts"
+                    : accountReadiness.healthyAssignedCount > 0
+                      ? `${accountReadiness.healthyAssignedCount} healthy account${accountReadiness.healthyAssignedCount === 1 ? "" : "s"} assigned`
+                      : "No healthy account assigned"}
+              </p>
+              {accountReadiness.status === "ready" &&
+                accountReadiness.healthyAssignedCount === 0 && (
+                  <p className="m-0 mt-1 text-xs leading-5 text-amber-800">
+                    {campaign.enabled
+                      ? "This automation is enabled. Assign at least one healthy Instagram account before publishing a live version."
+                      : "No healthy account is assigned. You can still publish this paused version; assign a healthy account before activating it."}
+                  </p>
+                )}
+              {accountReadiness.status === "ready" && accountReadiness.unavailableAssignedCount > 0 && (
+                <p className="m-0 mt-1 text-xs leading-5 text-amber-800">
+                  {accountReadiness.unavailableAssignedCount} assigned account{accountReadiness.unavailableAssignedCount === 1 ? " is" : "s are"} unavailable. Reconnect {accountReadiness.unavailableAssignedCount === 1 ? "it" : "them"} before expecting replies.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Lead details</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {milestones.length > 0
+                  ? `Collects details across ${milestones.length} goal${milestones.length === 1 ? "" : "s"}`
+                  : "No goal-based lead details configured yet"}
+              </p>
+            </div>
+          </div>
+
+          {accountReadiness.status === "error" && (
+            <div className="banner banner-error mt-3" role="alert">
+              {campaign.enabled
+                ? "Couldn't verify connected accounts. Refresh the page and check account status before publishing a live version."
+                : "Couldn't verify connected accounts. This automation will remain paused after publishing; check account readiness before activating it."}
+            </div>
+          )}
+          {accountReadiness.status === "ready" && accountReadiness.healthyAssignedCount === 0 && (
+            <div className="banner banner-error mt-3" role="alert">
+              Assign at least one healthy Instagram account before publishing. You can keep saving this automation as a draft while you finish setup.
+            </div>
+          )}
+
+          <p className="muted mt-3 text-xs leading-5">
+            {campaign.enabled
+              ? `Version v${builderVersion ?? "—"} will be published to an active automation. New matching conversations may use it immediately.`
+              : `Version v${builderVersion ?? "—"} will be published, but this automation will remain inactive until you activate it.`}
           </p>
 
           <div className="mt-5 flex justify-end gap-2">
@@ -799,10 +1073,23 @@ export function JourneyBuilder({
             <button
               type="button"
               className="btn-primary"
-              disabled={publishing}
+              disabled={
+                publishing ||
+                !canPublishCurrentVersion
+              }
               onClick={() => void handlePublish()}
             >
-              {publishing ? "Publishing…" : "Publish"}
+              {publishing
+                ? "Publishing…"
+                : !canPublishCurrentVersion
+                  ? "Check Instagram account"
+                  : campaign.enabled
+                    ? campaign.published
+                      ? "Publish update"
+                      : "Publish and go live"
+                    : campaign.published
+                      ? "Publish update (stay paused)"
+                      : "Publish draft"}
             </button>
           </div>
         </BottomSheet>
@@ -814,7 +1101,7 @@ export function JourneyBuilder({
           onClose={keepEditing}
         >
           <p className="m-0 text-sm text-ink">
-            You have unsaved journey changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
+            You have unsaved automation changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
           </p>
           {unsavedDialogError && (
             <div className="banner banner-error mt-3">{unsavedDialogError}</div>
@@ -865,7 +1152,7 @@ export function JourneyBuilder({
       {pendingTab && (
         <BottomSheet title="Unsaved changes" onClose={() => setPendingTab(null)}>
           <p className="muted mt-0">
-            You have unsaved changes in Details. What would you like to do?
+            You have unsaved changes in Setup. What would you like to do?
           </p>
 
           <div className="flex flex-col gap-2">

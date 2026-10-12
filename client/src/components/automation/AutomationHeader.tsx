@@ -5,28 +5,16 @@ export function AutomationHeader() {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="m-0 text-[26px] font-bold leading-[1.12] tracking-[-0.025em] text-ink">
-          Automation
-        </h1>
-        <p className="muted m-0 mt-1 text-[14px] leading-5">
-          Create AI-powered conversations that turn Instagram comments and DMs into qualified leads.
+        <h1 className="m-0 text-[26px] font-bold leading-[1.12] tracking-[-0.025em] text-ink">Automation</h1>
+        <p className="muted m-0 mt-1 max-w-2xl text-[14px] leading-5">
+          Turn Instagram conversations into qualified leads without building a complicated flow.
         </p>
       </div>
-
-      <Link
-        to="/docs/introduction"
-        className="hidden shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-chip md:flex"
-        aria-label="Open SignalAI documentation"
-      >
+      <Link to="/docs/introduction" className="hidden shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-chip md:flex" aria-label="Open SignalAI documentation">
         <FileTextIcon className="h-4 w-4" />
         Docs
       </Link>
-
-      <Link
-        to="/docs/quick-start"
-        aria-label="Open SignalAI quick start documentation"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-ink md:hidden"
-      >
+      <Link to="/docs/quick-start" aria-label="Open SignalAI quick start documentation" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-ink md:hidden">
         <FileTextIcon className="h-4.5 w-4.5" />
       </Link>
     </div>

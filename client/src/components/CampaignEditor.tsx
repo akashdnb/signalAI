@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useId, useImperativeHandle, useState } from "react";
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useState } from "react";
 import {
   api,
   LANGUAGE_LABEL,
@@ -13,7 +13,8 @@ import {
   type ReplyChannel,
   type TriggerSource,
 } from "../api";
-import { ChevronDownIcon, TrashIcon } from "./icons";
+import { ChevronDownIcon } from "./icons";
+import { formatCaptureFieldLabel } from "../lib/fieldLabels";
 
 interface MilestoneDraft {
   goalDescription: string;
@@ -62,8 +63,8 @@ function isValidHttpsUrl(value: string): boolean {
 
 function validateDraft(draft: SettingsDraft): string[] {
   const errors: string[] = [];
-  if (!draft.name.trim()) errors.push("Journey name can't be blank.");
-  if (draft.keywords.length === 0) errors.push("Add at least one trigger keyword.");
+  if (!draft.name.trim()) errors.push("Automation name can't be blank.");
+  if (draft.keywords.length === 0) errors.push("Add at least one word or phrase to match.");
   if (draft.replyMode === "ai_generated" && !draft.defaultReplyTemplate.trim()) {
     errors.push("A fallback reply template is required so AI mode can fail closed.");
   }
@@ -182,7 +183,7 @@ function KeywordChips({ keywords, onChange }: { keywords: string[]; onChange: (n
 
   return (
     <div>
-      <div className="mb-1 text-sm">Keywords</div>
+      <div className="mb-1 text-sm">Words or phrases</div>
       <div className="mb-2 flex flex-wrap gap-2">
         {keywords.map((k) => (
           <span className="tag-chip" key={k}>
@@ -205,7 +206,7 @@ function KeywordChips({ keywords, onChange }: { keywords: string[]; onChange: (n
                 commit();
               }
             }}
-            placeholder="Enter keyword"
+            placeholder="Add a word or phrase"
             autoFocus
             style={{ marginTop: 0 }}
           />
@@ -220,7 +221,7 @@ function KeywordChips({ keywords, onChange }: { keywords: string[]; onChange: (n
         </div>
       ) : (
         <button type="button" className="btn-secondary btn-small min-h-11" onClick={() => setAdding(true)}>
-          + Add keyword
+          + Add phrase
         </button>
       )}
     </div>
@@ -338,7 +339,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
       };
     }, [tenantId, campaign.id]);
 
-    async function handleSaveChanges(): Promise<boolean> {
+    const handleSaveChanges = useCallback(async (): Promise<boolean> => {
       const foundErrors = validateDraft(draft);
       setErrors(foundErrors);
       if (foundErrors.length > 0) return false;
@@ -371,14 +372,18 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
       } finally {
         setSaving(false);
       }
-    }
+    }, [draft, tenantId, campaign, onChanged]);
 
-    function handleDiscard() {
-      setDraft(baseline);
+    const handleDiscard = useCallback(() => {
+      setDraft(draftFromCampaign(campaign));
       setErrors([]);
-    }
+    }, [campaign]);
 
-    useImperativeHandle(ref, () => ({ isDirty, save: handleSaveChanges, discard: handleDiscard }), [isDirty, handleSaveChanges, handleDiscard]);
+    useImperativeHandle(
+      ref,
+      () => ({ isDirty, save: handleSaveChanges, discard: handleDiscard }),
+      [isDirty, handleSaveChanges, handleDiscard],
+    );
 
     async function saveReplyTemplates() {
       setSavingReplyTemplates(true);
@@ -446,7 +451,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
         await api.setMilestones(tenantId, campaign.id, payload);
         onChanged();
       } catch (err) {
-        setMilestoneError(err instanceof Error ? err.message : "Failed to save milestones");
+        setMilestoneError(err instanceof Error ? err.message : "Couldn't save goals");
       } finally {
         setSavingMilestones(false);
       }
@@ -490,11 +495,11 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
 
     return (
       <div className="campaign-editor-page flex w-full flex-col gap-3 pb-4 md:gap-4">
-        <Card title="Basic Information" defaultOpen>
+        <Card title="Name and status" defaultOpen>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_200px]">
             <div>
               <label>
-                Journey Name
+                Automation name
                 <input type="text" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
               </label>
               <label>
@@ -503,32 +508,37 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                   value={draft.description}
                   onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                   rows={2}
-                  placeholder="What this journey is for"
+                  placeholder="What should this automation help with?"
                 />
               </label>
             </div>
             <div>
-              <div className="mb-1 text-sm">Status</div>
+              <div className="mb-1 text-sm">Reply status</div>
               <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line px-3.5">
                 <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="!w-auto" />
-                {draft.enabled ? "Active" : "Inactive"}
+                {draft.enabled ? "Enabled" : "Paused"}
               </label>
+              <p className="muted m-0 mt-1 text-xs leading-5">
+                {campaign.published
+                  ? "Saving this setting takes effect immediately for the live automation."
+                  : "This draft won't reply until published. Publishing turns replies on."}
+              </p>
             </div>
           </div>
         </Card>
 
-        <Card title="Trigger Settings" defaultOpen>
+        <Card title="When should it start?" defaultOpen>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <OptionCard
               checked={draft.triggerSource === "comment"}
               title="Comments only"
-              subtitle="A keyword in a public comment"
+              subtitle="A word or phrase in a public comment"
               onSelect={() => setDraft({ ...draft, triggerSource: "comment" })}
             />
             <OptionCard
               checked={draft.triggerSource === "message"}
               title="Direct messages only"
-              subtitle="A keyword in a DM"
+              subtitle="A word or phrase in a direct message"
               onSelect={() => setDraft({ ...draft, triggerSource: "message" })}
             />
             <OptionCard checked={draft.triggerSource === "both"} title="Both" onSelect={() => setDraft({ ...draft, triggerSource: "both" })} />
@@ -539,15 +549,15 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           </div>
         </Card>
 
-        <Card title="Reply Settings" defaultOpen>
-          <div className="mb-1 text-sm">Reply Mode</div>
+        <Card title="How should it reply?" defaultOpen>
+          <div className="mb-1 text-sm">Reply style</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <OptionCard checked={draft.replyMode === "ai_generated"} title="AI-generated" onSelect={() => setDraft({ ...draft, replyMode: "ai_generated" })} />
-            <OptionCard checked={draft.replyMode === "rule_based"} title="Rule-based (fixed template)" onSelect={() => setDraft({ ...draft, replyMode: "rule_based" })} />
+            <OptionCard checked={draft.replyMode === "ai_generated"} title="AI writes the reply" onSelect={() => setDraft({ ...draft, replyMode: "ai_generated" })} />
+            <OptionCard checked={draft.replyMode === "rule_based"} title="Use a prewritten reply" onSelect={() => setDraft({ ...draft, replyMode: "rule_based" })} />
           </div>
 
           <label className="mt-2">
-            Default reply (used for rule-based, and as the fail-closed fallback for AI)
+            Backup reply (used if SignalAI can't provide an AI reply)
             <textarea
               value={draft.defaultReplyTemplate}
               onChange={(e) => setDraft({ ...draft, defaultReplyTemplate: e.target.value })}
@@ -680,7 +690,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           </div>
         </Card>
 
-        <Card title="AI Behaviour" defaultOpen={false}>
+        <Card title="AI reply preferences" defaultOpen={false}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label>
               Tone
@@ -707,18 +717,18 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           <div className="mt-3 rounded-xl border border-line px-3.5 py-3">
             <label className="flex min-h-11 items-center gap-2">
               <input type="checkbox" checked={draft.useKnowledgeBase} onChange={(e) => setDraft({ ...draft, useKnowledgeBase: e.target.checked })} className="!w-auto" />
-              <span className="text-sm font-medium text-ink">{draft.useKnowledgeBase ? "● Enabled" : "○ Disabled"}</span>
+              <span className="text-sm font-medium text-ink">Use my business information</span>
             </label>
             <p className="muted small mt-1">
               {draft.useKnowledgeBase
-                ? "Grounds AI replies in your uploaded documents, FAQs and pricing information."
-                : "AI will not use uploaded documents."}
+                ? "SignalAI can use your uploaded documents, FAQs and pricing information when replying."
+                : "AI replies will not use your uploaded documents."}
             </p>
           </div>
         </Card>
 
         {errors.length > 0 && (
-          <div className="banner banner-error">
+          <div className="banner banner-error" role="alert">
             {errors.map((e) => (
               <div key={e}>{e}</div>
             ))}
@@ -729,7 +739,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-end gap-2 border-t border-line bg-card px-4 py-3 shadow-sm md:sticky md:inset-x-auto md:z-auto md:-mx-1 md:rounded-xl md:border md:px-4 md:shadow-sm"
           style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
         >
-          {savedFlash && <span className="mr-auto text-sm text-ok-ink">Saved</span>}
+          {savedFlash && <span className="mr-auto text-sm text-ok-ink" role="status" aria-live="polite">Saved</span>}
           {isDirty && !savedFlash && <span className="mr-auto text-sm text-subtle">Unsaved changes</span>}
           <button type="button" className="btn-secondary min-h-11" onClick={handleDiscard} disabled={!isDirty || saving}>
             Discard
@@ -739,20 +749,20 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           </button>
         </div>
 
-        <Card title="Post Targeting" defaultOpen={false}>
-          <p className="muted small mt-0">Which posts should trigger this journey?</p>
+        <Card title="Which posts should it respond to?" defaultOpen={false}>
+          <p className="muted small mt-0">Choose which posts and Reels can start this automation.</p>
           <OptionCard checked={targetAllPosts} title="All posts and Reels" onSelect={() => setTargetAllPosts(true)} />
           <OptionCard checked={!targetAllPosts} title="Selected posts" onSelect={() => setTargetAllPosts(false)} />
 
           {!targetAllPosts && (
             <>
               <form onSubmit={addPostByUrl} className="inline-form mt-2">
-                <input type="text" placeholder="Paste a post or Reel URL to add it" value={addUrl} onChange={(e) => setAddUrl(e.target.value)} />
+                <input type="text" aria-label="Post or Reel URL" placeholder="Paste a post or Reel URL to add it" value={addUrl} onChange={(e) => setAddUrl(e.target.value)} />
                 <button type="submit" className="btn-secondary min-h-11" disabled={!addUrl.trim() || addingUrl}>
                   {addingUrl ? "Adding…" : "+ Add post"}
                 </button>
               </form>
-              {addUrlError && <div className="banner banner-error">{addUrlError}</div>}
+              {addUrlError && <div className="banner banner-error" role="alert">{addUrlError}</div>}
 
               {observedMedia.length === 0 ? (
                 <p className="muted">No posts yet — they'll show up here once someone comments, or add one by URL above.</p>
@@ -791,14 +801,14 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
               )}
             </>
           )}
-          {targetMediaError && <div className="banner banner-error">{targetMediaError}</div>}
-          <button className="btn-primary min-h-11 mt-2" onClick={saveTargetMedia} disabled={savingTargetMedia}>
+          {targetMediaError && <div className="banner banner-error" role="alert">{targetMediaError}</div>}
+          <button type="button" className="btn-primary min-h-11 mt-2" onClick={saveTargetMedia} disabled={savingTargetMedia}>
             {savingTargetMedia ? "Saving…" : "Save post targeting"}
           </button>
         </Card>
 
-        <Card title="Milestones" defaultOpen={false}>
-          <p className="muted small mt-0">Ordered conversation goals — reorder or edit these from the Builder tab's canvas too.</p>
+        <Card title="Conversation goals" defaultOpen={false}>
+          <p className="muted small mt-0">Add the goals you want to complete as the conversation progresses. You can also arrange them on the Flow tab.</p>
           {milestones.map((m, i) => {
             const availableFields = fieldDefinitions.filter((fd) => !m.captureFields.includes(fd.fieldKey));
             return (
@@ -810,6 +820,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 </div>
                 <input
                   type="text"
+                  aria-label={`Goal ${i + 1} description`}
                   placeholder={`Goal ${i + 1}, e.g. "capture their email"`}
                   value={m.goalDescription}
                   onChange={(e) => {
@@ -821,11 +832,11 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
 
                 <div style={{ margin: "0.5rem 0" }}>
                   {m.captureFields.length === 0 ? (
-                    <span className="muted small">No fields captured by this goal yet.</span>
+                    <span className="muted small">No details selected for this goal yet.</span>
                   ) : (
                     m.captureFields.map((fieldKey) => (
                       <span className="tag-chip" key={fieldKey}>
-                        {fieldDefinitions.find((fd) => fd.fieldKey === fieldKey)?.label ?? fieldKey}
+                        {fieldDefinitions.find((fd) => fd.fieldKey === fieldKey)?.label ?? formatCaptureFieldLabel(fieldKey)}
                         <button
                           type="button"
                           aria-label={`Remove field ${fieldKey}`}
@@ -843,6 +854,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 </div>
                 {availableFields.length > 0 && (
                   <select
+                    aria-label={`Details to collect for goal ${i + 1}`}
                     value=""
                     onChange={(e) => {
                       if (!e.target.value) return;
@@ -851,7 +863,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                       setMilestones(next);
                     }}
                   >
-                    <option value="">+ Add field to capture…</option>
+                    <option value="">+ Add detail to collect…</option>
                     {availableFields.map((fd) => (
                       <option key={fd.fieldKey} value={fd.fieldKey}>
                         {fd.label}
@@ -861,7 +873,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 )}
 
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button type="button" className="btn-secondary btn-small min-h-11" onClick={() => toggleNewFieldRow(i)}>
+                  <button type="button" aria-label={newFieldRow === i ? `Cancel adding a field for goal ${i + 1}` : `Add a new field for goal ${i + 1}`} className="btn-secondary btn-small min-h-11" onClick={() => toggleNewFieldRow(i)}>
                     {newFieldRow === i ? "Cancel" : "+ New field"}
                   </button>
                   <button
@@ -869,15 +881,16 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                     className="btn-secondary btn-small min-h-11"
                     onClick={() => setMilestones(milestones.filter((_, idx) => idx !== i))}
                     disabled={milestones.length === 1}
+                    aria-label={`Remove goal ${i + 1}`}
                   >
                     Remove
                   </button>
                 </div>
                 {newFieldRow === i && (
                   <form onSubmit={(e) => createFieldForRow(i, e)} className="inline-form mt-2">
-                    <input type="text" placeholder="Key, e.g. budget" value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} />
-                    <input type="text" placeholder="Label, e.g. Budget" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDefinitionValueType)}>
+                    <input type="text" aria-label="Field key" placeholder="Key, e.g. budget" value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} />
+                    <input type="text" aria-label="Field label" placeholder="Label, e.g. Budget" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+                    <select aria-label="Field type" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDefinitionValueType)}>
                       {VALUE_TYPES.map((t) => (
                         <option key={t.value} value={t.value}>
                           {t.label}
@@ -889,28 +902,21 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                     </button>
                   </form>
                 )}
-                {newFieldRow === i && newFieldError && <div className="banner banner-error">{newFieldError}</div>}
+                {newFieldRow === i && newFieldError && <div className="banner banner-error" role="alert">{newFieldError}</div>}
               </div>
             );
           })}
           <button type="button" className="btn-secondary btn-small min-h-11" onClick={() => setMilestones([...milestones, { goalDescription: "", captureFields: [] }])}>
-            + Add milestone
+            + Add goal
           </button>
-          {milestoneError && <div className="banner banner-error">{milestoneError}</div>}
-          <button className="btn-primary min-h-11" onClick={saveMilestones} disabled={savingMilestones} style={{ marginLeft: "0.5rem" }}>
-            {savingMilestones ? "Saving…" : "Save milestones"}
-          </button>
-        </Card>
-
-        <Card title="Danger Zone" defaultOpen={false}>
-          <p className="muted small">Deleting a journey isn't supported yet — disable it instead (toggle Status above) to stop it from replying.</p>
-          <button type="button" className="btn-secondary min-h-11 flex items-center gap-2 text-err-ink" disabled title="Not available yet">
-            <TrashIcon className="h-4.5 w-4.5" />
-            Delete journey
+          {milestoneError && <div className="banner banner-error" role="alert">{milestoneError}</div>}
+          <button type="button" className="btn-primary min-h-11" onClick={saveMilestones} disabled={savingMilestones} style={{ marginLeft: "0.5rem" }}>
+            {savingMilestones ? "Saving…" : "Save goals"}
           </button>
         </Card>
 
-        {/* Keeps Danger Zone from hiding behind the fixed mobile save bar above. */}
+
+        {/* Keeps the last section reachable above the fixed mobile save bar. */}
         <div className="h-20 md:hidden" aria-hidden="true" />
       </div>
     );

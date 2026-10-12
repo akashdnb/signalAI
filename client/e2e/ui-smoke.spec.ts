@@ -28,6 +28,12 @@ async function mockTenantApi(
     failFirstTimelineLoad?: boolean;
     unknownUsername?: boolean;
     journeyEditor?: boolean;
+    automationList?: boolean;
+    legacyCampaignList?: boolean;
+    legacyStatusContract?: boolean;
+    publishedCampaign?: boolean;
+    healthyAssignedAccount?: boolean;
+    campaignEnabled?: boolean;
   } = {},
 ) {
   const activeLead = options.unknownUsername
@@ -39,7 +45,8 @@ async function mockTenantApi(
     name: "Product enquiry journey",
     description: null,
     keywords: ["price"],
-    enabled: true,
+    enabled: options.campaignEnabled ?? false,
+    published: options.publishedCampaign ?? false,
     replyMode: "ai_generated",
     replyTemplates: [],
     defaultReplyTemplate: "Here's the information you asked for.",
@@ -68,9 +75,16 @@ async function mockTenantApi(
   // then the next request and must succeed.
   let failedLeadsLoadCount = 0;
   let failedTimelineLoadCount = 0;
+  let campaignDeleted = false;
   await page.route("http://localhost:3000/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+
+    if (route.request().method() === "DELETE" && path === `${tenantPath}/campaigns/smoke-campaign`) {
+      campaignDeleted = true;
+      await route.fulfill({ status: 204 });
+      return;
+    }
 
     if (
       options.failFirstLeadsLoad &&
@@ -101,6 +115,74 @@ async function mockTenantApi(
       return;
     }
 
+    if (
+      options.legacyStatusContract &&
+      path === `${tenantPath}/campaigns` &&
+      route.request().method() === "GET"
+    ) {
+      const requestedStatus = url.searchParams.get("status") ?? "all";
+      if (!["all", "active", "inactive"].includes(requestedStatus)) {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "status must be all, active or inactive" }),
+        });
+        return;
+      }
+
+      const campaigns = [
+        campaignFixture,
+        {
+          ...campaignFixture,
+          id: "smoke-live-campaign",
+          name: "Zebra product launch",
+          description: "Comment-to-DM launch automation",
+          keywords: ["launch", "product"],
+          enabled: true,
+          published: true,
+          triggerSource: "comment",
+          updatedAt: "2026-10-12T09:00:00.000Z",
+        },
+        {
+          ...campaignFixture,
+          id: "smoke-paused-campaign",
+          name: "Paused sample automation",
+          enabled: false,
+          published: true,
+          updatedAt: "2026-10-11T09:00:00.000Z",
+        },
+        {
+          ...campaignFixture,
+          id: "smoke-needs-publishing-campaign",
+          name: "Needs publishing sample",
+          enabled: true,
+          published: false,
+          triggerSource: "both",
+          updatedAt: "2026-10-11T10:00:00.000Z",
+        },
+      ];
+      const serverFiltered = campaigns.filter((campaign) => {
+        if (requestedStatus === "active") return campaign.enabled;
+        if (requestedStatus === "inactive") return !campaign.enabled;
+        return true;
+      });
+      const pageNumber = Math.max(1, Number(url.searchParams.get("page")) || 1);
+      const pageSize = Math.max(1, Number(url.searchParams.get("pageSize")) || 50);
+      const totalPages = Math.ceil(serverFiltered.length / pageSize);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: serverFiltered.slice((pageNumber - 1) * pageSize, pageNumber * pageSize),
+          page: pageNumber,
+          pageSize,
+          total: serverFiltered.length,
+          totalPages,
+        }),
+      });
+      return;
+    }
+
     let data: unknown = [];
 
     if (path === tenantPath) {
@@ -113,7 +195,21 @@ async function mockTenantApi(
     } else if (path === `${tenantPath}/account`) {
       data = { connected: false, status: "healthy" };
     } else if (path === `${tenantPath}/connected-accounts`) {
-      data = { accounts: [] };
+      data = {
+        accounts: options.healthyAssignedAccount
+          ? [{
+              id: "smoke-instagram-account",
+              tenantId,
+              instagramAccountId: "17841400000000000",
+              status: "healthy",
+              lastError: null,
+              lastCheckedAt: "2026-10-12T09:00:00.000Z",
+              expiresAt: null,
+              createdAt: "2026-10-01T09:00:00.000Z",
+              updatedAt: "2026-10-12T09:00:00.000Z",
+            }]
+          : [],
+      };
     } else if (path === `${tenantPath}/usage`) {
       data = {
         planTier: "trial",
@@ -167,6 +263,27 @@ async function mockTenantApi(
       data = options.journeyEditor ? [mediaFixture] : [];
     } else if (path === `${tenantPath}/field-definitions`) {
       data = { fieldDefinitions: [] };
+    } else if (path === `${tenantPath}/campaigns`) {
+      data = options.legacyCampaignList
+        ? [
+            campaignFixture,
+            {
+              ...campaignFixture,
+              id: "smoke-live-campaign",
+              name: "Zebra product launch",
+              description: "Comment-to-DM launch automation",
+              keywords: ["launch", "product"],
+              enabled: true,
+              published: true,
+              triggerSource: "comment",
+              updatedAt: "2026-10-12T09:00:00.000Z",
+            },
+          ]
+        : options.automationList
+          ? campaignDeleted
+            ? { items: [], page: 1, pageSize: 10, total: 0, totalPages: 0 }
+            : { items: [campaignFixture], page: 1, pageSize: 10, total: 1, totalPages: 1 }
+          : [];
     } else if (path === `${tenantPath}/campaigns/smoke-campaign`) {
       data = campaignFixture;
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/builder`) {
@@ -174,7 +291,16 @@ async function mockTenantApi(
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/milestones`) {
       data = [];
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/connected-accounts`) {
-      data = { accounts: [] };
+      data = {
+        accounts: options.healthyAssignedAccount
+          ? [{
+              campaignId: "smoke-campaign",
+              accountId: "smoke-instagram-account",
+              instagramAccountId: "17841400000000000",
+              enabled: true,
+            }]
+          : [],
+      };
     } else if (path === `${tenantPath}/members`) {
       data = [{ userId: "smoke-owner", email: "owner@example.com", role: "owner" }];
     } else if (path === `${tenantPath}/leads`) {
@@ -259,6 +385,273 @@ test.describe("responsive route smoke checks", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("Automation tabs are keyboard-accessible and always reference the active panel", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    const myAutomations = page.getByRole("tab", { name: "My automations" });
+    const templates = page.getByRole("tab", { name: "Start from a template" });
+    const panel = page.locator("#automation-tabpanel");
+
+    await expect(myAutomations).toHaveAttribute("aria-selected", "true");
+    await myAutomations.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(templates).toBeFocused();
+    await expect(templates).toHaveAttribute("aria-selected", "true");
+    await expect(panel).toHaveAttribute("aria-labelledby", "automation-tab-templates");
+    await expect(page.getByRole("heading", { name: "What do you want to automate?" })).toBeVisible();
+
+    await page.keyboard.press("ArrowLeft");
+    await expect(myAutomations).toBeFocused();
+    await expect(myAutomations).toHaveAttribute("aria-selected", "true");
+    await expect(panel).toHaveAttribute("aria-labelledby", "automation-tab-journeys");
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("custom draft validates parsed trigger phrases, not just non-empty text", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await page.getByRole("button", { name: "Create draft" }).first().click();
+
+    const dialog = page.getByRole("dialog", { name: "Create an automation" });
+    await dialog.getByLabel("Automation name").fill("Property enquiry");
+    const phrases = dialog.getByLabel("Words or phrases that should start it");
+    await phrases.fill(" , , ");
+    await expect(dialog.getByRole("button", { name: "Create draft" })).toBeDisabled();
+    await expect(dialog.getByRole("status")).toContainText("Enter at least one word or phrase");
+
+    await phrases.fill("details, , pricing");
+    await expect(dialog.getByRole("button", { name: "Create draft" })).toBeEnabled();
+  });
+
+  test("qualification template displays human-readable captured fields", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await page.getByRole("tab", { name: "Start from a template" }).click();
+
+    const card = page.locator("article").filter({ hasText: "Qualify new enquiries" });
+    await card.getByRole("button", { name: "Use this starting point" }).click();
+    const dialog = page.getByRole("dialog", { name: "Start with Qualify new enquiries" });
+    await expect(dialog.getByText("For example: Intent, What they need", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("For example: Email address, Phone number", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("For example: intent, need", { exact: true })).toHaveCount(0);
+  });
+
+  test("automation list actions are keyboard-dismissable without making the table row a button", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    const title = page.getByRole("button", { name: "Product enquiry journey" });
+    await expect(title).toBeVisible();
+    await expect(page.getByText("Search", { exact: true })).toBeVisible();
+    await expect(page.getByText("Status", { exact: true })).toBeVisible();
+    await expect(page.getByText("Start condition", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sort by", { exact: true })).toBeVisible();
+    // Keep the result-count footer, but avoid disabled paging controls for one page.
+    await expect(page.getByText("Showing 1–1 of 1 automations")).toBeVisible();
+    await expect(page.getByRole("group", { name: "Pagination controls" })).toHaveCount(0);
+    const row = page.getByRole("row", { name: /Product enquiry journey/ });
+    await expect(row).not.toHaveAttribute("role", "button");
+    await expect(row.getByText("Draft", { exact: true })).toBeVisible();
+
+    const actions = page.getByRole("button", { name: "Actions for Product enquiry journey" });
+    await actions.click();
+    await expect(actions).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("Escape");
+    await expect(actions).toHaveAttribute("aria-expanded", "false");
+    await expect(actions).toBeFocused();
+  });
+
+  test("automation search, status and trigger filters work with the legacy array API response", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { legacyCampaignList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("live");
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("draft");
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("all");
+    await page.getByRole("combobox", { name: "Filter by what starts it" }).selectOption("comment");
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by what starts it" }).selectOption("all");
+    await page.getByPlaceholder("Search automations...").fill("launch");
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
+  });
+
+  test("status filters map to the legacy active/inactive API contract when sorting", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { legacyStatusContract: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("live");
+    await page.getByRole("combobox", { name: "Sort automations" }).selectOption("name_asc");
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toHaveCount(0);
+    await expect(page.getByRole("alert").filter({ hasText: "status must be all, active or inactive" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("paused");
+    await expect(page.getByRole("button", { name: "Paused sample automation" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zebra product launch" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("needs_publishing");
+    await expect(page.getByRole("button", { name: "Needs publishing sample" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Paused sample automation" })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Filter by status" }).selectOption("draft");
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Needs publishing sample" })).toHaveCount(0);
+  });
+
+  test("automation filters fit a tablet viewport without horizontal overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await mockTenantApi(page, { automationList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await expect(page.getByRole("heading", { name: /My automations/ })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("single activation requires explicit confirmation before enabling a published automation", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true, publishedCampaign: true });
+    let activationRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/campaigns/smoke-campaign/enabled")) activationRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await page.getByRole("button", { name: "Actions for Product enquiry journey" }).click();
+    await page.getByRole("button", { name: "Activate automation" }).click();
+    const dialog = page.getByRole("dialog", { name: "Activate automation?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("real Instagram conversations");
+    expect(activationRequests).toBe(0);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(activationRequests).toBe(0);
+  });
+
+  test("bulk activation requires confirmation and explains live-reply impact", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true, publishedCampaign: true });
+    let activationRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/campaigns/smoke-campaign/enabled")) activationRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    await page.getByRole("checkbox", { name: "Select Product enquiry journey" }).check();
+    await page.getByRole("button", { name: "Activate", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Activate selected automations?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Activating 1 published automation");
+    await expect(dialog).toContainText("real Instagram conversations");
+    expect(activationRequests).toBe(0);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(activationRequests).toBe(0);
+  });
+
+  test("inactive draft deletion requires confirmation and removes the row", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page, { automationList: true });
+    let deleteRequests = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "DELETE" &&
+        request.url().endsWith("/tenants/smoke-tenant/campaigns/smoke-campaign")
+      ) deleteRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await expectNoHorizontalOverflow(page);
+
+    const actions = page.getByRole("button", { name: "Actions for Product enquiry journey" });
+    await actions.click();
+    await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete draft automation?" });
+    await expect(dialog).toContainText("inactive, unpublished draft");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(deleteRequests).toBe(0);
+
+    await actions.click();
+    await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+    await page.getByRole("dialog", { name: "Delete draft automation?" })
+      .getByRole("button", { name: "Delete draft", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "No automations yet" })).toBeVisible();
+    expect(deleteRequests).toBe(1);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("published automations do not expose draft deletion", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true, publishedCampaign: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await page.getByRole("button", { name: "Actions for Product enquiry journey" }).click();
+    await expect(page.getByRole("button", { name: "Delete draft", exact: true })).toHaveCount(0);
+  });
+
+  test("search has an accessible name and a clear action", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    const search = page.getByRole("searchbox", { name: "Search automations" });
+    await search.fill("no matching automation");
+    await expect(page.getByRole("heading", { name: "No automations match your filters" })).toBeVisible();
+    await page.getByRole("button", { name: "Clear search" }).click();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
+  });
+
+  test("publishing an inactive draft does not require an account and does not activate it", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true });
+    let publishRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/journey/publish")) publishRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Publish automation" });
+    await expect(dialog).toContainText("automation stays paused until you activate it");
+    const publishDraft = dialog.getByRole("button", { name: "Publish draft", exact: true });
+    await expect(publishDraft).toBeEnabled();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    expect(publishRequests).toBe(0);
+  });
+
+  test("publishing an enabled automation is blocked while account readiness is unhealthy", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true, campaignEnabled: true });
+    let publishRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/journey/publish")) publishRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Publish automation" });
+    await expect(dialog).toContainText("Publishing its first version will make it live");
+    const checkAccount = dialog.getByRole("button", { name: "Check Instagram account", exact: true });
+    await expect(checkAccount).toBeDisabled();
+    expect(publishRequests).toBe(0);
+  });
+
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockTenantApi(page, { failFirstTimelineLoad: true });
@@ -309,29 +702,29 @@ test.describe("responsive route smoke checks", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("journey Details previews CTA cards and explains non-HTTPS fallback", async ({ page }) => {
+  test("automation Setup previews CTA cards and explains non-HTTPS fallback", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await mockTenantApi(page, { journeyEditor: true });
     await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
 
-    const detailsTab = page.getByRole("tab", { name: "Details" });
-    await expect(detailsTab).toBeVisible();
-    await detailsTab.click();
+    const setupTab = page.getByRole("tab", { name: "Setup" });
+    await expect(setupTab).toBeVisible();
+    await setupTab.click();
 
     const ctaInput = page.getByRole("textbox", { name: "CTA link (HTTPS URL)" });
     await expect(ctaInput).toHaveValue("https://example.com/details");
     await expect(ctaInput).toHaveCSS("display", "block");
     await expect(page.getByText("Image card", { exact: true })).toBeVisible();
 
-    const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
-    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
+    const aiPreferences = page.getByRole("button", { name: "AI reply preferences" });
+    const toneSelect = aiPreferences.locator("xpath=..").locator("select").first();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "true");
     await expect(toneSelect).toBeVisible();
-    await aiBehaviour.click();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
     await expect(toneSelect).toBeHidden();
-    await aiBehaviour.click();
-    await expect(toneSelect).toBeVisible();
 
     const ctaHelp = page.getByText(/An HTTPS link becomes an Instagram button/);
     const ctaBox = await ctaInput.boundingBox();
@@ -350,37 +743,84 @@ test.describe("responsive route smoke checks", () => {
     await expect(page.getByRole("status").filter({ hasText: "Interactive Instagram CTAs require a valid HTTPS URL" })).toBeVisible();
   });
 
-  test("Campaign Details accordions are interactive on mobile", async ({ page }) => {
+  test("Automation Setup accordions are interactive on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockTenantApi(page, { journeyEditor: true });
     await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
 
-    const detailsTab = page.getByRole("tab", { name: "Details" });
-    await expect(detailsTab).toBeVisible();
-    await detailsTab.click();
+    const setupTab = page.getByRole("tab", { name: "Setup" });
+    await expect(setupTab).toBeVisible();
+    await setupTab.click();
 
-    const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
-    const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
-    await aiBehaviour.click();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
+    const aiPreferences = page.getByRole("button", { name: "AI reply preferences" });
+    const toneSelect = aiPreferences.locator("xpath=..").locator("select").first();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "true");
     await expect(toneSelect).toBeVisible();
-    await aiBehaviour.click();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
     await expect(toneSelect).toBeHidden();
 
-    const postTargeting = page.getByRole("button", { name: "Post Targeting" });
+    const postTargeting = page.getByRole("button", { name: "Which posts should it respond to?" });
     await postTargeting.click();
-    await expect(page.getByText("Which posts should trigger this journey?")).toBeVisible();
+    await expect(page.getByText("Choose which posts and Reels can start this automation.")).toBeVisible();
 
-    const milestones = page.getByRole("button", { name: "Milestones" });
-    await milestones.click();
-    await expect(page.getByRole("button", { name: "+ Add milestone" })).toBeVisible();
+    const conversationGoals = page.getByRole("button", { name: "Conversation goals" });
+    await conversationGoals.click();
+    await expect(page.getByRole("button", { name: "+ Add goal" })).toBeVisible();
 
-    const dangerZone = page.getByRole("button", { name: "Danger Zone" });
-    await dangerZone.click();
-    await expect(page.getByRole("button", { name: "Delete journey" })).toBeVisible();
+    // The inert Danger Zone / Delete placeholder was removed from Setup.
+    await expect(page.getByRole("button", { name: /Danger Zone|Delete journey/ })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("builder tabs activate with arrow keys and keep the selected panel in sync", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { journeyEditor: true });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    const flowTab = page.getByRole("tab", { name: "Flow" });
+    const setupTab = page.getByRole("tab", { name: "Setup" });
+    await expect(flowTab).toHaveAttribute("aria-selected", "true");
+    await flowTab.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(setupTab).toBeFocused();
+    await expect(setupTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#journey-tabpanel")).toHaveAttribute("aria-labelledby", "journey-tab-details");
+  });
+
+  test("builder actions explain why an unpublished draft cannot be activated", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+
+    await expect(page.getByText("Draft", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "More actions" }).click();
+    const activate = page.getByRole("button", { name: "Publish before activating" });
+    await expect(activate).toBeVisible();
+    await expect(activate).toBeDisabled();
+  });
+  test("builder activation requires confirmation before enabling live replies", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { publishedCampaign: true, healthyAssignedAccount: true });
+    let activationRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/campaigns/smoke-campaign/enabled")) activationRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+    await expect(page.getByText("1 healthy assigned", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("button", { name: "Activate automation" }).click();
+    const dialog = page.getByRole("dialog", { name: "Activate automation?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("real Instagram replies");
+    expect(activationRequests).toBe(0);
+
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(activationRequests).toBe(0);
   });
 
   test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {

@@ -70,17 +70,20 @@ export function TestJourneyDialog({
     setInput("");
   }
 
-  const finished = started && milestoneIndex >= milestones.length - 1 && milestones.length > 0 && messages.some((m) => m.text.includes("Journey complete"));
+  const finished = started && messages.some((message) => message.from === "system" && message.text.startsWith("Journey complete"));
 
   return (
-    <BottomSheet title={`Test Journey — ${campaign.name}`} onClose={onClose} maxWidth={520}>
-      <p className="muted small mt-0">
-        Simulates the full sequence (trigger → reply → milestones). This doesn't affect any real lead.
-      </p>
+    <BottomSheet title={`Walk through a sample — ${campaign.name}`} onClose={onClose} maxWidth={520}>
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950">
+        <p className="m-0 text-sm font-semibold">Sample walkthrough, not a live Instagram test</p>
+        <p className="m-0 mt-1 text-xs leading-5">
+          SignalAI checks the first reply using the preview service. Later goal steps are simulated in this window only; no real lead, Instagram conversation, or captured data is changed.
+        </p>
+      </div>
 
       {!started ? (
         <button type="button" className="btn-primary" onClick={handleStart}>
-          Start test
+          Start sample walkthrough
         </button>
       ) : (
         <>
@@ -116,7 +119,7 @@ export function TestJourneyDialog({
               </button>
             </form>
           ) : (
-            <div className="banner banner-ok">Test complete.</div>
+            <div className="banner banner-ok">Sample walkthrough complete. No live journey was run.</div>
           )}
         </>
       )}

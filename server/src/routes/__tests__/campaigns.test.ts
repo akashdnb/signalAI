@@ -88,6 +88,62 @@ describe("campaigns routes", () => {
     expect(invalidEnabled.status).toBe(400);
   });
 
+  it("deletes an inactive unpublished draft but protects enabled and published campaigns", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "draft-delete");
+    const app = createApp();
+
+    const draft = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Disposable draft", keywords: ["audit"] });
+    expect(draft.status).toBe(201);
+    expect(draft.body.enabled).toBe(false);
+
+    const active = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Keep this automation", keywords: ["hello"], enabled: true });
+    expect(active.status).toBe(201);
+
+    const protectedDelete = await request(app)
+      .delete(`/tenants/${tenant.id}/campaigns/${active.body.id}`)
+      .set(authHeader);
+    expect(protectedDelete.status).toBe(409);
+    const stillThere = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${active.body.id}`)
+      .set(authHeader);
+    expect(stillThere.status).toBe(200);
+
+    const publishedDraft = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Keep published snapshot", keywords: ["details"] });
+    expect(publishedDraft.status).toBe(201);
+    await pool.query(
+      `insert into campaign_journey_versions (tenant_id, campaign_id, version, graph)
+       values ($1, $2, 1, $3::jsonb)`,
+      [tenant.id, publishedDraft.body.id, JSON.stringify({ version: 1, nodes: [], edges: [] })],
+    );
+    const protectedPublishedDelete = await request(app)
+      .delete(`/tenants/${tenant.id}/campaigns/${publishedDraft.body.id}`)
+      .set(authHeader);
+    expect(protectedPublishedDelete.status).toBe(409);
+    const publishedStillThere = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${publishedDraft.body.id}`)
+      .set(authHeader);
+    expect(publishedStillThere.status).toBe(200);
+
+    const deleted = await request(app)
+      .delete(`/tenants/${tenant.id}/campaigns/${draft.body.id}`)
+      .set(authHeader);
+    expect(deleted.status).toBe(204);
+    const missing = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${draft.body.id}`)
+      .set(authHeader);
+    expect(missing.status).toBe(404);
+  });
+
   it("rejects a campaign with no keywords", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
