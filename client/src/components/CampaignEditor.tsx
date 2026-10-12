@@ -756,7 +756,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           {!targetAllPosts && (
             <>
               <form onSubmit={addPostByUrl} className="inline-form mt-2">
-                <input type="text" placeholder="Paste a post or Reel URL to add it" value={addUrl} onChange={(e) => setAddUrl(e.target.value)} />
+                <input type="text" aria-label="Post or Reel URL" placeholder="Paste a post or Reel URL to add it" value={addUrl} onChange={(e) => setAddUrl(e.target.value)} />
                 <button type="submit" className="btn-secondary min-h-11" disabled={!addUrl.trim() || addingUrl}>
                   {addingUrl ? "Adding…" : "+ Add post"}
                 </button>
@@ -801,7 +801,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
             </>
           )}
           {targetMediaError && <div className="banner banner-error">{targetMediaError}</div>}
-          <button className="btn-primary min-h-11 mt-2" onClick={saveTargetMedia} disabled={savingTargetMedia}>
+          <button type="button" className="btn-primary min-h-11 mt-2" onClick={saveTargetMedia} disabled={savingTargetMedia}>
             {savingTargetMedia ? "Saving…" : "Save post targeting"}
           </button>
         </Card>
@@ -819,7 +819,8 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 </div>
                 <input
                   type="text"
-                  placeholder={`Goal ${i + 1}, e.g. "capture their email"`}
+                  aria-label={`Goal ${i + 1} description`}
+                  placeholder={`Goal ${i + 1}, e.g. "capture their email"`
                   value={m.goalDescription}
                   onChange={(e) => {
                     const next = [...milestones];
@@ -852,6 +853,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 </div>
                 {availableFields.length > 0 && (
                   <select
+                    aria-label={`Details to collect for goal ${i + 1}`}
                     value=""
                     onChange={(e) => {
                       if (!e.target.value) return;
@@ -870,7 +872,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                 )}
 
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button type="button" className="btn-secondary btn-small min-h-11" onClick={() => toggleNewFieldRow(i)}>
+                  <button type="button" aria-label={newFieldRow === i ? `Cancel adding a field for goal ${i + 1}` : `Add a new field for goal ${i + 1}`} className="btn-secondary btn-small min-h-11" onClick={() => toggleNewFieldRow(i)}>
                     {newFieldRow === i ? "Cancel" : "+ New field"}
                   </button>
                   <button
@@ -878,15 +880,16 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                     className="btn-secondary btn-small min-h-11"
                     onClick={() => setMilestones(milestones.filter((_, idx) => idx !== i))}
                     disabled={milestones.length === 1}
+                    aria-label={`Remove goal ${i + 1}`}
                   >
                     Remove
                   </button>
                 </div>
                 {newFieldRow === i && (
                   <form onSubmit={(e) => createFieldForRow(i, e)} className="inline-form mt-2">
-                    <input type="text" placeholder="Key, e.g. budget" value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} />
-                    <input type="text" placeholder="Label, e.g. Budget" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDefinitionValueType)}>
+                    <input type="text" aria-label="Field key" placeholder="Key, e.g. budget" value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} />
+                    <input type="text" aria-label="Field label" placeholder="Label, e.g. Budget" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+                    <select aria-label="Field type" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDefinitionValueType)}>
                       {VALUE_TYPES.map((t) => (
                         <option key={t.value} value={t.value}>
                           {t.label}
@@ -906,7 +909,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
             + Add goal
           </button>
           {milestoneError && <div className="banner banner-error">{milestoneError}</div>}
-          <button className="btn-primary min-h-11" onClick={saveMilestones} disabled={savingMilestones} style={{ marginLeft: "0.5rem" }}>
+          <button type="button" className="btn-primary min-h-11" onClick={saveMilestones} disabled={savingMilestones} style={{ marginLeft: "0.5rem" }}>
             {savingMilestones ? "Saving…" : "Save goals"}
           </button>
         </Card>
