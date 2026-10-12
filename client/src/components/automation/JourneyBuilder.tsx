@@ -826,7 +826,7 @@ export function JourneyBuilder({
                     Publishing will turn the automation on, but it cannot handle conversations until a healthy Instagram account is assigned.
                   </p>
                 )}
-              {accountReadiness.unavailableAssignedCount > 0 && (
+              {accountReadiness.status === "ready" && accountReadiness.unavailableAssignedCount > 0 && (
                 <p className="m-0 mt-1 text-xs leading-5 text-amber-800">
                   {accountReadiness.unavailableAssignedCount} assigned account{accountReadiness.unavailableAssignedCount === 1 ? " is" : "s are"} unavailable. Reconnect {accountReadiness.unavailableAssignedCount === 1 ? "it" : "them"} before expecting replies.
                 </p>
