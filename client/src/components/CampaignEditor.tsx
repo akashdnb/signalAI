@@ -727,7 +727,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
         </Card>
 
         {errors.length > 0 && (
-          <div className="banner banner-error">
+          <div className="banner banner-error" role="alert">
             {errors.map((e) => (
               <div key={e}>{e}</div>
             ))}
@@ -738,7 +738,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
           className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-end gap-2 border-t border-line bg-card px-4 py-3 shadow-sm md:sticky md:inset-x-auto md:z-auto md:-mx-1 md:rounded-xl md:border md:px-4 md:shadow-sm"
           style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
         >
-          {savedFlash && <span className="mr-auto text-sm text-ok-ink">Saved</span>}
+          {savedFlash && <span className="mr-auto text-sm text-ok-ink" role="status" aria-live="polite">Saved</span>}
           {isDirty && !savedFlash && <span className="mr-auto text-sm text-subtle">Unsaved changes</span>}
           <button type="button" className="btn-secondary min-h-11" onClick={handleDiscard} disabled={!isDirty || saving}>
             Discard
@@ -761,7 +761,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                   {addingUrl ? "Adding…" : "+ Add post"}
                 </button>
               </form>
-              {addUrlError && <div className="banner banner-error">{addUrlError}</div>}
+              {addUrlError && <div className="banner banner-error" role="alert">{addUrlError}</div>}
 
               {observedMedia.length === 0 ? (
                 <p className="muted">No posts yet — they'll show up here once someone comments, or add one by URL above.</p>
@@ -800,7 +800,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
               )}
             </>
           )}
-          {targetMediaError && <div className="banner banner-error">{targetMediaError}</div>}
+          {targetMediaError && <div className="banner banner-error" role="alert">{targetMediaError}</div>}
           <button type="button" className="btn-primary min-h-11 mt-2" onClick={saveTargetMedia} disabled={savingTargetMedia}>
             {savingTargetMedia ? "Saving…" : "Save post targeting"}
           </button>
@@ -901,14 +901,14 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                     </button>
                   </form>
                 )}
-                {newFieldRow === i && newFieldError && <div className="banner banner-error">{newFieldError}</div>}
+                {newFieldRow === i && newFieldError && <div className="banner banner-error" role="alert">{newFieldError}</div>}
               </div>
             );
           })}
           <button type="button" className="btn-secondary btn-small min-h-11" onClick={() => setMilestones([...milestones, { goalDescription: "", captureFields: [] }])}>
             + Add goal
           </button>
-          {milestoneError && <div className="banner banner-error">{milestoneError}</div>}
+          {milestoneError && <div className="banner banner-error" role="alert">{milestoneError}</div>}
           <button type="button" className="btn-primary min-h-11" onClick={saveMilestones} disabled={savingMilestones} style={{ marginLeft: "0.5rem" }}>
             {savingMilestones ? "Saving…" : "Save goals"}
           </button>
