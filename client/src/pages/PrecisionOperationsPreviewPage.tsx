@@ -305,7 +305,10 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void;
 }) {
   const [selectedNode, setSelectedNode] = useState<BuilderNodeKey>("trigger");
-  const [subTab, setSubTab] = useState("Flow");
+  const [subTab, setSubTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get("builderTab");
+    return requested && ["Flow", "Setup", "Results", "Leads"].includes(requested) ? requested : "Flow";
+  });
   const [draftName, setDraftName] = useState(automationName);
   const [description, setDescription] = useState("Reply to matching comments and DMs, then collect the details your team needs.");
   const [triggerType, setTriggerType] = useState("Comment or direct message");
@@ -315,7 +318,14 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   const [handoffEnabled, setHandoffEnabled] = useState(true);
   const [goalQuestion, setGoalQuestion] = useState("What are you looking for help with?");
   const [resultPeriod, setResultPeriod] = useState("Last 7 days");
-  const switchTab = (tab: string) => setSubTab(tab);
+  const switchTab = (tab: string) => {
+    setSubTab(tab);
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    params.set("screen", "builder");
+    params.set("builderTab", tab);
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}<div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
     {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{builderNodes.map((node, index) => <FlowNode key={node.key} node={node} index={index} selected={selectedNode === node.key} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); }} />)}<button type="button" className="po-add-step" onClick={() => { setSelectedNode("followup"); onSelectNode("followup"); onDirty(); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>4 steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section><StepInspector nodeKey={selectedNode} onDirty={onDirty} /></div>}
