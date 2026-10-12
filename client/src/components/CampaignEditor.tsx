@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useId, useImperativeHandle, useState } from "react";
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useState } from "react";
 import {
   api,
   LANGUAGE_LABEL,
@@ -338,7 +338,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
       };
     }, [tenantId, campaign.id]);
 
-    async function handleSaveChanges(): Promise<boolean> {
+    const handleSaveChanges = useCallback(async (): Promise<boolean> => {
       const foundErrors = validateDraft(draft);
       setErrors(foundErrors);
       if (foundErrors.length > 0) return false;
@@ -371,14 +371,18 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
       } finally {
         setSaving(false);
       }
-    }
+    }, [draft, tenantId, campaign, onChanged]);
 
-    function handleDiscard() {
-      setDraft(baseline);
+    const handleDiscard = useCallback(() => {
+      setDraft(draftFromCampaign(campaign));
       setErrors([]);
-    }
+    }, [campaign]);
 
-    useImperativeHandle(ref, () => ({ isDirty, save: handleSaveChanges, discard: handleDiscard }), [isDirty, handleSaveChanges, handleDiscard]);
+    useImperativeHandle(
+      ref,
+      () => ({ isDirty, save: handleSaveChanges, discard: handleDiscard }),
+      [isDirty, handleSaveChanges, handleDiscard],
+    );
 
     async function saveReplyTemplates() {
       setSavingReplyTemplates(true);
