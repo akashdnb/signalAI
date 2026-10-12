@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { TriggerSource } from "../../api";
 import { BottomSheet } from "../BottomSheet";
 
 export function NewJourneyDialog({
@@ -6,10 +7,11 @@ export function NewJourneyDialog({
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (name: string, keywords: string[]) => Promise<void>;
+  onCreate: (name: string, keywords: string[], triggerSource: TriggerSource) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [keywords, setKeywords] = useState("");
+  const [triggerSource, setTriggerSource] = useState<TriggerSource>("comment");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +22,7 @@ export function NewJourneyDialog({
     setSaving(true);
     setError(null);
     try {
-      await onCreate(name.trim(), parsedKeywords);
+      await onCreate(name.trim(), parsedKeywords, triggerSource);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create automation");
     } finally {
@@ -38,6 +40,17 @@ export function NewJourneyDialog({
         <label>
           Automation name
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Property enquiry" autoFocus />
+        </label>
+        <label>
+          Where should it start?
+          <select
+            value={triggerSource}
+            onChange={(event) => setTriggerSource(event.target.value as TriggerSource)}
+          >
+            <option value="comment">When someone comments on a post or Reel</option>
+            <option value="message">When someone sends a direct message</option>
+            <option value="both">When someone comments or sends a direct message</option>
+          </select>
         </label>
         <label>
           Words or phrases that should start it
