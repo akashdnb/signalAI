@@ -4,7 +4,12 @@ import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
+import "./styles/precision-operations-preview.css";
 import { loadSession } from "./api";
+
+const PrecisionOperationsPreviewPage = lazy(() =>
+  import("./pages/PrecisionOperationsPreviewPage").then((module) => ({ default: module.PrecisionOperationsPreviewPage })),
+);
 
 const AnalyticsPage = lazy(() =>
   import("./pages/AnalyticsPage").then((module) => ({ default: module.AnalyticsPage })),
@@ -85,6 +90,8 @@ function HomeRedirect() {
 export default function App() {
   return (
     <Routes>
+      {/* Isolated UI concept route. Sample content only; remove after the design is approved and migrated into real screens. */}
+      <Route path="/redesign-preview" element={<LazyPage Page={PrecisionOperationsPreviewPage} />} />
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
       <Route path="/docs/*" element={<LazyPage Page={DocsPage} />} />
