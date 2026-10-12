@@ -73,9 +73,16 @@ async function mockTenantApi(
   // then the next request and must succeed.
   let failedLeadsLoadCount = 0;
   let failedTimelineLoadCount = 0;
+  let campaignDeleted = false;
   await page.route("http://localhost:3000/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+
+    if (route.request().method() === "DELETE" && path === `${tenantPath}/campaigns/smoke-campaign`) {
+      campaignDeleted = true;
+      await route.fulfill({ status: 204 });
+      return;
+    }
 
     if (
       options.failFirstLeadsLoad &&
@@ -203,7 +210,9 @@ async function mockTenantApi(
             },
           ]
         : options.automationList
-          ? { items: [campaignFixture], page: 1, pageSize: 10, total: 1, totalPages: 1 }
+          ? campaignDeleted
+            ? { items: [], page: 1, pageSize: 10, total: 0, totalPages: 0 }
+            : { items: [campaignFixture], page: 1, pageSize: 10, total: 1, totalPages: 1 }
           : [];
     } else if (path === `${tenantPath}/campaigns/smoke-campaign`) {
       data = campaignFixture;
@@ -454,6 +463,57 @@ test.describe("responsive route smoke checks", () => {
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
     expect(activationRequests).toBe(0);
+  });
+
+  test("inactive draft deletion requires confirmation and removes the row", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page, { automationList: true });
+    let deleteRequests = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "DELETE" &&
+        request.url().endsWith("/tenants/smoke-tenant/campaigns/smoke-campaign")
+      ) deleteRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await expectNoHorizontalOverflow(page);
+
+    const actions = page.getByRole("button", { name: "Actions for Product enquiry journey" });
+    await actions.click();
+    await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete draft automation?" });
+    await expect(dialog).toContainText("inactive, unpublished draft");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(deleteRequests).toBe(0);
+
+    await actions.click();
+    await page.getByRole("button", { name: "Delete draft", exact: true }).click();
+    await page.getByRole("dialog", { name: "Delete draft automation?" })
+      .getByRole("button", { name: "Delete draft", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "No automations yet" })).toBeVisible();
+    expect(deleteRequests).toBe(1);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("published automations do not expose draft deletion", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true, publishedCampaign: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await page.getByRole("button", { name: "Actions for Product enquiry journey" }).click();
+    await expect(page.getByRole("button", { name: "Delete draft", exact: true })).toHaveCount(0);
+  });
+
+  test("search has an accessible name and a clear action", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    const search = page.getByRole("searchbox", { name: "Search automations" });
+    await search.fill("no matching automation");
+    await expect(page.getByRole("heading", { name: "No automations match your filters" })).toBeVisible();
+    await page.getByRole("button", { name: "Clear search" }).click();
+    await expect(page.getByRole("button", { name: "Product enquiry journey" })).toBeVisible();
   });
 
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {

@@ -697,6 +697,8 @@ export const api = {
   listCampaigns: (tenantId: string) => request<Campaign[]>(`/tenants/${tenantId}/campaigns`),
   getCampaign: (tenantId: string, campaignId: string) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}`),
+  deleteDraftCampaign: (tenantId: string, campaignId: string) =>
+    request<void>(`/tenants/${tenantId}/campaigns/${campaignId}`, { method: "DELETE" }),
   createCampaign: (tenantId: string, name: string, keywords: string[], options?: { enabled?: boolean }) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns`, {
       method: "POST",

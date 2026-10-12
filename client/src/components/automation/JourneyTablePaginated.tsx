@@ -75,7 +75,7 @@ function TriggerBadge({ campaign }: { campaign: Campaign }) {
   );
 }
 
-function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campaign; onOpen: () => void; onRename: () => void; onToggle: () => Promise<void> }) {
+function ActionMenu({ campaign, onOpen, onRename, onToggle, onDelete, canDeleteDraft }: { campaign: Campaign; onOpen: () => void; onRename: () => void; onToggle: () => Promise<void>; onDelete: () => void; canDeleteDraft: boolean }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmActivate, setConfirmActivate] = useState(false);
@@ -119,6 +119,15 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
           {error && !confirmActivate && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
+          {canDeleteDraft && (
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#B91C1C] hover:bg-[#FEF2F2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              onClick={(event) => { event.stopPropagation(); setOpen(false); onDelete(); }}
+            >
+              Delete draft
+            </button>
+          )}
           <button type="button" disabled={saving || (!campaign.enabled && !canActivate)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50" onClick={(event) => {
             event.stopPropagation();
             if (!campaign.enabled && canActivate) setConfirmActivate(true);
@@ -177,6 +186,9 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
   const [data, setData] = useState<PaginatedResponse<Campaign> | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [renameCampaign, setRenameCampaign] = useState<Campaign | null>(null);
+  const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
+  const [deletingDraft, setDeletingDraft] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [showBulkActivateConfirm, setShowBulkActivateConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +280,27 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
     }
   }
 
+  async function confirmDeleteDraft() {
+    if (!deleteCampaign || deletingDraft) return;
+    setDeletingDraft(true);
+    setDeleteError(null);
+    try {
+      await api.deleteDraftCampaign(tenantId, deleteCampaign.id);
+      const deletedId = deleteCampaign.id;
+      setDeleteCampaign(null);
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(deletedId);
+        return next;
+      });
+      setReloadToken((value) => value + 1);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Couldn't delete this draft. Please try again.");
+    } finally {
+      setDeletingDraft(false);
+    }
+  }
+
   const hasFilters = Boolean(search.trim()) || status !== "all" || trigger !== "all";
 
   return (
@@ -275,7 +308,7 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
       <div className="flex flex-wrap items-end justify-between gap-4"><h2 className="m-0 text-[21px] font-semibold tracking-[-0.015em] text-ink">{data === null ? "My automations" : `My automations (${data.total})`}</h2><button type="button" className="btn-primary flex h-10 items-center gap-2 px-4 text-sm whitespace-nowrap" onClick={onNewJourney}>Create draft</button></div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(200px,1fr)_150px_200px_150px]">
-        <div className="relative"><SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" /><input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search automations..." className="!m-0 !h-11 !rounded-xl !bg-card !pl-10 !text-sm" /></div>
+        <div className="relative"><SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" /><input type="search" aria-label="Search automations" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search automations..." className="!m-0 !h-11 !rounded-xl !bg-card !pl-10 !pr-14 !text-sm" />{search && <button type="button" aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-1 text-xs font-semibold text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setSearch("")}>Clear</button>}</div>
         <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by status"><option value="all">All statuses</option><option value="live">Live</option><option value="paused">Paused</option><option value="draft">Draft</option><option value="needs_publishing">Needs publishing</option></select>
         <select value={trigger} onChange={(event) => setTrigger(event.target.value as TriggerFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by what starts it"><option value="all">All start conditions</option><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment + DM</option></select>
         <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort automations"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option></select>
@@ -318,6 +351,8 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
                         campaign={campaign}
                         onOpen={() => onSelect(campaign.id)}
                         onRename={() => setRenameCampaign(campaign)}
+                        onDelete={() => { setDeleteCampaign(campaign); setDeleteError(null); }}
+                        canDeleteDraft={!campaign.enabled && campaign.published !== true}
                         onToggle={async () => {
                           await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled);
                           setReloadToken((value) => value + 1);
@@ -339,8 +374,8 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
               })}
             </div>
             <div className="hidden lg:block">
-              <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible automations" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Starts when</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
-              {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} className={`border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"}`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><button type="button" className="block max-w-full text-left text-[15px] font-semibold leading-5 text-ink underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => onSelect(campaign.id)}>{campaign.name}</button><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><AutomationStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
+              <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible automations" className="h-4 w-4 shrink-0 cursor-pointer accent-[#7C3AED] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Starts when</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
+              {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} className={`border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"}`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><button type="button" className="block max-w-full text-left text-[15px] font-semibold leading-5 text-ink underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => onSelect(campaign.id)}>{campaign.name}</button><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><AutomationStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onDelete={() => { setDeleteCampaign(campaign); setDeleteError(null); }} canDeleteDraft={!campaign.enabled && campaign.published !== true} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
             </tbody></table>
             </div>
             </>
@@ -350,6 +385,26 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
       </div>
 
       {renameCampaign && <RenameJourney campaign={renameCampaign} onClose={() => setRenameCampaign(null)} onSaved={() => setReloadToken((value) => value + 1)} />}
+      {deleteCampaign && (
+        <BottomSheet
+          title="Delete draft automation?"
+          onClose={() => { if (!deletingDraft) { setDeleteCampaign(null); setDeleteError(null); } }}
+          closeDisabled={deletingDraft}
+          maxWidth={480}
+          zIndex={70}
+        >
+          <p className="m-0 text-sm leading-6 text-ink">
+            Permanently delete <strong>{deleteCampaign.name}</strong>? This only removes an inactive, unpublished draft and cannot be undone. It will not send or change any Instagram messages.
+          </p>
+          {deleteError && <div className="banner banner-error mt-3" role="alert">{deleteError}</div>}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="btn-secondary min-h-11" onClick={() => { setDeleteCampaign(null); setDeleteError(null); }} disabled={deletingDraft}>Cancel</button>
+            <button type="button" className="min-h-11 rounded-xl bg-[#B91C1C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#991B1B] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60" onClick={() => void confirmDeleteDraft()} disabled={deletingDraft}>
+              {deletingDraft ? "Deleting…" : "Delete draft"}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
       {showBulkActivateConfirm && (
         <BottomSheet title="Activate selected automations?" onClose={() => setShowBulkActivateConfirm(false)} closeDisabled={bulkSaving} maxWidth={560} zIndex={70}>
           <p className="m-0 text-sm leading-6 text-ink">

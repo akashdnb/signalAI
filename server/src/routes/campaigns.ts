@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import {
   createCampaign,
+  deleteDraftCampaign,
   getCampaign,
   listCampaigns,
   setCampaignEnabled,
@@ -54,6 +55,25 @@ campaignsRouter.post("/tenants/:tenantId/campaigns", async (req, res) => {
 campaignsRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
   const campaigns = await listCampaigns(getPool(), req.params.tenantId);
   return res.status(200).json(campaigns);
+});
+
+campaignsRouter.delete("/tenants/:tenantId/campaigns/:campaignId", async (req, res) => {
+  const { tenantId, campaignId } = req.params;
+  const result = await deleteDraftCampaign(getPool(), tenantId, campaignId);
+  if (result === "not_found") {
+    return res.status(404).json({ error: "automation not found for this workspace" });
+  }
+  if (result === "not_draft") {
+    return res.status(409).json({
+      error: "Only inactive, unpublished drafts can be deleted. Pause an active draft first; published automations are kept to preserve history.",
+    });
+  }
+  if (result === "has_history") {
+    return res.status(409).json({
+      error: "This automation has recorded milestone history and cannot be permanently deleted.",
+    });
+  }
+  return res.status(204).end();
 });
 
 campaignsRouter.get("/tenants/:tenantId/campaigns/:campaignId", async (req, res) => {

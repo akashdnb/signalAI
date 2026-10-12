@@ -118,6 +118,95 @@ export async function getCampaign(pool: Pool, tenantId: string, campaignId: stri
   return result.rows[0] ? toCampaign(result.rows[0]) : null;
 }
 
+
+export type DeleteDraftCampaignResult = "deleted" | "not_found" | "not_draft" | "has_history";
+
+/**
+ * Permanently remove an inactive, unpublished draft. Published automation
+ * versions and their execution history are intentionally never deleted here.
+ */
+export async function deleteDraftCampaign(
+  pool: Pool,
+  tenantId: string,
+  campaignId: string,
+): Promise<DeleteDraftCampaignResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query<{ enabled: boolean; published: boolean }>(
+      `select c.enabled,
+              exists (
+                select 1 from campaign_journey_versions published
+                 where published.tenant_id = c.tenant_id
+                   and published.campaign_id = c.id
+              ) as published
+         from campaigns c
+        where c.id = $1 and c.tenant_id = $2
+        for update`,
+      [campaignId, tenantId],
+    );
+    const campaign = found.rows[0];
+    if (!campaign) {
+      await client.query("ROLLBACK");
+      return "not_found";
+    }
+    if (campaign.enabled || campaign.published) {
+      await client.query("ROLLBACK");
+      return "not_draft";
+    }
+
+    // Keep append-only funnel analytics intact. A draft with milestone
+    // advancement history is unexpected, but must not be silently erased.
+    const history = await client.query<{ has_history: boolean }>(
+      `select exists (
+         select 1 from milestone_advancements
+          where tenant_id = $1 and campaign_id = $2
+       ) as has_history`,
+      [tenantId, campaignId],
+    );
+    if (history.rows[0]?.has_history) {
+      await client.query("ROLLBACK");
+      return "has_history";
+    }
+
+    // These tables reference campaigns without ON DELETE CASCADE. Remove
+    // only the draft's editable graph/configuration in a single transaction.
+    await client.query(
+      "delete from journey_edges where tenant_id = $1 and campaign_id = $2",
+      [tenantId, campaignId],
+    );
+    // Clear the self-reference so nested/group nodes can be removed together.
+    await client.query(
+      "update journey_nodes set parent_group_id = null where tenant_id = $1 and campaign_id = $2",
+      [tenantId, campaignId],
+    );
+    await client.query(
+      "delete from journey_nodes where tenant_id = $1 and campaign_id = $2",
+      [tenantId, campaignId],
+    );
+    await client.query(
+      "delete from campaign_milestones where tenant_id = $1 and campaign_id = $2",
+      [tenantId, campaignId],
+    );
+    // Defensive cleanup for a stale, non-published legacy DM assignment.
+    await client.query(
+      "update leads set active_dm_campaign_id = null where tenant_id = $1 and active_dm_campaign_id = $2",
+      [tenantId, campaignId],
+    );
+    await client.query(
+      "delete from campaigns where tenant_id = $1 and id = $2 and enabled = false",
+      [tenantId, campaignId],
+    );
+    await client.query("COMMIT");
+    return "deleted";
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listActiveCampaignKeywords(pool: Queryable, tenantId: string): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
   const result = await pool.query<{ id: string; keywords: string[]; target_media_ids: string[]; trigger_source: TriggerSource; reply_channel: ReplyChannel }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [tenantId]);
   return result.rows.map((row) => ({ id: row.id, keywords: row.keywords, targetMediaIds: row.target_media_ids, triggerSource: row.trigger_source, replyChannel: row.reply_channel }));
