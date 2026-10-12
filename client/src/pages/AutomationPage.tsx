@@ -43,6 +43,14 @@ export function AutomationPage() {
     navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
   }
 
+  function handleCloseNewJourney() {
+    setShowNewJourney(false);
+    if (pendingCustomDraftId) {
+      setPendingCustomDraftId(null);
+      push("The draft was created but its setup may be incomplete. Open it from My automations to finish.");
+    }
+  }
+
   async function handleUseTemplate(template: AutomationTemplate) {
     if (!tenantId || creatingTemplate) return;
     setCreatingTemplate(true);
@@ -96,7 +104,7 @@ export function AutomationPage() {
           <JourneyTablePaginated tenantId={tenantId} onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)} onNewJourney={() => setShowNewJourney(true)} />
         </div>
       )}
-      {showNewJourney && <NewJourneyDialog onClose={() => setShowNewJourney(false)} onCreate={handleCreateJourney} />}
+      {showNewJourney && <NewJourneyDialog onClose={handleCloseNewJourney} onCreate={handleCreateJourney} />}
       <ToastStack toasts={toasts} />
     </div>
   );
