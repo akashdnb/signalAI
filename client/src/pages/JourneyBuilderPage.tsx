@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Campaign } from "../api";
-import { JourneyAccountsPanel } from "../components/JourneyAccountsPanel";
+import {
+  JourneyAccountsPanel,
+  type JourneyAccountReadiness,
+} from "../components/JourneyAccountsPanel";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
 
 export function JourneyBuilderPage() {
@@ -11,6 +14,11 @@ export function JourneyBuilderPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accountReadiness, setAccountReadiness] = useState<JourneyAccountReadiness>({
+    status: "loading",
+    healthyAssignedCount: 0,
+    unavailableAssignedCount: 0,
+  });
 
   const loadCampaign = useCallback(async () => {
     if (!tenantId || !campaignId) return;
@@ -28,6 +36,10 @@ export function JourneyBuilderPage() {
       setLoading(false);
     }
   }, [tenantId, campaignId]);
+
+  const handleAccountReadinessChange = useCallback((readiness: JourneyAccountReadiness) => {
+    setAccountReadiness(readiness);
+  }, []);
 
   const refreshCampaign = useCallback(async () => {
     if (!tenantId || !campaignId) return;
@@ -73,10 +85,15 @@ export function JourneyBuilderPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-56px)] flex-col px-3 py-3 md:px-4 md:py-3">
-      <JourneyAccountsPanel tenantId={tenantId} campaignId={campaignId} />
+      <JourneyAccountsPanel
+        tenantId={tenantId}
+        campaignId={campaignId}
+        onReadinessChange={handleAccountReadinessChange}
+      />
       <JourneyBuilder
         tenantId={tenantId}
         campaign={campaign}
+        accountReadiness={accountReadiness}
         onChanged={refreshCampaign}
         onBack={() => navigate(`/dashboard/${tenantId}/automation`)}
       />
