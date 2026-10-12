@@ -66,7 +66,7 @@ export function NewJourneyDialog({
             Separate multiple phrases with commas. You can change these later.
           </span>
           {keywords.trim().length > 0 && parsedKeywords.length === 0 && (
-            <span className="mt-1 block text-xs text-danger-ink" role="status">
+            <span className="mt-1 block text-xs text-[#B91C1C]" role="status">
               Enter at least one word or phrase, not just commas.
             </span>
           )}
