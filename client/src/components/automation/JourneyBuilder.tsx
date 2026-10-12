@@ -594,7 +594,7 @@ export function JourneyBuilder({
                 aria-label="More actions"
                 aria-haspopup="true"
                 aria-expanded={menuOpen}
-                aria-controls="journey-builder-actions"
+                aria-controls={menuOpen ? "journey-builder-actions" : undefined}
                 className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => setMenuOpen((value) => !value)}
               >
@@ -606,6 +606,7 @@ export function JourneyBuilder({
                   <button
                     type="button"
                     aria-label="Close actions"
+                    tabIndex={-1}
                     className="fixed inset-0 z-40 cursor-default"
                     onClick={() => setMenuOpen(false)}
                   />
