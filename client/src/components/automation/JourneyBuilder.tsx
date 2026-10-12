@@ -26,14 +26,13 @@ import { NodeInspectorDialog } from "./NodeInspectorDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { TestJourneyDialog } from "./TestJourneyDialog";
 
-type BuilderTab = "builder" | "details" | "analytics" | "leads" | "versions";
+type BuilderTab = "builder" | "details" | "analytics" | "leads";
 
 const TABS: { key: BuilderTab; label: string }[] = [
-  { key: "builder", label: "Builder" },
-  { key: "details", label: "Details" },
-  { key: "analytics", label: "Analytics" },
+  { key: "builder", label: "Flow" },
+  { key: "details", label: "Setup" },
+  { key: "analytics", label: "Results" },
   { key: "leads", label: "Leads" },
-  { key: "versions", label: "Versions" },
 ];
 
 function describeCampaign(campaign: Campaign): string {
@@ -42,12 +41,13 @@ function describeCampaign(campaign: Campaign): string {
   const count = campaign.keywords.length;
   const kind =
     campaign.triggerSource === "message"
-      ? "DMs"
+      ? "a direct message"
       : campaign.triggerSource === "both"
-        ? "comments & DMs"
-        : "comments";
+        ? "a comment or direct message"
+        : "a comment";
+  const phraseCount = `${count} phrase${count === 1 ? "" : "s"}`;
 
-  return `Replies to ${kind} matching ${count} keyword${count === 1 ? "" : "s"}`;
+  return `Starts when ${kind} mentions one of ${phraseCount}`;
 }
 
 export function JourneyBuilder({
@@ -156,7 +156,7 @@ export function JourneyBuilder({
   async function saveAndContinue() {
     const saved = await saveCanvasDraft();
     if (!saved) {
-      setUnsavedDialogError("Couldn't save your journey. Your changes are still here; please try again.");
+      setUnsavedDialogError("Couldn't save this automation. Your changes are still here; please try again.");
       return;
     }
 
@@ -421,7 +421,7 @@ export function JourneyBuilder({
   function requestPublish() {
     requestNavigation(() => {
       if (builderVersion === null) {
-        setPublishError("The journey version is still loading.");
+        setPublishError("The current version is still loading.");
         return;
       }
 
@@ -459,7 +459,7 @@ export function JourneyBuilder({
               className="builder-toolbar-button mt-0.5 flex h-8 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-ink hover:bg-chip"
               onClick={() => requestNavigation(onBack)}
             >
-              ← Back to journeys
+              ← Back to automations
             </button>
 
             <div className="flex shrink-0 items-center gap-1.5">
@@ -496,13 +496,13 @@ export function JourneyBuilder({
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={() => void saveCanvasDraft()}
                 >
-                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading goals…" : "Save changes"}
+                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading setup…" : "Save changes"}
                 </button>
               )}
 
               <Link
                 to="/docs/journey-builder"
-                aria-label="Open Journey Builder documentation"
+                aria-label="Open automation flow documentation"
                 className="builder-toolbar-button hidden h-9 min-w-[72px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink lg:inline-flex"
               >
                 <FileTextIcon className="h-4 w-4 shrink-0" />
@@ -523,7 +523,7 @@ export function JourneyBuilder({
                 className="builder-toolbar-button hidden h-9 min-w-[112px] items-center justify-center rounded-lg bg-chip px-3 text-[13px] font-semibold text-ink md:inline-flex"
                 onClick={() => setShowTestJourney(true)}
               >
-                Test Journey
+                Sample walkthrough
               </button>
 
               <button
@@ -587,7 +587,7 @@ export function JourneyBuilder({
                       className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip"
                       onClick={() => void handleToggleEnabled()}
                     >
-                      {campaign.enabled ? "Disable journey" : "Enable journey"}
+                      {campaign.enabled ? "Disable automation" : "Enable automation"}
                     </button>
                   </div>
                 </>
@@ -619,7 +619,7 @@ export function JourneyBuilder({
             </p>
           </div>
 
-          <div role="tablist" aria-label="Journey sections" className="mt-1.5 flex gap-5 overflow-x-auto md:gap-7">
+          <div role="tablist" aria-label="Automation sections" className="mt-1.5 flex gap-5 overflow-x-auto md:gap-7">
             {TABS.map((tab, index) => {
               const selected = subTab === tab.key;
               return (
@@ -668,7 +668,7 @@ export function JourneyBuilder({
         {milestonesLoading && (
           <div className="mx-4 mt-3 flex items-center gap-2 text-xs text-subtle md:mx-5" role="status">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-            Loading goals and capture fields…
+            Loading automation setup…
           </div>
         )}
         {milestoneLoadError && (
@@ -735,26 +735,6 @@ export function JourneyBuilder({
             </div>
           )}
 
-          {subTab === "versions" && (
-            <div className="h-full overflow-y-auto p-4 md:p-6">
-              <div className="rounded-2xl border border-line bg-card p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="m-0 text-base font-semibold text-ink">
-                      Journey versions
-                    </h2>
-                    <p className="muted m-0 mt-1 text-sm">
-                      Draft and published journey snapshots will appear here.
-                    </p>
-                  </div>
-
-                  <span className="rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-subtle">
-                    v{builderVersion ?? "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -774,7 +754,7 @@ export function JourneyBuilder({
 
       {showPublishConfirm && (
         <BottomSheet
-          title="Publish changes"
+          title="Publish automation"
           onClose={() => {
             if (!publishing) setShowPublishConfirm(false);
           }}
@@ -783,7 +763,7 @@ export function JourneyBuilder({
             v{builderVersion ?? "—"} will become the active version.
           </p>
           <p className="muted mt-2 text-xs">
-            Your currently published journey remains active until these changes are published.
+            Your current live automation remains active until this update is published.
           </p>
 
           <div className="mt-5 flex justify-end gap-2">
@@ -814,7 +794,7 @@ export function JourneyBuilder({
           onClose={keepEditing}
         >
           <p className="m-0 text-sm text-ink">
-            You have unsaved journey changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
+            You have unsaved automation changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
           </p>
           {unsavedDialogError && (
             <div className="banner banner-error mt-3">{unsavedDialogError}</div>
@@ -865,7 +845,7 @@ export function JourneyBuilder({
       {pendingTab && (
         <BottomSheet title="Unsaved changes" onClose={() => setPendingTab(null)}>
           <p className="muted mt-0">
-            You have unsaved changes in Details. What would you like to do?
+            You have unsaved changes in Setup. What would you like to do?
           </p>
 
           <div className="flex flex-col gap-2">
