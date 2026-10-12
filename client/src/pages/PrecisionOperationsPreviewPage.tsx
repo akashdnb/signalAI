@@ -176,7 +176,10 @@ function LeadsScreen() {
 }
 
 export function PrecisionOperationsPreviewPage() {
-  const [screen, setScreen] = useState<PreviewScreen>("builder");
+  const [screen, setScreen] = useState<PreviewScreen>(() => {
+    const requested = new URLSearchParams(window.location.search).get("screen");
+    return requested === "inbox" || requested === "leads" ? requested : "builder";
+  });
   const [dirty, setDirty] = useState(true);
   const [savedNotice, setSavedNotice] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
