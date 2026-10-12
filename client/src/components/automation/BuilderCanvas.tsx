@@ -1393,14 +1393,31 @@ export function BuilderCanvas({
         </ReactFlow>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between gap-3 md:hidden">
-        <div className="pointer-events-none rounded-xl bg-card/95 px-3 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
-          Tap a node to edit it
+      <div className="absolute bottom-4 left-3 right-3 z-20 flex items-center justify-between gap-2 md:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            title="Fit the full automation flow into view"
+            onClick={() => {
+              void flowInstanceRef.current?.fitView({
+                padding: 0.16,
+                minZoom: 0.22,
+                maxZoom: 0.8,
+                duration: 180,
+              });
+            }}
+            className="flex min-h-11 shrink-0 items-center rounded-xl border border-line bg-card/95 px-3 text-xs font-semibold text-ink shadow-lg backdrop-blur"
+          >
+            Fit flow
+          </button>
+          <div className="pointer-events-none min-w-0 rounded-xl bg-card/95 px-2.5 py-2 text-[11px] text-subtle shadow-lg backdrop-blur">
+            Tap a node to edit
+          </div>
         </div>
         <button
           type="button"
           onClick={onAddMilestone}
-          className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-white shadow-lg"
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-3 text-sm font-semibold text-white shadow-lg"
         >
           <PlusIcon className="h-4 w-4" />
           Add goal
