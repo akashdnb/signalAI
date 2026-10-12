@@ -1,36 +1,36 @@
 ---
-title: Journey Builder
+title: Automation Flow
 slug: journey-builder
-group: Journey Builder
-description: Configure the trigger, reply, and goal sequence in the visual Builder.
+group: Automation
+description: Configure the trigger, reply, and goal sequence in the visual Flow builder.
 order: 9
 related: goals-and-fields, rich-media-messages, preview-test-publish, automations, beta-scope
 ---
 
-## Open the Builder
+## Open Flow
 
-1. Open Automation → Journeys.
-2. Select the journey you want to work on.
-3. Stay on the Builder tab to inspect or configure the visual flow.
+1. Open **Automation**.
+2. Select the automation you want to work on.
+3. Stay on the **Flow** tab to inspect or configure the visual path.
 
-The Builder presents a canvas and opens node configuration in a dialog. On the journey header, the other tabs are Details, Analytics, Leads, and Versions.
+The Flow presents a canvas and opens node configuration in a dialog. The automation header also provides **Setup**, **Results**, and **Leads**.
 
 ## Understand the current node types
 
 - **Trigger:** chooses the Instagram event type and keyword behavior.
 - **AI Reply / Send Message:** configures a message step. The dialog's **Instagram layout** tab supports plain text, text with buttons, a single card, a gallery/carousel, and quick replies. See [Rich Media Messages](/docs/rich-media-messages).
 - **Goal:** names a conversational qualification checkpoint and the fields it should capture.
-- **Send Link:** uses the CTA link configured in Details when the action is present.
+- **Send Link:** uses the CTA link configured in Setup when the action is present.
 - **Condition, Delay, and a separate Handoff flow node:** shown as coming soon in the current beta.
 
-The node picker may show both AI Reply and Send Message, but both open the current message configuration. Use Reply Mode in Details to choose AI-generated or fixed-template behavior. Rich-message presentation is set per message node in the Builder.
+The node picker may show both AI Reply and Send Message, but both open the current message configuration. Use Reply Mode in Setup to choose AI-generated or fixed-template behavior. Rich-message presentation is set per message node in Flow.
 
 ## Edit a node
 
 1. Select the node on the canvas.
 2. Use its configuration dialog to review current values.
 3. Make a focused change and save it using the dialog's Save action where provided.
-4. Check the Builder's save indicator before moving on.
+4. Check the Flow's save indicator before moving on.
 
 For goals, you can change the title, choose captured fields, create a field definition, and reorder goals. Avoid removing a goal that is still part of the qualification flow.
 
@@ -39,21 +39,23 @@ For goals, you can change the title, choose captured fields, create a field defi
 1. Select the message node that should send the interactive content.
 2. In its dialog, open **Instagram layout** and select **Text + buttons**, **Single card**, **Gallery / carousel**, or **Quick replies**.
 3. Configure the copy and content. Cards support a title, optional subtitle, optional public HTTPS image URL, and optional actions.
-4. For a **Continue journey** button or quick reply, connect the message node to its destination node on the canvas first. Select that destination in the interaction's Journey destination field.
-5. Save in the message dialog. This stages the change in the Builder draft; it does not yet persist the journey.
-6. Use the Builder's explicit **Save** action to persist the graph, then **Publish** when you are ready to make that version active.
+4. For a **Continue automation** button or quick reply, connect the message node to its destination node on the canvas first. Select that destination in the interaction's Automation destination field.
+5. Save in the message dialog. This stages the change in the Flow draft; it does not yet persist the automation.
+6. Use the Flow's explicit **Save** action to persist the graph, then **Publish** when you are ready to make that version active.
 
 For button/quick-reply configuration limits and examples, see [Rich Media Messages](/docs/rich-media-messages).
 
-## Use Details for journey-wide settings
+## Use Setup for automation-wide settings
 
-Details contains the journey name and description, active state, trigger type and keywords, reply mode and channel, default reply and variations, campaign-level CTA link, AI tone and language, knowledge-base toggle, post targeting, and milestone configuration. Campaign-level CTA links and per-node rich layouts are separate settings.
+Setup contains the automation name and description, active state, trigger type and keywords, reply mode and channel, default reply and variations, campaign-level CTA link, AI tone and language, knowledge-base toggle, post targeting, and goal configuration. Campaign-level CTA links and per-node rich layouts are separate settings.
 
 ## Save versus publish
 
-Saving preserves configuration changes; publishing makes the selected Builder version active. Publishing the journey requires a saved Builder version. The existing published journey remains active until the new version is published.
+Saving preserves configuration changes; publishing makes the selected Flow version active. Publishing the automation requires a saved Flow version. The existing published version remains active until the new version is published.
 
-After publishing, verify whether the journey is Active or Inactive. Publishing alone is not a substitute for enabling a journey.
+After publishing, verify whether the automation is **Live** or **Paused**. Publishing alone is not a substitute for activation.
+
+If you make changes and navigate away, Flow asks whether to save or discard the unsaved draft. Choosing discard restores the last saved graph; choosing save persists the draft before navigation.
 
 ## Best practices
 
@@ -66,4 +68,4 @@ After publishing, verify whether the journey is Active or Inactive. Publishing a
 
 ## Current beta limitations
 
-The Current Beta Scope guide lists node types and tabs that are placeholders, so you can design around supported controls rather than assuming every visible item is ready.
+The Current Beta Scope guide lists node types and controls that are placeholders, so you can design around supported controls rather than assuming every visible item is ready.
