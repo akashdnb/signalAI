@@ -802,6 +802,20 @@ export function JourneyBuilder({
             </div>
 
             <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Link to share</p>
+              {campaign.ctaLink?.trim() ? (
+                <p className="m-0 mt-1 break-all text-sm text-ink">{campaign.ctaLink}</p>
+              ) : (
+                <>
+                  <p className="m-0 mt-1 text-sm text-ink">No link configured</p>
+                  <p className="muted m-0 mt-1 text-xs leading-5">
+                    Optional. Add a product, booking or website link in Setup if this reply should direct people somewhere.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div>
               <p className="m-0 text-xs font-semibold text-subtle">Reply style</p>
               <p className="m-0 mt-1 text-sm text-ink">
                 {campaign.replyMode === "ai_generated" ? "AI-generated replies" : "Prewritten replies"}
@@ -843,6 +857,17 @@ export function JourneyBuilder({
             </div>
           </div>
 
+          {accountReadiness.status === "error" && (
+            <div className="banner banner-error mt-3" role="alert">
+              Couldn't verify the connected Instagram accounts. Refresh the page and check account status before publishing.
+            </div>
+          )}
+          {accountReadiness.status === "ready" && accountReadiness.healthyAssignedCount === 0 && (
+            <div className="banner banner-error mt-3" role="alert">
+              Assign at least one healthy Instagram account before publishing. You can keep saving this automation as a draft while you finish setup.
+            </div>
+          )}
+
           <p className="muted mt-3 text-xs leading-5">
             Version v{builderVersion ?? "—"} will become live. If this automation already has a live version, it stays active until this update is published.
           </p>
@@ -860,10 +885,18 @@ export function JourneyBuilder({
             <button
               type="button"
               className="btn-primary"
-              disabled={publishing}
+              disabled={
+                publishing ||
+                accountReadiness.status !== "ready" ||
+                accountReadiness.healthyAssignedCount === 0
+              }
               onClick={() => void handlePublish()}
             >
-              {publishing ? "Publishing…" : "Publish and activate"}
+              {publishing
+                ? "Publishing…"
+                : accountReadiness.status !== "ready" || accountReadiness.healthyAssignedCount === 0
+                  ? "Check Instagram account"
+                  : "Publish and activate"}
             </button>
           </div>
         </BottomSheet>
