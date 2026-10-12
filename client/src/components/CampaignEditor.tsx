@@ -63,7 +63,7 @@ function isValidHttpsUrl(value: string): boolean {
 function validateDraft(draft: SettingsDraft): string[] {
   const errors: string[] = [];
   if (!draft.name.trim()) errors.push("Automation name can't be blank.");
-  if (draft.keywords.length === 0) errors.push("Add at least one trigger keyword.");
+  if (draft.keywords.length === 0) errors.push("Add at least one word or phrase to match.");
   if (draft.replyMode === "ai_generated" && !draft.defaultReplyTemplate.trim()) {
     errors.push("A fallback reply template is required so AI mode can fail closed.");
   }
@@ -182,7 +182,7 @@ function KeywordChips({ keywords, onChange }: { keywords: string[]; onChange: (n
 
   return (
     <div>
-      <div className="mb-1 text-sm">Keywords</div>
+      <div className="mb-1 text-sm">Words or phrases</div>
       <div className="mb-2 flex flex-wrap gap-2">
         {keywords.map((k) => (
           <span className="tag-chip" key={k}>
@@ -205,7 +205,7 @@ function KeywordChips({ keywords, onChange }: { keywords: string[]; onChange: (n
                 commit();
               }
             }}
-            placeholder="Enter keyword"
+            placeholder="Add a word or phrase"
             autoFocus
             style={{ marginTop: 0 }}
           />
@@ -220,7 +220,7 @@ function KeywordChips({ keywords, onChange }: { keywords: string[]; onChange: (n
         </div>
       ) : (
         <button type="button" className="btn-secondary btn-small min-h-11" onClick={() => setAdding(true)}>
-          + Add keyword
+          + Add phrase
         </button>
       )}
     </div>
@@ -508,10 +508,10 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
               </label>
             </div>
             <div>
-              <div className="mb-1 text-sm">Status</div>
+              <div className="mb-1 text-sm">Status after publishing</div>
               <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line px-3.5">
                 <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="!w-auto" />
-                {draft.enabled ? "Active" : "Inactive"}
+                {draft.enabled ? "Enabled" : "Paused"}
               </label>
             </div>
           </div>
@@ -522,13 +522,13 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
             <OptionCard
               checked={draft.triggerSource === "comment"}
               title="Comments only"
-              subtitle="A keyword in a public comment"
+              subtitle="A word or phrase in a public comment"
               onSelect={() => setDraft({ ...draft, triggerSource: "comment" })}
             />
             <OptionCard
               checked={draft.triggerSource === "message"}
               title="Direct messages only"
-              subtitle="A keyword in a DM"
+              subtitle="A word or phrase in a direct message"
               onSelect={() => setDraft({ ...draft, triggerSource: "message" })}
             />
             <OptionCard checked={draft.triggerSource === "both"} title="Both" onSelect={() => setDraft({ ...draft, triggerSource: "both" })} />
