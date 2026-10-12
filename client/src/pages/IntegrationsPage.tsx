@@ -4,6 +4,11 @@ import { ApiError, api } from "../api";
 import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
 
+function formatDate(iso: string | null): string {
+  if (!iso) return "Not available";
+  return new Date(iso).toLocaleString();
+}
+
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
@@ -85,7 +90,7 @@ export function IntegrationsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1>Integrations</h1>
-          <p className="muted">Connect the channels signalAI can send and receive messages through.</p>
+          <p className="muted">Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account.</p>
         </div>
         <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
           <span className="inline-flex items-center gap-1.5">
@@ -119,11 +124,14 @@ export function IntegrationsPage() {
                   </span>
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-2">
-                      <strong>@{account.instagramAccountId}</strong>
+                      <strong>Instagram account</strong>
                       <span className={account.status === "healthy" ? "pill pill-ok" : "pill pill-error"}>
-                        {account.status === "healthy" ? "Connected" : "Needs attention"}
+                        {account.status === "healthy" ? "Healthy" : "Needs attention"}
                       </span>
                     </span>
+                    <p className="muted small mt-1 mb-0">Account ID: <code>{account.instagramAccountId}</code></p>
+                    <p className="muted small mt-1 mb-0">Last checked: {formatDate(account.lastCheckedAt)}</p>
+                    {account.expiresAt && <p className="muted small mt-1 mb-0">Connection credential expires: {formatDate(account.expiresAt)}</p>}
                     {account.status === "error" && account.lastError && (
                       <span className="banner banner-error small mt-2" style={{ display: "block" }}>{account.lastError}</span>
                     )}
@@ -169,7 +177,7 @@ export function IntegrationsPage() {
         </span>
         <div>
           <div className="flex items-center gap-2"><h3 className="m-0">WhatsApp</h3><span className="pill" style={{ marginLeft: 0 }}>Coming soon</span></div>
-          <p className="muted small mt-1">Hand off qualified leads to WhatsApp for your sales team to take over.</p>
+          <p className="muted small mt-1">Not available yet. This card is informational and does not create a connection.</p>
         </div>
       </section>
 
@@ -179,7 +187,7 @@ export function IntegrationsPage() {
         </span>
         <div>
           <div className="flex items-center gap-2"><h3 className="m-0">CRM sync</h3><span className="pill" style={{ marginLeft: 0 }}>Coming soon</span></div>
-          <p className="muted small mt-1">Push qualified leads straight into your CRM as they're handed over.</p>
+          <p className="muted small mt-1">Not available yet. Qualified leads remain in SignalAI until CRM sync is supported.</p>
         </div>
       </section>
     </div>

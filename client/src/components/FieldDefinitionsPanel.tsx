@@ -63,70 +63,74 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm("Remove this field definition? Existing captured values may still reference it, and automations using the field can be affected.")) return;
     setError(null);
     try {
       await api.deleteFieldDefinition(tenantId, id);
       setDefinitions((prev) => (prev ?? []).filter((d) => d.id !== id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete field");
+      setError(err instanceof Error ? err.message : "Failed to remove field");
     }
   }
 
   return (
     <section className="card">
-      <h2>Field Definitions</h2>
+      <h2>Captured fields</h2>
       <p className="muted small">
-        Reusable typed fields (e.g. email, phone) that milestones across your campaigns can capture, instead of
-        freeform text every time.
+        Reusable typed fields that automations can capture, such as email, phone, country, or buying intent. The key is an internal identifier; the label is what your team sees.
       </p>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       {definitions === null ? (
         <p className="muted">Loading…</p>
       ) : (
         <>
           {definitions.length === 0 ? (
-            <p className="muted">No field definitions yet.</p>
+            <p className="muted">No captured fields yet.</p>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Label</th>
-                  <th>Type</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {definitions.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.fieldKey}</td>
-                    <td>{d.label}</td>
-                    <td>{VALUE_TYPES.find((t) => t.value === d.valueType)?.label ?? d.valueType}</td>
-                    <td>
-                      <button type="button" className="btn-secondary btn-small" onClick={() => handleDelete(d.id)}>
-                        Remove
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="table min-w-[620px]">
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Internal key</th>
+                    <th>Type</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {definitions.map((d) => (
+                    <tr key={d.id}>
+                      <td><strong>{d.label}</strong></td>
+                      <td><code>{d.fieldKey}</code></td>
+                      <td>{VALUE_TYPES.find((t) => t.value === d.valueType)?.label ?? d.valueType}</td>
+                      <td>
+                        <button type="button" className="btn-secondary btn-small" onClick={() => void handleDelete(d.id)}>
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           <form onSubmit={handleCreate} className="inline-form" style={{ marginTop: "1rem" }}>
             <input
               type="text"
-              placeholder="Key, e.g. email"
+              aria-label="Internal field key"
+              placeholder="Internal key, e.g. email"
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
             />
             <input
               type="text"
+              aria-label="Field label"
               placeholder="Label, e.g. Email address"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
             />
-            <select value={newType} onChange={(e) => setNewType(e.target.value as FieldDefinitionValueType)}>
+            <select aria-label="Field type" value={newType} onChange={(e) => setNewType(e.target.value as FieldDefinitionValueType)}>
               {VALUE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
