@@ -234,9 +234,60 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
       <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
         <div className="overflow-x-auto">
           {data === null && !error ? <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-chip" />)}</div> : error && data === null ? <div className="p-5"><div className="banner banner-error" role="alert">{error}</div><button type="button" className="link-button mt-3" onClick={() => setReloadToken((value) => value + 1)}>Retry</button></div> : data?.total === 0 ? <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center"><h3 className="m-0 text-lg font-semibold text-ink">{hasFilters ? "No automations match your filters" : "No automations yet"}</h3><p className="muted m-0 mt-2 max-w-md text-sm">{hasFilters ? "Try changing your search or filters." : "Choose a template for your first automation, or create a draft from scratch."}</p>{!hasFilters && <button type="button" className="btn-primary mt-5" onClick={onNewJourney}>Create draft</button>}</div> : (
-            <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible automations" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Starts when</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
+            <div className="grid gap-3 p-3 md:hidden">
+              {campaigns.map((campaign) => {
+                const selected = selectedIds.has(campaign.id);
+                const updated = relativeUpdatedAt(campaign.updatedAt);
+                return (
+                  <article key={campaign.id} className={`rounded-xl border border-line bg-card p-3.5 ${selected ? "border-accent/50 bg-chip/30" : ""}`}>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${campaign.name}`}
+                        checked={selected}
+                        onChange={() => toggleSelected(campaign.id)}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          className="block max-w-full text-left text-sm font-semibold text-ink underline-offset-2 hover:underline"
+                          onClick={() => onSelect(campaign.id)}
+                        >
+                          {campaign.name}
+                        </button>
+                        <p className="muted m-0 mt-1 line-clamp-3 text-xs leading-4">
+                          {campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}
+                        </p>
+                      </div>
+                      <ActionMenu
+                        campaign={campaign}
+                        onOpen={() => onSelect(campaign.id)}
+                        onRename={() => setRenameCampaign(campaign)}
+                        onToggle={async () => {
+                          await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled);
+                          setReloadToken((value) => value + 1);
+                        }}
+                      />
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <TriggerBadge campaign={campaign} />
+                      <AutomationStatusBadge campaign={campaign} />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+                      <span className="text-xs text-subtle" title={updated.title}>Updated {updated.label}</span>
+                      <button type="button" className="link-button shrink-0" onClick={() => onSelect(campaign.id)}>
+                        Open automation
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="hidden md:block">
+              <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible automations" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Starts when</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
               {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} tabIndex={0} aria-pressed={selected} role="button" onClick={() => onSelect(campaign.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(campaign.id); } }} className={`cursor-pointer border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"} focus:bg-chip/35 focus:outline-none`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><div className="text-[15px] font-semibold leading-5 text-ink">{campaign.name}</div><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><AutomationStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
             </tbody></table>
+            </div>
           )}
         </div>
         {data && data.total > 0 && <Pagination page={data.page} totalPages={data.totalPages} total={data.total} pageSize={data.pageSize} onPageChange={setPage} label="automations" />}
