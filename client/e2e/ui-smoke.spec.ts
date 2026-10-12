@@ -31,6 +31,7 @@ async function mockTenantApi(
     automationList?: boolean;
     legacyCampaignList?: boolean;
     publishedCampaign?: boolean;
+    healthyAssignedAccount?: boolean;
   } = {},
 ) {
   const activeLead = options.unknownUsername
@@ -117,7 +118,21 @@ async function mockTenantApi(
     } else if (path === `${tenantPath}/account`) {
       data = { connected: false, status: "healthy" };
     } else if (path === `${tenantPath}/connected-accounts`) {
-      data = { accounts: [] };
+      data = {
+        accounts: options.healthyAssignedAccount
+          ? [{
+              id: "smoke-instagram-account",
+              tenantId,
+              instagramAccountId: "17841400000000000",
+              status: "healthy",
+              lastError: null,
+              lastCheckedAt: "2026-10-12T09:00:00.000Z",
+              expiresAt: null,
+              createdAt: "2026-10-01T09:00:00.000Z",
+              updatedAt: "2026-10-12T09:00:00.000Z",
+            }]
+          : [],
+      };
     } else if (path === `${tenantPath}/usage`) {
       data = {
         planTier: "trial",
@@ -197,7 +212,16 @@ async function mockTenantApi(
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/milestones`) {
       data = [];
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/connected-accounts`) {
-      data = { accounts: [] };
+      data = {
+        accounts: options.healthyAssignedAccount
+          ? [{
+              campaignId: "smoke-campaign",
+              accountId: "smoke-instagram-account",
+              instagramAccountId: "17841400000000000",
+              enabled: true,
+            }]
+          : [],
+      };
     } else if (path === `${tenantPath}/members`) {
       data = [{ userId: "smoke-owner", email: "owner@example.com", role: "owner" }];
     } else if (path === `${tenantPath}/leads`) {
@@ -580,6 +604,27 @@ test.describe("responsive route smoke checks", () => {
     const activate = page.getByRole("button", { name: "Publish before activating" });
     await expect(activate).toBeVisible();
     await expect(activate).toBeDisabled();
+  });
+  test("builder activation requires confirmation before enabling live replies", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { publishedCampaign: true, healthyAssignedAccount: true });
+    let activationRequests = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/campaigns/smoke-campaign/enabled")) activationRequests += 1;
+    });
+    await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
+    await expect(page.getByText("1 healthy assigned", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("button", { name: "Activate automation" }).click();
+    const dialog = page.getByRole("dialog", { name: "Activate automation?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("real Instagram replies");
+    expect(activationRequests).toBe(0);
+
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    expect(activationRequests).toBe(0);
   });
 
   test("Leads recovers from a temporary list failure through Retry", async ({ page }) => {
