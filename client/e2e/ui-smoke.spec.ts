@@ -308,6 +308,14 @@ test.describe("responsive route smoke checks", () => {
     await expect(actions).toBeFocused();
   });
 
+  test("automation filters fit a tablet viewport without horizontal overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await mockTenantApi(page, { automationList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await expect(page.getByRole("heading", { name: /My automations/ })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockTenantApi(page, { failFirstTimelineLoad: true });
