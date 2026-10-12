@@ -129,6 +129,9 @@ export function JourneyBuilder({
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [showActivateConfirm, setShowActivateConfirm] = useState(false);
+  const [togglingEnabled, setTogglingEnabled] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
   const journeyDirty = canvasDirty || milestonesDirty;
@@ -465,9 +468,36 @@ export function JourneyBuilder({
 
   async function handleToggleEnabled() {
     if (!campaign.enabled && !canEnableAutomation) return;
-    await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
+    setTogglingEnabled(true);
+    setToggleError(null);
+    try {
+      await api.setCampaignEnabled(tenantId, campaign.id, !campaign.enabled);
+      setMenuOpen(false);
+      setShowActivateConfirm(false);
+      await onChanged();
+    } catch (error) {
+      setToggleError(
+        error instanceof Error
+          ? error.message
+          : campaign.enabled
+            ? "Could not pause this automation. Please try again."
+            : "Could not activate this automation. Check account readiness and try again.",
+      );
+    } finally {
+      setTogglingEnabled(false);
+    }
+  }
+
+  function requestToggleEnabled() {
     setMenuOpen(false);
-    await onChanged();
+    requestNavigation(() => {
+      if (campaign.enabled) {
+        void handleToggleEnabled();
+        return;
+      }
+      setToggleError(null);
+      setShowActivateConfirm(true);
+    });
   }
 
   function requestPublish() {
@@ -640,7 +670,7 @@ export function JourneyBuilder({
                     </button>
                     <button
                       type="button"
-                      disabled={publishing || (!campaign.enabled && !canEnableAutomation)}
+                      disabled={publishing || togglingEnabled || (!campaign.enabled && !canEnableAutomation)}
                       title={
                         campaign.enabled
                           ? "Pause this published automation or turn off its draft state."
@@ -655,9 +685,11 @@ export function JourneyBuilder({
                                   : "Activate this published automation."
                       }
                       className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-chip disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => void handleToggleEnabled()}
+                      onClick={requestToggleEnabled}
                     >
-                      {campaign.enabled
+                      {togglingEnabled
+                        ? "Updating…"
+                        : campaign.enabled
                         ? "Pause automation"
                         : !campaign.published
                           ? "Publish before activating"
@@ -831,6 +863,60 @@ export function JourneyBuilder({
         onSaveMessageConfiguration={saveMessageConfiguration}
       />
 
+      {showActivateConfirm && (
+        <BottomSheet
+          title="Activate automation?"
+          onClose={() => {
+            if (!togglingEnabled) {
+              setShowActivateConfirm(false);
+              setToggleError(null);
+            }
+          }}
+          closeDisabled={togglingEnabled}
+        >
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
+            <p className="m-0 text-sm font-semibold">This can start real Instagram replies.</p>
+            <p className="m-0 mt-1 text-xs leading-5">
+              SignalAI will respond to matching comments or direct messages using this automation&apos;s published version.
+              You can pause it at any time.
+            </p>
+          </div>
+          <div className="mt-4 rounded-xl border border-line p-3.5">
+            <p className="m-0 text-xs font-semibold uppercase tracking-wide text-subtle">Account readiness</p>
+            <p className="m-0 mt-1.5 text-sm text-ink">
+              {accountReadiness.status === "loading"
+                ? "Checking connected Instagram accounts…"
+                : accountReadiness.status === "error"
+                  ? "Could not verify connected accounts."
+                  : accountReadiness.healthyAssignedCount > 0
+                    ? `${accountReadiness.healthyAssignedCount} healthy account${accountReadiness.healthyAssignedCount === 1 ? "" : "s"} assigned.`
+                    : "No healthy Instagram account is assigned."}
+            </p>
+          </div>
+          {toggleError && <div className="banner banner-error mt-3" role="alert">{toggleError}</div>}
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className="btn-secondary min-h-11"
+              onClick={() => {
+                setShowActivateConfirm(false);
+                setToggleError(null);
+              }}
+              disabled={togglingEnabled}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary min-h-11"
+              onClick={() => void handleToggleEnabled()}
+              disabled={togglingEnabled || !canEnableAutomation}
+            >
+              {togglingEnabled ? "Activating…" : "Confirm activation"}
+            </button>
+          </div>
+        </BottomSheet>
+      )}
       {showPublishConfirm && (
         <BottomSheet
           title="Publish automation"
