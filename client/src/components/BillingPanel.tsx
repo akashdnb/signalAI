@@ -52,30 +52,35 @@ export function BillingPanel({ tenantId }: { tenantId: string }) {
   return (
     <section className="card">
       <h2>Billing</h2>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       {billing === null ? (
-        <p className="muted">Loading…</p>
+        <p className="muted" role="status">Loading…</p>
       ) : (
         <>
-          <p>
+          <div className="flex flex-wrap items-center gap-2">
             <span className={billing.billingStatus === "active" ? "pill pill-ok" : "pill"}>
               {billing.planTierLabel}
             </span>
-            {billing.billingStatus === "active" && " Your subscription is active — thanks for being a pilot creator!"}
-            {billing.planTier === "trial" && billing.trialEndsAt && (
-              <>
-                {" "}
-                Trial ends {formatDate(billing.trialEndsAt)}
-                {showTrialCountdown && (
-                  <span className="pill pill-error">{trialDaysLeft! <= 0 ? "expired" : `${trialDaysLeft}d left`}</span>
-                )}
-              </>
-            )}
-            {billing.billingStatus === "canceled" && " Your subscription was canceled."}
-          </p>
+            <span className="muted small">
+              {billing.billingStatus === "active"
+                ? "Subscription active"
+                : billing.billingStatus === "canceled"
+                  ? "Subscription canceled"
+                  : "No paid subscription"}
+            </span>
+          </div>
+
+          {billing.planTier === "trial" && billing.trialEndsAt && (
+            <p className="muted small mt-2 mb-0">
+              Trial ends {formatDate(billing.trialEndsAt)}.
+              {showTrialCountdown && (
+                <span className="pill pill-error ml-2">{trialDaysLeft! <= 0 ? "expired" : `${trialDaysLeft}d left`}</span>
+              )}
+            </p>
+          )}
 
           {usage && (
-            <div className="stat-grid">
+            <div className="stat-grid mt-4">
               <div className="stat">
                 <div className="stat-value">
                   {usage.tokens.used.toLocaleString()}
@@ -98,17 +103,24 @@ export function BillingPanel({ tenantId }: { tenantId: string }) {
               )}
             </div>
           )}
+
           {usage && !usage.isEntitled && (
-            <div className="banner banner-error">
+            <div className="banner banner-error mt-4" role="alert">
               Your trial has ended. Upgrade below to keep campaigns running.
             </div>
           )}
 
           {!billing.billingConfigured ? (
-            <p className="muted">Billing isn't set up yet on this server. Check back soon.</p>
+            <div className="banner mt-4">
+              <strong>Payments are not enabled yet.</strong>
+              <p className="small mt-1 mb-0">
+                This beta workspace is not connected to a payment provider, so no charge will be created from this screen.
+                Your current usage allowance is shown above. When paid billing is enabled, this page will show the available plans and checkout action.
+              </p>
+            </div>
           ) : billing.billingStatus !== "active" && billing.availableTiers.length > 0 ? (
             <>
-              <h3 style={{ marginTop: "1.25rem" }}>Upgrade</h3>
+              <h3 style={{ marginTop: "1.25rem" }}>Choose a plan</h3>
               <div className="button-row">
                 {billing.availableTiers.map((tier) => (
                   <button
@@ -125,6 +137,10 @@ export function BillingPanel({ tenantId }: { tenantId: string }) {
               </div>
             </>
           ) : null}
+
+          <p className="muted small mt-4 mb-0">
+            Usage resets with the current billing cycle. The allowance shown here is the limit SignalAI applies to this workspace.
+          </p>
         </>
       )}
     </section>
