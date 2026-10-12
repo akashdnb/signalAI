@@ -161,12 +161,13 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
   const [keywords, setKeywords] = useState("price\nquote\ndetails");
   const [alsoStory, setAlsoStory] = useState(false);
   const [caseInsensitive, setCaseInsensitive] = useState(true);
+  const [matchType, setMatchType] = useState("contains");
   const [alsoDm, setAlsoDm] = useState(true);
   const [messageText, setMessageText] = useState("Thanks for reaching out. I can help you find the right option. What are you looking for?");
   const [presentation, setPresentation] = useState("text");
-  const [buttons, setButtons] = useState([{ title: "View details", action: "Open website", url: "https://example.com/details" }]);
-  const [cards, setCards] = useState([{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "" }]);
-  const [quickReplies, setQuickReplies] = useState(["Pricing", "More information"]);
+  const [buttons, setButtons] = useState([{ title: "View details", action: "Open website", url: "https://example.com/details", destination: "Goal: capture interest" }]);
+  const [cards, setCards] = useState([{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg", actionTitle: "View details", actionType: "Open website", actionUrl: "https://example.com/details" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "", actionTitle: "Ask a question", actionType: "Continue journey", actionUrl: "", actionDestination: "Goal: capture interest" }]);
+  const [quickReplies, setQuickReplies] = useState([{ title: "Pricing", destination: "Ask about pricing" }, { title: "More information", destination: "Capture interest" }]);
   const [tone, setTone] = useState("Friendly and helpful");
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [goalTitle, setGoalTitle] = useState("What the person needs");
@@ -194,8 +195,8 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
     setApplyNotice("");
     onDirty();
   };
-  const addButton = () => { setButtons(previous => previous.concat({ title: "", action: "Open website", url: "" })); edit(); };
-  const addCard = () => { setCards(previous => previous.concat({ title: "New option", subtitle: "", imageUrl: "" })); edit(); };
+  const addButton = () => { setButtons(previous => previous.concat({ title: "", action: "Open website", url: "", destination: "" })); edit(); };
+  const addCard = () => { setCards(previous => previous.concat({ title: "New option", subtitle: "", imageUrl: "", actionTitle: "", actionType: "Open website", actionUrl: "", actionDestination: "" })); edit(); };
   const applyToPreview = () => {
     setLocalError("");
     if (nodeKey === "trigger" && !keywords.trim()) {
@@ -208,7 +209,7 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
         if (buttons.length === 0) { setLocalError("Add at least one button."); return; }
         if (buttons.some(button => !button.title.trim())) { setLocalError("Every button needs a label."); return; }
       }
-      if (presentation === "quick_replies" && (!messageText.trim() || quickReplies.some(label => !label.trim()))) {
+      if (presentation === "quick_replies" && (!messageText.trim() || quickReplies.some(reply => !reply.title.trim() || !reply.destination))) {
         setLocalError("Add message text and a label for each quick reply.");
         return;
       }
@@ -216,6 +217,8 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
         setLocalError("Every card needs a title.");
         return;
       }
+      if ((presentation === "card" || presentation === "gallery") && cards.some(card => card.imageUrl.trim() && !/^https:\/\//i.test(card.imageUrl.trim()))) { setLocalError("Card images need a valid HTTPS URL."); return; }
+      if ((presentation === "card" || presentation === "gallery") && cards.some(card => card.actionType === "Open website" && card.actionUrl && !/^https:\/\//i.test(card.actionUrl.trim()))) { setLocalError("Card buttons need a valid HTTPS URL."); return; }
     }
     if (nodeKey === "goal" && !goalTitle.trim()) {
       setLocalError("Goal title cannot be empty.");
@@ -225,10 +228,10 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
     setApplyNotice("Changes applied to this local preview draft. Use Save changes in the header to mark the draft saved.");
   };
   const resetEditor = () => {
-    if (nodeKey === "trigger") { setTriggerType("both"); setKeywords("price\nquote\ndetails"); setAlsoStory(false); setCaseInsensitive(true); setAlsoDm(true); }
-    if (nodeKey === "reply" || nodeKey === "followup") { setMessageText("Thanks for reaching out. I can help you find the right option. What are you looking for?"); setPresentation("text"); setButtons([{ title: "View details", action: "Open website", url: "https://example.com/details" }]); setCards([{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "" }]); setQuickReplies(["Pricing", "More information"]); setTone("Friendly and helpful"); setUseKnowledge(true); }
+    if (nodeKey === "trigger") { setTriggerType("both"); setKeywords("price\nquote\ndetails"); setAlsoStory(false); setCaseInsensitive(true); setMatchType("contains"); setAlsoDm(true); }
+    if (nodeKey === "reply" || nodeKey === "followup") { setMessageText("Thanks for reaching out. I can help you find the right option. What are you looking for?"); setPresentation("text"); setButtons([{ title: "View details", action: "Open website", url: "https://example.com/details", destination: "Goal: capture interest" }]); setCards([{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg", actionTitle: "View details", actionType: "Open website", actionUrl: "https://example.com/details" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "", actionTitle: "Ask a question", actionType: "Continue journey", actionUrl: "", actionDestination: "Goal: capture interest" }]); setQuickReplies([{ title: "Pricing", destination: "Ask about pricing" }, { title: "More information", destination: "Capture interest" }]); setTone("Friendly and helpful"); setUseKnowledge(true); }
     if (nodeKey === "goal") { setGoalTitle("What the person needs"); setCaptureFields(["Interest", "Preferred timeline"]); }
-    setEditorDirty(false); setLocalError(""); setApplyNotice("Local editor values reset to the example configuration.");
+    setEditorDirty(false); setLocalError(""); setApplyNotice("Local editor values reset to the example configuration."); onDirty();
   };
 
   const tabNavigation = <div className="po-inspector-tabs po-inspector-tabs--sections" role="tablist" aria-label="Node editor sections">
@@ -242,7 +245,7 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
     {nodeKey === "trigger" && tab === "basic" && <div className="po-inspector-fields">
       <label>Trigger type<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);edit();}}><option value="comment">Instagram comments</option><option value="message">Direct messages</option><option value="both">Comments and direct messages</option></select></label>
       <label>Matching words or phrases <span className="po-field-meta">One phrase per line</span><textarea rows={4} value={keywords} onChange={e=>{setKeywords(e.target.value);edit();}} aria-label="Sample trigger keywords"/></label>
-      <label>Match type<select defaultValue="contains" onChange={edit}><option value="contains">Contains</option><option value="exact">Exact match</option></select></label>
+      <label>Match type<select value={matchType} onChange={e=>{setMatchType(e.target.value);edit();}}><option value="contains">Contains</option><option value="exact">Exact match</option></select></label>
       <label className="po-toggle-row"><span><strong>Also trigger on story replies</strong><small>Include replies to Instagram stories.</small></span><input type="checkbox" checked={alsoStory} onChange={e=>{setAlsoStory(e.target.checked);edit();}}/></label>
       <label className="po-toggle-row"><span><strong>Case insensitive matching</strong><small>“PRICE” matches “price”.</small></span><input type="checkbox" checked={caseInsensitive} onChange={e=>{setCaseInsensitive(e.target.checked);edit();}}/></label>
       <label className="po-toggle-row"><span><strong>Also trigger on direct messages</strong><small>Include DMs alongside the selected trigger.</small></span><input type="checkbox" checked={alsoDm} onChange={e=>{setAlsoDm(e.target.checked);edit();}}/></label>
