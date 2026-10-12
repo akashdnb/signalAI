@@ -5,7 +5,7 @@ import { getCampaignsPage, type PaginatedResponse } from "../../api/pagination";
 import { Pagination } from "../Pagination";
 import { DotsVerticalIcon, InstagramMarkIcon, SearchIcon, SendIcon } from "../icons";
 
-type StatusFilter = "all" | "active" | "inactive";
+type StatusFilter = "all" | "live" | "paused" | "draft" | "needs_publishing";
 type TriggerFilter = "all" | TriggerSource;
 type SortOption = "updated_desc" | "updated_asc" | "name_asc" | "name_desc";
 
@@ -276,7 +276,7 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(200px,1fr)_150px_200px_150px]">
         <div className="relative"><SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" /><input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search automations..." className="!m-0 !h-11 !rounded-xl !bg-card !pl-10 !text-sm" /></div>
-        <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by status"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+        <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by status"><option value="all">All statuses</option><option value="live">Live</option><option value="paused">Paused</option><option value="draft">Draft</option><option value="needs_publishing">Needs publishing</option></select>
         <select value={trigger} onChange={(event) => setTrigger(event.target.value as TriggerFilter)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Filter by what starts it"><option value="all">All start conditions</option><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment + DM</option></select>
         <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)} className="!m-0 !h-11 !rounded-xl !bg-card !px-4 !text-sm" aria-label="Sort automations"><option value="updated_desc">Recently updated</option><option value="updated_asc">Oldest updated</option><option value="name_asc">Name A-Z</option><option value="name_desc">Name Z-A</option></select>
       </div>
