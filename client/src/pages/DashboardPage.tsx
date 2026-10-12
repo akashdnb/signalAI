@@ -69,9 +69,6 @@ export function DashboardPage() {
   const justConnected = searchParams.get("connected") === "1";
 
   useEffect(() => {
-    // AppShell already guards the session before this page ever mounts —
-    // this effect only needs to load the page's own data. A 401/403 mid-
-    // session (expired/revoked token) is still handled below per call.
     if (!tenantId) return;
 
     let cancelled = false;
@@ -123,18 +120,23 @@ export function DashboardPage() {
 
   if (!tenantId) return null;
 
-  const stageCounts = leads?.reduce(
-    (acc, lead) => {
-      if (PIPELINE_STAGES.some((stage) => stage.value === lead.pipelineStage)) {
-        acc[lead.pipelineStage] = (acc[lead.pipelineStage] ?? 0) + 1;
-      }
-      return acc;
-    },
-    Object.fromEntries(PIPELINE_STAGES.map((s) => [s.value, 0])) as Record<PipelineStage, number>,
-  );
-  const uncategorizedLeadCount = leads?.filter(
-    (lead) => !PIPELINE_STAGES.some((stage) => stage.value === lead.pipelineStage),
-  ).length ?? 0;
+  // The funnel endpoint is the canonical all-lead snapshot. The Leads page is
+  // paginated, so deriving Overview totals from its first page can undercount
+  // stages (for example 20 visible leads versus 24 total leads).
+  const stageCounts = funnel
+    ? funnel.stages.reduce(
+        (acc, stage) => {
+          const match = PIPELINE_STAGES.find((pipelineStage) => pipelineStage.value === stage.key);
+          if (match) acc[match.value] = stage.count;
+          return acc;
+        },
+        Object.fromEntries(PIPELINE_STAGES.map((s) => [s.value, 0])) as Record<PipelineStage, number>,
+      )
+    : undefined;
+  const categorizedLeadCount = stageCounts
+    ? Object.values(stageCounts).reduce((total, count) => total + count, 0)
+    : 0;
+  const uncategorizedLeadCount = funnel ? Math.max(0, (analytics?.uniqueLeads ?? categorizedLeadCount) - categorizedLeadCount) : 0;
 
   const qualifiedCount = funnel?.stages.find((s) => s.key === "qualified")?.count ?? 0;
   const meetingCount = funnel?.stages.find((s) => s.key === "meeting")?.count ?? 0;
@@ -212,7 +214,14 @@ export function DashboardPage() {
           {stageCounts === undefined ? (
             <p className="muted">{dataLoadError ? "Lead stage data is unavailable." : "Loading…"}</p>
           ) : (
-            <LeadsByStageDonut counts={stageCounts} uncategorized={uncategorizedLeadCount} />
+            <>
+              <LeadsByStageDonut counts={stageCounts} uncategorized={uncategorizedLeadCount} />
+              {uncategorizedLeadCount > 0 && (
+                <p className="muted small mt-3 mb-0">
+                  {uncategorizedLeadCount} lead{uncategorizedLeadCount === 1 ? " is" : "s are"} not mapped to a known pipeline stage.
+                </p>
+              )}
+            </>
           )}
         </section>
       </div>
