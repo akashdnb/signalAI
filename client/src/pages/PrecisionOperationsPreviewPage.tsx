@@ -1,4 +1,5 @@
 import { useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen } from "./PrecisionOperationsFullScreens";
 import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
   IntegrationsIcon, LeadsIcon, SettingsIcon, TeamIcon, InstagramMarkIcon,
@@ -6,7 +7,7 @@ import {
   ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, CreditCardIcon,
 } from "../components/icons";
 
-type PreviewScreen = "overview" | "automations" | "builder" | "inbox" | "leads" | "lead-detail" | "knowledge" | "content" | "analytics" | "integrations" | "team" | "billing" | "settings" | "login" | "connect-error" | "invite" | "docs";
+type PreviewScreen = FullPreviewScreen;
 type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
 type IconType = ComponentType<{ className?: string }>;
 type NavigationItem = { label: string; icon: IconType; screen?: PreviewScreen; section: "primary" | "workspace" };
