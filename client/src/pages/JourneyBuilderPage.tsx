@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiError, api, type Campaign } from "../api";
 import {
   JourneyAccountsPanel,
@@ -10,6 +10,8 @@ import { JourneyBuilder } from "../components/automation/JourneyBuilder";
 export function JourneyBuilderPage() {
   const { tenantId, campaignId } = useParams<{ tenantId: string; campaignId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const startOnSetup = searchParams.get("tab") === "setup";
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,7 @@ export function JourneyBuilderPage() {
         tenantId={tenantId}
         campaign={campaign}
         accountReadiness={accountReadiness}
+        startOnSetup={startOnSetup}
         onChanged={refreshCampaign}
         onBack={() => navigate(`/dashboard/${tenantId}/automation`)}
       />
