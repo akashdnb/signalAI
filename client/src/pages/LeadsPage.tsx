@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
-import { PIPELINE_STAGES, formatLastContactVia, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -112,25 +112,32 @@ export function LeadsPage() {
               <table className="table leads-data-table min-w-[980px]">
                 <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
                 <tbody>
-                  {leads.map((lead) => (
-                    <tr key={lead.id}>
-                      <td>
-                        <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
-                          {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
-                          <span className="inline-flex flex-col align-top">
-                            <span>{leadDisplayName(lead.username)}</span>
-                            {!lead.username && <span className="muted small">Username unavailable</span>}
+                  {leads.map((lead) => {
+                    const messagingWindow = formatMessagingWindow(lead.windowOpenUntil);
+                    return (
+                      <tr key={lead.id}>
+                        <td>
+                          <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
+                            {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
+                            <span className="inline-flex flex-col align-top">
+                              <span>{leadDisplayName(lead.username)}</span>
+                              {!lead.username && <span className="muted small">Username unavailable</span>}
+                            </span>
+                          </Link>
+                        </td>
+                        <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
+                        <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
+                        <td><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "—"}</time></td>
+                        <td>{formatLastContactVia(lead.lastEventType)}</td>
+                        <td>
+                          <span className={messagingWindow.open ? "pill pill-ok" : "pill"} title={messagingWindow.title} style={{ marginLeft: 0 }}>
+                            {messagingWindow.label}
                           </span>
-                        </Link>
-                      </td>
-                      <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
-                      <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
-                      <td><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "—"}</time></td>
-                      <td>{formatLastContactVia(lead.lastEventType)}</td>
-                      <td>{lead.windowOpenUntil && new Date(lead.windowOpenUntil) > new Date() ? <span className="pill pill-ok">open</span> : <span className="pill">closed</span>}</td>
-                      <td><time dateTime={lead.createdAt} title={new Date(lead.createdAt).toLocaleString()}>{formatRelativeTime(lead.createdAt)}</time></td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td><time dateTime={lead.createdAt} title={new Date(lead.createdAt).toLocaleString()}>{formatRelativeTime(lead.createdAt)}</time></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
