@@ -40,7 +40,7 @@ export function AutomationPage() {
     setPendingCustomDraftId(null);
     setShowNewJourney(false);
     push("Draft created. Review it before publishing.");
-    navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
+    navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}?tab=setup`);
   }
 
   function handleCloseNewJourney() {
@@ -71,7 +71,7 @@ export function AutomationPage() {
         return next;
       });
       push(`${template.name} draft created. Review it before publishing.`);
-      navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
+      navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}?tab=setup`);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to create automation draft";
       setError(message);
