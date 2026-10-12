@@ -487,6 +487,10 @@ export function PrecisionOperationsPreviewPage() {
   const [,setSelectedNode] = useState<BuilderNodeKey>("trigger");
   const [automationName,setAutomationName] = useState("Lead qualification");
   const [selectedLeadName,setSelectedLeadName] = useState("Morgan Lee");
+  const [selectedLeadHandle,setSelectedLeadHandle] = useState("@morgan.sample");
+  const [selectedLeadStage,setSelectedLeadStage] = useState("New");
+  const [selectedLeadOwner,setSelectedLeadOwner] = useState("Unassigned");
+  const [selectedLeadHandoff,setSelectedLeadHandoff] = useState(true);
   const [theme,setTheme] = useState<"light"|"dark">("light");
   const applyNavigation = (next: PreviewScreen) => {
     setScreen(next);
@@ -523,7 +527,13 @@ export function PrecisionOperationsPreviewPage() {
     if (next) applyNavigation(next);
   };
   const openLead = (name: string) => {
+    const record = leads.find(item => item.name === name);
+    const recordIndex = leads.findIndex(item => item.name === name);
     setSelectedLeadName(name);
+    setSelectedLeadHandle(record?.handle ?? "@morgan.sample");
+    setSelectedLeadStage(record?.stage ?? "New");
+    setSelectedLeadOwner(record?.owner ?? "Unassigned");
+    setSelectedLeadHandoff(recordIndex === 3);
     go("lead-detail");
   };
   const savePreviewState = () => { setDirty(false); setSavedNotice(true); };
@@ -535,7 +545,7 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} />
     : screen === "inbox" ? <InboxScreen />
     : screen === "leads" ? <LeadsScreen onOpenLead={openLead} />
-    : screen === "lead-detail" ? <LeadDetailScreen leadName={selectedLeadName} onBack={()=>go("leads")} onNavigate={go} />
+    : screen === "lead-detail" ? <LeadDetailScreen leadName={selectedLeadName} leadHandle={selectedLeadHandle} initialStage={selectedLeadStage} initialOwner={selectedLeadOwner} initialHandoff={selectedLeadHandoff} onBack={()=>go("leads")} onNavigate={go} />
     : screen === "knowledge" ? <KnowledgeScreen />
     : screen === "content" ? <ContentScreen />
     : screen === "analytics" ? <AnalyticsScreen />
