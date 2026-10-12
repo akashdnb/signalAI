@@ -83,6 +83,13 @@ function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
 }
 
 function HomeRedirect() {
+  // Render the isolated concept from the static preview site's root when its
+  // explicit query flag is present. This avoids relying on host-level SPA
+  // rewrite configuration for a temporary review route.
+  const isPrecisionPreview =
+    new URLSearchParams(window.location.search).get("preview") === "precision-operations";
+  if (isPrecisionPreview) return <LazyPage Page={PrecisionOperationsPreviewPage} />;
+
   const session = loadSession();
   return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
 }
