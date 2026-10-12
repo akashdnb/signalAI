@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BottomSheet } from "../BottomSheet";
 import { api, type Campaign, type TriggerSource } from "../../api";
 import { getCampaignsPage, type PaginatedResponse } from "../../api/pagination";
@@ -79,7 +79,20 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const canActivate = campaign.published === true;
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
   async function toggle() {
     if (!campaign.enabled && !canActivate) return;
     setSaving(true);
@@ -95,12 +108,12 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
   }
   return (
     <div className="relative inline-block">
-      <button type="button" aria-label={`Actions for ${campaign.name}`} aria-expanded={open} className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink" onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); }}>
+      <button ref={triggerRef} type="button" aria-label={`Actions for ${campaign.name}`} aria-haspopup="true" aria-expanded={open} aria-controls={`automation-actions-${campaign.id}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); }}>
         <DotsVerticalIcon className="h-4 w-4" />
       </button>
       {open && <>
         <button type="button" aria-label="Close automation actions" className="fixed inset-0 z-20 cursor-default" onClick={(event) => { event.stopPropagation(); setOpen(false); }} />
-        <div className="absolute right-0 top-9 z-30 w-52 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
+        <div id={`automation-actions-${campaign.id}`} className="absolute right-0 top-9 z-30 w-52 rounded-xl border border-line bg-card p-1.5 text-left shadow-xl">
           {error && <p className="m-1 rounded-lg bg-[#FEE2E2] px-2 py-1.5 text-[11px] text-[#991B1B]" role="alert">{error}</p>}
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onOpen(); }}>Open</button>
           <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-ink hover:bg-chip" onClick={(event) => { event.stopPropagation(); setOpen(false); onRename(); }}>Rename</button>
