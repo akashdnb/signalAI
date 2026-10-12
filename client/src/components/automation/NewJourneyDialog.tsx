@@ -14,10 +14,10 @@ export function NewJourneyDialog({
   const [triggerSource, setTriggerSource] = useState<TriggerSource>("comment");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const parsedKeywords = keywords.split(",").map((k) => k.trim()).filter(Boolean);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const parsedKeywords = keywords.split(",").map((k) => k.trim()).filter(Boolean);
     if (!name.trim() || parsedKeywords.length === 0) return;
     setSaving(true);
     setError(null);
@@ -39,7 +39,7 @@ export function NewJourneyDialog({
         </div>
         <label>
           Automation name
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Property enquiry" autoFocus />
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Property enquiry" autoFocus required />
         </label>
         <label>
           Where should it start?
@@ -54,13 +54,27 @@ export function NewJourneyDialog({
         </label>
         <label>
           Words or phrases that should start it
-          <textarea value={keywords} onChange={(e) => setKeywords(e.target.value)} rows={2} placeholder="price, details, brochure, site visit" />
-          <span className="muted mt-1 block text-xs">Separate multiple phrases with commas. You can change these later.</span>
+          <textarea
+            value={keywords}
+            onChange={(e) => setKeywords(e.target.value)}
+            rows={2}
+            placeholder="price, details, brochure, site visit"
+            aria-describedby="automation-keywords-help"
+            required
+          />
+          <span id="automation-keywords-help" className="muted mt-1 block text-xs">
+            Separate multiple phrases with commas. You can change these later.
+          </span>
+          {keywords.trim().length > 0 && parsedKeywords.length === 0 && (
+            <span className="mt-1 block text-xs text-danger-ink" role="status">
+              Enter at least one word or phrase, not just commas.
+            </span>
+          )}
         </label>
         {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={!name.trim() || !keywords.trim() || saving}>
+          <button type="submit" className="btn-primary" disabled={!name.trim() || parsedKeywords.length === 0 || saving}>
             {saving ? "Creating…" : "Create draft"}
           </button>
         </div>
