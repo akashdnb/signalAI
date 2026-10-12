@@ -28,6 +28,7 @@ async function mockTenantApi(
     failFirstTimelineLoad?: boolean;
     unknownUsername?: boolean;
     journeyEditor?: boolean;
+    automationList?: boolean;
   } = {},
 ) {
   const activeLead = options.unknownUsername
@@ -168,6 +169,10 @@ async function mockTenantApi(
       data = options.journeyEditor ? [mediaFixture] : [];
     } else if (path === `${tenantPath}/field-definitions`) {
       data = { fieldDefinitions: [] };
+    } else if (path === `${tenantPath}/campaigns`) {
+      data = options.automationList
+        ? { items: [campaignFixture], page: 1, pageSize: 10, total: 1, totalPages: 1 }
+        : [];
     } else if (path === `${tenantPath}/campaigns/smoke-campaign`) {
       data = campaignFixture;
     } else if (path === `${tenantPath}/campaigns/smoke-campaign/builder`) {
@@ -258,6 +263,49 @@ test.describe("responsive route smoke checks", () => {
     await page.goto("/docs/introduction");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("Automation tabs are keyboard-accessible and always reference the active panel", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    const myAutomations = page.getByRole("tab", { name: "My automations" });
+    const templates = page.getByRole("tab", { name: "Start from a template" });
+    const panel = page.locator("#automation-tabpanel");
+
+    await expect(myAutomations).toHaveAttribute("aria-selected", "true");
+    await myAutomations.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(templates).toBeFocused();
+    await expect(templates).toHaveAttribute("aria-selected", "true");
+    await expect(panel).toHaveAttribute("aria-labelledby", "automation-tab-templates");
+    await expect(page.getByRole("heading", { name: "What do you want to automate?" })).toBeVisible();
+
+    await page.keyboard.press("ArrowLeft");
+    await expect(myAutomations).toBeFocused();
+    await expect(myAutomations).toHaveAttribute("aria-selected", "true");
+    await expect(panel).toHaveAttribute("aria-labelledby", "automation-tab-journeys");
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("automation list actions are keyboard-dismissable without making the table row a button", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockTenantApi(page, { automationList: true });
+    await page.goto("/dashboard/smoke-tenant/automation");
+
+    const title = page.getByRole("button", { name: "Product enquiry journey" });
+    await expect(title).toBeVisible();
+    const row = page.getByRole("row", { name: /Product enquiry journey/ });
+    await expect(row).not.toHaveAttribute("role", "button");
+    await expect(row.getByText("Draft", { exact: true })).toBeVisible();
+
+    const actions = page.getByRole("button", { name: "Actions for Product enquiry journey" });
+    await actions.click();
+    await expect(actions).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("Escape");
+    await expect(actions).toHaveAttribute("aria-expanded", "false");
+    await expect(actions).toBeFocused();
   });
 
   test("Inbox opens a conversation without overflowing the mobile viewport", async ({ page }) => {
