@@ -592,7 +592,6 @@ export function JourneyBuilder({
                 ref={menuButtonRef}
                 type="button"
                 aria-label="More actions"
-                aria-haspopup="true"
                 aria-expanded={menuOpen}
                 aria-controls={menuOpen ? "journey-builder-actions" : undefined}
                 className="builder-toolbar-button flex h-9 w-9 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
