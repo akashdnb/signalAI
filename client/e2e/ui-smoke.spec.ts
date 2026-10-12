@@ -309,28 +309,28 @@ test.describe("responsive route smoke checks", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("journey Details previews CTA cards and explains non-HTTPS fallback", async ({ page }) => {
+  test("automation Setup previews CTA cards and explains non-HTTPS fallback", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await mockTenantApi(page, { journeyEditor: true });
     await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
 
-    const detailsTab = page.getByRole("tab", { name: "Details" });
-    await expect(detailsTab).toBeVisible();
-    await detailsTab.click();
+    const setupTab = page.getByRole("tab", { name: "Setup" });
+    await expect(setupTab).toBeVisible();
+    await setupTab.click();
 
     const ctaInput = page.getByRole("textbox", { name: "CTA link (HTTPS URL)" });
     await expect(ctaInput).toHaveValue("https://example.com/details");
     await expect(ctaInput).toHaveCSS("display", "block");
     await expect(page.getByText("Image card", { exact: true })).toBeVisible();
 
-    const aiBehaviour = page.getByRole("button", { name: "AI Behaviour" });
+    const aiPreferences = page.getByRole("button", { name: "AI reply preferences" });
     const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "true");
     await expect(toneSelect).toBeVisible();
-    await aiBehaviour.click();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
+    await aiPreferences.click();
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "false");
     await expect(toneSelect).toBeHidden();
-    await aiBehaviour.click();
+    await aiPreferences.click();
     await expect(toneSelect).toBeVisible();
 
     const ctaHelp = page.getByText(/An HTTPS link becomes an Instagram button/);
@@ -350,7 +350,7 @@ test.describe("responsive route smoke checks", () => {
     await expect(page.getByRole("status").filter({ hasText: "Interactive Instagram CTAs require a valid HTTPS URL" })).toBeVisible();
   });
 
-  test("Campaign Details accordions are interactive on mobile", async ({ page }) => {
+  test("Automation Setup accordions are interactive on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockTenantApi(page, { journeyEditor: true });
     await page.goto("/dashboard/smoke-tenant/automation/journeys/smoke-campaign");
@@ -363,23 +363,21 @@ test.describe("responsive route smoke checks", () => {
     const toneSelect = aiBehaviour.locator("xpath=..").locator("select").first();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
     await aiBehaviour.click();
-    await expect(aiBehaviour).toHaveAttribute("aria-expanded", "true");
+    await expect(aiPreferences).toHaveAttribute("aria-expanded", "true");
     await expect(toneSelect).toBeVisible();
     await aiBehaviour.click();
     await expect(aiBehaviour).toHaveAttribute("aria-expanded", "false");
     await expect(toneSelect).toBeHidden();
 
-    const postTargeting = page.getByRole("button", { name: "Post Targeting" });
+    const postTargeting = page.getByRole("button", { name: "Which posts should it respond to?" });
     await postTargeting.click();
-    await expect(page.getByText("Which posts should trigger this journey?")).toBeVisible();
+    await expect(page.getByText("Choose which posts and Reels can start this automation.")).toBeVisible();
 
-    const milestones = page.getByRole("button", { name: "Milestones" });
-    await milestones.click();
-    await expect(page.getByRole("button", { name: "+ Add milestone" })).toBeVisible();
+    const conversationGoals = page.getByRole("button", { name: "Conversation goals" });
+    await conversationGoals.click();
+    await expect(page.getByRole("button", { name: "+ Add goal" })).toBeVisible();
 
-    const dangerZone = page.getByRole("button", { name: "Danger Zone" });
-    await dangerZone.click();
-    await expect(page.getByRole("button", { name: "Delete journey" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Danger Zone|Delete journey/ })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
 
