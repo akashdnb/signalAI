@@ -62,7 +62,7 @@ function isValidHttpsUrl(value: string): boolean {
 
 function validateDraft(draft: SettingsDraft): string[] {
   const errors: string[] = [];
-  if (!draft.name.trim()) errors.push("Journey name can't be blank.");
+  if (!draft.name.trim()) errors.push("Automation name can't be blank.");
   if (draft.keywords.length === 0) errors.push("Add at least one trigger keyword.");
   if (draft.replyMode === "ai_generated" && !draft.defaultReplyTemplate.trim()) {
     errors.push("A fallback reply template is required so AI mode can fail closed.");
