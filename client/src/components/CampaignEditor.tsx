@@ -515,7 +515,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
               </label>
               <p className="muted m-0 mt-1 text-xs leading-5">
                 {campaign.published
-                  ? "This takes effect immediately for the live automation."
+                  ? "Saving this setting takes effect immediately for the live automation."
                   : "This draft won't reply until published. Publishing turns replies on."}
               </p>
             </div>
