@@ -14,6 +14,7 @@ import {
   type TriggerSource,
 } from "../api";
 import { ChevronDownIcon } from "./icons";
+import { formatCaptureFieldLabel } from "../lib/fieldLabels";
 
 interface MilestoneDraft {
   goalDescription: string;
@@ -835,7 +836,7 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
                   ) : (
                     m.captureFields.map((fieldKey) => (
                       <span className="tag-chip" key={fieldKey}>
-                        {fieldDefinitions.find((fd) => fd.fieldKey === fieldKey)?.label ?? fieldKey}
+                        {fieldDefinitions.find((fd) => fd.fieldKey === fieldKey)?.label ?? formatCaptureFieldLabel(fieldKey)}
                         <button
                           type="button"
                           aria-label={`Remove field ${fieldKey}`}
