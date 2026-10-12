@@ -15,6 +15,13 @@ function isPendingInvitation(invitation: WorkspaceInvitation): boolean {
   );
 }
 
+function formatExpiry(iso: string): string {
+  const expiry = new Date(iso);
+  const days = Math.ceil((expiry.getTime() - Date.now()) / 86_400_000);
+  if (days <= 1) return `Expires ${expiry.toLocaleString()}`;
+  return `Expires in ${days} days`;
+}
+
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
@@ -74,6 +81,7 @@ export function TeamPage() {
 
   async function handleInvitationAction(invitationId: string, action: "resend" | "revoke") {
     if (!tenantId) return;
+    if (action === "revoke" && !window.confirm("Cancel this invitation? The existing invitation link will stop working.")) return;
     setActionKey(`${action}:${invitationId}`);
     setError(null);
     try {
@@ -108,7 +116,7 @@ export function TeamPage() {
   }
 
   async function handleRemove(member: WorkspaceMember) {
-    if (!tenantId || !window.confirm(`Remove ${member.email} from this workspace?`)) return;
+    if (!tenantId || !window.confirm(`Remove ${member.email} from this workspace? They will lose access to workspace data and automations.`)) return;
     setActionKey(`remove:${member.userId}`);
     setError(null);
     try {
@@ -134,7 +142,10 @@ export function TeamPage() {
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">
-          <h2 style={{ marginBottom: 0 }}>Members</h2>
+          <div>
+            <h2 style={{ marginBottom: 0 }}>Members</h2>
+            <p className="muted small mt-1 mb-0">Owners can manage billing and workspace access. Admins can manage members, accounts and automations. Members can work with inbox, leads and automations.</p>
+          </div>
           <button
             type="button"
             className="btn-secondary btn-small"
@@ -171,7 +182,7 @@ export function TeamPage() {
         ) : members.length === 0 ? (
           <p className="muted">No members found.</p>
         ) : (
-          <ul className="list" style={{ marginTop: inviting ? "1.25rem" : 0 }}>
+          <ul className="list" style={{ marginTop: inviting ? "1.25rem" : "1rem" }}>
             {members.map((member) => {
               const busy = actionKey?.endsWith(member.userId) ?? false;
               const isOwner = member.role === "owner";
@@ -216,6 +227,7 @@ export function TeamPage() {
       {pendingInvitations.length > 0 && (
         <section className="card">
           <h2>Pending invitations</h2>
+          <p className="muted small">Invitations are single-use and expire automatically. Resend to issue a fresh invitation link.</p>
           <ul className="list">
             {pendingInvitations.map((invitation) => {
               const resendBusy = actionKey === `resend:${invitation.id}`;
@@ -225,6 +237,7 @@ export function TeamPage() {
                   <span className="min-w-0 flex-1">
                     <strong>{invitation.email}</strong>
                     <span className="muted small" style={{ marginLeft: 8 }}>{formatRole(invitation.role)}</span>
+                    <span className="muted small block mt-1">{formatExpiry(invitation.expiresAt)}</span>
                   </span>
                   <span className="inline-flex items-center gap-2">
                     <button
