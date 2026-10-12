@@ -12,6 +12,9 @@ export function KnowledgePage() {
       <p className="muted">
         Documents uploaded here ground AI replies across every journey that has "Use knowledge base for context" enabled.
       </p>
+      <div className="banner small" role="note">
+        <strong>How grounding works:</strong> sources marked Ready are available to AI replies. Processing sources are still being prepared; failed sources are not used until they are replaced or uploaded again.
+      </div>
       <KnowledgeBasePanel tenantId={tenantId} />
     </div>
   );
