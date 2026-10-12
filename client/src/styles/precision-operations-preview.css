@@ -898,3 +898,335 @@
 .po-preview-app .po-system-state-picker { max-width: 360px; margin: 16px 0; }
 .po-preview-app .po-auth-inline-error { margin: 7px 0 0; color: #9b2c28; font-size: 10px; }
 .po-preview-app.is-dark .po-auth-inline-error { color: #ffaaa4; }
+
+
+/* Standalone auth/recovery previews must stack top-to-bottom rather than
+   inheriting the dashboard shell's horizontal flex layout. Match LoginLayout
+   from production: gradient surface, adjacent marketing copy, floating card. */
+.po-preview-app.po-standalone-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-height: 100vh;
+}
+.po-preview-app.po-standalone-preview .po-standalone-header {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-height: 58px;
+  padding: 12px 22px;
+}
+.po-preview-app.po-standalone-preview .po-preview-notice {
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 0;
+}
+.po-preview-app.po-standalone-preview .po-auth-layout {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 56px;
+  width: 100%;
+  max-width: none;
+  min-height: max(620px, calc(100vh - 130px));
+  margin: 0;
+  padding: 56px 24px;
+  border: 0;
+  background: var(--auth-gradient, linear-gradient(135deg, #e7defb 0%, #eef1fc 45%, #dcf0fb 100%));
+}
+.po-preview-app.po-standalone-preview .po-auth-brand {
+  display: flex;
+  flex: 1 1 460px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  max-width: 465px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+.po-preview-app.po-standalone-preview .po-auth-brand h2 {
+  max-width: 465px;
+  margin: 32px 0 0;
+  color: var(--po-ink);
+  font-size: 36px;
+  font-weight: 820;
+  letter-spacing: -.045em;
+  line-height: 1.13;
+}
+.po-preview-app.po-standalone-preview .po-auth-brand h2 span { color: var(--po-primary); }
+.po-preview-app.po-standalone-preview .po-auth-brand p {
+  max-width: 455px;
+  margin: 16px 0 0;
+  color: var(--po-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.po-preview-app.po-standalone-preview .po-auth-brand ul {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin: 29px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.po-preview-app.po-standalone-preview .po-auth-brand li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: none;
+  margin: 0;
+  color: var(--po-ink);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.po-preview-app.po-standalone-preview .po-auth-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--po-primary-soft);
+  color: var(--po-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+.po-preview-app.po-standalone-preview .po-auth-card {
+  display: block;
+  flex: 0 0 384px;
+  align-self: center;
+  width: min(384px, 100%);
+  max-width: 384px;
+  min-width: 0;
+  padding: 32px;
+  border: 1px solid rgb(148 163 184 / 24%);
+  border-radius: 16px;
+  background: var(--po-surface);
+  box-shadow: 0 20px 60px -15px rgb(15 23 42 / 25%);
+}
+.po-preview-app.po-standalone-preview .po-auth-card h1 {
+  margin: 0;
+  color: var(--po-ink);
+  font-size: 24px;
+  font-weight: 760;
+  letter-spacing: -.03em;
+  line-height: 1.3;
+}
+.po-preview-app.po-standalone-preview .po-auth-card .po-auth-subtitle {
+  margin: 5px 0 0;
+  color: var(--po-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.po-preview-app.po-standalone-preview .po-auth-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-top: 24px;
+}
+.po-preview-app.po-standalone-preview .po-auth-provider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 43px;
+  margin: 0;
+  padding: 9px 14px;
+  border: 1px solid var(--po-line-strong);
+  border-radius: 10px;
+  background: var(--po-surface);
+  color: var(--po-ink);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  transition: background .15s ease, border-color .15s ease;
+}
+.po-preview-app.po-standalone-preview .po-auth-provider:hover { background: var(--po-surface-muted); border-color: var(--po-line-strong); }
+.po-preview-app.po-standalone-preview .po-auth-provider-icon { width: 17px; height: 17px; flex: 0 0 auto; }
+.po-preview-app.po-standalone-preview .po-auth-provider-note {
+  margin: 5px 0 0;
+  color: var(--po-muted);
+  font-size: 11px;
+  text-align: center;
+}
+.po-preview-app.po-standalone-preview .po-auth-terms {
+  margin: 22px 0 0;
+  color: var(--po-muted) !important;
+  font-size: 11px !important;
+  line-height: 1.55;
+  text-align: center;
+}
+.po-preview-app.po-standalone-preview .po-auth-terms button,
+.po-preview-app.po-standalone-preview .po-auth-signup button,
+.po-preview-app.po-standalone-preview .po-auth-resend button,
+.po-preview-app.po-standalone-preview .po-auth-help-link button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--po-primary);
+  font-weight: 650;
+  text-decoration: none;
+}
+.po-preview-app.po-standalone-preview .po-auth-terms button:hover,
+.po-preview-app.po-standalone-preview .po-auth-signup button:hover,
+.po-preview-app.po-standalone-preview .po-auth-resend button:hover,
+.po-preview-app.po-standalone-preview .po-auth-help-link button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.po-preview-app.po-standalone-preview .po-auth-signup {
+  margin: 13px 0 0;
+  color: var(--po-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+.po-preview-app.po-standalone-preview .po-auth-back {
+  margin: 0 0 15px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--po-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.po-preview-app.po-standalone-preview .po-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 22px;
+}
+.po-preview-app.po-standalone-preview .po-auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  color: var(--po-ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+.po-preview-app.po-standalone-preview .po-auth-form input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--po-line-strong);
+  border-radius: 10px;
+  background: var(--po-surface);
+  color: var(--po-ink);
+  font-size: 14px;
+  font-weight: 450;
+}
+.po-preview-app.po-standalone-preview .po-auth-form input[type="text"] { text-align: center; letter-spacing: .45em; }
+.po-preview-app.po-standalone-preview .po-auth-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 43px;
+  padding: 10px 14px;
+  border: 1px solid var(--po-primary);
+  border-radius: 10px;
+  background: var(--po-primary);
+  color: white;
+  font-size: 13px;
+  font-weight: 720;
+  transition: background .15s ease;
+}
+.po-preview-app.po-standalone-preview .po-auth-primary:not(:disabled):hover { background: var(--po-primary-hover); }
+.po-preview-app.po-standalone-preview .po-auth-primary:disabled { opacity: .5; }
+.po-preview-app.po-standalone-preview .po-auth-error {
+  margin-top: 15px;
+  padding: 11px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.po-preview-app.po-standalone-preview .po-auth-success {
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid #cde9d8;
+  border-radius: 8px;
+  background: var(--po-green-soft);
+  color: var(--po-green);
+}
+.po-preview-app.po-standalone-preview .po-auth-success strong { font-size: 12px; }
+.po-preview-app.po-standalone-preview .po-auth-success p { margin: 4px 0 12px; font-size: 11px; line-height: 1.5; }
+.po-preview-app.po-standalone-preview .po-auth-resend {
+  margin: 19px 0 0;
+  color: var(--po-muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.po-preview-app.po-standalone-preview .po-auth-resend button:disabled { color: var(--po-muted); opacity: .55; }
+.po-preview-app.po-standalone-preview .po-auth-preview-tools {
+  margin-top: 18px;
+  padding-top: 13px;
+  border-top: 1px solid var(--po-line);
+}
+.po-preview-app.po-standalone-preview .po-auth-preview-tools > button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--po-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+.po-preview-app.po-standalone-preview .po-auth-preview-tools label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--po-secondary);
+  font-size: 11px;
+}
+.po-preview-app.po-standalone-preview .po-auth-preview-tools select {
+  margin: 0;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--po-line-strong);
+  border-radius: 8px;
+  background: var(--po-surface);
+  color: var(--po-ink);
+  font-size: 11px;
+}
+.po-preview-app.po-standalone-preview .po-auth-help-link { margin: 16px 0 0; font-size: 11px; }
+.po-preview-app.po-standalone-preview .po-footer { flex: 0 0 auto; width: 100%; }
+
+.po-preview-app.is-dark.po-standalone-preview .po-auth-layout {
+  background: linear-gradient(135deg, #201a3d 0%, #171d34 45%, #0d1f30 100%);
+}
+.po-preview-app.is-dark.po-standalone-preview .po-auth-card { border-color: var(--po-line); }
+.po-preview-app.is-dark.po-standalone-preview .po-auth-error {
+  border-color: #7f1d1d; background: #351c24; color: #fecaca;
+}
+
+@media (max-width: 760px) {
+  .po-preview-app.po-standalone-preview .po-auth-layout {
+    flex-direction: column;
+    gap: 28px;
+    min-height: auto;
+    padding: 32px 18px 40px;
+  }
+  .po-preview-app.po-standalone-preview .po-auth-brand {
+    flex: 0 1 auto;
+    max-width: 480px;
+  }
+  .po-preview-app.po-standalone-preview .po-auth-brand h2 { margin-top: 20px; font-size: 29px; }
+  .po-preview-app.po-standalone-preview .po-auth-brand p { font-size: 12px; }
+  .po-preview-app.po-standalone-preview .po-auth-brand ul { gap: 8px; margin-top: 18px; }
+  .po-preview-app.po-standalone-preview .po-auth-card {
+    flex: 0 1 auto;
+    width: 100%;
+    max-width: 430px;
+    padding: 24px;
+  }
+}
