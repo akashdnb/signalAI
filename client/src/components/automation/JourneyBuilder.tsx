@@ -759,11 +759,65 @@ export function JourneyBuilder({
             if (!publishing) setShowPublishConfirm(false);
           }}
         >
-          <p className="m-0 text-sm text-ink">
-            v{builderVersion ?? "—"} will become the active version.
-          </p>
-          <p className="muted mt-2 text-xs">
-            Your current live automation remains active until this update is published.
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
+            <p className="m-0 text-sm font-semibold">Publishing turns this automation on immediately.</p>
+            <p className="m-0 mt-1 text-xs leading-5">
+              After publishing, SignalAI can respond to real Instagram conversations that match this setup.
+            </p>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-line p-3.5">
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Starts when</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {campaign.triggerSource === "message"
+                  ? "Someone sends a direct message"
+                  : campaign.triggerSource === "both"
+                    ? "Someone comments or sends a direct message"
+                    : "Someone comments on a post or Reel"}
+              </p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Matching words or phrases</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {campaign.keywords.length > 0 ? campaign.keywords.map((keyword) => (
+                  <span key={keyword} className="rounded-md bg-chip px-2 py-1 text-xs font-medium text-ink">{keyword}</span>
+                )) : <span className="text-sm text-err-ink">No phrases configured</span>}
+              </div>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Reply destination</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {campaign.replyChannel === "dm"
+                  ? "Private Instagram message"
+                  : campaign.replyChannel === "comment"
+                    ? "Public comment reply"
+                    : "Public comment and private message"}
+              </p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Reply style</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {campaign.replyMode === "ai_generated" ? "AI-generated replies" : "Prewritten replies"}
+              </p>
+              <p className="muted m-0 mt-1 text-xs">Fallback reply: {campaign.defaultReplyTemplate?.trim() || "Not configured"}</p>
+            </div>
+
+            <div>
+              <p className="m-0 text-xs font-semibold text-subtle">Lead details</p>
+              <p className="m-0 mt-1 text-sm text-ink">
+                {milestones.length > 0
+                  ? `Collects details across ${milestones.length} goal${milestones.length === 1 ? "" : "s"}`
+                  : "No goal-based lead details configured yet"}
+              </p>
+            </div>
+          </div>
+
+          <p className="muted mt-3 text-xs leading-5">
+            Version v{builderVersion ?? "—"} will become live. If this automation already has a live version, it stays active until this update is published.
           </p>
 
           <div className="mt-5 flex justify-end gap-2">
@@ -782,7 +836,7 @@ export function JourneyBuilder({
               disabled={publishing}
               onClick={() => void handlePublish()}
             >
-              {publishing ? "Publishing…" : "Publish"}
+              {publishing ? "Publishing…" : "Publish and activate"}
             </button>
           </div>
         </BottomSheet>
