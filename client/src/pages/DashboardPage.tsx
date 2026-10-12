@@ -125,11 +125,16 @@ export function DashboardPage() {
 
   const stageCounts = leads?.reduce(
     (acc, lead) => {
-      acc[lead.pipelineStage] = (acc[lead.pipelineStage] ?? 0) + 1;
+      if (PIPELINE_STAGES.some((stage) => stage.value === lead.pipelineStage)) {
+        acc[lead.pipelineStage] = (acc[lead.pipelineStage] ?? 0) + 1;
+      }
       return acc;
     },
     Object.fromEntries(PIPELINE_STAGES.map((s) => [s.value, 0])) as Record<PipelineStage, number>,
   );
+  const uncategorizedLeadCount = leads?.filter(
+    (lead) => !PIPELINE_STAGES.some((stage) => stage.value === lead.pipelineStage),
+  ).length ?? 0;
 
   const qualifiedCount = funnel?.stages.find((s) => s.key === "qualified")?.count ?? 0;
   const meetingCount = funnel?.stages.find((s) => s.key === "meeting")?.count ?? 0;
@@ -207,7 +212,7 @@ export function DashboardPage() {
           {stageCounts === undefined ? (
             <p className="muted">{dataLoadError ? "Lead stage data is unavailable." : "Loading…"}</p>
           ) : (
-            <LeadsByStageDonut counts={stageCounts} />
+            <LeadsByStageDonut counts={stageCounts} uncategorized={uncategorizedLeadCount} />
           )}
         </section>
       </div>
@@ -215,7 +220,7 @@ export function DashboardPage() {
       <section className="card">
         <div className="dashboard-header" style={{ marginBottom: "1rem" }}>
           <h2 style={{ marginBottom: 0 }}>Recent conversations</h2>
-          <Link to={`/dashboard/${tenantId}/leads`}>View all leads →</Link>
+          <Link to={`/dashboard/${tenantId}/inbox`}>View inbox →</Link>
         </div>
         {leads === null ? (
           <p className="muted">{dataLoadError ? "Recent conversations are unavailable." : "Loading…"}</p>

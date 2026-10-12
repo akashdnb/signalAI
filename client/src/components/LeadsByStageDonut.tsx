@@ -17,8 +17,8 @@ const STAGE_COLOR: Record<PipelineStage, string> = {
   lost: "var(--error-text)",
 };
 
-export function LeadsByStageDonut({ counts }: { counts: Record<PipelineStage, number> }) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+export function LeadsByStageDonut({ counts, uncategorized = 0 }: { counts: Record<PipelineStage, number>; uncategorized?: number }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0) + uncategorized;
   const size = 160;
   const radius = 60;
   const strokeWidth = 22;
@@ -31,8 +31,8 @@ export function LeadsByStageDonut({ counts }: { counts: Record<PipelineStage, nu
 
   // Precompute each segment's dash length + running offset in one pass
   // rather than mutating a counter inside the render map below.
-  const segments = PIPELINE_STAGES.map(({ value, label }) => ({ value, label, count: counts[value] ?? 0 })).reduce<
-    Array<{ value: PipelineStage; label: string; count: number; dash: number; offset: number }>
+  const segments = [...PIPELINE_STAGES.map(({ value, label }) => ({ value, label, count: counts[value] ?? 0 })), ...(uncategorized > 0 ? [{ value: "uncategorized" as const, label: "Uncategorized", count: uncategorized }] : [])].reduce<
+    Array<{ value: PipelineStage | "uncategorized"; label: string; count: number; dash: number; offset: number }>
   >((acc, stage) => {
     const previousEnd = acc.length > 0 ? acc[acc.length - 1]!.offset + acc[acc.length - 1]!.dash : 0;
     const dash = (stage.count / total) * circumference;
@@ -55,7 +55,7 @@ export function LeadsByStageDonut({ counts }: { counts: Record<PipelineStage, nu
                 cy={center}
                 r={radius}
                 fill="none"
-                stroke={STAGE_COLOR[s.value]}
+                stroke={s.value === "uncategorized" ? "var(--border)" : STAGE_COLOR[s.value]}
                 strokeWidth={strokeWidth}
                 strokeDasharray={`${s.dash} ${circumference - s.dash}`}
                 strokeDashoffset={-s.offset}
@@ -75,11 +75,11 @@ export function LeadsByStageDonut({ counts }: { counts: Record<PipelineStage, nu
       </svg>
 
       <ul className="list-none space-y-2 p-0 text-sm">
-        {PIPELINE_STAGES.map(({ value, label }) => {
-          const count = counts[value] ?? 0;
+        {[...PIPELINE_STAGES, ...(uncategorized > 0 ? [{ value: "uncategorized" as const, label: "Uncategorized" }] : [])].map(({ value, label }) => {
+          const count = value === "uncategorized" ? uncategorized : counts[value] ?? 0;
           return (
             <li key={value} className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: STAGE_COLOR[value] }} />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: value === "uncategorized" ? "var(--border)" : STAGE_COLOR[value] }} />
               <span className="text-ink">{label}</span>
               <span className="text-subtle">
                 {count} ({total ? Math.round((count / total) * 100) : 0}%)

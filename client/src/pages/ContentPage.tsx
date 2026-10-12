@@ -93,7 +93,7 @@ export function ContentPage() {
   return (
     <div className="page page-wide">
       <h1>Content</h1>
-      <p className="muted">Posts and Reels people have commented on, sorted by most recently active.</p>
+      <p className="muted">Posts and Reels people have commented on, sorted by most recently active.</p><p className="muted small mt-1">If an Instagram thumbnail has expired, refresh the list to try loading it again.</p>
 
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
@@ -169,7 +169,7 @@ export function ContentPage() {
                   </button>
                 ) : (
                   <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-chip text-sm text-subtle">
-                    <span>No preview</span>
+                    <span className="font-medium text-ink">Preview unavailable</span><span className="max-w-[16rem] px-4 text-center text-xs">Instagram may have expired this thumbnail. Refresh the content list to try again.</span>
                     {m.thumbnailUrl && (
                       <button
                         type="button"
