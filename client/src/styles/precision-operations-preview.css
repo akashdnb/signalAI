@@ -852,3 +852,43 @@
 .po-preview-app .po-nav-coming-soon { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 8px 10px; color: #8c9690; font-size: 12px; }
 .po-preview-app .po-nav-coming-soon small { margin-left: auto; padding: 3px 5px; border-radius: 4px; background: #f0eafe; color: #66528a; font-size: 8px; font-weight: 800; letter-spacing: .07em; }
 .po-preview-app.is-dark .po-nav-coming-soon small { background: #302746; color: #d6c6ff; }
+
+/* Detailed node editors used by the full Builder preview */
+.po-preview-app .po-inspector { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.po-preview-app .po-inspector-fields input:not([type="checkbox"]),
+.po-preview-app .po-inspector-fields select,
+.po-preview-app .po-inspector-fields textarea {
+  width: 100%; min-width: 0; min-height: 34px; padding: 8px 9px;
+  border: 1px solid var(--po-line-strong); border-radius: 4px; background: var(--po-surface-muted);
+  color: var(--po-ink); font-size: 10px; font-weight: 450; line-height: 1.5;
+}
+.po-preview-app .po-inspector-fields textarea { min-height: 80px; resize: vertical; }
+.po-preview-app .po-inspector-fields label.po-toggle-row { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--po-line); }
+.po-preview-app .po-inspector-fields .po-toggle-row > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.po-preview-app .po-inspector-fields .po-toggle-row input[type="checkbox"] { width: 15px; height: 15px; flex: 0 0 auto; accent-color: var(--po-primary); }
+.po-preview-app .po-inspector-tabs--sections { flex-wrap: wrap; gap: 12px; min-height: 43px; }
+.po-preview-app .po-inspector-tabs--sections button { min-height: 36px; font-size: 9px; }
+.po-preview-app .po-inspector-footer-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.po-preview-app .po-inspector-footer .po-button { min-height: 31px; padding: 6px 8px; font-size: 9px; }
+.po-preview-app .po-editor-subtitle { margin: 0; font-size: 12px; font-weight: 760; }
+.po-preview-app .po-editor-group { display: flex; flex-direction: column; gap: 9px; padding-top: 12px; border-top: 1px solid var(--po-line); }
+.po-preview-app .po-editor-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.po-preview-app .po-editor-group-heading > strong { font-size: 10px; }
+.po-preview-app .po-editor-item { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--po-line); background: var(--po-surface-muted); }
+.po-preview-app .po-editor-item label { display: flex; flex-direction: column; gap: 5px; font-size: 9px; font-weight: 700; }
+.po-preview-app .po-field-heading { display: block; font-size: 10px; font-weight: 720; }
+.po-preview-app .po-character-count { color: var(--po-muted); font-size: 9px; text-align: right; }
+.po-preview-app .po-variable-menu { display: flex; flex-direction: column; border: 1px solid var(--po-line); background: var(--po-surface); }
+.po-preview-app .po-variable-menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; border: 0; border-bottom: 1px solid var(--po-line); background: transparent; color: var(--po-ink); text-align: left; }
+.po-preview-app .po-variable-menu button:last-child { border-bottom: 0; }
+.po-preview-app .po-variable-menu strong { font-size: 9px; }
+.po-preview-app .po-variable-menu code { color: var(--po-primary); font-size: 8px; }
+.po-preview-app .po-inline-notice--error { border-color: #efc9c7; background: #fff1f0; color: #9b2c28; }
+.po-preview-app.is-dark .po-inspector-fields input:not([type="checkbox"]),
+.po-preview-app.is-dark .po-inspector-fields select,
+.po-preview-app.is-dark .po-inspector-fields textarea,
+.po-preview-app.is-dark .po-editor-item,
+.po-preview-app.is-dark .po-variable-menu { border-color: var(--po-line-strong); background: var(--po-surface-muted); color: var(--po-ink); }
+@media (max-width: 1080px) {
+  .po-preview-app .po-inspector { max-height: none; overflow: visible; }
+}
