@@ -102,6 +102,37 @@ describe("authEmail routes (email OTP)", () => {
     expect(res.body).toEqual({ error: "invalid_or_expired_code" });
   });
 
+  it("accepts the fixed test OTP in development but rejects it in production", async () => {
+    const app = createApp();
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    try {
+      process.env.NODE_ENV = "development";
+      const requested = await request(app)
+        .post("/auth/email/request")
+        .send({ email: "signalai.test@gmail.com" });
+      expect(requested.status).toBe(200);
+      expect(sendOtpEmail).not.toHaveBeenCalled();
+
+      const accepted = await request(app)
+        .post("/auth/email/verify")
+        .send({ email: "signalai.test@gmail.com", code: "123456" });
+      expect(accepted.status).toBe(200);
+      expect(accepted.body.tenantId).toBeTruthy();
+      expect(verifySessionToken(SESSION_SECRET, accepted.body.token)).not.toBeNull();
+
+      process.env.NODE_ENV = "production";
+      const rejected = await request(app)
+        .post("/auth/email/verify")
+        .send({ email: "signalai.test@gmail.com", code: "123456" });
+      expect(rejected.status).toBe(401);
+      expect(rejected.body).toEqual({ error: "invalid_or_expired_code" });
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
   it("verify spends the code, creates a workspace on first login, and returns a valid session directly in the JSON body", async () => {
     const pool = getPool();
     const app = createApp();
