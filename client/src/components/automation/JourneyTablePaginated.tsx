@@ -110,7 +110,7 @@ function ActionMenu({ campaign, onOpen, onRename, onToggle }: { campaign: Campai
   }
   return (
     <div className="relative inline-block">
-      <button ref={triggerRef} type="button" aria-label={`Actions for ${campaign.name}`} aria-haspopup="true" aria-expanded={open} aria-controls={open ? `automation-actions-${campaign.id}` : undefined} className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); }}>
+      <button ref={triggerRef} type="button" aria-label={`Actions for ${campaign.name}`} aria-expanded={open} aria-controls={open ? `automation-actions-${campaign.id}` : undefined} className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); }}>
         <DotsVerticalIcon className="h-4 w-4" />
       </button>
       {open && <>
