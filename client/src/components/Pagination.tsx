@@ -16,7 +16,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange, la
   return (
     <nav className="flex flex-col gap-3 border-t border-line px-4 py-3 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between md:px-5" aria-label={`${label} pagination`}>
       <span>Showing {start}–{end} of {total} {label}</span>
-      {compact ? (
+      {totalPages > 1 && (compact ? (
         <div className="flex items-center justify-between gap-2" role="group" aria-label="Pagination controls">
           <button type="button" disabled={page <= 1} className="rounded-lg border border-line bg-card px-2.5 py-1.5 font-medium text-ink disabled:opacity-40" onClick={() => onPageChange(page - 1)}>Previous</button>
           <span aria-current="page" className="px-1 font-medium">Page {page} of {totalPages}</span>
@@ -32,7 +32,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange, la
           ))}
           <button type="button" disabled={page >= totalPages} aria-label="Next page" className="flex h-9 min-w-9 items-center justify-center rounded-lg border border-line bg-card px-2 text-ink disabled:opacity-40" onClick={() => onPageChange(page + 1)}>Next</button>
         </div>
-      )}
+      ))}
     </nav>
   );
 }
