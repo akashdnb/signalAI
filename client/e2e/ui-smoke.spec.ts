@@ -290,6 +290,23 @@ test.describe("responsive route smoke checks", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("custom draft validates parsed trigger phrases, not just non-empty text", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockTenantApi(page);
+    await page.goto("/dashboard/smoke-tenant/automation");
+    await page.getByRole("button", { name: "Create draft" }).first().click();
+
+    const dialog = page.getByRole("dialog", { name: "Create an automation" });
+    await dialog.getByLabel("Automation name").fill("Property enquiry");
+    const phrases = dialog.getByLabel("Words or phrases that should start it");
+    await phrases.fill(" , , ");
+    await expect(dialog.getByRole("button", { name: "Create draft" })).toBeDisabled();
+    await expect(dialog.getByRole("status")).toContainText("Enter at least one word or phrase");
+
+    await phrases.fill("details, , pricing");
+    await expect(dialog.getByRole("button", { name: "Create draft" })).toBeEnabled();
+  });
+
   test("automation list actions are keyboard-dismissable without making the table row a button", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await mockTenantApi(page, { automationList: true });
