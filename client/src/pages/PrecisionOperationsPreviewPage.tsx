@@ -91,12 +91,12 @@ function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (n
   );
 }
 
-function PageHeader({ screen, dirty, onSave, onTest, onPublish, selectedLeadName, automationName, onNavigate }: {
+function PageHeader({ screen, dirty, onSave, onTest, onPublish, selectedLeadName, automationName, automationStatus, onNavigate }: {
   screen: PreviewScreen; dirty: boolean; onSave: () => void; onTest: () => void; onPublish: () => void;
-  selectedLeadName: string; automationName: string; onNavigate: (screen: PreviewScreen) => void;
+  selectedLeadName: string; automationName: string; automationStatus: string; onNavigate: (screen: PreviewScreen) => void;
 }) {
   if (screen === "builder") return <header className="po-page-header po-builder-header">
-    <div className="po-builder-heading"><div className="po-breadcrumb"><button type="button" onClick={() => onNavigate("automations")}>Automations</button><span aria-hidden="true">/</span><strong>{automationName}</strong></div><div className="po-title-row"><h1>{automationName}</h1><Tag tone="warning">Draft · Not live</Tag></div><p>Review the trigger, reply behavior, lead capture, and account assignment before activating.</p></div>
+    <div className="po-builder-heading"><div className="po-breadcrumb"><button type="button" onClick={() => onNavigate("automations")}>Automations</button><span aria-hidden="true">/</span><strong>{automationName}</strong></div><div className="po-title-row"><h1>{automationName}</h1><Tag tone={automationStatus==="Live"?"green":automationStatus==="Paused"?"neutral":"warning"}>{automationStatus==="Live"?"Live":automationStatus==="Paused"?"Paused":automationStatus==="Needs publishing"?"Needs publishing":"Draft · Not live"}</Tag></div><p>Review the trigger, reply behavior, lead capture, and account assignment before activating.</p></div>
     <div className="po-header-actions"><span className={"po-save-status" + (dirty ? " is-dirty" : "")} role="status"><span className="po-save-status-dot" />{dirty ? "Unsaved preview changes" : "Preview marked saved"}</span><button type="button" className="po-button po-button--quiet" onClick={onTest}><PlayIcon className="po-button-icon" /> Sample walkthrough</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button></div>
   </header>;
   const configs: Record<string, { eyebrow: string; title: string; description: string }> = {
@@ -267,6 +267,10 @@ function LeadsScreen({ onOpenLead }: { onOpenLead: (name: string) => void }) {
     </div><p className="po-help-text">Names, events, counts, and timestamps are sample values. No production leads are loaded or modified.</p></section>;
 }
 
+function UnsavedChangesDialog({ onKeepEditing, onSaveAndLeave, onDiscard }: { onKeepEditing: () => void; onSaveAndLeave: () => void; onDiscard: () => void }) {
+  return <div className="po-modal-backdrop" role="presentation"><section className="po-modal po-unsaved-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-unsaved-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span></div><span className="po-eyebrow">UNSAVED CHANGES</span><h2 id="po-unsaved-title">Leave the builder?</h2><p>You have preview changes that haven't been marked saved. In the real product, choose whether to save or discard before leaving the automation.</p><div className="po-modal-footer po-unsaved-actions"><button type="button" className="po-button po-button--quiet" onClick={onKeepEditing}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={onDiscard}>Discard changes</button><button type="button" className="po-button po-button--primary" onClick={onSaveAndLeave}>Save & leave</button></div></section></div>;
+}
+
 function WorkspaceBar({ onNavigate, theme, onToggleTheme }: { onNavigate: (screen: PreviewScreen) => void; theme: "light" | "dark"; onToggleTheme: () => void }) {
   const [notificationsOpen,setNotificationsOpen] = useState(false);
   const [profileOpen,setProfileOpen] = useState(false);
@@ -286,7 +290,9 @@ export function PrecisionOperationsPreviewPage() {
     const requested = new URLSearchParams(window.location.search).get("screen") as PreviewScreen | null;
     return requested && validScreens.includes(requested) ? requested : "overview";
   });
-  const [dirty,setDirty] = useState(true);
+  const [dirty,setDirty] = useState(false);
+  const [automationStatus,setAutomationStatus] = useState("Draft");
+  const [pendingNavigation,setPendingNavigation] = useState<PreviewScreen|null>(null);
   const [savedNotice,setSavedNotice] = useState(false);
   const [showWalkthrough,setShowWalkthrough] = useState(false);
   const [showPublish,setShowPublish] = useState(false);
@@ -294,7 +300,7 @@ export function PrecisionOperationsPreviewPage() {
   const [automationName,setAutomationName] = useState("Lead qualification");
   const [selectedLeadName,setSelectedLeadName] = useState("Morgan Lee");
   const [theme,setTheme] = useState<"light"|"dark">("light");
-  const go = (next: PreviewScreen) => {
+  const applyNavigation = (next: PreviewScreen) => {
     setScreen(next);
     setSavedNotice(false);
     const params = new URLSearchParams(window.location.search);
@@ -302,10 +308,31 @@ export function PrecisionOperationsPreviewPage() {
     params.set("screen",next);
     window.history.replaceState(null,"",window.location.pathname+"?"+params.toString());
   };
-  const openBuilder = (name: string) => {
+  const go = (next: PreviewScreen) => {
+    if (screen === "builder" && dirty && next !== "builder") {
+      setPendingNavigation(next);
+      return;
+    }
+    applyNavigation(next);
+  };
+  const openBuilder = (name: string, status = "Draft", newDraft = false) => {
     setAutomationName(name);
-    setDirty(true);
-    go("builder");
+    setAutomationStatus(status);
+    setDirty(newDraft);
+    applyNavigation("builder");
+  };
+  const saveAndLeave = () => {
+    setDirty(false);
+    setSavedNotice(true);
+    const next = pendingNavigation;
+    setPendingNavigation(null);
+    if (next) applyNavigation(next);
+  };
+  const discardAndLeave = () => {
+    setDirty(false);
+    const next = pendingNavigation;
+    setPendingNavigation(null);
+    if (next) applyNavigation(next);
   };
   const openLead = (name: string) => {
     setSelectedLeadName(name);
@@ -330,5 +357,5 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go}/><main id="po-main" className="po-main"><PreviewNotice/><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>setTheme(v=>v==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPublish={()=>setShowPublish(true)} selectedLeadName={selectedLeadName} automationName={automationName} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog onClose={()=>setShowPublish(false)}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go}/><main id="po-main" className="po-main"><PreviewNotice/><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>setTheme(v=>v==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPublish={()=>setShowPublish(true)} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog onClose={()=>setShowPublish(false)}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
