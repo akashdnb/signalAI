@@ -103,3 +103,14 @@ Before shipping new or refreshed UI, answer:
 5. What happens in loading, first-use empty, no-results, error, success, and relevant edge states?
 6. Does it work with keyboard, visible focus, reduced motion, both themes, and narrow viewports?
 7. Did this change reuse the existing tokens/primitives and avoid unrelated regressions?
+
+
+## Reference projects
+
+The anti-slop approach here is adapted to SignalAI rather than copied as a third-party package:
+
+- [Krirox/anti-ai-slop-skills](https://github.com/Krirox/anti-ai-slop-skills) — pre-flight review, specificity, hierarchy, and deliberate art direction.
+- [miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop) — separate filtering from visual direction, honest copy/data, state coverage, accessibility, and a delivery gate.
+- [huyhoangnhh98/anti-ai-design](https://github.com/huyhoangnhh98/anti-ai-design) — consistent direction across screens, reusable tokens, purposeful motion, responsive constraints, and a design self-audit.
+
+SignalAI-specific rules in this document take precedence whenever an upstream pattern conflicts with the existing product, real workflows, established tokens, or accessibility.
