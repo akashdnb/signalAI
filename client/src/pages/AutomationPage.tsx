@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api } from "../api";
+import { ApiError, api, type TriggerSource } from "../api";
 import { AutomationHeader } from "../components/automation/AutomationHeader";
 import { AutomationTabs, type AutomationTab } from "../components/automation/AutomationTabs";
 import { AutomationTemplates, type AutomationTemplate } from "../components/automation/AutomationTemplates";
@@ -14,16 +14,33 @@ export function AutomationPage() {
   const [activeTab, setActiveTab] = useState<AutomationTab>("journeys");
   const [error, setError] = useState<string | null>(null);
   const [showNewJourney, setShowNewJourney] = useState(false);
+  const [pendingCustomDraftId, setPendingCustomDraftId] = useState<string | null>(null);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [templateDraftIds, setTemplateDraftIds] = useState<Record<string, string>>({});
   const { toasts, push } = useToasts();
 
-  async function handleCreateJourney(name: string, keywords: string[]) {
+  async function handleCreateJourney(name: string, keywords: string[], triggerSource: TriggerSource) {
     if (!tenantId) return;
-    const created = await api.createCampaign(tenantId, name, keywords, { enabled: false });
+
+    // Keep the draft ID after a partial failure so retrying applies the chosen
+    // settings to the same inactive draft instead of creating duplicates.
+    let campaignId = pendingCustomDraftId;
+    if (!campaignId) {
+      const created = await api.createCampaign(tenantId, name, keywords, { enabled: false });
+      campaignId = created.id;
+      setPendingCustomDraftId(campaignId);
+    }
+
+    await api.updateReplyConfig(tenantId, campaignId, {
+      name,
+      keywords,
+      triggerSource,
+    });
+
+    setPendingCustomDraftId(null);
     setShowNewJourney(false);
     push("Draft created. Review it before publishing.");
-    navigate(`/dashboard/${tenantId}/automation/journeys/${created.id}`);
+    navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`);
   }
 
   async function handleUseTemplate(template: AutomationTemplate) {
