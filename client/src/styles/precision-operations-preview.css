@@ -1418,3 +1418,10 @@
   background: #2b2736;
   color: #a19bad;
 }
+
+
+/* Native drag-and-drop is preview-only; keep the gesture discoverable. */
+.po-preview-app .po-flow-node[draggable="true"] { cursor: grab; }
+.po-preview-app .po-flow-node[draggable="true"]:active { cursor: grabbing; }
+.po-preview-app .po-flow-node-end { color: var(--po-muted); font-size: 18px; letter-spacing: -2px; }
+.po-preview-app .po-flow-node[draggable="true"]:focus-visible { outline-offset: 2px; }
