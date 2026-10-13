@@ -11,22 +11,22 @@ body:has(.po-preview-app) {
   --po-shadow-dialog:0 24px 60px rgba(15,23,42,.18); background:var(--po-bg); color:var(--po-text);
 }
 body:has(.po-preview-app),body:has(.po-preview-app) button,body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px;line-height:1.2;letter-spacing:-.025em;font-weight:750}
+body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px;line-height:1.2;letter-spacing:-.025em;font-weight:800}
 body:has(.po-preview-app) .po-page-header>div>p,body:has(.po-preview-app) .po-builder-heading>p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
 body:has(.po-preview-app) .po-eyebrow,body:has(.po-preview-app) .po-group-label,body:has(.po-preview-app) .po-sample-label{font-size:11px;line-height:16px;letter-spacing:.08em;font-weight:700;color:var(--po-text-muted)}
 body:has(.po-preview-app) .po-panel-title h2,body:has(.po-preview-app) .po-list-toolbar h2,body:has(.po-preview-app) .po-panel-heading h2{font-size:18px;line-height:26px;letter-spacing:-.012em;font-weight:700}
 body:has(.po-preview-app) .po-panel-title p,body:has(.po-preview-app) .po-list-toolbar p,body:has(.po-preview-app) .po-panel-copy{color:var(--po-text-secondary);font-size:14px;line-height:22px}
 body:has(.po-preview-app) .po-sidebar{background:var(--po-surface);border-right:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-sidebar-brand-row{border-bottom:1px solid var(--po-border)}
-body:has(.po-preview-app) .po-nav-item{min-height:40px;border-radius:var(--po-radius-md);color:#273142;font-size:14px;font-weight:550;transition:background-color 120ms ease,color 120ms ease}
+body:has(.po-preview-app) .po-nav-item{min-height:40px;border-radius:var(--po-radius-md);color:#273142;font-size:14px;font-weight:600;transition:background-color 120ms ease,color 120ms ease}
 body:has(.po-preview-app) .po-nav-item:hover:not(.is-active){background:#f7f5fb}
-body:has(.po-preview-app) .po-nav-item.is-active{background:var(--po-primary-soft);color:var(--po-primary);font-weight:650;box-shadow:inset 2px 0 0 var(--po-primary)}
+body:has(.po-preview-app) .po-nav-item.is-active{background:var(--po-primary-soft);color:var(--po-primary);font-weight:700;box-shadow:inset 2px 0 0 var(--po-primary)}
 body:has(.po-preview-app) .po-nav-label{color:var(--po-text-muted);font-size:11px;letter-spacing:.1em;font-weight:700}
 body:has(.po-preview-app) .po-plan-card{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);background:#fbfbfd;box-shadow:none}
 body:has(.po-preview-app) .po-plan-card button{border-radius:var(--po-radius-md);min-height:40px}
 body:has(.po-preview-app) .po-page-header{margin-bottom:24px}
 body:has(.po-preview-app) .po-header-actions{gap:8px}
-body:has(.po-preview-app) .po-button{min-height:38px;border-radius:var(--po-radius-md);padding:0 14px;font-size:14px;line-height:22px;font-weight:650;box-shadow:none;transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease,transform 120ms ease,box-shadow 120ms ease}
+body:has(.po-preview-app) .po-button{min-height:38px;border-radius:var(--po-radius-md);padding:0 14px;font-size:14px;line-height:22px;font-weight:700;box-shadow:none;transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease,transform 120ms ease,box-shadow 120ms ease}
 body:has(.po-preview-app) .po-button--primary{background:var(--po-primary);color:#fff}
 body:has(.po-preview-app) .po-button--primary:hover:not(:disabled){background:var(--po-primary-hover)}
 body:has(.po-preview-app) .po-button--secondary{background:var(--po-surface);color:var(--po-text);border:1px solid var(--po-border-strong)}
@@ -34,7 +34,7 @@ body:has(.po-preview-app) .po-button--secondary:hover:not(:disabled){background:
 body:has(.po-preview-app) .po-button--quiet{background:transparent;color:var(--po-text-secondary)}
 body:has(.po-preview-app) .po-button--quiet:hover:not(:disabled){background:#f3f4f7;color:var(--po-text)}
 body:has(.po-preview-app) .po-button:active:not(:disabled){transform:translateY(1px)}
-body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid transparent;border-radius:999px;font-size:12px;line-height:17px;font-weight:650;white-space:nowrap}
+body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid transparent;border-radius:999px;font-size:12px;line-height:17px;font-weight:700;white-space:nowrap}
 body:has(.po-preview-app) .po-tag--neutral{background:#eef1f5;color:#596273}
 body:has(.po-preview-app) .po-tag--purple{background:var(--po-primary-soft);color:var(--po-primary)}
 body:has(.po-preview-app) .po-tag--green{background:var(--po-success-soft);color:var(--po-success)}
@@ -51,13 +51,13 @@ body:has(.po-preview-app) .po-metric strong{margin-top:6px;font-size:28px;line-h
 body:has(.po-preview-app) .po-metric small{color:var(--po-text-muted);font-size:12px;line-height:19px}
 body:has(.po-preview-app) .po-overview-grid{gap:16px}
 body:has(.po-preview-app) .po-chart-summary strong{font-size:28px;line-height:32px}
-body:has(.po-preview-app) .po-text-action{color:var(--po-primary);font-size:14px;font-weight:650}
+body:has(.po-preview-app) .po-text-action{color:var(--po-primary);font-size:14px;font-weight:700}
 body:has(.po-preview-app) .po-action-row,body:has(.po-preview-app) .po-recent-item{border-color:#eef0f4}
 body:has(.po-preview-app) .po-action-row:hover,body:has(.po-preview-app) .po-recent-item:hover{background:#faf9fd}
 body:has(.po-preview-app) .po-tab-bar{gap:28px;border-bottom:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-tab-bar button{min-height:44px;padding:0 0 10px;border-bottom:2px solid transparent;color:var(--po-text-secondary);font-size:14px;font-weight:600}
 body:has(.po-preview-app) .po-tab-bar button.is-active{color:var(--po-text);border-color:var(--po-primary)}
-body:has(.po-preview-app) .po-outcome-banner{display:flex;align-items:center;gap:16px;padding:18px 20px;background:linear-gradient(90deg,#fbf9ff,#fff);border-color:#ded1f7}
+body:has(.po-preview-app) .po-outcome-banner{display:flex;align-items:center;gap:16px;padding:18px 20px;background:var(--po-surface);border-color:var(--po-border)}
 body:has(.po-preview-app) .po-outcome-banner p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
 body:has(.po-preview-app) .po-list-toolbar{align-items:flex-end;margin-top:28px;margin-bottom:16px}
 body:has(.po-preview-app) .po-list-toolbar h2{margin-bottom:4px}
@@ -71,17 +71,17 @@ body:has(.po-preview-app) .po-automation-table td{min-height:64px;padding-top:14
 body:has(.po-preview-app) .po-automation-table tbody tr:hover{background:#fcfbff}
 body:has(.po-preview-app) .po-builder-header{padding-bottom:18px;border-bottom:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-breadcrumb{margin-bottom:8px;color:var(--po-text-muted);font-size:12px}
-body:has(.po-preview-app) .po-breadcrumb button{color:var(--po-primary);font-weight:650}
+body:has(.po-preview-app) .po-breadcrumb button{color:var(--po-primary);font-weight:500}
 body:has(.po-preview-app) .po-save-status{color:var(--po-text-muted);font-size:12px;font-weight:600}
 body:has(.po-preview-app) .po-save-status.is-dirty{color:var(--po-warning)}
 body:has(.po-preview-app) .po-save-status-dot{width:7px;height:7px;border-radius:50%;background:#b4bbc7}
 body:has(.po-preview-app) .po-save-status.is-dirty .po-save-status-dot{background:var(--po-warning)}
 body:has(.po-preview-app) .po-builder-tabs,body:has(.po-preview-app) .po-automation-tabs{border-bottom:1px solid var(--po-border)}
-body:has(.po-preview-app) .po-builder-tabs button,body:has(.po-preview-app) .po-automation-tabs button{min-height:44px;font-size:14px;font-weight:650}
+body:has(.po-preview-app) .po-builder-tabs button,body:has(.po-preview-app) .po-automation-tabs button{min-height:44px;font-size:14px;font-weight:700}
 body:has(.po-preview-app) .po-palette{background:var(--po-surface);border-right:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-palette-item{border-radius:var(--po-radius-md);padding:10px 8px}
 body:has(.po-preview-app) .po-palette-item:hover{background:#f8f6fc}
-body:has(.po-preview-app) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:10px;background:var(--po-surface);box-shadow:0 2px 5px rgba(15,23,42,.04);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
+body:has(.po-preview-app) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:12px;background:var(--po-surface);box-shadow:0 2px 5px rgba(15,23,42,.04);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
 body:has(.po-preview-app) .po-flow-node:hover,body:has(.po-preview-app) .po-flow-node.is-selected{border-color:#9b72ed;box-shadow:0 8px 24px rgba(124,58,237,.1)}
 body:has(.po-preview-app) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px rgba(124,58,237,.1)}
 body:has(.po-preview-app) .po-flow-node-kicker{color:#6b746e;font-size:11px;letter-spacing:.08em;font-weight:700}
@@ -123,7 +123,7 @@ body:has(.po-preview-app.is-dark) .po-tag--neutral{background:#262e29;color:var(
 body:has(.po-preview-app.is-dark) .po-panel-title{border-bottom-color:var(--po-border)}
 body:has(.po-preview-app.is-dark) .po-action-row,body:has(.po-preview-app.is-dark) .po-recent-item{border-color:var(--po-border)}
 body:has(.po-preview-app.is-dark) .po-action-row:hover,body:has(.po-preview-app.is-dark) .po-recent-item:hover{background:#202723}
-body:has(.po-preview-app.is-dark) .po-outcome-banner{background:linear-gradient(90deg,#241d35,#1b211e);border-color:#3f3458}
+body:has(.po-preview-app.is-dark) .po-outcome-banner{background:#1b211e;border-color:var(--po-border)}
 body:has(.po-preview-app.is-dark) .po-automation-table th,body:has(.po-preview-app.is-dark) table th{background:#202723;color:var(--po-text-muted)}
 body:has(.po-preview-app.is-dark) .po-automation-table td{border-color:var(--po-border)}
 body:has(.po-preview-app.is-dark) .po-automation-table tbody tr:hover{background:#202723}
@@ -170,6 +170,8 @@ body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--green{back
 body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--amber{background:#3b301e;color:#f0c36a}
 body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--blue{background:#1e2a40;color:#8ab4ff}
 body:has(.po-preview-app.is-dark) .po-lead-username{color:#8ab4ff}
+body:has(.po-preview-app.is-dark) .po-token-track,
+body:has(.po-preview-app.is-dark) .po-usage-track{background:#2a332d}
 body:has(.po-preview-app.is-dark) .po-leads-pagination,
 body:has(.po-preview-app.is-dark) .po-leads-pagination span{color:var(--po-text-muted)}
 
@@ -202,6 +204,38 @@ body:has(.po-preview-app) .po-preview-app .po-detail-control select{min-height:3
 body:has(.po-preview-app) .po-preview-app.is-dark select{
   background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2393a098' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")}
 body:has(.po-preview-app) .po-preview-app.is-dark .po-select-wrap select{background-image:none}
+
+/* ---- Pointer targets ------------------------------------------------------
+ * AGENTS.md: layouts must work "without ... tiny touch targets". Row checkboxes
+ * were 15x15, the row action menu 31x31, global icons 34x34 and pagination
+ * 21x17. The hit area is expanded with an overlay so the dense desktop layout
+ * keeps its current visual size, and the controls themselves grow to 44px on a
+ * coarse pointer, where the 44x44 minimum actually applies.
+ */
+body:has(.po-preview-app) .po-preview-app .po-icon-button,
+body:has(.po-preview-app) .po-preview-app .po-global-icon,
+body:has(.po-preview-app) .po-preview-app .po-leads-pagination button,
+body:has(.po-preview-app) .po-preview-app .po-row-actions button{position:relative}
+body:has(.po-preview-app) .po-preview-app .po-icon-button::after,
+body:has(.po-preview-app) .po-preview-app .po-global-icon::after,
+body:has(.po-preview-app) .po-preview-app .po-leads-pagination button::after,
+body:has(.po-preview-app) .po-preview-app .po-row-actions button::after{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  min-width:44px;min-height:44px;width:100%;height:100%}
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"]{width:18px;height:18px;flex:0 0 auto}
+@media (pointer: coarse){
+  /* Every real control, not just the ones with a .po-button class. Links sitting
+     inside a line of text keep their size (WCAG 2.5.8 exempts inline links). */
+  body:has(.po-preview-app) .po-preview-app button,
+  body:has(.po-preview-app) .po-preview-app select,
+  body:has(.po-preview-app) .po-preview-app [role="tab"],
+  body:has(.po-preview-app) .po-preview-app .po-detail-control select,
+  body:has(.po-preview-app) .po-preview-app .po-search,
+  body:has(.po-preview-app) .po-preview-app .po-skip-link{min-height:44px}
+  body:has(.po-preview-app) .po-preview-app .po-icon-button,
+  body:has(.po-preview-app) .po-preview-app .po-global-icon{width:44px;height:44px}
+  body:has(.po-preview-app) .po-preview-app input[type="checkbox"]{width:22px;height:22px}
+}
 
 @media (max-width:900px){body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px}body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(2){border-right:0}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(-n+2){border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-outcome-banner{align-items:flex-start;flex-wrap:wrap}}
 @media (max-width:640px){body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:1fr}body:has(.po-preview-app) .po-overview-metrics .po-metric{border-right:0;border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-overview-metrics .po-metric:last-child{border-bottom:0}body:has(.po-preview-app) .po-button{min-height:42px}body:has(.po-preview-app) .po-list-toolbar{align-items:stretch}}
