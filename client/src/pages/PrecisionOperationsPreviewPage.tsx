@@ -10,6 +10,14 @@ import {
 type PreviewScreen = FullPreviewScreen;
 type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
 type BuilderSeed = { triggerType: string; keywords: string };
+type NodeEditorConfig = {
+  triggerType?: string; keywords?: string; alsoStory?: boolean; caseInsensitive?: boolean; matchType?: string; alsoDm?: boolean;
+  messageText?: string; presentation?: string;
+  buttons?: Array<{ title: string; action: string; url: string; destination: string }>;
+  cards?: Array<{ title: string; subtitle: string; imageUrl: string; actionTitle: string; actionType: string; actionUrl: string; actionDestination: string }>;
+  quickReplies?: Array<{ title: string; destination: string }>;
+  tone?: string; useKnowledge?: boolean; goalTitle?: string; captureFields?: string[];
+};
 type IconType = ComponentType<{ className?: string }>;
 type NavigationItem = { label: string; icon: IconType; screen?: PreviewScreen; section: "primary" | "workspace" };
 
@@ -149,12 +157,19 @@ function BuilderPalette({ onSelect }: { onSelect: (key: BuilderNodeKey) => void 
   </aside>;
 }
 
-function FlowNode({ node, selected, onClick, index }: { node: (typeof builderNodes)[number]; selected: boolean; onClick: () => void; index: number }) {
+function FlowNode({ node, selected, onClick, index, nodeId, onReorder }: {
+  node: (typeof builderNodes)[number]; selected: boolean; onClick: () => void; index: number; nodeId: number; onReorder: (fromId: number, toId: number) => void;
+}) {
   const Icon = node.icon;
-  return <div className="po-flow-node-wrap">{index > 0 && <div className="po-flow-connector" aria-hidden="true"><span /></div>}<button type="button" className={"po-flow-node" + (selected ? " is-selected" : "")} onClick={onClick} aria-pressed={selected}><span className={"po-flow-node-icon po-flow-node-icon--" + node.key}><Icon /></span><span className="po-flow-node-content"><span className="po-flow-node-kicker">{node.number} / {node.kind}</span><strong>{node.title}</strong><span>{node.summary}</span><small>{node.detail}</small></span><span className="po-flow-node-end" aria-hidden="true">↗</span></button></div>;
+  return <div className="po-flow-node-wrap" onDragOver={event=>{event.preventDefault();event.dataTransfer.dropEffect="move";}} onDrop={event=>{event.preventDefault();const raw=event.dataTransfer.getData("text/plain");const fromId=Number(raw);if(raw!==""&&Number.isInteger(fromId)&&fromId!==nodeId)onReorder(fromId,nodeId);}}>
+    {index > 0 && <div className="po-flow-connector" aria-hidden="true"><span /></div>}
+    <button type="button" draggable className={"po-flow-node" + (selected ? " is-selected" : "")} onClick={onClick} onDragStart={event=>{event.dataTransfer.setData("text/plain",String(nodeId));event.dataTransfer.effectAllowed="move";}} aria-pressed={selected} title="Click to edit. Drag to reorder this step.">
+      <span className={"po-flow-node-icon po-flow-node-icon--" + node.key}><Icon /></span><span className="po-flow-node-content"><span className="po-flow-node-kicker">{node.number} / {node.kind}</span><strong>{node.title}</strong><span>{node.summary}</span><small>{node.detail}</small></span><span className="po-flow-node-end" aria-hidden="true">⠿</span>
+    </button>
+  </div>;
 }
 
-function StepInspector({ nodeKey, onDirty, onEditorDirtyChange, seed, onClose, onApplied }: { nodeKey: BuilderNodeKey; onDirty: () => void; onEditorDirtyChange: (dirty:boolean) => void; seed: BuilderSeed|null; onClose: () => void; onApplied: (result: {triggerType?:string;keywords?:string}) => void }) {
+function StepInspector({ nodeKey, nodeId, nodeConfig, onDirty, onEditorDirtyChange, seed, onClose, onApplied }: { nodeKey: BuilderNodeKey; nodeId:number; nodeConfig:NodeEditorConfig|null; onDirty: () => void; onEditorDirtyChange: (dirty:boolean) => void; seed: BuilderSeed|null; onClose: () => void; onApplied: (result: NodeEditorConfig) => void }) {
   const selected = builderNodes.find((node) => node.key === nodeKey) ?? builderNodes[0]!;
   const Icon = selected.icon;
   const sections = nodeKey === "trigger"
@@ -163,8 +178,8 @@ function StepInspector({ nodeKey, onDirty, onEditorDirtyChange, seed, onClose, o
       ? [{ key: "basic", label: "Basic" }, { key: "capture", label: "Capture Fields" }, { key: "validation", label: "Validation" }, { key: "success", label: "Success Message" }]
       : [{ key: "basic", label: "Message" }, { key: "presentation", label: "Instagram layout" }, { key: "ai", label: "AI Settings" }];
   const [tab, setTab] = useState("basic");
-  const [triggerType, setTriggerType] = useState(seed?.triggerType ?? "both");
-  const [keywords, setKeywords] = useState(seed?.keywords ? seed.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : "price\nquote\ndetails");
+  const [triggerType, setTriggerType] = useState(seed?.triggerType ?? nodeConfig?.triggerType ?? "both");
+  const [keywords, setKeywords] = useState(seed?.keywords ? seed.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : nodeConfig?.keywords ? nodeConfig.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : "price\nquote\ndetails");
   const [alsoStory, setAlsoStory] = useState(false);
   const [caseInsensitive, setCaseInsensitive] = useState(true);
   const [matchType, setMatchType] = useState("contains");
@@ -194,9 +209,22 @@ function StepInspector({ nodeKey, onDirty, onEditorDirtyChange, seed, onClose, o
     setLocalError("");
     setApplyNotice("");
     setShowCreateField(false);
-    setTriggerType(seed?.triggerType ?? "both");
-    setKeywords(seed?.keywords ? seed.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : "price\nquote\ndetails");
-  }, [nodeKey,seed?.triggerType,seed?.keywords]);
+    setTriggerType(seed?.triggerType ?? nodeConfig?.triggerType ?? "both");
+    setKeywords(seed?.keywords ? seed.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : nodeConfig?.keywords ? nodeConfig.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : "price\nquote\ndetails");
+    setAlsoStory(nodeConfig?.alsoStory ?? false);
+    setCaseInsensitive(nodeConfig?.caseInsensitive ?? true);
+    setMatchType(nodeConfig?.matchType ?? "contains");
+    setAlsoDm(nodeConfig?.alsoDm ?? true);
+    setMessageText(nodeConfig?.messageText ?? "Thanks for reaching out. I can help you find the right option. What are you looking for?");
+    setPresentation(nodeConfig?.presentation ?? "text");
+    setButtons(nodeConfig?.buttons ?? [{ title: "View details", action: "Open website", url: "https://example.com/details", destination: "Goal: capture interest" }]);
+    setCards(nodeConfig?.cards ?? [{ title: "Your offer", subtitle: "Options that fit your needs", imageUrl: "https://example.com/offer.jpg", actionTitle: "View details", actionType: "Open website", actionUrl: "https://example.com/details", actionDestination: "Goal: capture interest" }, { title: "Another option", subtitle: "Compare the available choices", imageUrl: "", actionTitle: "Ask a question", actionType: "Continue journey", actionUrl: "", actionDestination: "Goal: capture interest" }]);
+    setQuickReplies(nodeConfig?.quickReplies ?? [{ title: "Pricing", destination: "Ask about pricing" }, { title: "More information", destination: "Capture interest" }]);
+    setTone(nodeConfig?.tone ?? "Friendly and helpful");
+    setUseKnowledge(nodeConfig?.useKnowledge ?? true);
+    setGoalTitle(nodeConfig?.goalTitle ?? "What the person needs");
+    setCaptureFields(nodeConfig?.captureFields ?? ["Interest", "Preferred timeline"]);
+  }, [nodeKey,nodeId,nodeConfig,seed?.triggerType,seed?.keywords]);
 
   const edit = () => {
     setEditorDirty(true);
@@ -237,7 +265,10 @@ function StepInspector({ nodeKey, onDirty, onEditorDirtyChange, seed, onClose, o
     onEditorDirtyChange(false);
     onDirty();
     setApplyNotice("Changes applied to this local preview draft. Use Save changes in the header to mark the draft saved.");
-    if(nodeKey==="trigger") onApplied({triggerType,keywords:keywords.split(/\n/).map(value=>value.trim()).filter(Boolean).join(", ")});
+    onApplied({
+      triggerType,keywords:keywords.split(/\n/).map(value=>value.trim()).filter(Boolean).join(", "),
+      alsoStory,caseInsensitive,matchType,alsoDm,messageText,presentation,buttons,cards,quickReplies,tone,useKnowledge,goalTitle,captureFields,
+    });
     onClose();
   };
   const resetEditor = () => {
@@ -314,13 +345,16 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; onSavePreview: () => void; seed: BuilderSeed|null; inspectorCloseRequest: number; onInspectorDirtyChange: (dirty:boolean) => void; onInspectorDiscarded: () => void; onInspectorCloseCancelled: () => void;
 }) {
   const [selectedNode, setSelectedNode] = useState<BuilderNodeKey>("trigger");
+  const [selectedNodeId,setSelectedNodeId] = useState(0);
+  const [nodeConfigs,setNodeConfigs] = useState<Record<number,NodeEditorConfig>>({});
   const [inspectorOpen,setInspectorOpen] = useState(false);
   const [inspectorDirty,setInspectorDirty] = useState(false);
   const [confirmInspectorClose,setConfirmInspectorClose] = useState(false);
   const [inspectorKey,setInspectorKey] = useState(0);
   const [pendingInspectorTab,setPendingInspectorTab] = useState<string|null>(null);
   useEffect(()=>{if(inspectorCloseRequest>0){setPendingInspectorTab(null);setConfirmInspectorClose(true);}},[inspectorCloseRequest]);
-  const [addedNodes,setAddedNodes] = useState<BuilderNodeKey[]>([]);
+  const [addedNodes,setAddedNodes] = useState<Array<{id:number;key:BuilderNodeKey}>>([]);
+  const [nodeOrder,setNodeOrder] = useState<number[]>([0,1,2,3]);
   const [subTab, setSubTab] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get("builderTab");
     return requested && ["Flow", "Setup", "Results", "Leads"].includes(requested) ? requested : "Flow";
@@ -375,6 +409,9 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     setHandoffEnabled(true);
     setGoalQuestion("What are you looking for help with?");
     setAddedNodes([]);
+    setNodeOrder([0,1,2,3]);
+    setNodeConfigs({});
+    setSelectedNodeId(0);
     setSelectedNode("trigger");
     onSelectNode("trigger");
     setInspectorOpen(false);
@@ -387,19 +424,45 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     setPendingTab(null);
     applyTabSwitch(next);
   };
-  const flowStepCount = builderNodes.length + addedNodes.length;
-  const visibleNodes = [...builderNodes,...addedNodes.map((key,index)=>({...builderNodes.find(node=>node.key===key)!,number:String(builderNodes.length+index+1).padStart(2,"0")}))];
-  const selectedInstanceIndex = visibleNodes.map(node=>node.key).lastIndexOf(selectedNode);
+  const sourceNodes = [
+    ...builderNodes.map((node,index)=>({...node,nodeId:index})),
+    ...addedNodes.map(item=>({...builderNodes.find(node=>node.key===item.key)!,nodeId:item.id,number:String(item.id+1).padStart(2,"0")})),
+  ];
+  const flowStepCount = sourceNodes.length;
+  const visibleNodes = nodeOrder.map(id=>sourceNodes.find(node=>node.nodeId===id)).filter((node): node is (typeof sourceNodes)[number] => node !== undefined);
+  const selectedInstanceIndex = visibleNodes.findIndex(node=>node.nodeId===selectedNodeId);
+  const reorderFlowNodes = (fromId:number,toId:number) => {
+    setNodeOrder(current=>{
+      const from=current.indexOf(fromId),to=current.indexOf(toId);
+      if(from<0||to<0||from===to)return current;
+      const next=[...current];
+      const [moved]=next.splice(from,1);
+      next.splice(to,0,moved!);
+      return next;
+    });
+    onDirty();
+  };
   const addPaletteNode = (key: BuilderNodeKey) => {
-    setSelectedNode(key);
-    onSelectNode(key);
-    if(key !== "trigger") { setAddedNodes(current=>current.concat(key)); onDirty(); }
+    if(key === "trigger") {
+      setSelectedNode("trigger");setSelectedNodeId(0);onSelectNode("trigger");
+    } else {
+      const id=builderNodes.length+addedNodes.length;
+      setAddedNodes(current=>current.concat({id,key}));
+      setNodeOrder(current=>current.concat(id));
+      setSelectedNode(key);setSelectedNodeId(id);onSelectNode(key);onDirty();
+    }
     setInspectorOpen(true);
+  };
+  const addAnotherMessage = () => {
+    const id=builderNodes.length+addedNodes.length;
+    setAddedNodes(current=>current.concat({id,key:"followup"}));
+    setNodeOrder(current=>current.concat(id));
+    setSelectedNode("followup");setSelectedNodeId(id);onSelectNode("followup");onDirty();setInspectorOpen(true);
   };
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}<div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
-    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={addPaletteNode} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{visibleNodes.map((node, index) => <FlowNode key={node.key+"-"+index} node={node} index={index} selected={selectedInstanceIndex===index} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); setInspectorOpen(true); }} />)}<button type="button" className="po-add-step" onClick={() => { setAddedNodes(current=>current.concat("followup")); setSelectedNode("followup"); onSelectNode("followup"); onDirty(); setInspectorOpen(true); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span role="status" aria-live="polite" data-step-count={flowStepCount}>{flowStepCount} steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section></div>}
-    <div className={"po-modal-backdrop po-inspector-backdrop"+(inspectorOpen?"":" is-hidden")} role="presentation" aria-hidden={!inspectorOpen} onMouseDown={event=>event.target===event.currentTarget&&requestInspectorClose()}><section className="po-modal po-inspector-dialog" role="dialog" aria-modal={inspectorOpen} aria-label="Edit flow step"><div className="po-inspector-dialog-actions"><span className="po-eyebrow">NODE INSPECTOR · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close step inspector" onClick={requestInspectorClose}>×</button></div><StepInspector key={inspectorKey} nodeKey={selectedNode} onDirty={onDirty} seed={{triggerType,keywords}} onClose={()=>setInspectorOpen(false)} onEditorDirtyChange={(value)=>{setInspectorDirty(value);onInspectorDirtyChange(value);}} onApplied={(result)=>{if(result.triggerType)setTriggerType(result.triggerType);if(result.keywords)setKeywords(result.keywords);}}/></section></div>
+    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={addPaletteNode} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{visibleNodes.map((node, index) => <FlowNode key={node.nodeId} node={{...node,number:String(index+1).padStart(2,"0")}} nodeId={node.nodeId} index={index} selected={node.nodeId===selectedNodeId} onReorder={reorderFlowNodes} onClick={() => { setSelectedNode(node.key);setSelectedNodeId(node.nodeId);onSelectNode(node.key);setInspectorOpen(true); }} />)}<button type="button" className="po-add-step" onClick={addAnotherMessage}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span role="status" aria-live="polite" data-step-count={flowStepCount}>{flowStepCount} steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section></div>}
+    <div className={"po-modal-backdrop po-inspector-backdrop"+(inspectorOpen?"":" is-hidden")} role="presentation" aria-hidden={!inspectorOpen} onMouseDown={event=>event.target===event.currentTarget&&requestInspectorClose()}><section className="po-modal po-inspector-dialog" role="dialog" aria-modal={inspectorOpen} aria-label="Edit flow step"><div className="po-inspector-dialog-actions"><span className="po-eyebrow">NODE INSPECTOR · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close step inspector" onClick={requestInspectorClose}>×</button></div><StepInspector key={inspectorKey} nodeKey={selectedNode} nodeId={selectedNodeId} nodeConfig={nodeConfigs[selectedNodeId]??null} onDirty={onDirty} seed={{triggerType,keywords}} onClose={()=>setInspectorOpen(false)} onEditorDirtyChange={(value)=>{setInspectorDirty(value);onInspectorDirtyChange(value);}} onApplied={(result)=>{setNodeConfigs(current=>({...current,[selectedNodeId]:{...(current[selectedNodeId]??{}),...result}}));if(selectedNode==="trigger"){if(result.triggerType)setTriggerType(result.triggerType);if(result.keywords)setKeywords(result.keywords);}}}/></section></div>
     {confirmInspectorClose&&<div className="po-modal-backdrop po-inspector-discard-backdrop" role="presentation"><section className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-inspector-discard-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Keep editing this step" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);onInspectorCloseCancelled();}}>×</button></div><span className="po-eyebrow">UNSAVED STEP CHANGES</span><h2 id="po-inspector-discard-title">Discard inspector changes?</h2><p>You have edited this step but have not applied those changes to the automation draft.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);onInspectorCloseCancelled();}}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={discardInspectorEdits}>Discard changes</button></div></section></div>}
     {subTab === "Setup" && <div className="po-builder-setup">
       <div className="po-setup-main"><div className="po-step-section"><span className="po-step-number">01</span><div className="po-step-section-body"><span className="po-eyebrow">BASICS</span><h2>Name and purpose</h2><p>A clear name makes the automation easy to find and identify later.</p><label className="po-field-block">Automation name<input value={draftName} onChange={e=>{setDraftName(e.target.value);onDirty();}} maxLength={100}/></label><label className="po-field-block">Description<textarea rows={3} value={description} onChange={e=>{setDescription(e.target.value);onDirty();}}/></label></div></div>
