@@ -430,7 +430,6 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   ];
   const flowStepCount = sourceNodes.length;
   const visibleNodes = nodeOrder.map(id=>sourceNodes.find(node=>node.nodeId===id)).filter((node): node is (typeof sourceNodes)[number] => node !== undefined);
-  const selectedInstanceIndex = visibleNodes.findIndex(node=>node.nodeId===selectedNodeId);
   const reorderFlowNodes = (fromId:number,toId:number) => {
     setNodeOrder(current=>{
       const from=current.indexOf(fromId),to=current.indexOf(toId);
