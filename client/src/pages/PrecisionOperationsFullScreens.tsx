@@ -119,7 +119,7 @@ export function AutomationsScreen({onOpenBuilder}:{onOpenBuilder:(name:string,st
 
   return <section className="po-automations-page">
     <div className="po-tab-bar" role="tablist" aria-label="Automation sections">
-      <button type="button" role="tab" id="po-automation-tab-mine" aria-selected={tab==="mine"} aria-controls="po-automation-panel" className={tab==="mine"?"is-active":""} onClick={()=>setTab("mine")}>My automations <span>{items.length}</span></button>
+      <button type="button" role="tab" id="po-automation-tab-mine" aria-selected={tab==="mine"} aria-controls="po-automation-panel" className={tab==="mine"?"is-active":""} onClick={()=>setTab("mine")}>My automations</button>
       <button type="button" role="tab" id="po-automation-tab-templates" aria-selected={tab==="templates"} aria-controls="po-automation-panel" className={tab==="templates"?"is-active":""} onClick={()=>setTab("templates")}>Start from a template</button>
     </div>
     <div id="po-automation-panel" role="tabpanel" aria-labelledby={tab==="mine"?"po-automation-tab-mine":"po-automation-tab-templates"}>
