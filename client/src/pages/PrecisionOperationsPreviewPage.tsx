@@ -309,8 +309,8 @@ function StepInspector({ nodeKey, onDirty, onEditorDirtyChange, seed, onClose, o
   </aside>;
 }
 
-function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLead, onSavePreview, seed }: {
-  dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; onSavePreview: () => void; seed: BuilderSeed|null;
+function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLead, onSavePreview, seed, inspectorCloseRequest, onInspectorDirtyChange, onInspectorDiscarded, onInspectorCloseCancelled }: {
+  dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; onSavePreview: () => void; seed: BuilderSeed|null; inspectorCloseRequest: number; onInspectorDirtyChange: (dirty:boolean) => void; onInspectorDiscarded: () => void; onInspectorCloseCancelled: () => void;
 }) {
   const [selectedNode, setSelectedNode] = useState<BuilderNodeKey>("trigger");
   const [inspectorOpen,setInspectorOpen] = useState(false);
@@ -318,6 +318,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   const [confirmInspectorClose,setConfirmInspectorClose] = useState(false);
   const [inspectorKey,setInspectorKey] = useState(0);
   const [pendingInspectorTab,setPendingInspectorTab] = useState<string|null>(null);
+  useEffect(()=>{if(inspectorCloseRequest>0){setPendingInspectorTab(null);setConfirmInspectorClose(true);}},[inspectorCloseRequest]);
   const [addedNodes,setAddedNodes] = useState<BuilderNodeKey[]>([]);
   const [subTab, setSubTab] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get("builderTab");
@@ -353,11 +354,14 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     setInspectorDirty(false);
     setInspectorOpen(false);
     setInspectorKey(value=>value+1);
+    onInspectorDirtyChange(false);
     const next=pendingInspectorTab;
     setPendingInspectorTab(null);
     if(next) {
       if(dirty) setPendingTab(next);
       else applyTabSwitch(next);
+    } else {
+      onInspectorDiscarded();
     }
   };
   const resetBuilderDraft = () => {
@@ -393,8 +397,8 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}<div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
     {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={addPaletteNode} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{visibleNodes.map((node, index) => <FlowNode key={node.key+"-"+index} node={node} index={index} selected={selectedInstanceIndex===index} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); setInspectorOpen(true); }} />)}<button type="button" className="po-add-step" onClick={() => { setAddedNodes(current=>current.concat("followup")); setSelectedNode("followup"); onSelectNode("followup"); onDirty(); setInspectorOpen(true); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>{visibleNodes.length} steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section></div>}
-    <div className={"po-modal-backdrop po-inspector-backdrop"+(inspectorOpen?"":" is-hidden")} role="presentation" aria-hidden={!inspectorOpen} onMouseDown={event=>event.target===event.currentTarget&&requestInspectorClose()}><section className="po-modal po-inspector-dialog" role="dialog" aria-modal={inspectorOpen} aria-label="Edit flow step"><div className="po-inspector-dialog-actions"><span className="po-eyebrow">NODE INSPECTOR · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close step inspector" onClick={requestInspectorClose}>×</button></div><StepInspector key={inspectorKey} nodeKey={selectedNode} onDirty={onDirty} onEditorDirtyChange={setInspectorDirty} seed={{triggerType,keywords}} onClose={()=>setInspectorOpen(false)} onApplied={(result)=>{if(result.triggerType)setTriggerType(result.triggerType);if(result.keywords)setKeywords(result.keywords);}}/></section></div>
-    {confirmInspectorClose&&<div className="po-modal-backdrop po-inspector-discard-backdrop" role="presentation"><section className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-inspector-discard-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Keep editing this step" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);}}>×</button></div><span className="po-eyebrow">UNSAVED STEP CHANGES</span><h2 id="po-inspector-discard-title">Discard inspector changes?</h2><p>You have edited this step but have not applied those changes to the automation draft.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);}}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={discardInspectorEdits}>Discard changes</button></div></section></div>}
+    <div className={"po-modal-backdrop po-inspector-backdrop"+(inspectorOpen?"":" is-hidden")} role="presentation" aria-hidden={!inspectorOpen} onMouseDown={event=>event.target===event.currentTarget&&requestInspectorClose()}><section className="po-modal po-inspector-dialog" role="dialog" aria-modal={inspectorOpen} aria-label="Edit flow step"><div className="po-inspector-dialog-actions"><span className="po-eyebrow">NODE INSPECTOR · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close step inspector" onClick={requestInspectorClose}>×</button></div><StepInspector key={inspectorKey} nodeKey={selectedNode} onDirty={onDirty} onEditorDirtyChange={setInspectorDirty} seed={{triggerType,keywords}} onClose={()=>setInspectorOpen(false)} onEditorDirtyChange={(value)=>{setInspectorDirty(value);onInspectorDirtyChange(value);}} onApplied={(result)=>{if(result.triggerType)setTriggerType(result.triggerType);if(result.keywords)setKeywords(result.keywords);}}/></section></div>
+    {confirmInspectorClose&&<div className="po-modal-backdrop po-inspector-discard-backdrop" role="presentation"><section className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-inspector-discard-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Keep editing this step" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);onInspectorCloseCancelled();}}>×</button></div><span className="po-eyebrow">UNSAVED STEP CHANGES</span><h2 id="po-inspector-discard-title">Discard inspector changes?</h2><p>You have edited this step but have not applied those changes to the automation draft.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);onInspectorCloseCancelled();}}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={discardInspectorEdits}>Discard changes</button></div></section></div>}
     {subTab === "Setup" && <div className="po-builder-setup">
       <div className="po-setup-main"><div className="po-step-section"><span className="po-step-number">01</span><div className="po-step-section-body"><span className="po-eyebrow">BASICS</span><h2>Name and purpose</h2><p>A clear name makes the automation easy to find and identify later.</p><label className="po-field-block">Automation name<input value={draftName} onChange={e=>{setDraftName(e.target.value);onDirty();}} maxLength={100}/></label><label className="po-field-block">Description<textarea rows={3} value={description} onChange={e=>{setDescription(e.target.value);onDirty();}}/></label></div></div>
       <div className="po-step-section"><span className="po-step-number">02</span><div className="po-step-section-body"><span className="po-eyebrow">START CONDITION</span><h2>When should it start?</h2><p>Choose which inbound interaction can trigger this automation.</p><label className="po-field-block">Trigger source<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);onDirty();}}><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment or direct message</option></select></label><label className="po-field-block">Keywords<textarea rows={3} value={keywords} onChange={e=>{setKeywords(e.target.value);onDirty();}}/><span className="po-help">Separate phrases with commas. Matching behavior depends on the configured trigger rules.</span></label></div></div>
@@ -556,6 +560,9 @@ export function PrecisionOperationsPreviewPage() {
   const [dirty,setDirty] = useState(false);
   const [automationStatus,setAutomationStatus] = useState("Draft");
   const [pendingNavigation,setPendingNavigation] = useState<PreviewScreen|null>(null);
+  const [inspectorEditingDirty,setInspectorEditingDirty] = useState(false);
+  const [inspectorCloseRequest,setInspectorCloseRequest] = useState(0);
+  const [pendingInspectorRoute,setPendingInspectorRoute] = useState<PreviewScreen|null>(null);
   const [savedNotice,setSavedNotice] = useState(false);
   const [showWalkthrough,setShowWalkthrough] = useState(false);
   const [showPublish,setShowPublish] = useState(false);
@@ -580,6 +587,11 @@ export function PrecisionOperationsPreviewPage() {
     window.history.replaceState(null,"",window.location.pathname+"?"+params.toString());
   };
   const go = (next: PreviewScreen) => {
+    if (screen === "builder" && inspectorEditingDirty && next !== "builder") {
+      setPendingInspectorRoute(next);
+      setInspectorCloseRequest(value=>value+1);
+      return;
+    }
     if (screen === "builder" && dirty && next !== "builder") {
       setPendingNavigation(next);
       return;
@@ -622,13 +634,22 @@ export function PrecisionOperationsPreviewPage() {
     go("lead-detail");
   };
   const savePreviewState = () => { setDirty(false); setSavedNotice(true); };
+  const handleInspectorDiscarded = () => {
+    const next = pendingInspectorRoute;
+    setPendingInspectorRoute(null);
+    setInspectorEditingDirty(false);
+    if(!next) return;
+    if(dirty) setPendingNavigation(next);
+    else applyNavigation(next);
+  };
+  const handleInspectorCloseCancelled = () => { setPendingInspectorRoute(null); };
   const requestLifecycleAction = (action: "pause"|"activate") => { setLifecycleAction(action); setShowLifecycle(true); };
   const confirmLifecycleAction = () => { setAutomationStatus(lifecycleAction === "pause" ? "Paused" : "Live"); setShowLifecycle(false); setDirty(false); setSavedNotice(true); };
   const confirmPublishPreview = () => { setAutomationStatus(automationStatus === "Needs publishing" ? "Live" : automationStatus === "Live" ? "Live" : "Paused"); setShowPublish(false); setDirty(false); setSavedNotice(true); };
   const standalone = screen === "login" || screen === "connect-error" || screen === "invite";
   const page = screen === "overview" ? <OverviewScreen onNavigate={go} />
     : screen === "automations" ? <AutomationsScreen onOpenBuilder={openBuilder} />
-    : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} onSavePreview={savePreviewState} seed={builderSeed} />
+    : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} onSavePreview={savePreviewState} seed={builderSeed} inspectorCloseRequest={inspectorCloseRequest} onInspectorDirtyChange={setInspectorEditingDirty} onInspectorDiscarded={handleInspectorDiscarded} onInspectorCloseCancelled={handleInspectorCloseCancelled} />
     : screen === "inbox" ? <InboxScreen />
     : screen === "leads" ? <LeadsScreen onOpenLead={openLead} />
     : screen === "lead-detail" ? <LeadDetailScreen leadName={selectedLeadName} leadHandle={selectedLeadHandle} initialStage={selectedLeadStage} initialOwner={selectedLeadOwner} initialHandoff={selectedLeadHandoff} onBack={()=>go("leads")} onNavigate={go} />
