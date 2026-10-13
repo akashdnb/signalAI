@@ -119,3 +119,6 @@ The preview remains an interactive design model, not a production-connected app.
 ### Recovery route compatibility
 
 The broad desktop sweep used the intuitive query values `screen=connection-recovery` and `screen=invitation-recovery`. Those aliases originally fell through to Overview because the canonical screen values were `connect-error` and `invite`. Both route names are now accepted and map to the dedicated recovery screens. Verify both canonical and alias links after deployment.
+
+
+Recovery alias check completed after deployment: [TinyFish route regression](https://agent.tinyfish.ai/runs/2e464dca-8872-4f97-88f6-2a2e5ce57366). Both `screen=connection-recovery` and `screen=invitation-recovery` now load the dedicated recovery UI; their state selectors, success variants, and canonical `connect-error` / `invite` links were confirmed. No connection or invitation was performed.
