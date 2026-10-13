@@ -620,9 +620,15 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme }: { onNavigate: (scree
 
 export function PrecisionOperationsPreviewPage() {
   const validScreens: PreviewScreen[] = ["overview","automations","builder","inbox","leads","lead-detail","knowledge","content","analytics","integrations","team","billing","settings","docs","login","connect-error","invite"];
+  const screenAliases: Record<string, PreviewScreen> = {
+    "connection-recovery": "connect-error",
+    "invitation-recovery": "invite",
+  };
   const [screen,setScreen] = useState<PreviewScreen>(() => {
-    const requested = new URLSearchParams(window.location.search).get("screen") as PreviewScreen | null;
-    return requested && validScreens.includes(requested) ? requested : "overview";
+    const requested = new URLSearchParams(window.location.search).get("screen");
+    if (!requested) return "overview";
+    if (validScreens.includes(requested as PreviewScreen)) return requested as PreviewScreen;
+    return screenAliases[requested] ?? "overview";
   });
   const [dirty,setDirty] = useState(false);
   const [automationStatus,setAutomationStatus] = useState("Draft");
