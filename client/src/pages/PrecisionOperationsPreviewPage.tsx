@@ -5,7 +5,7 @@ import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
   IntegrationsIcon, LeadsIcon, SettingsIcon, TeamIcon, InstagramMarkIcon,
   BotIcon, SendIcon, ListChecksIcon, SearchIcon, PlayIcon, PlusIcon,
-  ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, CreditCardIcon, SunIcon, MoonIcon, BellIcon, ContactsIcon, BroadcastIcon,
+  ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, CreditCardIcon, SunIcon, MoonIcon, BellIcon,
 } from "../components/icons";
 
 type PreviewScreen = FullPreviewScreen;
@@ -92,12 +92,12 @@ function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (n
             return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">5</span>}</button>;
           })}
         </div>
-        <div className="po-nav-section po-nav-future"><div className="po-nav-coming-soon" aria-disabled="true"><ContactsIcon className="po-nav-icon"/><span>Contacts</span><small>SOON</small></div><div className="po-nav-coming-soon" aria-disabled="true"><BroadcastIcon className="po-nav-icon"/><span>Broadcasts</span><small>SOON</small></div></div>
+        
         <div className="po-nav-divider" /><div className="po-nav-section"><p className="po-nav-label">Workspace</p>
           {navigation.filter((item) => item.section === "workspace").map((item) => { const Icon = item.icon; const active = item.screen === selectedScreen; return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>; })}
         </div>
       </nav>
-      <div className="po-plan-card"><span className="po-plan-label">Current Plan</span><strong>Trial</strong><button type="button" onClick={() => onNavigate("billing")}>Upgrade</button></div>
+      <div className="po-plan-card"><span className="po-plan-label">Current Plan</span><strong>Trial</strong><button type="button" onClick={() => onNavigate("billing")}>View plan &amp; usage</button></div>
     </aside>
   );
 }
@@ -510,20 +510,46 @@ function InboxScreen() {
   const [notice, setNotice] = useState("");
   const [stage, setStage] = useState("New");
   const [owner, setOwner] = useState("Unassigned");
-  const [escalated, setEscalated] = useState(false);
+  const [escalatedHandles, setEscalatedHandles] = useState<string[]>([]);
   const filters = ["All", "Unread", "AI Handling", "Qualified", "Needs Attention"];
-  const visibleConversations = conversations.filter(item => {
+  const visibleConversations = useMemo(() => conversations.filter(item => {
     const search = query.toLowerCase().trim();
     const textMatches = !search || item.handle.toLowerCase().includes(search) || item.preview.toLowerCase().includes(search);
     const filterMatches = filter === "All" ||
       (filter === "Unread" && item.unread) ||
       (filter === "AI Handling" && !item.human) ||
       (filter === "Qualified" && item.stage === "Qualified") ||
-      (filter === "Needs Attention" && (item.attention || escalated));
+      (filter === "Needs Attention" && (item.attention || escalatedHandles.includes(item.handle)));
     return textMatches && filterMatches;
-  });
-  const current = conversations[selected] ?? conversations[0]!;
-  const human = humanMode;
+  }), [filter, query, escalatedHandles]);
+  const selectedConversation = conversations[selected];
+  const selectionIsVisible = !!selectedConversation && visibleConversations.some(item => item.handle === selectedConversation.handle);
+  const current = selectionIsVisible ? selectedConversation! : visibleConversations[0] ?? null;
+  const human = current ? (selectionIsVisible ? humanMode : current.human) : false;
+
+  useEffect(() => {
+    if (visibleConversations.length === 0) {
+      if (selected !== -1) setSelected(-1);
+      if (humanMode) setHumanMode(false);
+      if (stage !== "New") setStage("New");
+      if (owner !== "Unassigned") setOwner("Unassigned");
+      if (compose) setCompose("");
+      if (localReplies.length) setLocalReplies([]);
+      if (notice) setNotice("");
+      return;
+    }
+    const selectedItem = conversations[selected];
+    if (selectedItem && visibleConversations.some(item => item.handle === selectedItem.handle)) return;
+    const next = visibleConversations[0]!;
+    const nextIndex = conversations.findIndex(item => item.handle === next.handle);
+    if (selected !== nextIndex) setSelected(nextIndex);
+    if (humanMode !== next.human) setHumanMode(next.human);
+    if (stage !== next.stage) setStage(next.stage);
+    if (owner !== next.owner) setOwner(next.owner);
+    if (compose) setCompose("");
+    if (localReplies.length) setLocalReplies([]);
+    if (notice) setNotice("");
+  }, [visibleConversations, selected, humanMode, stage, owner, compose, localReplies.length, notice]);
   function selectConversation(index: number) {
     setSelected(index);
     setHumanMode(conversations[index]!.human);
@@ -531,7 +557,6 @@ function InboxScreen() {
     setOwner(conversations[index]!.owner);
     setLocalReplies([]);
     setNotice("");
-    setEscalated(false);
   }
   function submitSampleReply() {
     if (!compose.trim() || !human) return;
@@ -543,14 +568,25 @@ function InboxScreen() {
     <div className="po-screen-toolbar"><div className="po-filter-tabs" role="group" aria-label="Conversation filters">{filters.map(name=><button type="button" key={name} onClick={()=>setFilter(name)} className={filter===name?"is-active":""}>{name}{name==="All"&&<span>5</span>}</button>)}</div><label className="po-search"><SearchIcon/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search by username…"/></label></div>
     <div className="po-inbox-layout">
       <div className="po-conversation-list">{visibleConversations.length===0?<div className="po-empty-mini"><strong>No conversations match</strong><span>Try another filter or search by username.</span><button type="button" className="po-text-action" onClick={()=>{setFilter("All");setQuery("");}}>Clear filters</button></div>:visibleConversations.map(item=>{const originalIndex=conversations.findIndex(candidate=>candidate.handle===item.handle);return <button key={item.handle} type="button" className={"po-conversation"+(selected===originalIndex?" is-selected":"")} onClick={()=>selectConversation(originalIndex)}><span className="po-avatar">{item.initial}</span><span className="po-conversation-body"><span className="po-conversation-first"><strong>{item.handle}</strong><small>{item.time}</small></span><span className="po-conversation-preview">{item.preview}</span><span className="po-conversation-bottom">{item.unread&&<span className="po-unread-dot" aria-label="Unread"/>}<Tag tone={item.tone}>{item.human?"Human handling":item.status}</Tag></span></span></button>;})}</div>
-      <div className="po-thread">
-        <header className="po-thread-header"><div className="po-avatar">{current.initial}</div><div><strong>{current.handle}</strong><span>Instagram conversation · sample</span></div><Tag tone={human?"blue":"purple"}>{human?"Human handling":"AI handling"}</Tag></header>
-        <div className="po-post-context"><InstagramMarkIcon/><span><strong>{current.via==="Comment"?"Comment on a recent post":"Direct message"}</strong><small>“Interested in coaching options” · sample context</small></span><Tag>{current.via}</Tag></div>
-        <div className="po-messages"><div className="po-message po-message--incoming"><span>{current.preview}</span><small>10:24 AM · Sample inbound {current.via}</small></div><div className="po-message po-message--outgoing"><span>Thanks for reaching out. I can share a few options based on what you’re looking for.</span><small>10:25 AM · Example AI reply</small></div><div className="po-message po-message--incoming"><span>That sounds good. Could you tell me more?</span><small>10:26 AM · Sample</small></div>{localReplies.map((reply,index)=><div className="po-message po-message--outgoing" key={index}><span>{reply}</span><small>Just now · Local sample reply</small></div>)}</div>
-        {notice&&<p className="po-inline-notice" role="status">{notice}</p>}
-        {human?<div className="po-composer"><textarea aria-label="Sample human reply composer" placeholder="Write a reply…" value={compose} onChange={e=>setCompose(e.target.value)}/><div className="po-composer-actions"><span>Preview only · no message is sent</span><button type="button" className="po-button po-button--primary" disabled={!compose.trim()} onClick={submitSampleReply}><SendIcon/> Add sample reply</button></div></div>:<div className="po-composer po-ai-composer"><p>AI is handling this conversation. Take over before composing a human reply.</p><button type="button" className="po-button po-button--secondary" onClick={()=>{setHumanMode(true);setNotice("Human-handling state changed locally in preview only.");}}>Take over to reply (demo)</button></div>}
-      </div>
-      <aside className="po-conversation-details"><span className="po-eyebrow">LEAD CONTEXT</span><h3>{current.handle}</h3><p>Instagram contact · sample profile</p><div className="po-detail-row"><span>Handoff status</span><Tag tone={human?"blue":"purple"}>{human?"Human handling":"AI handling"}</Tag></div><div className="po-detail-row"><span>Pipeline stage</span><span className="po-detail-control"><select aria-label="Pipeline stage" value={stage} onChange={e=>setStage(e.target.value)}>{["New","Contacted","Qualified","Meeting Scheduled","Won","Lost"].map(value=><option key={value}>{value}</option>)}</select></span></div><div className="po-detail-row"><span>Owner</span><span className="po-detail-control"><select aria-label="Lead owner" value={owner} onChange={e=>setOwner(e.target.value)}>{["Unassigned","Alex Morgan","Sam Taylor","Follow-up queue"].map(value=><option key={value}>{value}</option>)}</select></span></div><div className="po-detail-row"><span>Messaging window</span><strong>{current.window}</strong></div><div className="po-detail-row"><span>Last contact via</span><strong>{current.via}</strong></div><div className="po-detail-divider"/>{human?<button type="button" className="po-button po-button--secondary po-full-width" onClick={()=>{setHumanMode(false);setCompose("");setNotice("AI handling restored in preview only.");}}>Return to AI (demo)</button>:<button type="button" className="po-button po-button--secondary po-full-width" onClick={()=>{setEscalated(true);setNotice("This conversation was flagged for attention in preview only.");}}>Escalate for attention (demo)</button>}<p className="po-help">All assignment, stage, and handoff changes are local to the preview.</p></aside>
+      {!current ? (
+        <div className="po-thread po-thread-empty" role="status">
+          <div><span className="po-empty-mark">⌕</span><h2>No conversation selected</h2><p>There are no conversations matching these filters. Clear filters or choose another view to continue.</p><button type="button" className="po-button po-button--secondary" onClick={() => { setFilter("All"); setQuery(""); }}>Clear filters</button></div>
+        </div>
+      ) : (
+        <div className="po-thread">
+          <header className="po-thread-header"><div className="po-avatar">{current.initial}</div><div><strong>{current.handle}</strong><span>Instagram conversation · sample</span></div><Tag tone={human ? "blue" : "purple"}>{human ? "Human handling" : "AI handling"}</Tag></header>
+          <div className="po-post-context"><InstagramMarkIcon/><span><strong>{current.via === "Comment" ? "Comment on a recent post" : "Direct message"}</strong><small>“Interested in coaching options” · sample context</small></span><Tag>{current.via}</Tag></div>
+          <div className="po-messages"><div className="po-message po-message--incoming"><span>{current.preview}</span><small>10:24 AM · Sample inbound {current.via}</small></div><div className="po-message po-message--outgoing"><span>Thanks for reaching out. I can share a few options based on what you’re looking for.</span><small>10:25 AM · Example AI reply</small></div><div className="po-message po-message--incoming"><span>That sounds good. Could you tell me more?</span><small>10:26 AM · Sample</small></div>{localReplies.map((reply,index)=><div className="po-message po-message--outgoing" key={index}><span>{reply}</span><small>Just now · Local sample reply</small></div>)}</div>
+          {notice&&<p className="po-inline-notice" role="status">{notice}</p>}
+          {human?<div className="po-composer"><textarea aria-label="Sample human reply composer" placeholder="Write a reply…" value={compose} onChange={e=>setCompose(e.target.value)}/><div className="po-composer-actions"><span>Preview only · no message is sent</span><button type="button" className="po-button po-button--primary" disabled={!compose.trim()} onClick={submitSampleReply}><SendIcon/> Add sample reply</button></div></div>:<div className="po-composer po-ai-composer"><p>AI is handling this conversation. Take over before composing a human reply.</p><button type="button" className="po-button po-button--secondary" onClick={()=>{setHumanMode(true);setNotice("Human-handling state changed locally in preview only.");}}>Take over to reply (demo)</button></div>}
+        </div>
+      )}
+      {!current ? (
+        <aside className="po-conversation-details po-context-empty"><span className="po-eyebrow">LEAD CONTEXT</span><h3>No contact selected</h3><p>Contact details are hidden until a conversation matches the current search and filters.</p></aside>
+      ) : (
+        <aside className="po-conversation-details"><span className="po-eyebrow">LEAD CONTEXT</span><h3>{current.handle}</h3><p>Instagram contact · sample profile</p><div className="po-detail-row"><span>Handoff status</span><Tag tone={human?"blue":"purple"}>{human?"Human handling":"AI handling"}</Tag></div><div className="po-detail-row"><span>Pipeline stage</span><span className="po-detail-control"><select aria-label="Pipeline stage" value={selectionIsVisible ? stage : current.stage} onChange={e=>setStage(e.target.value)}>{["New","Contacted","Qualified","Meeting Scheduled","Won","Lost"].map(value=><option key={value}>{value}</option>)}</select></span></div><div className="po-detail-row"><span>Owner</span><span className="po-detail-control"><select aria-label="Lead owner" value={selectionIsVisible ? owner : current.owner} onChange={e=>setOwner(e.target.value)}>{["Unassigned","Alex Morgan","Sam Taylor","Follow-up queue"].map(value=><option key={value}>{value}</option>)}</select></span></div><div className="po-detail-row"><span>Messaging window</span><strong>{current.window}</strong></div><div className="po-detail-row"><span>Last contact via</span><strong>{current.via}</strong></div><div className="po-detail-divider"/>{human?<button type="button" className="po-button po-button--secondary po-full-width" onClick={()=>{setHumanMode(false);setCompose("");setNotice("AI handling restored in preview only.");}}>Return to AI (demo)</button>:<button type="button" className="po-button po-button--secondary po-full-width" onClick={()=>{setEscalatedHandles(previous=>previous.includes(current.handle)?previous:[...previous,current.handle]);setNotice("This conversation was flagged for attention in preview only.");}}>Escalate for attention (demo)</button>}<p className="po-help">All assignment, stage, and handoff changes are local to the preview.</p></aside>
+      )}
+
     </div>
   </section>;
 }
