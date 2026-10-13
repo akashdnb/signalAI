@@ -5,6 +5,7 @@ import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
 import "./styles/precision-operations-preview.css";
+import "./styles/precision-operations-design-system.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() =>
@@ -83,9 +84,6 @@ function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
 }
 
 function HomeRedirect() {
-  // Render the isolated concept from the static preview site's root when its
-  // explicit query flag is present. This avoids relying on host-level SPA
-  // rewrite configuration for a temporary review route.
   const isPrecisionPreview =
     new URLSearchParams(window.location.search).get("preview") === "precision-operations";
   if (isPrecisionPreview) return <LazyPage Page={PrecisionOperationsPreviewPage} />;
@@ -97,7 +95,6 @@ function HomeRedirect() {
 export default function App() {
   return (
     <Routes>
-      {/* Isolated UI concept route. Sample content only; remove after the design is approved and migrated into real screens. */}
       <Route path="/redesign-preview" element={<LazyPage Page={PrecisionOperationsPreviewPage} />} />
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
