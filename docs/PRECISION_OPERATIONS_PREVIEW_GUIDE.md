@@ -99,7 +99,7 @@ A focused hosted run verified the node editor lifecycle and rich-message control
 - The inspector opens as a modal over the canvas.
 - Editing a message and closing it opens the discard dialog above the inspector. **Keep editing** preserves the unsaved text; **Discard changes** closes and restores the original value.
 - The Message / Instagram layout / AI Settings tabs and all five layout modes were found. Text + buttons reveals button label, action, and HTTPS URL fields; applying stages the change locally and shows the correct confirmation.
-- The run observed that adding nodes updates the canvas but the footer count can continue to show 4. The footer was changed to use an explicit count derived from base nodes plus added nodes, with a live status announcement. **Recheck this counter after the current deployment.**
+- The earlier run observed that adding nodes updated the canvas but the footer remained at 4. The counter was changed to explicit state and the latest hosted regression now confirms the count increments 4 → 5 → 6. See the [latest builder counter test](https://agent.tinyfish.ai/runs/7a55342d-b812-4a44-8bb9-f64d36116807).
 
 
 ### Builder count and per-node regression — latest live preview
