@@ -75,3 +75,18 @@ For recovery screens, change the **Preview state** selector to inspect all avail
 ## Important boundary
 
 This is a high-fidelity, navigable design preview, not yet a 1:1 implementation of every API-backed production interaction. The internal app components have deliberately not been replaced. Preview-side save, sending, upload, invitation, integration, scoring, and publish actions are local simulations. The next phase must wait for design approval and a separate implementation plan; real API behavior and accessibility must be verified in real screens before production rollout.
+
+
+## Regression QA — 13 October 2026
+
+A hosted TinyFish browser run exercised the deployed preview with dummy values: [view the regression run](https://agent.tinyfish.ai/runs/2a71ea17-737a-4e76-a9db-ea6906f28ffb).
+
+**Verified on desktop:** method → email → code sign-in states; code-entry validation; automation tabs and filters; 11 sample automations across two pages; select-all, bulk-action confirmation/cancel; row menu and rename; create-draft → Setup with trigger source and keyword preserved; unsaved Setup tab change prompt; Flow / Setup / Results / Leads navigation; sample message preview, walkthrough, and publish safeguards; inspector edit/discard flow; no production API calls or Instagram messages.
+
+**Still to verify / known boundary:**
+- The last pass did not directly resize the hosted browser to a mobile viewport. The preview now renders automation cards below 1024px, but that behavior still needs a visual mobile-width check.
+- The Builder flow canvas has selectable sample nodes and an Add Message action; it does not yet reproduce production ReactFlow drag-and-connect behavior. Treat graph editing as a preview interaction, not a faithful simulation of every canvas gesture.
+- The OTP, draft saves, rename/status changes, lead edits, publish and send actions are local demonstrations. No email, message, server record, token use, or production mutation occurs.
+- The verification outcome controls are for inspecting invalid/expired/too-many/success states; only submitted, six-digit sample input shows a success state.
+
+The latest change also adds an always-visible inline message on the code screen that explains that no email was sent. After that change is deployed, repeat the auth portion of the test before considering the sign-in preview reviewed.
