@@ -15,18 +15,18 @@ body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-build
 body:has(.po-preview-app) .po-page-header>div>p,body:has(.po-preview-app) .po-builder-heading>p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
 body:has(.po-preview-app) .po-eyebrow,body:has(.po-preview-app) .po-group-label,body:has(.po-preview-app) .po-sample-label{font-size:11px;line-height:16px;letter-spacing:.08em;font-weight:700;color:var(--po-text-muted)}
 body:has(.po-preview-app) .po-panel-title h2,body:has(.po-preview-app) .po-list-toolbar h2,body:has(.po-preview-app) .po-panel-heading h2{font-size:18px;line-height:26px;letter-spacing:-.012em;font-weight:700}
-body:has(.po-preview-app) .po-panel-title p,body:has(.po-preview-app) .po-list-toolbar p,body:has(.po-preview-app) .po-panel-copy{color:var(--po-text-secondary);font-size:13px;line-height:20px}
+body:has(.po-preview-app) .po-panel-title p,body:has(.po-preview-app) .po-list-toolbar p,body:has(.po-preview-app) .po-panel-copy{color:var(--po-text-secondary);font-size:14px;line-height:22px}
 body:has(.po-preview-app) .po-sidebar{background:var(--po-surface);border-right:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-sidebar-brand-row{border-bottom:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-nav-item{min-height:40px;border-radius:var(--po-radius-md);color:#273142;font-size:14px;font-weight:550;transition:background-color 120ms ease,color 120ms ease}
 body:has(.po-preview-app) .po-nav-item:hover:not(.is-active){background:#f7f5fb}
 body:has(.po-preview-app) .po-nav-item.is-active{background:var(--po-primary-soft);color:var(--po-primary);font-weight:650;box-shadow:inset 2px 0 0 var(--po-primary)}
-body:has(.po-preview-app) .po-nav-label{color:var(--po-text-muted);font-size:12px;letter-spacing:.1em;font-weight:700}
+body:has(.po-preview-app) .po-nav-label{color:var(--po-text-muted);font-size:11px;letter-spacing:.1em;font-weight:700}
 body:has(.po-preview-app) .po-plan-card{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);background:#fbfbfd;box-shadow:none}
 body:has(.po-preview-app) .po-plan-card button{border-radius:var(--po-radius-md);min-height:40px}
 body:has(.po-preview-app) .po-page-header{margin-bottom:24px}
 body:has(.po-preview-app) .po-header-actions{gap:8px}
-body:has(.po-preview-app) .po-button{min-height:38px;border-radius:var(--po-radius-md);padding:0 14px;font-size:13px;line-height:20px;font-weight:650;box-shadow:none;transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease,transform 120ms ease,box-shadow 120ms ease}
+body:has(.po-preview-app) .po-button{min-height:38px;border-radius:var(--po-radius-md);padding:0 14px;font-size:14px;line-height:22px;font-weight:650;box-shadow:none;transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease,transform 120ms ease,box-shadow 120ms ease}
 body:has(.po-preview-app) .po-button--primary{background:var(--po-primary);color:#fff}
 body:has(.po-preview-app) .po-button--primary:hover:not(:disabled){background:var(--po-primary-hover)}
 body:has(.po-preview-app) .po-button--secondary{background:var(--po-surface);color:var(--po-text);border:1px solid var(--po-border-strong)}
@@ -34,7 +34,7 @@ body:has(.po-preview-app) .po-button--secondary:hover:not(:disabled){background:
 body:has(.po-preview-app) .po-button--quiet{background:transparent;color:var(--po-text-secondary)}
 body:has(.po-preview-app) .po-button--quiet:hover:not(:disabled){background:#f3f4f7;color:var(--po-text)}
 body:has(.po-preview-app) .po-button:active:not(:disabled){transform:translateY(1px)}
-body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid transparent;border-radius:999px;font-size:11px;line-height:16px;font-weight:650;white-space:nowrap}
+body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid transparent;border-radius:999px;font-size:12px;line-height:17px;font-weight:650;white-space:nowrap}
 body:has(.po-preview-app) .po-tag--neutral{background:#eef1f5;color:#596273}
 body:has(.po-preview-app) .po-tag--purple{background:var(--po-primary-soft);color:var(--po-primary)}
 body:has(.po-preview-app) .po-tag--green{background:var(--po-success-soft);color:var(--po-success)}
@@ -48,17 +48,17 @@ body:has(.po-preview-app) .po-overview-metrics .po-metric{border:0;border-right:
 body:has(.po-preview-app) .po-overview-metrics .po-metric:last-child{border-right:0}
 body:has(.po-preview-app) .po-metric>span{font-size:12px;color:var(--po-text-secondary)}
 body:has(.po-preview-app) .po-metric strong{margin-top:6px;font-size:28px;line-height:32px;letter-spacing:-.025em}
-body:has(.po-preview-app) .po-metric small{color:var(--po-text-muted);font-size:11px;line-height:17px}
+body:has(.po-preview-app) .po-metric small{color:var(--po-text-muted);font-size:12px;line-height:19px}
 body:has(.po-preview-app) .po-overview-grid{gap:16px}
 body:has(.po-preview-app) .po-chart-summary strong{font-size:28px;line-height:32px}
-body:has(.po-preview-app) .po-text-action{color:var(--po-primary);font-size:12px;font-weight:650}
+body:has(.po-preview-app) .po-text-action{color:var(--po-primary);font-size:14px;font-weight:650}
 body:has(.po-preview-app) .po-action-row,body:has(.po-preview-app) .po-recent-item{border-color:#eef0f4}
 body:has(.po-preview-app) .po-action-row:hover,body:has(.po-preview-app) .po-recent-item:hover{background:#faf9fd}
 body:has(.po-preview-app) .po-tab-bar{gap:28px;border-bottom:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-tab-bar button{min-height:44px;padding:0 0 10px;border-bottom:2px solid transparent;color:var(--po-text-secondary);font-size:14px;font-weight:600}
 body:has(.po-preview-app) .po-tab-bar button.is-active{color:var(--po-text);border-color:var(--po-primary)}
 body:has(.po-preview-app) .po-outcome-banner{display:flex;align-items:center;gap:16px;padding:18px 20px;background:linear-gradient(90deg,#fbf9ff,#fff);border-color:#ded1f7}
-body:has(.po-preview-app) .po-outcome-banner p{color:var(--po-text-secondary);font-size:13px;line-height:20px}
+body:has(.po-preview-app) .po-outcome-banner p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
 body:has(.po-preview-app) .po-list-toolbar{align-items:flex-end;margin-top:28px;margin-bottom:16px}
 body:has(.po-preview-app) .po-list-toolbar h2{margin-bottom:4px}
 body:has(.po-preview-app) .po-automation-filters{gap:12px}
@@ -66,35 +66,35 @@ body:has(.po-preview-app) .po-automation-filters label{color:var(--po-text-muted
 body:has(.po-preview-app) .po-search,body:has(.po-preview-app) .po-automation-filter select,body:has(.po-preview-app) .po-automation-search input{min-height:40px;border-radius:var(--po-radius-md);border-color:var(--po-border-strong);background:var(--po-surface)}
 body:has(.po-preview-app) .po-search:focus-within{border-color:var(--po-primary);box-shadow:var(--po-focus)}
 body:has(.po-preview-app) .po-automation-table{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);overflow:hidden;background:var(--po-surface)}
-body:has(.po-preview-app) .po-automation-table th{height:42px;background:#fafbfc;color:var(--po-text-muted);font-size:12px;letter-spacing:.07em;font-weight:700}
-body:has(.po-preview-app) .po-automation-table td{min-height:64px;padding-top:14px;padding-bottom:14px;border-color:#eef0f4;font-size:13px}
+body:has(.po-preview-app) .po-automation-table th{height:42px;background:#fafbfc;color:var(--po-text-muted);font-size:11px;letter-spacing:.07em;font-weight:700}
+body:has(.po-preview-app) .po-automation-table td{min-height:64px;padding-top:14px;padding-bottom:14px;border-color:#eef0f4;font-size:14px}
 body:has(.po-preview-app) .po-automation-table tbody tr:hover{background:#fcfbff}
 body:has(.po-preview-app) .po-builder-header{padding-bottom:18px;border-bottom:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-breadcrumb{margin-bottom:8px;color:var(--po-text-muted);font-size:12px}
 body:has(.po-preview-app) .po-breadcrumb button{color:var(--po-primary);font-weight:650}
-body:has(.po-preview-app) .po-save-status{color:var(--po-text-muted);font-size:11px;font-weight:600}
+body:has(.po-preview-app) .po-save-status{color:var(--po-text-muted);font-size:12px;font-weight:600}
 body:has(.po-preview-app) .po-save-status.is-dirty{color:var(--po-warning)}
 body:has(.po-preview-app) .po-save-status-dot{width:7px;height:7px;border-radius:50%;background:#b4bbc7}
 body:has(.po-preview-app) .po-save-status.is-dirty .po-save-status-dot{background:var(--po-warning)}
 body:has(.po-preview-app) .po-builder-tabs,body:has(.po-preview-app) .po-automation-tabs{border-bottom:1px solid var(--po-border)}
-body:has(.po-preview-app) .po-builder-tabs button,body:has(.po-preview-app) .po-automation-tabs button{min-height:44px;font-size:13px;font-weight:650}
+body:has(.po-preview-app) .po-builder-tabs button,body:has(.po-preview-app) .po-automation-tabs button{min-height:44px;font-size:14px;font-weight:650}
 body:has(.po-preview-app) .po-palette{background:var(--po-surface);border-right:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-palette-item{border-radius:var(--po-radius-md);padding:10px 8px}
 body:has(.po-preview-app) .po-palette-item:hover{background:#f8f6fc}
 body:has(.po-preview-app) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:10px;background:var(--po-surface);box-shadow:0 2px 5px rgba(15,23,42,.04);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
 body:has(.po-preview-app) .po-flow-node:hover,body:has(.po-preview-app) .po-flow-node.is-selected{border-color:#9b72ed;box-shadow:0 8px 24px rgba(124,58,237,.1)}
 body:has(.po-preview-app) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px rgba(124,58,237,.1)}
-body:has(.po-preview-app) .po-flow-node-kicker{color:#6b746e;font-size:12px;letter-spacing:.08em;font-weight:700}
+body:has(.po-preview-app) .po-flow-node-kicker{color:#6b746e;font-size:11px;letter-spacing:.08em;font-weight:700}
 body:has(.po-preview-app) .po-flow-node-content strong{font-size:14px;line-height:20px}
-body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker),body:has(.po-preview-app) .po-flow-node-content small{font-size:12px;line-height:18px}
+body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker),body:has(.po-preview-app) .po-flow-node-content small{font-size:14px;line-height:21px}
 body:has(.po-preview-app) .po-dialog-backdrop{background:rgba(15,23,42,.42);backdrop-filter:blur(2px)}
 body:has(.po-preview-app) .po-dialog,body:has(.po-preview-app) .po-modal,body:has(.po-preview-app) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
-body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:13px}
+body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
 body:has(.po-preview-app) input:focus,body:has(.po-preview-app) select:focus,body:has(.po-preview-app) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus)}
 body:has(.po-preview-app) label{color:var(--po-text-secondary);font-size:12px;line-height:18px;font-weight:600}
-body:has(.po-preview-app) table th{color:var(--po-text-muted);background:#fafbfc;font-size:12px;letter-spacing:.07em;font-weight:700}
-body:has(.po-preview-app) table td{font-size:13px;color:var(--po-text)}
-body:has(.po-preview-app) .po-preview-notice{border:1px solid #ddd5ee;background:#faf8ff;color:#5e566d;border-radius:var(--po-radius-md);font-size:11px}
+body:has(.po-preview-app) table th{color:var(--po-text-muted);background:#fafbfc;font-size:11px;letter-spacing:.07em;font-weight:700}
+body:has(.po-preview-app) table td{font-size:14px;color:var(--po-text)}
+body:has(.po-preview-app) .po-preview-notice{border:1px solid #ddd5ee;background:#faf8ff;color:#5e566d;border-radius:var(--po-radius-md);font-size:12px}
 /* Dark theme.
  * The token block above is light-only and is set on `body`, so without this the
  * preview's dark mode (.po-preview-app.is-dark, which redefines a *different*
@@ -187,7 +187,7 @@ body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search{
   min-height:40px;gap:8px;padding:0 12px;border-radius:var(--po-radius-md);
   border:1px solid var(--po-border-strong)}
 body:has(.po-preview-app) .po-preview-app .po-search svg{width:15px;height:15px}
-body:has(.po-preview-app) .po-preview-app .po-search input{font-size:13px}
+body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px}
 
 body:has(.po-preview-app) .po-preview-app select{
   appearance:none;-webkit-appearance:none;min-height:40px;
@@ -203,6 +203,6 @@ body:has(.po-preview-app) .po-preview-app.is-dark select{
   background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2393a098' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")}
 body:has(.po-preview-app) .po-preview-app.is-dark .po-select-wrap select{background-image:none}
 
-@media (max-width:900px){body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:24px}body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(2){border-right:0}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(-n+2){border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-outcome-banner{align-items:flex-start;flex-wrap:wrap}}
+@media (max-width:900px){body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px}body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(2){border-right:0}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(-n+2){border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-outcome-banner{align-items:flex-start;flex-wrap:wrap}}
 @media (max-width:640px){body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:1fr}body:has(.po-preview-app) .po-overview-metrics .po-metric{border-right:0;border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-overview-metrics .po-metric:last-child{border-bottom:0}body:has(.po-preview-app) .po-button{min-height:42px}body:has(.po-preview-app) .po-list-toolbar{align-items:stretch}}
 @media (prefers-reduced-motion:reduce){body:has(.po-preview-app) *,body:has(.po-preview-app) *::before,body:has(.po-preview-app) *::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
