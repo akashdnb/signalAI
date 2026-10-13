@@ -129,3 +129,39 @@ The scale is recorded in `DESIGN.md` under "Type and copy" so the next screen in
 **Verified:** 0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; build and `oxlint` clean.
 
 **Deployment note.** Render fronts the static site with a CDN using `s-maxage=300` on `index.html`. For five minutes after a deploy the edge can serve the previous HTML, pointing at the previous CSS hash — a verification run against the plain URL during that window reports stale values. Append a cache-busting query param (or hard-refresh) when checking a fresh deploy.
+
+---
+
+# Round 4 — anti-slop guidelines applied (14 October 2026)
+
+Commit `f942daf`, deploy `dep-db78cq7avr4c73fb0cu0` (live).
+
+Audited against `AGENTS.md` "Anti-slop review before shipping frontend work", `DESIGN.md` "Deliberate anti-defaults" + the design-change self-audit, and the adaptation notes in `docs/ANTI_AI_DESIGN_SOURCES.md`.
+
+## Already clean (checked, not changed)
+
+No `transition: all`; no emoji iconography; no generic button labels (`Submit`/`Click here`/`Learn more`); no fabricated metrics, testimonials or customer logos — sample data is labelled 129 times across the two page files; `prefers-reduced-motion` handled in both stylesheets; every selector scoped under `body:has(.po-preview-app)`, so nothing leaks into production screens.
+
+## Fixed
+
+**Decorative purple gradients.** `.po-outcome-banner` carried a purple-to-white wash declared *three separate times* across the two stylesheets (`preview.css:1514`, `preview.css:1613`, `design-system.css:60`) plus purple-tinted borders — on an element that is neither an action nor a selected state. Now a plain surface with a neutral border.
+
+**Purple as a blanket colour.** It was doing six jobs: primary buttons, active nav, links, activity chart bars, pipeline bars and the usage meter. Data bars moved to the supporting blue accent (`--po-info`), so purple reads as "action or selection" again per `DESIGN.md` "Brand and tokens". Verified against the 3:1 non-text minimum in both themes — which surfaced that the usage meter's track was a hardcoded light purple with no dark value (1.62:1 in dark); it now has one.
+
+**Status colour without meaning.** `Draft` and `Paused` both rendered as the same neutral chip. `Paused` is now its own tone. Colour was never the only signal — the chips carry text labels.
+
+**Generic AI claim.** "AI-powered Instagram automation: …" replaced with what the product does. `DESIGN.md` names "AI-powered" explicitly.
+
+**Arbitrary rounding.** 13 radius values against 4 defined tokens → `6/8/12/16` plus the pill. Live now reports only `6px/8px/12px/999px`. The chart bar cap keeps its `3px 3px 0 0` shape.
+
+**Tiny touch targets.** Row checkboxes 15×15, row action menu 31×31, global icons 34×34, pagination 21×17. Hit areas expanded with an overlay so the dense desktop layout keeps its visual size, and controls grow to 44px under `@media (pointer: coarse)` where the minimum actually applies. Down from 14 undersized controls to 2 — an input whose 44px wrapper is the real target, and a tab 1px under on width. Inline text links keep their size (WCAG 2.5.8 exempts them).
+
+**Weights implying a hierarchy they did not have.** 17 declared weights collapsed onto the 5 loaded faces, so `650` and `700` rendered identically. All snapped to what the browser already drew — visually a no-op — and the three places where this had erased a real distinction were given genuine steps: the builder breadcrumb (parent link now 500 against the current page's 700) and the docs sidebar (group label now an 11px uppercase eyebrow against its 500-weight links). Live now reports only `400/600/700/800`.
+
+## Judgement call left in place
+
+`backdrop-filter: blur(2px)` on the modal scrim. The anti-defaults list "glassmorphism", but this is layering depth on an overlay — which `DESIGN.md` explicitly reserves elevation for — not a glass treatment applied to a content surface.
+
+## Verified
+
+0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; 0 remaining invisible weight contrasts; build and `oxlint` clean. One regression introduced and fixed during the pass: the `.po-detail-control` padding change met the nowrap "Pipeline stage" label in a narrow panel and overflowed at 768px — the lead-context rows now wrap.
