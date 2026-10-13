@@ -122,3 +122,31 @@ The broad desktop sweep used the intuitive query values `screen=connection-recov
 
 
 Recovery alias check completed after deployment: [TinyFish route regression](https://agent.tinyfish.ai/runs/2e464dca-8872-4f97-88f6-2a2e5ce57366). Both `screen=connection-recovery` and `screen=invitation-recovery` now load the dedicated recovery UI; their state selectors, success variants, and canonical `connect-error` / `invite` links were confirmed. No connection or invitation was performed.
+
+
+## Audit fixes (13 October 2026)
+
+The preview is intentionally sample-only. Changes below were made on `feat/precision-operations-product-ui` and deployed to the separate Render preview service. Production routes, records, and messaging APIs are not used by this concept.
+
+### Inbox selection and empty states
+- Selection now stays inside the currently filtered conversation set. When the current contact no longer matches search/filter, the first matching conversation is selected; if none match, both the thread and lead context clear into an explicit empty state.
+- The empty state offers `Clear filters`.
+- The `Needs Attention` filter now stores escalation state per sample conversation rather than globally marking all conversations as needing attention.
+- Demo replies remain local; copy explicitly says no Instagram message is sent.
+- Non-functional Contacts and Broadcasts entries are hidden from primary navigation.
+
+### Lead details and scoring
+- Lead detail tabs now have clear tab/tabpanel relationships, selected-tab focusability, and arrow/Home/End keyboard navigation.
+- The uncalculated Lead Intelligence card explains why a score may not exist, names prerequisites (applicable rules and enough supported conversation signals), and clarifies that the preview does not call scoring services.
+- The sample plan CTA says `View plan & usage` rather than implying a purchase flow is available.
+- The global meter uses the label `AI usage` and spells out that the displayed unit is tokens.
+
+### Automation walkthrough
+- The action is labelled `Run sample walkthrough`; the dialog guides users through a multi-step example and states that it does not execute a live Instagram test, send messages, or write lead records.
+- Publish/lifecycle actions remain simulated and explicitly marked preview-only.
+
+### Hosting and verification
+- The Render service is linked to branch `feat/precision-operations-product-ui`, with auto-deploy still disabled. Preview changes are deployed manually after a build.
+- Preview links use query-based routes, e.g. `/?preview=precision-operations&screen=inbox`, rather than nested React paths.
+- The project build and `oxlint` completed successfully for the deployed commit. A browser test against a fresh isolated session returned `ERR_TUNNEL_CONNECTION_FAILED`, so live post-deploy interaction verification was inconclusive. The existing connected browser showed an older cached navigation; do a hard refresh before reviewing.
+- The Preview service's route rewrite rule was not confirmed through the available service-management connector, so direct nested paths such as `/dashboard/:tenantId/inbox` may still return 404. Use the query-based preview links above until the Render Dashboard's Redirects/Rewrites rule `/* → /index.html` is verified.
