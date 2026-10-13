@@ -569,6 +569,11 @@ export function PrecisionOperationsPreviewPage() {
     setAutomationStatus(status);
     setBuilderSeed(seed ?? null);
     setDirty(newDraft);
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview","precision-operations");
+    params.set("screen","builder");
+    params.set("builderTab",newDraft?"Setup":"Flow");
+    window.history.replaceState(null,"",window.location.pathname+"?"+params.toString());
     applyNavigation("builder");
   };
   const saveAndLeave = () => {
