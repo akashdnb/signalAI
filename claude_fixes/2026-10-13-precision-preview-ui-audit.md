@@ -97,3 +97,35 @@ Headless over 14 screens × 2 themes, re-run against the live deployment: **0** 
 Two regressions the type bump introduced were caught and fixed: "AI usage" and the inbox "Pipeline stage" label — both label/value rows where only the value was `nowrap`, so the label absorbed the squeeze.
 
 **Still not done:** the font-weight collapse, line-height/letter-spacing spread, collapsing the four stylesheets, the parallel `--po-*` palette, purple's six jobs, `Draft` vs `Paused`, and 44×44 touch targets.
+
+---
+
+# Round 3 — type sizes assigned by role (14 October 2026)
+
+Commit `f3f866d`, deploy `dep-db77n1ad0e5s73fhvef0` (live).
+
+**What round 2 got wrong.** It normalised the *vocabulary* of font sizes (26 → 10) but remapped each declaration relative to its old value, so every page kept its own base. Leads had been built on 14px while Inbox, Knowledge, Integrations and Team sat on 12px — Leads read ~17% larger — and the same role drifted per screen: section headings spanned 12/13/14/16/18/20/24/28px and page titles 24/28/32px.
+
+**Fix.** Size is assigned by **role**, not per page, applied at source rather than through another override layer. Selectors were classified from the stylesheet inventory, then 258 declaration blocks rewritten with px line-heights scaled by the same ratio.
+
+| Role | Size |
+|---|---|
+| Sign-in hero (display) | 40px |
+| Page title (`h1`, every screen incl. auth/recovery) | 32px |
+| Metric values | 28px |
+| Section heading (every panel/card/modal/table-toolbar `h2`) | 18px |
+| Sub-heading (`h3`) | 16px |
+| Body, table cells, nav, buttons, inputs | 14px |
+| Dense body (reserved) | 13px |
+| Labels, captions, `<small>`, metadata, chips | 12px |
+| Uppercase tracked labels and table `th` | 11px |
+
+Rules where `font-size` sizes an icon glyph, an avatar initial or the wordmark were excluded, so icons did not change size. Two hand corrections after the mechanical pass: the sign-in hero was classified as a section heading (restored to display), and `.po-source-summary` was grouped with `small` though it is body copy.
+
+**Result, measured live across 14 screens:** body mode is 14px on 13 of 14, `h1` is 32px and `h2` is 18px on every screen that has one. Overview keeps a 12px median because it is genuinely caption-heavy — KPI labels and footnotes are label-role — not because its scale differs.
+
+The scale is recorded in `DESIGN.md` under "Type and copy" so the next screen inherits it instead of inventing another base. That section also records that weights must stay on the five loaded faces (`400/500/600/700/800`), since in-between values are silently rounded.
+
+**Verified:** 0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; build and `oxlint` clean.
+
+**Deployment note.** Render fronts the static site with a CDN using `s-maxage=300` on `index.html`. For five minutes after a deploy the edge can serve the previous HTML, pointing at the previous CSS hash — a verification run against the plain URL during that window reports stale values. Append a cache-busting query param (or hard-refresh) when checking a fresh deploy.
