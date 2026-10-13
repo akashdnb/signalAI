@@ -3,7 +3,7 @@
  */
 body:has(.po-sidebar) {
   --po-bg:#f6f7fb; --po-surface:#fff; --po-text:#111827; --po-text-secondary:#4b5563;
-  --po-text-muted:#7b8496; --po-border:#e5e7eb; --po-border-strong:#d8dce5;
+  --po-text-muted:#626a7c; --po-border:#e5e7eb; --po-border-strong:#d8dce5;
   --po-primary:#7c3aed; --po-primary-hover:#6d28d9; --po-primary-soft:#f1eafe;
   --po-success:#087f5b; --po-success-soft:#eaf8f2; --po-warning:#a15c00; --po-warning-soft:#fff6df;
   --po-info:#2563eb; --po-info-soft:#eef4ff; --po-radius-sm:6px; --po-radius-md:8px;
@@ -13,7 +13,7 @@ body:has(.po-sidebar) {
 body:has(.po-sidebar),body:has(.po-sidebar) button,body:has(.po-sidebar) input,body:has(.po-sidebar) select,body:has(.po-sidebar) textarea{font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 body:has(.po-sidebar) .po-page-header h1,body:has(.po-sidebar) .po-builder-header h1{font-size:32px;line-height:1.2;letter-spacing:-.025em;font-weight:750}
 body:has(.po-sidebar) .po-page-header>div>p,body:has(.po-sidebar) .po-builder-heading>p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
-body:has(.po-sidebar) .po-eyebrow,body:has(.po-sidebar) .po-group-label,body:has(.po-sidebar) .po-sample-label{font-size:11px;line-height:16px;letter-spacing:.08em;font-weight:700;color:#687386}
+body:has(.po-sidebar) .po-eyebrow,body:has(.po-sidebar) .po-group-label,body:has(.po-sidebar) .po-sample-label{font-size:11px;line-height:16px;letter-spacing:.08em;font-weight:700;color:var(--po-text-muted)}
 body:has(.po-sidebar) .po-panel-title h2,body:has(.po-sidebar) .po-list-toolbar h2,body:has(.po-sidebar) .po-panel-heading h2{font-size:18px;line-height:26px;letter-spacing:-.012em;font-weight:700}
 body:has(.po-sidebar) .po-panel-title p,body:has(.po-sidebar) .po-list-toolbar p,body:has(.po-sidebar) .po-panel-copy{color:var(--po-text-secondary);font-size:13px;line-height:20px}
 body:has(.po-sidebar) .po-sidebar{background:var(--po-surface);border-right:1px solid var(--po-border)}
@@ -21,7 +21,7 @@ body:has(.po-sidebar) .po-sidebar-brand-row{border-bottom:1px solid var(--po-bor
 body:has(.po-sidebar) .po-nav-item{min-height:40px;border-radius:var(--po-radius-md);color:#273142;font-size:14px;font-weight:550;transition:background-color 120ms ease,color 120ms ease}
 body:has(.po-sidebar) .po-nav-item:hover:not(.is-active){background:#f7f5fb}
 body:has(.po-sidebar) .po-nav-item.is-active{background:var(--po-primary-soft);color:var(--po-primary);font-weight:650;box-shadow:inset 2px 0 0 var(--po-primary)}
-body:has(.po-sidebar) .po-nav-label{color:#8992a2;font-size:10px;letter-spacing:.1em;font-weight:700}
+body:has(.po-sidebar) .po-nav-label{color:var(--po-text-muted);font-size:10px;letter-spacing:.1em;font-weight:700}
 body:has(.po-sidebar) .po-plan-card{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);background:#fbfbfd;box-shadow:none}
 body:has(.po-sidebar) .po-plan-card button{border-radius:var(--po-radius-md);min-height:40px}
 body:has(.po-sidebar) .po-page-header{margin-bottom:24px}
@@ -34,7 +34,6 @@ body:has(.po-sidebar) .po-button--secondary:hover:not(:disabled){background:#faf
 body:has(.po-sidebar) .po-button--quiet{background:transparent;color:var(--po-text-secondary)}
 body:has(.po-sidebar) .po-button--quiet:hover:not(:disabled){background:#f3f4f7;color:var(--po-text)}
 body:has(.po-sidebar) .po-button:active:not(:disabled){transform:translateY(1px)}
-body:has(.po-sidebar) .po-button:focus-visible,body:has(.po-sidebar) .po-nav-item:focus-visible,body:has(.po-sidebar) .po-text-action:focus-visible,body:has(.po-sidebar) .po-palette-item:focus-visible,body:has(.po-sidebar) .po-flow-node:focus-visible{outline:none;box-shadow:var(--po-focus)}
 body:has(.po-sidebar) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid transparent;border-radius:999px;font-size:11px;line-height:16px;font-weight:650;white-space:nowrap}
 body:has(.po-sidebar) .po-tag--neutral{background:#eef1f5;color:#596273}
 body:has(.po-sidebar) .po-tag--purple{background:var(--po-primary-soft);color:var(--po-primary)}
@@ -63,20 +62,20 @@ body:has(.po-sidebar) .po-outcome-banner p{color:var(--po-text-secondary);font-s
 body:has(.po-sidebar) .po-list-toolbar{align-items:flex-end;margin-top:28px;margin-bottom:16px}
 body:has(.po-sidebar) .po-list-toolbar h2{margin-bottom:4px}
 body:has(.po-sidebar) .po-automation-filters{gap:12px}
-body:has(.po-sidebar) .po-automation-filters label{color:#697386;font-size:12px;font-weight:600}
+body:has(.po-sidebar) .po-automation-filters label{color:var(--po-text-muted);font-size:12px;font-weight:600}
 body:has(.po-sidebar) .po-search,body:has(.po-sidebar) .po-automation-filter select,body:has(.po-sidebar) .po-automation-search input{min-height:40px;border-radius:var(--po-radius-md);border-color:var(--po-border-strong);background:var(--po-surface)}
 body:has(.po-sidebar) .po-search:focus-within{border-color:var(--po-primary);box-shadow:var(--po-focus)}
 body:has(.po-sidebar) .po-automation-table{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);overflow:hidden;background:var(--po-surface)}
-body:has(.po-sidebar) .po-automation-table th{height:42px;background:#fafbfc;color:#697386;font-size:10px;letter-spacing:.07em;font-weight:700}
+body:has(.po-sidebar) .po-automation-table th{height:42px;background:#fafbfc;color:var(--po-text-muted);font-size:10px;letter-spacing:.07em;font-weight:700}
 body:has(.po-sidebar) .po-automation-table td{min-height:64px;padding-top:14px;padding-bottom:14px;border-color:#eef0f4;font-size:13px}
 body:has(.po-sidebar) .po-automation-table tbody tr:hover{background:#fcfbff}
 body:has(.po-sidebar) .po-builder-header{padding-bottom:18px;border-bottom:1px solid var(--po-border)}
-body:has(.po-sidebar) .po-breadcrumb{margin-bottom:8px;color:#7b8496;font-size:12px}
+body:has(.po-sidebar) .po-breadcrumb{margin-bottom:8px;color:var(--po-text-muted);font-size:12px}
 body:has(.po-sidebar) .po-breadcrumb button{color:var(--po-primary);font-weight:650}
 body:has(.po-sidebar) .po-save-status{color:var(--po-text-muted);font-size:11px;font-weight:600}
 body:has(.po-sidebar) .po-save-status.is-dirty{color:var(--po-warning)}
 body:has(.po-sidebar) .po-save-status-dot{width:7px;height:7px;border-radius:50%;background:#b4bbc7}
-body:has(.po-sidebar) .po-save-status.is-dirty .po-save-status-dot{background:#d88b14}
+body:has(.po-sidebar) .po-save-status.is-dirty .po-save-status-dot{background:var(--po-warning)}
 body:has(.po-sidebar) .po-builder-tabs,body:has(.po-sidebar) .po-automation-tabs{border-bottom:1px solid var(--po-border)}
 body:has(.po-sidebar) .po-builder-tabs button,body:has(.po-sidebar) .po-automation-tabs button{min-height:44px;font-size:13px;font-weight:650}
 body:has(.po-sidebar) .po-palette{background:var(--po-surface);border-right:1px solid var(--po-border)}
@@ -85,17 +84,95 @@ body:has(.po-sidebar) .po-palette-item:hover{background:#f8f6fc}
 body:has(.po-sidebar) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:10px;background:var(--po-surface);box-shadow:0 2px 5px rgba(15,23,42,.04);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
 body:has(.po-sidebar) .po-flow-node:hover,body:has(.po-sidebar) .po-flow-node.is-selected{border-color:#9b72ed;box-shadow:0 8px 24px rgba(124,58,237,.1)}
 body:has(.po-sidebar) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px rgba(124,58,237,.1)}
-body:has(.po-sidebar) .po-flow-node-kicker{color:#7b8496;font-size:10px;letter-spacing:.08em;font-weight:700}
+body:has(.po-sidebar) .po-flow-node-kicker{color:#6b746e;font-size:10px;letter-spacing:.08em;font-weight:700}
 body:has(.po-sidebar) .po-flow-node-content strong{font-size:15px;line-height:21px}
 body:has(.po-sidebar) .po-flow-node-content>span:not(.po-flow-node-kicker),body:has(.po-sidebar) .po-flow-node-content small{font-size:12px;line-height:18px}
 body:has(.po-sidebar) .po-dialog-backdrop{background:rgba(15,23,42,.42);backdrop-filter:blur(2px)}
 body:has(.po-sidebar) .po-dialog,body:has(.po-sidebar) .po-modal,body:has(.po-sidebar) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
 body:has(.po-sidebar) input,body:has(.po-sidebar) select,body:has(.po-sidebar) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:13px}
-body:has(.po-sidebar) input:focus,body:has(.po-sidebar) select:focus,body:has(.po-sidebar) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus);outline:none}
+body:has(.po-sidebar) input:focus,body:has(.po-sidebar) select:focus,body:has(.po-sidebar) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus)}
 body:has(.po-sidebar) label{color:var(--po-text-secondary);font-size:12px;line-height:18px;font-weight:600}
-body:has(.po-sidebar) table th{color:#697386;background:#fafbfc;font-size:10px;letter-spacing:.07em;font-weight:700}
+body:has(.po-sidebar) table th{color:var(--po-text-muted);background:#fafbfc;font-size:10px;letter-spacing:.07em;font-weight:700}
 body:has(.po-sidebar) table td{font-size:13px;color:var(--po-text)}
 body:has(.po-sidebar) .po-preview-notice{border:1px solid #ddd5ee;background:#faf8ff;color:#5e566d;border-radius:var(--po-radius-md);font-size:11px}
+/* Dark theme.
+ * The token block above is light-only and is set on `body`, so without this the
+ * preview's dark mode (.po-preview-app.is-dark, which redefines a *different*
+ * namespace in precision-operations-preview.css) left --po-text #111827 on a
+ * #1b211e surface — 1.08:1. Same specificity as the light block (0,1,1), so
+ * source order decides; keep this last.
+ */
+body:has(.po-preview-app.is-dark) {
+  --po-bg:#141816; --po-text:#edf1ec; --po-text-secondary:#c1cbc3;
+  --po-text-muted:#93a098; --po-border:#303a34; --po-border-strong:#465148;
+  --po-primary:#b49af5; --po-primary-hover:#c3b0fa; --po-primary-soft:#302746;
+  --po-success:#81d0a2; --po-success-soft:#203c2c; --po-warning:#f0c36a; --po-warning-soft:#3b301e;
+  --po-info:#8ab4ff; --po-info-soft:#1e2a40;
+  --po-focus:0 0 0 3px rgba(180,154,245,.3);
+  --po-shadow-dialog:0 24px 60px rgba(0,0,0,.5);
+}
+/* Hardcoded light values from the block above that have no token to follow. */
+body:has(.po-preview-app.is-dark) .po-nav-item{color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-nav-item:hover:not(.is-active){background:#202723}
+body:has(.po-preview-app.is-dark) .po-nav-label{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-eyebrow,body:has(.po-preview-app.is-dark) .po-group-label,body:has(.po-preview-app.is-dark) .po-sample-label{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-plan-card{background:#1b211e}
+body:has(.po-preview-app.is-dark) .po-button--secondary:hover:not(:disabled){background:#202723;border-color:#55605a}
+body:has(.po-preview-app.is-dark) .po-button--quiet:hover:not(:disabled){background:#202723}
+body:has(.po-preview-app.is-dark) .po-tag--neutral{background:#262e29;color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-panel-title{border-bottom-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-action-row,body:has(.po-preview-app.is-dark) .po-recent-item{border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-action-row:hover,body:has(.po-preview-app.is-dark) .po-recent-item:hover{background:#202723}
+body:has(.po-preview-app.is-dark) .po-outcome-banner{background:linear-gradient(90deg,#241d35,#1b211e);border-color:#3f3458}
+body:has(.po-preview-app.is-dark) .po-automation-table th,body:has(.po-preview-app.is-dark) table th{background:#202723;color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-automation-table td{border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-automation-table tbody tr:hover{background:#202723}
+body:has(.po-preview-app.is-dark) .po-automation-filters label{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-breadcrumb{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-flow-node-kicker{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-save-status-dot{background:#6d7a72}
+body:has(.po-preview-app.is-dark) .po-palette-item:hover{background:#202723}
+body:has(.po-preview-app.is-dark) .po-preview-notice{border-color:#3a3350;background:#1e1a2b;color:#c7c0d6}
+/* --po-primary is the lavender accent for text on dark; as a button fill under
+ * white text it is 2.36:1. Keep the production accent for filled buttons. */
+body:has(.po-preview-app.is-dark) .po-button--primary{background:#7c3aed;color:#fff}
+body:has(.po-preview-app.is-dark) .po-button--primary:hover:not(:disabled){background:#6d28d9}
+body:has(.po-preview-app.is-dark) .po-plan-card > button{background:#7c3aed;color:#fff}
+body:has(.po-preview-app.is-dark) .po-plan-card > button:hover{background:#6d28d9}
+/* White on the lavender accent is 2.36:1; keep the production accent for filled shapes. */
+body:has(.po-preview-app.is-dark) .po-profile-avatar{background:#7c3aed;color:#fff}
+/* The skip link paints white on var(--po-ink), which is light in dark mode. */
+body:has(.po-preview-app.is-dark) .po-skip-link{background:#111827;color:#fff}
+body:has(.po-preview-app.is-dark) .po-footer{color:#93a098}
+/* Remaining hardcoded light fills in precision-operations-preview.css that had no
+ * dark counterpart, so light-mode tokens were painting onto them. */
+body:has(.po-preview-app.is-dark) .po-conversation:hover{background:#202723}
+body:has(.po-preview-app.is-dark) .po-conversation.is-selected{background:#302746}
+body:has(.po-preview-app.is-dark) .po-conversation{border-bottom-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-add-step{background:#202723;border-color:#465148;color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-canvas-footer{background:#1b211e;border-top-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-canvas-footer button{background:#202723;color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-icon-button{background:#202723;color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-post-context{background:#202723}
+body:has(.po-preview-app.is-dark) .po-thread-empty{background:#1b211e}
+body:has(.po-preview-app.is-dark) .po-coming-soon > div{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-leads-disclaimer{color:var(--po-primary)}
+body:has(.po-preview-app.is-dark) .po-leads-production-card,
+body:has(.po-preview-app.is-dark) .po-thread-empty{background:#1b211e;border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-leads-filter-row select{background:#202723;color:var(--po-text)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table th{background:#302746;color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table td{color:var(--po-text-secondary);border-bottom-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table tbody tr:hover{background:#202723}
+body:has(.po-preview-app.is-dark) .po-time-cell{color:var(--po-text-muted)!important}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--purple,
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--neutral{background:#302746;color:#cdb8ff}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--green{background:#203c2c;color:#81d0a2}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--amber{background:#3b301e;color:#f0c36a}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--blue{background:#1e2a40;color:#8ab4ff}
+body:has(.po-preview-app.is-dark) .po-lead-username{color:#8ab4ff}
+body:has(.po-preview-app.is-dark) .po-leads-pagination,
+body:has(.po-preview-app.is-dark) .po-leads-pagination span{color:var(--po-text-muted)}
+
 @media (max-width:900px){body:has(.po-sidebar) .po-page-header h1,body:has(.po-sidebar) .po-builder-header h1{font-size:26px}body:has(.po-sidebar) .po-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}body:has(.po-sidebar) .po-overview-metrics .po-metric:nth-child(2){border-right:0}body:has(.po-sidebar) .po-overview-metrics .po-metric:nth-child(-n+2){border-bottom:1px solid var(--po-border)}body:has(.po-sidebar) .po-outcome-banner{align-items:flex-start;flex-wrap:wrap}}
 @media (max-width:640px){body:has(.po-sidebar) .po-overview-metrics{grid-template-columns:1fr}body:has(.po-sidebar) .po-overview-metrics .po-metric{border-right:0;border-bottom:1px solid var(--po-border)}body:has(.po-sidebar) .po-overview-metrics .po-metric:last-child{border-bottom:0}body:has(.po-sidebar) .po-button{min-height:42px}body:has(.po-sidebar) .po-list-toolbar{align-items:stretch}}
 @media (prefers-reduced-motion:reduce){body:has(.po-sidebar) *,body:has(.po-sidebar) *::before,body:has(.po-sidebar) *::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}

@@ -1,5 +1,9 @@
 /* Final preview-only chrome corrections. */
-body:has(.po-sidebar) [role="tablist"] > :last-child { display: none; }
+/* The builder subnav repeats the save status already shown in the page header.
+ * Hide that one element by name. (This was previously a blanket
+ * `[role="tablist"] > :last-child` rule, which also hid the real last tab of
+ * every other tablist: Start from a template, Notes, and Lead conversion.) */
+body:has(.po-sidebar) .po-builder-subnav-right { display: none; }
 body:has(.po-sidebar) .po-builder-more-button { width: 38px; min-width: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 body:has(.po-sidebar) .po-builder-more-button svg { width: 18px; height: 18px; color: var(--po-text-secondary); display: block; }
 body:has(.po-sidebar) .po-builder-more-button:hover svg { color: var(--po-text); }
