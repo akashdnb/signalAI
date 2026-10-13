@@ -90,3 +90,13 @@ A hosted TinyFish browser run exercised the deployed preview with dummy values: 
 - The verification outcome controls are for inspecting invalid/expired/too-many/success states; only submitted, six-digit sample input shows a success state.
 
 The latest change also adds an always-visible inline message on the code screen that explains that no email was sent. After that change is deployed, repeat the auth portion of the test before considering the sign-in preview reviewed.
+
+
+### Builder inspector follow-up QA
+
+A focused hosted run verified the node editor lifecycle and rich-message controls: [view the inspector regression run](https://agent.tinyfish.ai/runs/5facbe73-3179-4cc9-92d5-d202beb8ccf2).
+
+- The inspector opens as a modal over the canvas.
+- Editing a message and closing it opens the discard dialog above the inspector. **Keep editing** preserves the unsaved text; **Discard changes** closes and restores the original value.
+- The Message / Instagram layout / AI Settings tabs and all five layout modes were found. Text + buttons reveals button label, action, and HTTPS URL fields; applying stages the change locally and shows the correct confirmation.
+- The run observed that adding nodes updates the canvas but the footer count can continue to show 4. The footer was changed to use an explicit count derived from base nodes plus added nodes, with a live status announcement. **Recheck this counter after the current deployment.**
