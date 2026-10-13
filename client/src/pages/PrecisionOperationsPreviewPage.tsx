@@ -303,8 +303,8 @@ function StepInspector({ nodeKey, onDirty, seed, onClose }: { nodeKey: BuilderNo
   </aside>;
 }
 
-function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLead, seed }: {
-  dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; seed: BuilderSeed|null;
+function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLead, onSavePreview, seed }: {
+  dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; onSavePreview: () => void; seed: BuilderSeed|null;
 }) {
   const [selectedNode, setSelectedNode] = useState<BuilderNodeKey>("trigger");
   const [inspectorOpen,setInspectorOpen] = useState(false);
@@ -322,7 +322,8 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   const [handoffEnabled, setHandoffEnabled] = useState(true);
   const [goalQuestion, setGoalQuestion] = useState("What are you looking for help with?");
   const [resultPeriod, setResultPeriod] = useState("Last 7 days");
-  const switchTab = (tab: string) => {
+  const [pendingTab,setPendingTab] = useState<string|null>(null);
+  const applyTabSwitch = (tab: string) => {
     setSubTab(tab);
     if(tab !== "Flow") setInspectorOpen(false);
     const params = new URLSearchParams(window.location.search);
@@ -330,6 +331,32 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     params.set("screen", "builder");
     params.set("builderTab", tab);
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
+  const switchTab = (tab: string) => {
+    if(dirty && tab !== subTab) { setPendingTab(tab); return; }
+    applyTabSwitch(tab);
+  };
+  const resetBuilderDraft = () => {
+    setDraftName(automationName);
+    setDescription("Reply to matching comments and DMs, then collect the details your team needs.");
+    setTriggerType(seed?.triggerType ?? "both");
+    setKeywords(seed?.keywords ?? "price, quote, details");
+    setAccount("@creatorstudio");
+    setKnowledgeEnabled(true);
+    setHandoffEnabled(true);
+    setGoalQuestion("What are you looking for help with?");
+    setAddedNodes([]);
+    setSelectedNode("trigger");
+    onSelectNode("trigger");
+    setInspectorOpen(false);
+  };
+  const continueTabAfterDecision = (decision: "save"|"discard") => {
+    const next = pendingTab;
+    if(!next) return;
+    if(decision === "discard") resetBuilderDraft();
+    onSavePreview();
+    setPendingTab(null);
+    applyTabSwitch(next);
   };
   const visibleNodes = [...builderNodes,...addedNodes.map((key,index)=>({...builderNodes.find(node=>node.key===key)!,number:String(builderNodes.length+index+1).padStart(2,"0")}))];
   const selectedInstanceIndex = visibleNodes.map(node=>node.key).lastIndexOf(selectedNode);
@@ -351,6 +378,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
       </div><aside className="po-setup-summary"><span className="po-eyebrow">READINESS CHECK</span><h2>Before publishing</h2><p>Review every requirement before this automation can reply to real customers.</p><div className="po-readiness-checks"><div><CheckCircleIcon/><span><strong>Basic details</strong><small>Name and description present</small></span><Tag tone="green">Ready</Tag></div><div><CheckCircleIcon/><span><strong>Trigger configured</strong><small>{keywords.trim()?"Keywords present":"Add a keyword"}</small></span><Tag tone={keywords.trim()?"green":"warning"}>{keywords.trim()?"Ready":"Blocked"}</Tag></div><div><CheckCircleIcon/><span><strong>Account assigned</strong><small>{account}</small></span><Tag tone={account==="No account assigned"?"warning":"green"}>{account==="No account assigned"?"Blocked":"Ready"}</Tag></div><div><CheckCircleIcon/><span><strong>Draft reviewed</strong><small>Test before publishing</small></span><Tag>Review</Tag></div></div><div className="po-warning-note"><span>!</span><span><strong>Preview-only readiness</strong><small>This checklist doesn't call the real account readiness or validation APIs.</small></span></div></aside>
     </div>}
     {subTab === "Results" && <section className="po-builder-results"><div className="po-screen-toolbar"><div><span className="po-eyebrow">AUTOMATION RESULTS</span><p>Only sample data is shown. Production metrics need a defined reporting window.</p></div><label className="po-select-wrap"><span className="po-visually-hidden">Results period</span><select value={resultPeriod} onChange={e=>setResultPeriod(e.target.value)}><option>Last 7 days</option><option>Last 30 days</option><option>This month</option></select><ChevronDownIcon/></label></div><div className="po-metric-row"><div className="po-metric"><span>Trigger events</span><strong>42</strong><small>sample runs in {resultPeriod.toLowerCase()}</small></div><div className="po-metric"><span>Replies sent</span><strong>35</strong><small>example event count</small></div><div className="po-metric"><span>Lead records created</span><strong>12</strong><small>unique leads · sample</small></div><div className="po-metric"><span>Human reviews</span><strong>4</strong><small>sample handoff count</small></div></div><div className="po-overview-grid"><section className="po-content-panel"><header className="po-panel-title"><div><span className="po-eyebrow">RUN VOLUME</span><h2>Activity over time</h2><p>Sample trigger and reply counts.</p></div></header><div className="po-minibars" role="img" aria-label="Sample automation run volume">{[8,12,7,17,13,18,9].map((n,i)=><div className="po-minibar-col" key={i}><div className="po-minibar-track"><span style={{height:n/18*100+"%"}}/></div><small>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]}</small></div>)}</div></section><section className="po-content-panel"><header className="po-panel-title"><div><span className="po-eyebrow">RECENT RUNS</span><h2>Execution activity</h2><p>Sample events, not actual run logs.</p></div></header><div className="po-timeline"><div><b>Trigger matched</b><small>Comment keyword “price” · just now</small></div><div><b>AI reply prepared</b><small>Knowledge context included · 4m ago</small></div><div><b>Goal captured</b><small>Interest field recorded · 10m ago</small></div><div><b>Human review requested</b><small>Uncertain answer · 32m ago</small></div></div></section></div><div className="po-inline-help">This results layout is illustrative. It doesn't read historical journey executions or claim actual performance.</div></section>}
+    {pendingTab&&<div className="po-modal-backdrop" role="presentation"><section className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-builder-unsaved-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Close unsaved changes dialog" onClick={()=>setPendingTab(null)}>×</button></div><span className="po-eyebrow">UNSAVED CHANGES</span><h2 id="po-builder-unsaved-title">Leave this builder tab?</h2><p>Your automation has changes that are not marked saved. Save them, discard them, or keep editing before switching to another tab.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>setPendingTab(null)}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={()=>continueTabAfterDecision("discard")}>Discard changes</button><button type="button" className="po-button po-button--primary" onClick={()=>continueTabAfterDecision("save")}>Save changes & continue</button></div></section></div>}
     {subTab === "Leads" && <section className="po-builder-results"><div className="po-screen-toolbar"><div><span className="po-eyebrow">LEADS FROM THIS AUTOMATION</span><p>Lead examples attributed to this automation; values are sample data.</p></div><button type="button" className="po-button po-button--secondary" disabled>Export</button></div><div className="po-automation-table-wrap"><table className="po-automation-table"><thead><tr><th>Lead</th><th>Stage</th><th>Handoff</th><th>Last activity</th><th>Owner</th><th>View</th></tr></thead><tbody>{[["Morgan Lee","New","Human review","2m ago","Unassigned"],["Casey Rivera","Contacted","AI handling","12m ago","Alex"],["Taylor Kim","Qualified","AI handling","27m ago","Sam"]].map((row,i)=><tr key={row[0]}><td><button type="button" className="po-table-primary-link" onClick={()=>onOpenLead(row[0])}>{row[0]}</button><small>{["@morgan.sample","@casey.sample","@taylor.sample"][i]}</small></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td><button type="button" className="po-text-action" onClick={()=>onOpenLead(row[0])}>Open →</button></td></tr>)}</tbody></table></div></section>}
   </section>;
 }
@@ -569,7 +597,7 @@ export function PrecisionOperationsPreviewPage() {
   const standalone = screen === "login" || screen === "connect-error" || screen === "invite";
   const page = screen === "overview" ? <OverviewScreen onNavigate={go} />
     : screen === "automations" ? <AutomationsScreen onOpenBuilder={openBuilder} />
-    : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} seed={builderSeed} />
+    : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} onSavePreview={savePreviewState} seed={builderSeed} />
     : screen === "inbox" ? <InboxScreen />
     : screen === "leads" ? <LeadsScreen onOpenLead={openLead} />
     : screen === "lead-detail" ? <LeadDetailScreen leadName={selectedLeadName} leadHandle={selectedLeadHandle} initialStage={selectedLeadStage} initialOwner={selectedLeadOwner} initialHandoff={selectedLeadHandoff} onBack={()=>go("leads")} onNavigate={go} />
