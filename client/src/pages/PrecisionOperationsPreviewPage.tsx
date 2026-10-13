@@ -8,7 +8,7 @@ import {
 } from "../components/icons";
 
 type PreviewScreen = FullPreviewScreen;
-type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup" | "handoff" | "link";
+type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
 type BuilderSeed = { triggerType: string; keywords: string };
 type IconType = ComponentType<{ className?: string }>;
 type NavigationItem = { label: string; icon: IconType; screen?: PreviewScreen; section: "primary" | "workspace" };
@@ -153,7 +153,7 @@ function FlowNode({ node, selected, onClick, index }: { node: (typeof builderNod
   return <div className="po-flow-node-wrap">{index > 0 && <div className="po-flow-connector" aria-hidden="true"><span /></div>}<button type="button" className={"po-flow-node" + (selected ? " is-selected" : "")} onClick={onClick} aria-pressed={selected}><span className={"po-flow-node-icon po-flow-node-icon--" + node.key}><Icon /></span><span className="po-flow-node-content"><span className="po-flow-node-kicker">{node.number} / {node.kind}</span><strong>{node.title}</strong><span>{node.summary}</span><small>{node.detail}</small></span><span className="po-flow-node-end" aria-hidden="true">↗</span></button></div>;
 }
 
-function StepInspector({ nodeKey, onDirty, seed }: { nodeKey: BuilderNodeKey; onDirty: () => void; seed: BuilderSeed|null }) {
+function StepInspector({ nodeKey, onDirty, seed, onClose }: { nodeKey: BuilderNodeKey; onDirty: () => void; seed: BuilderSeed|null; onClose: () => void }) {
   const selected = builderNodes.find((node) => node.key === nodeKey) ?? builderNodes[0]!;
   const Icon = selected.icon;
   const sections = nodeKey === "trigger"
@@ -231,6 +231,7 @@ function StepInspector({ nodeKey, onDirty, seed }: { nodeKey: BuilderNodeKey; on
     }
     setEditorDirty(false);
     setApplyNotice("Changes applied to this local preview draft. Use Save changes in the header to mark the draft saved.");
+    onClose();
   };
   const resetEditor = () => {
     if (nodeKey === "trigger") { setTriggerType("both"); setKeywords("price\nquote\ndetails"); setAlsoStory(false); setCaseInsensitive(true); setMatchType("contains"); setAlsoDm(true); }
@@ -306,6 +307,8 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; seed: BuilderSeed|null;
 }) {
   const [selectedNode, setSelectedNode] = useState<BuilderNodeKey>("trigger");
+  const [inspectorOpen,setInspectorOpen] = useState(false);
+  const [addedNodes,setAddedNodes] = useState<BuilderNodeKey[]>([]);
   const [subTab, setSubTab] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get("builderTab");
     return requested && ["Flow", "Setup", "Results", "Leads"].includes(requested) ? requested : "Flow";
@@ -321,15 +324,24 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   const [resultPeriod, setResultPeriod] = useState("Last 7 days");
   const switchTab = (tab: string) => {
     setSubTab(tab);
+    if(tab !== "Flow") setInspectorOpen(false);
     const params = new URLSearchParams(window.location.search);
     params.set("preview", "precision-operations");
     params.set("screen", "builder");
     params.set("builderTab", tab);
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
   };
+  const visibleNodes = [...builderNodes,...addedNodes.map((key,index)=>({...builderNodes.find(node=>node.key===key)!,number:String(builderNodes.length+index+1).padStart(2,"0")}))];
+  const selectedInstanceIndex = visibleNodes.map(node=>node.key).lastIndexOf(selectedNode);
+  const addPaletteNode = (key: BuilderNodeKey) => {
+    setSelectedNode(key);
+    onSelectNode(key);
+    if(key !== "trigger") { setAddedNodes(current=>current.concat(key)); onDirty(); }
+    setInspectorOpen(true);
+  };
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}<div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
-    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{builderNodes.map((node, index) => <FlowNode key={node.key} node={node} index={index} selected={selectedNode === node.key} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); }} />)}<button type="button" className="po-add-step" onClick={() => { setSelectedNode("followup"); onSelectNode("followup"); onDirty(); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>4 steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section><StepInspector nodeKey={selectedNode} onDirty={onDirty} seed={seed} /></div>}
+    {subTab === "Flow" && <><div className="po-builder-grid"><BuilderPalette onSelect={addPaletteNode} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{visibleNodes.map((node, index) => <FlowNode key={node.key+"-"+index} node={node} index={index} selected={selectedInstanceIndex===index} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); setInspectorOpen(true); }} />)}<button type="button" className="po-add-step" onClick={() => { setAddedNodes(current=>current.concat("followup")); setSelectedNode("followup"); onSelectNode("followup"); onDirty(); setInspectorOpen(true); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>{visibleNodes.length} steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section></div>{inspectorOpen&&<div className="po-modal-backdrop po-inspector-backdrop" role="presentation" onMouseDown={event=>event.target===event.currentTarget&&setInspectorOpen(false)}><section className="po-modal po-inspector-dialog" role="dialog" aria-modal="true" aria-label="Edit flow step"><div className="po-inspector-dialog-actions"><span className="po-eyebrow">NODE INSPECTOR · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close step inspector" onClick={()=>setInspectorOpen(false)}>×</button></div><StepInspector nodeKey={selectedNode} onDirty={onDirty} seed={seed} onClose={()=>setInspectorOpen(false)}/></section></div>}</>}
     {subTab === "Setup" && <div className="po-builder-setup">
       <div className="po-setup-main"><div className="po-step-section"><span className="po-step-number">01</span><div className="po-step-section-body"><span className="po-eyebrow">BASICS</span><h2>Name and purpose</h2><p>A clear name makes the automation easy to find and identify later.</p><label className="po-field-block">Automation name<input value={draftName} onChange={e=>{setDraftName(e.target.value);onDirty();}} maxLength={100}/></label><label className="po-field-block">Description<textarea rows={3} value={description} onChange={e=>{setDescription(e.target.value);onDirty();}}/></label></div></div>
       <div className="po-step-section"><span className="po-step-number">02</span><div className="po-step-section-body"><span className="po-eyebrow">START CONDITION</span><h2>When should it start?</h2><p>Choose which inbound interaction can trigger this automation.</p><label className="po-field-block">Trigger source<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);onDirty();}}><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment or direct message</option></select></label><label className="po-field-block">Keywords<textarea rows={3} value={keywords} onChange={e=>{setKeywords(e.target.value);onDirty();}}/><span className="po-help">Separate phrases with commas. Matching behavior depends on the configured trigger rules.</span></label></div></div>
