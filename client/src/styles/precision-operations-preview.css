@@ -1689,3 +1689,13 @@
 .po-preview-app .po-automation-table th:nth-child(5),
 .po-preview-app .po-automation-table td:nth-child(5) { width: 11%; }
 .po-preview-app .po-nav { margin-top: 36px; }
+
+
+.po-preview-app .po-outcome-banner { min-height: 109px; margin-top: 18px; }
+.po-preview-app .po-outcome-banner > .po-button {
+  min-height: 44px;
+  padding: 10px 24px;
+  font-size: 14px;
+}
+.po-preview-app .po-automation-filters { margin-bottom: 8px; }
+.po-preview-app .po-automation-table td { padding-top: 14px; padding-bottom: 14px; }
