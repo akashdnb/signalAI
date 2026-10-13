@@ -1429,12 +1429,14 @@
 
 /* Opera comparison pass: mirror the production dashboard shell and density. */
 .po-preview-app .po-sidebar {
-  flex: 0 0 256px;
-  width: 256px;
+  flex: 0 0 240px;
+  width: 240px;
   padding: 22px 14px 14px;
 }
 .po-preview-app .po-brand { gap: 8px; padding: 0 8px; }
 .po-preview-app .po-brand > svg { width: 28px; height: 28px; }
+.po-preview-app .po-brand > span:last-child { color: var(--po-ink) !important; }
+.po-preview-app .po-brand .text-accent { color: #7c3aed !important; }
 .po-preview-app .po-workspace-switcher,
 .po-preview-app .po-sidebar-footer,
 .po-preview-app .po-nav-help { display: none !important; }
@@ -1478,7 +1480,7 @@
   min-height: 56px;
   padding: 8px 26px;
 }
-.po-preview-app .po-main-content { padding: 8px 26px 16px; }
+.po-preview-app .po-main-content { padding: 16px 26px 16px; }
 .po-preview-app .po-page-header {
   margin-bottom: 12px;
   padding-bottom: 0;
@@ -1559,7 +1561,7 @@
 .po-preview-app .po-inline-notice { border-radius: 10px; }
 
 @media (max-width: 1400px) {
-  .po-preview-app .po-sidebar { flex-basis: 256px; width: 256px; }
+  .po-preview-app .po-sidebar { flex-basis: 240px; width: 240px; }
   .po-preview-app .po-main-content { padding-right: 20px; padding-left: 20px; }
   .po-preview-app .po-outcome-banner { padding: 18px; }
 }
@@ -1602,6 +1604,8 @@
 }
 .po-preview-app .po-sidebar-brand-row .po-brand { gap: 8px; padding: 0; }
 .po-preview-app .po-sidebar-brand-row .po-brand > svg { width: 28px; height: 28px; }
+.po-preview-app .po-sidebar-brand-row .po-brand > span:last-child { color: var(--po-ink) !important; }
+.po-preview-app .po-sidebar-brand-row .po-brand .text-accent { color: #7c3aed !important; }
 .po-preview-app .po-nav { margin-top: 42px; }
 .po-preview-app .po-sidebar { background: #fff; }
 .po-preview-app .po-outcome-banner { background: linear-gradient(100deg,#f6f0ff 0%,#fff 82%); }
