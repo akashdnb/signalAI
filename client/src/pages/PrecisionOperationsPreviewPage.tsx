@@ -83,7 +83,7 @@ function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (n
   const selectedScreen = screen === "builder" ? "automations" : screen === "lead-detail" ? "leads" : screen;
   return (
     <aside className="po-sidebar" aria-label="Preview navigation">
-      <BrandMark />
+      <div className="po-sidebar-brand-row"><BrandMark /></div>
       <nav className="po-nav">
         <div className="po-nav-section">
           {navigation.filter((item) => item.section === "primary").map((item) => {
