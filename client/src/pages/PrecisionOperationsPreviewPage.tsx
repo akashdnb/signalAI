@@ -595,7 +595,7 @@ function LeadsScreen({ onOpenLead }: { onOpenLead: (name: string) => void }) {
         <table className="po-leads-table po-leads-production-table">
           <thead><tr><th scope="col">Username</th><th scope="col">Stage</th><th scope="col">Handoff</th><th scope="col">Last contact</th><th scope="col">Via</th><th scope="col">Messaging window</th><th scope="col">First seen</th></tr></thead>
           <tbody>
-            {pageRows.map((lead,index)=><tr key={lead.handle}>
+            {pageRows.map(lead=><tr key={lead.handle}>
               <td><button type="button" className="po-lead-username" onClick={()=>onOpenLead(lead.name)}>{lead.unread&&<span className="po-lead-unread-dot" aria-hidden="true"/>}{lead.username}</button></td>
               <td>{lead.stage}</td>
               <td><Tag tone={lead.handoffStatus==="Needs attention"?"amber":lead.handoffStatus==="Human is replying"?"green":"purple"}>{lead.handoffStatus}</Tag></td>
