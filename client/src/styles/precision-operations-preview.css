@@ -1365,3 +1365,30 @@
   .po-preview-app .po-automation-filters { grid-template-columns: minmax(0,1fr); }
   .po-preview-app .po-inspector-dialog { width: calc(100vw - 18px); }
 }
+
+
+.po-preview-app .po-automation-mobile-list { display: none; }
+.po-preview-app .po-automation-mobile-card {
+  min-width: 0;
+  padding: 14px;
+  border-bottom: 1px solid var(--po-line);
+  background: var(--po-surface);
+}
+.po-preview-app .po-automation-mobile-card:last-child { border-bottom: 0; }
+.po-preview-app .po-automation-mobile-card-top { display: flex; align-items: flex-start; gap: 10px; }
+.po-preview-app .po-automation-mobile-card-top > input { width: 15px; height: 15px; flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--po-primary); }
+.po-preview-app .po-automation-mobile-card-title { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
+.po-preview-app .po-automation-mobile-card-title .po-table-primary-link { font-size: 13px; line-height: 1.35; }
+.po-preview-app .po-automation-mobile-card-title small { color: var(--po-muted); font-size: 10px; line-height: 1.45; }
+.po-preview-app .po-automation-mobile-card-badges { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.po-preview-app .po-automation-mobile-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--po-line); color: var(--po-muted); font-size: 10px; }
+.po-preview-app .po-automation-mobile-card-footer button { padding: 2px 0; border: 0; background: transparent; color: var(--po-primary); font-size: 10px; font-weight: 750; }
+@media (max-width: 1023px) {
+  .po-preview-app .po-automation-table-wrap { overflow: visible; }
+  .po-preview-app .po-automation-mobile-list { display: block; }
+  .po-preview-app .po-automation-desktop-table { display: none; }
+}
+@media (min-width: 1024px) {
+  .po-preview-app .po-automation-desktop-table { display: block; }
+  .po-preview-app .po-automation-mobile-list { display: none; }
+}
