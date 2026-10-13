@@ -8,7 +8,8 @@ import {
 } from "../components/icons";
 
 type PreviewScreen = FullPreviewScreen;
-type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
+type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup" | "handoff" | "link";
+type BuilderSeed = { triggerType: string; keywords: string };
 type IconType = ComponentType<{ className?: string }>;
 type NavigationItem = { label: string; icon: IconType; screen?: PreviewScreen; section: "primary" | "workspace" };
 
@@ -152,7 +153,7 @@ function FlowNode({ node, selected, onClick, index }: { node: (typeof builderNod
   return <div className="po-flow-node-wrap">{index > 0 && <div className="po-flow-connector" aria-hidden="true"><span /></div>}<button type="button" className={"po-flow-node" + (selected ? " is-selected" : "")} onClick={onClick} aria-pressed={selected}><span className={"po-flow-node-icon po-flow-node-icon--" + node.key}><Icon /></span><span className="po-flow-node-content"><span className="po-flow-node-kicker">{node.number} / {node.kind}</span><strong>{node.title}</strong><span>{node.summary}</span><small>{node.detail}</small></span><span className="po-flow-node-end" aria-hidden="true">↗</span></button></div>;
 }
 
-function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty: () => void }) {
+function StepInspector({ nodeKey, onDirty, seed }: { nodeKey: BuilderNodeKey; onDirty: () => void; seed: BuilderSeed|null }) {
   const selected = builderNodes.find((node) => node.key === nodeKey) ?? builderNodes[0]!;
   const Icon = selected.icon;
   const sections = nodeKey === "trigger"
@@ -161,8 +162,8 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
       ? [{ key: "basic", label: "Basic" }, { key: "capture", label: "Capture Fields" }, { key: "validation", label: "Validation" }, { key: "success", label: "Success Message" }]
       : [{ key: "basic", label: "Basic" }, { key: "presentation", label: "Presentation" }, { key: "ai", label: "AI Settings" }];
   const [tab, setTab] = useState("basic");
-  const [triggerType, setTriggerType] = useState("both");
-  const [keywords, setKeywords] = useState("price\nquote\ndetails");
+  const [triggerType, setTriggerType] = useState(seed?.triggerType ?? "both");
+  const [keywords, setKeywords] = useState(seed?.keywords ? seed.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : "price\nquote\ndetails");
   const [alsoStory, setAlsoStory] = useState(false);
   const [caseInsensitive, setCaseInsensitive] = useState(true);
   const [matchType, setMatchType] = useState("contains");
@@ -301,8 +302,8 @@ function StepInspector({ nodeKey, onDirty }: { nodeKey: BuilderNodeKey; onDirty:
   </aside>;
 }
 
-function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLead }: {
-  dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void;
+function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLead, seed }: {
+  dirty: boolean; onSelectNode: (key: BuilderNodeKey) => void; automationName: string; onDirty: () => void; onOpenLead: (name: string) => void; seed: BuilderSeed|null;
 }) {
   const [selectedNode, setSelectedNode] = useState<BuilderNodeKey>("trigger");
   const [subTab, setSubTab] = useState(() => {
@@ -311,8 +312,8 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   });
   const [draftName, setDraftName] = useState(automationName);
   const [description, setDescription] = useState("Reply to matching comments and DMs, then collect the details your team needs.");
-  const [triggerType, setTriggerType] = useState("Comment or direct message");
-  const [keywords, setKeywords] = useState("price, quote, details");
+  const [triggerType, setTriggerType] = useState(seed?.triggerType ?? "both");
+  const [keywords, setKeywords] = useState(seed?.keywords ?? "price, quote, details");
   const [account, setAccount] = useState("@creatorstudio");
   const [knowledgeEnabled, setKnowledgeEnabled] = useState(true);
   const [handoffEnabled, setHandoffEnabled] = useState(true);
@@ -328,10 +329,10 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   };
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}<div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
-    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{builderNodes.map((node, index) => <FlowNode key={node.key} node={node} index={index} selected={selectedNode === node.key} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); }} />)}<button type="button" className="po-add-step" onClick={() => { setSelectedNode("followup"); onSelectNode("followup"); onDirty(); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>4 steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section><StepInspector nodeKey={selectedNode} onDirty={onDirty} /></div>}
+    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={(key) => { setSelectedNode(key); onSelectNode(key); }} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{builderNodes.map((node, index) => <FlowNode key={node.key} node={node} index={index} selected={selectedNode === node.key} onClick={() => { setSelectedNode(node.key); onSelectNode(node.key); }} />)}<button type="button" className="po-add-step" onClick={() => { setSelectedNode("followup"); onSelectNode("followup"); onDirty(); }}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span>4 steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section><StepInspector nodeKey={selectedNode} onDirty={onDirty} seed={seed} /></div>}
     {subTab === "Setup" && <div className="po-builder-setup">
       <div className="po-setup-main"><div className="po-step-section"><span className="po-step-number">01</span><div className="po-step-section-body"><span className="po-eyebrow">BASICS</span><h2>Name and purpose</h2><p>A clear name makes the automation easy to find and identify later.</p><label className="po-field-block">Automation name<input value={draftName} onChange={e=>{setDraftName(e.target.value);onDirty();}} maxLength={100}/></label><label className="po-field-block">Description<textarea rows={3} value={description} onChange={e=>{setDescription(e.target.value);onDirty();}}/></label></div></div>
-      <div className="po-step-section"><span className="po-step-number">02</span><div className="po-step-section-body"><span className="po-eyebrow">START CONDITION</span><h2>When should it start?</h2><p>Choose which inbound interaction can trigger this automation.</p><label className="po-field-block">Trigger source<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);onDirty();}}><option>Comment</option><option>Direct message</option><option>Comment or direct message</option></select></label><label className="po-field-block">Keywords<textarea rows={3} value={keywords} onChange={e=>{setKeywords(e.target.value);onDirty();}}/><span className="po-help">Separate phrases with commas. Matching behavior depends on the configured trigger rules.</span></label></div></div>
+      <div className="po-step-section"><span className="po-step-number">02</span><div className="po-step-section-body"><span className="po-eyebrow">START CONDITION</span><h2>When should it start?</h2><p>Choose which inbound interaction can trigger this automation.</p><label className="po-field-block">Trigger source<select value={triggerType} onChange={e=>{setTriggerType(e.target.value);onDirty();}}><option value="comment">Comment</option><option value="message">Direct message</option><option value="both">Comment or direct message</option></select></label><label className="po-field-block">Keywords<textarea rows={3} value={keywords} onChange={e=>{setKeywords(e.target.value);onDirty();}}/><span className="po-help">Separate phrases with commas. Matching behavior depends on the configured trigger rules.</span></label></div></div>
       <div className="po-step-section"><span className="po-step-number">03</span><div className="po-step-section-body"><span className="po-eyebrow">INSTAGRAM ACCOUNT</span><h2>Choose the account</h2><p>A published automation needs at least one healthy assigned account.</p><label className="po-field-block">Assigned account<select value={account} onChange={e=>{setAccount(e.target.value);onDirty();}}><option>@creatorstudio</option><option>@studioaccount</option><option>No account assigned</option></select></label><div className="po-readiness-row"><span><CheckCircleIcon/> Sample connection state</span><Tag tone={account==="No account assigned"?"warning":"green"}>{account==="No account assigned"?"Not assigned":"Healthy · sample"}</Tag></div></div></div>
       <div className="po-step-section"><span className="po-step-number">04</span><div className="po-step-section-body"><span className="po-eyebrow">AI BEHAVIOR</span><h2>Reply guidance</h2><p>Set how the AI uses approved knowledge and when a person should step in.</p><label className="po-toggle-row"><span><strong>Use knowledge base</strong><small>Ground replies in the sources marked Ready.</small></span><input type="checkbox" checked={knowledgeEnabled} onChange={e=>{setKnowledgeEnabled(e.target.checked);onDirty();}}/></label><label className="po-toggle-row"><span><strong>Escalate when uncertain</strong><small>Route unclear or sensitive questions for human review.</small></span><input type="checkbox" checked={handoffEnabled} onChange={e=>{setHandoffEnabled(e.target.checked);onDirty();}}/></label></div></div>
       <div className="po-step-section"><span className="po-step-number">05</span><div className="po-step-section-body"><span className="po-eyebrow">LEAD QUALIFICATION</span><h2>Question and captured fields</h2><p>Ask a specific question and store the answer in a structured lead field.</p><label className="po-field-block">Question<textarea rows={2} value={goalQuestion} onChange={e=>{setGoalQuestion(e.target.value);onDirty();}}/></label><div className="po-captured-facts"><div><span>Interest</span><strong>Text · sample field</strong></div><div><span>Preferred timeline</span><strong>Text · sample field</strong></div></div></div></div>
@@ -496,6 +497,7 @@ export function PrecisionOperationsPreviewPage() {
   const [lifecycleAction,setLifecycleAction] = useState<"pause"|"activate">("pause");
   const [,setSelectedNode] = useState<BuilderNodeKey>("trigger");
   const [automationName,setAutomationName] = useState("Lead qualification");
+  const [builderSeed,setBuilderSeed] = useState<BuilderSeed|null>(null);
   const [selectedLeadName,setSelectedLeadName] = useState("Morgan Lee");
   const [selectedLeadHandle,setSelectedLeadHandle] = useState("@morgan.sample");
   const [selectedLeadStage,setSelectedLeadStage] = useState("New");
@@ -517,9 +519,10 @@ export function PrecisionOperationsPreviewPage() {
     }
     applyNavigation(next);
   };
-  const openBuilder = (name: string, status = "Draft", newDraft = false) => {
+  const openBuilder = (name: string, status = "Draft", newDraft = false, seed?: BuilderSeed) => {
     setAutomationName(name);
     setAutomationStatus(status);
+    setBuilderSeed(seed ?? null);
     setDirty(newDraft);
     applyNavigation("builder");
   };
@@ -552,7 +555,7 @@ export function PrecisionOperationsPreviewPage() {
   const standalone = screen === "login" || screen === "connect-error" || screen === "invite";
   const page = screen === "overview" ? <OverviewScreen onNavigate={go} />
     : screen === "automations" ? <AutomationsScreen onOpenBuilder={openBuilder} />
-    : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} />
+    : screen === "builder" ? <BuilderScreen dirty={dirty} onSelectNode={setSelectedNode} automationName={automationName} onDirty={()=>setDirty(true)} onOpenLead={openLead} seed={builderSeed} />
     : screen === "inbox" ? <InboxScreen />
     : screen === "leads" ? <LeadsScreen onOpenLead={openLead} />
     : screen === "lead-detail" ? <LeadDetailScreen leadName={selectedLeadName} leadHandle={selectedLeadHandle} initialStage={selectedLeadStage} initialOwner={selectedLeadOwner} initialHandoff={selectedLeadHandoff} onBack={()=>go("leads")} onNavigate={go} />
