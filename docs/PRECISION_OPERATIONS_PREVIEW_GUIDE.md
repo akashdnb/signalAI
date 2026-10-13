@@ -114,3 +114,8 @@ Latest regression run: [Builder count / node configuration QA](https://agent.tin
 - **Mobile layout also remains not directly verified at a 390px viewport.** The responsive styles and mobile automation cards exist, but the browser run could not resize the viewport.
 
 The preview remains an interactive design model, not a production-connected app. All sample data and operational actions are local.
+
+
+### Recovery route compatibility
+
+The broad desktop sweep used the intuitive query values `screen=connection-recovery` and `screen=invitation-recovery`. Those aliases originally fell through to Overview because the canonical screen values were `connect-error` and `invite`. Both route names are now accepted and map to the dedicated recovery screens. Verify both canonical and alias links after deployment.
