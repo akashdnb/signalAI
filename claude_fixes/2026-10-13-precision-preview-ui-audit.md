@@ -57,3 +57,43 @@ The systemic problems behind these bugs were reported but deliberately **not** f
 - **Mobile 390px** (previously unverified, now checked): no horizontal scroll, but the sidebar becomes a horizontally-scrolling nav row with the active item clipped mid-word and no scroll affordance, hiding 7 of 11 destinations; three stacked header bands eat ~460px before content.
 - Charts have no axis value labels.
 - The dark palette is green-tinted (`#141816`/`#1b211e`/`#303a34`) while production dark is slate/navy (`#0f172a`/`#1f2937`/`#374151`) — two product identities. Left as-is here to keep the fix surgical.
+
+---
+
+# Round 2 — typography, controls, standalone screens (14 October 2026)
+
+Commit `034fc07`, deploy `dep-db77g6d9fdbs739s362g` (live).
+
+## Font consistency
+
+**Sizes.** 26 declared sizes between 8px and 36px (incl. `15.3px`); the two most common were 9px (95 declarations) and 10px (108), so ~50% of visible text rendered below the 12px body minimum. Remapped 237 declarations onto a 10-step scale — `11/12/13/14/16/18/20/24/28/32` — scaling px line-heights by the same ratio so they stay proportional. 11px is now reserved for uppercase micro-labels; nothing else sits below 12px. A bare `<small>` on Knowledge was falling back to the browser's `0.8333em` (10.83px) and now takes the scale.
+
+**Weights — measured, reported, not changed.** Only `400;500;600;700;800` are loaded, so the 18 declared weights collapse to **5 rendered faces**. Proven by measuring glyph widths of the same string at each weight: `450/500` are identical, as are `550/560/600`, `640/650/660/700`, and `720/730/740/750/760/780/800/820`. Three places lose an intended contrast — the builder breadcrumb (650 link vs 700 current), the inbox lead-context heading vs its button (700/650), and the docs sidebar where the section label (800) and its topic links (760) render identically. Fixing this means picking real steps per component, which belongs with the token rebuild.
+
+Also 19 line-height values mixing unitless and px, 19 letter-spacing values (incl. a lone `-2px` among ems), and three different spellings of the same font stack — one hardcoding the family instead of `var(--font-sans-stack)`. Reported, not changed.
+
+## Controls
+
+- **Wrapping buttons.** "Add source" and "Invite teammate" each broke onto two lines: `.po-button` had no `white-space: nowrap` and was being shrunk by its flex parent.
+- **Search fields.** Two heights (40/43px) and three paddings across five instances; unified.
+- **Selects.** Six different treatments. Only `.po-select-wrap` drew a custom chevron — the other five used the **native OS arrow**, which sits flush against the right border, and `.po-automation-filter` reserved 30px of padding for a chevron it never drew. All now share one height, padding and chevron (with a dark-mode variant). The leads filter row was furthest out (48px tall, 11px radius, 16px text, its own border colour) and was normalised **at source** rather than with another override.
+
+## Standalone screens
+
+`precision-operations-design-system.css` was scoped to `body:has(.po-sidebar)`. The sign-in, invitation and connection-recovery screens render no sidebar, so **none of its 135 rules applied there** — the same `.po-button--secondary` rendered `5px/36px/11px/730` on sign-in versus `8px/38px/13px/650` in the app. Rescoped to `:has(.po-preview-app)`; all five screens now render identically in both themes (verified).
+
+## Layout and markup
+
+- **Horizontal overflow removed** at 390px and 768px. The analytics "Top posts" table had no scroll wrapper while its sibling did (fixed in markup); the lead profile heading had `min-width: 200px` that a status chip pushed past the viewport.
+- **Mobile nav.** `:not(:first-child){display:none}` hid the entire Workspace section below 900px, making Integrations, Team, Billing and Settings **unreachable**. Both sections now scroll in one row, and the row no longer expands the page.
+- **Duplicate DOM id.** Two `<Logo>` instances on sign-in emitted the same `#signalai-logo-gradient`; now per-instance via `useId()`.
+- **Tabs.** Analytics, builder and inspector tablists had no `aria-controls` and no `role="tabpanel"`; all three are wired now. (Keyboard models still differ — only lead-detail implements roving tabindex with arrow keys. Reported.)
+- **Search inputs had no accessible name** — each sits in a `<label>` containing only an icon and the input, so `label.textContent` is empty and the placeholder was the only name.
+
+## Verified
+
+Headless over 14 screens × 2 themes, re-run against the live deployment: **0** page-level horizontal overflow at 390/768/1024/1440; no dangling ARIA refs, duplicate ids or unnamed controls; contrast unchanged at 19 known-exempt items; rendered type down to **10 sizes**. Build and `oxlint` clean.
+
+Two regressions the type bump introduced were caught and fixed: "AI usage" and the inbox "Pipeline stage" label — both label/value rows where only the value was `nowrap`, so the label absorbed the squeeze.
+
+**Still not done:** the font-weight collapse, line-height/letter-spacing spread, collapsing the four stylesheets, the parallel `--po-*` palette, purple's six jobs, `Draft` vs `Paused`, and 44×44 touch targets.
