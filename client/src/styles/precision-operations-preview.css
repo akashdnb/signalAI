@@ -1395,3 +1395,26 @@
 
 /* Keep the destructive inspector confirmation above the still-mounted editor dialog. */
 .po-preview-app .po-inspector-discard-backdrop { z-index: 200; }
+
+.po-preview-app.po-standalone-preview .po-auth-primary:disabled,
+.po-preview-app.po-standalone-preview .po-auth-primary[disabled] {
+  border-color: #d8d5e2;
+  background: #e8e5ef;
+  color: #817b91;
+  opacity: 1;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.po-preview-app.po-standalone-preview .po-auth-code-hint {
+  margin: -8px 0 0;
+  color: var(--po-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.po-preview-app.po-standalone-preview .po-auth-code-hint:has(+ .po-auth-error) { margin-bottom: 0; }
+.po-preview-app.is-dark.po-standalone-preview .po-auth-primary:disabled,
+.po-preview-app.is-dark.po-standalone-preview .po-auth-primary[disabled] {
+  border-color: #3b354c;
+  background: #2b2736;
+  color: #a19bad;
+}
