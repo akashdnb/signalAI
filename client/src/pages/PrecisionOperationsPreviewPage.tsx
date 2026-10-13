@@ -355,6 +355,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
   useEffect(()=>{if(inspectorCloseRequest>0){setPendingInspectorTab(null);setConfirmInspectorClose(true);}},[inspectorCloseRequest]);
   const [addedNodes,setAddedNodes] = useState<Array<{id:number;key:BuilderNodeKey}>>([]);
   const [nodeOrder,setNodeOrder] = useState<number[]>([0,1,2,3]);
+  const [flowStepCount,setFlowStepCount] = useState(4);
   const [subTab, setSubTab] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get("builderTab");
     return requested && ["Flow", "Setup", "Results", "Leads"].includes(requested) ? requested : "Flow";
@@ -410,6 +411,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     setGoalQuestion("What are you looking for help with?");
     setAddedNodes([]);
     setNodeOrder([0,1,2,3]);
+    setFlowStepCount(4);
     setNodeConfigs({});
     setSelectedNodeId(0);
     setSelectedNode("trigger");
@@ -428,7 +430,6 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     ...builderNodes.map((node,index)=>({...node,nodeId:index})),
     ...addedNodes.map(item=>({...builderNodes.find(node=>node.key===item.key)!,nodeId:item.id,number:String(item.id+1).padStart(2,"0")})),
   ];
-  const flowStepCount = sourceNodes.length;
   const visibleNodes = nodeOrder.map(id=>sourceNodes.find(node=>node.nodeId===id)).filter((node): node is (typeof sourceNodes)[number] => node !== undefined);
   const reorderFlowNodes = (fromId:number,toId:number) => {
     setNodeOrder(current=>{
@@ -448,6 +449,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
       const id=builderNodes.length+addedNodes.length;
       setAddedNodes(current=>current.concat({id,key}));
       setNodeOrder(current=>current.concat(id));
+      setFlowStepCount(current=>current+1);
       setSelectedNode(key);setSelectedNodeId(id);onSelectNode(key);onDirty();
     }
     setInspectorOpen(true);
@@ -456,6 +458,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     const id=builderNodes.length+addedNodes.length;
     setAddedNodes(current=>current.concat({id,key:"followup"}));
     setNodeOrder(current=>current.concat(id));
+    setFlowStepCount(current=>current+1);
     setSelectedNode("followup");setSelectedNodeId(id);onSelectNode("followup");onDirty();setInspectorOpen(true);
   };
   return <section className="po-builder-screen" aria-label="Automation builder concept">
