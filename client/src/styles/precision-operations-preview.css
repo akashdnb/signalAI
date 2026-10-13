@@ -1676,3 +1676,16 @@
   .po-preview-app .po-automation-table th:nth-child(n),
   .po-preview-app .po-automation-table td:nth-child(n) { width: auto; }
 }
+
+
+/* Match the live automation banner and tab proportions more closely. */
+.po-preview-app .po-outcome-banner > .po-outcome-marker { display: none; }
+.po-preview-app .po-outcome-banner > div { max-width: none; flex: 1 1 auto; }
+.po-preview-app .po-outcome-banner p { max-width: 730px; }
+.po-preview-app .po-tab-bar { min-height: 42px; gap: 32px; }
+.po-preview-app .po-tab-bar button { font-size: 15.3px; }
+.po-preview-app .po-automation-table th:nth-child(2),
+.po-preview-app .po-automation-table td:nth-child(2) { width: 51%; }
+.po-preview-app .po-automation-table th:nth-child(5),
+.po-preview-app .po-automation-table td:nth-child(5) { width: 11%; }
+.po-preview-app .po-nav { margin-top: 36px; }
