@@ -17,7 +17,7 @@ const navigation: NavigationItem[] = [
   { label: "Overview", icon: HomeIcon, screen: "overview", section: "primary" },
   { label: "Inbox", icon: InboxIcon, screen: "inbox", section: "primary" },
   { label: "Leads", icon: LeadsIcon, screen: "leads", section: "primary" },
-  { label: "Automations", icon: AutomationIcon, screen: "automations", section: "primary" },
+  { label: "Automation", icon: AutomationIcon, screen: "automations", section: "primary" },
   { label: "Knowledge", icon: BookIcon, screen: "knowledge", section: "primary" },
   { label: "Content", icon: ContentIcon, screen: "content", section: "primary" },
   { label: "Analytics", icon: AnalyticsIcon, screen: "analytics", section: "primary" },
@@ -108,7 +108,7 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
   </header>;
   const configs: Record<string, { eyebrow: string; title: string; description: string }> = {
     overview: { eyebrow: "WORKSPACE SUMMARY", title: "Overview", description: "A clear view of what needs attention across your Instagram operations." },
-    automations: { eyebrow: "AUTOMATION WORKSPACE", title: "Automations", description: "Build, test, and manage how SignalAI handles conversations." },
+    automations: { eyebrow: "AUTOMATION WORKSPACE", title: "Automation", description: "Turn Instagram conversations into qualified leads without building a complicated flow." },
     inbox: { eyebrow: "CONVERSATION OPERATIONS", title: "Inbox", description: "Review Instagram conversations and decide when AI or a person should reply." },
     leads: { eyebrow: "PIPELINE", title: "Leads", description: "Track people who have shown interest in your business through Instagram." },
     "lead-detail": { eyebrow: "LEAD PROFILE", title: selectedLeadName, description: "Review context, ownership, conversation, activity, notes, and next steps." },
@@ -127,6 +127,7 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
   const config = configs[screen] ?? configs.overview!;
   return <header className="po-page-header">
     <div><div className="po-eyebrow">{config.eyebrow}</div><h1>{config.title}</h1><p>{config.description}</p></div>
+    {screen === "automations" ? <button type="button" className="po-button po-button--quiet" onClick={() => onNavigate("docs")}><BookIcon className="po-button-icon"/> Docs</button> : null}
     {screen === "inbox" ? <div className="po-header-context"><span className="po-status-dot" /> Sample inbox <ChevronDownIcon className="po-icon-small" /></div> : null}
     {screen === "lead-detail" ? <button type="button" className="po-button po-button--secondary" onClick={() => onNavigate("leads")}>Back to leads</button> : null}
   </header>;
@@ -160,7 +161,7 @@ function StepInspector({ nodeKey, onDirty, onEditorDirtyChange, seed, onClose, o
     ? [{ key: "basic", label: "Basic" }, { key: "advanced", label: "Advanced" }, { key: "ai", label: "AI Settings" }]
     : nodeKey === "goal"
       ? [{ key: "basic", label: "Basic" }, { key: "capture", label: "Capture Fields" }, { key: "validation", label: "Validation" }, { key: "success", label: "Success Message" }]
-      : [{ key: "basic", label: "Basic" }, { key: "presentation", label: "Presentation" }, { key: "ai", label: "AI Settings" }];
+      : [{ key: "basic", label: "Message" }, { key: "presentation", label: "Instagram layout" }, { key: "ai", label: "AI Settings" }];
   const [tab, setTab] = useState("basic");
   const [triggerType, setTriggerType] = useState(seed?.triggerType ?? "both");
   const [keywords, setKeywords] = useState(seed?.keywords ? seed.keywords.split(/[,\n]/).map(value=>value.trim()).filter(Boolean).join("\n") : "price\nquote\ndetails");
