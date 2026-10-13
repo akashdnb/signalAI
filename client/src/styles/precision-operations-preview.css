@@ -1622,3 +1622,57 @@
   .po-preview-app .po-sidebar { padding: 0 12px 8px; }
   .po-preview-app .po-sidebar-brand-row { height: 46px; min-height: 46px; flex-basis: 46px; margin: 0 -12px; padding: 0 15px; justify-content: flex-start; }
 }
+
+
+/* Final screenshot alignment against the live Automation page. */
+.po-preview-app .po-outcome-banner { margin: 17px 0 8px; gap: 7px; padding: 20px; }
+.po-preview-app .po-outcome-marker { width: 30px; height: 30px; border-radius: 8px; }
+.po-preview-app .po-outcome-marker svg { width: 16px; height: 16px; }
+.po-preview-app .po-outcome-banner > div { min-width: 0; max-width: none; flex: 1 1 auto; }
+.po-preview-app .po-outcome-banner p { max-width: 680px; font-size: 13px; line-height: 21px; }
+.po-preview-app .po-outcome-banner > .po-button { flex: 0 0 auto; min-height: 44px; padding: 10px 18px; }
+.po-preview-app .po-list-toolbar { padding: 7px 0 3px; }
+.po-preview-app .po-automation-filters { margin: 4px 0 4px; }
+.po-preview-app .po-automation-search .po-search,
+.po-preview-app .po-automation-filter select { min-height: 42px; }
+.po-preview-app .po-automation-search .po-search input { min-height: 39px; }
+.po-preview-app .po-automation-table { table-layout: fixed; }
+.po-preview-app .po-automation-table th:nth-child(1),
+.po-preview-app .po-automation-table td:nth-child(1) { width: 52px; }
+.po-preview-app .po-automation-table th:nth-child(2),
+.po-preview-app .po-automation-table td:nth-child(2) { width: 50%; }
+.po-preview-app .po-automation-table th:nth-child(3),
+.po-preview-app .po-automation-table td:nth-child(3) { width: 18%; }
+.po-preview-app .po-automation-table th:nth-child(4),
+.po-preview-app .po-automation-table td:nth-child(4) { width: 11%; }
+.po-preview-app .po-automation-table th:nth-child(5),
+.po-preview-app .po-automation-table td:nth-child(5) { width: 12%; }
+.po-preview-app .po-automation-table th:nth-child(6),
+.po-preview-app .po-automation-table td:nth-child(6) { width: 54px; }
+.po-preview-app .po-automation-table td .po-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.po-preview-app .po-automation-table td .po-tag::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+@media (max-width: 760px) {
+  .po-preview-app .po-outcome-banner { margin: 14px 0 8px; padding: 16px; gap: 10px; }
+  .po-preview-app .po-outcome-banner > div { flex-basis: calc(100% - 54px); }
+  .po-preview-app .po-automation-table { table-layout: auto; min-width: 720px; }
+  .po-preview-app .po-automation-table th:nth-child(n),
+  .po-preview-app .po-automation-table td:nth-child(n) { width: auto; }
+}
