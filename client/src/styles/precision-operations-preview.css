@@ -1341,3 +1341,27 @@
   .po-preview-app .po-inspector-dialog .po-inspector { padding: 0 14px 14px; }
   .po-preview-app .po-inspector-dialog-actions { padding: 12px 14px 9px; }
 }
+
+
+/* Inspector is mounted while closed so draft field values survive reopening. */
+.po-preview-app .po-inspector-backdrop.is-hidden { display: none !important; }
+.po-preview-app.po-standalone-preview .text-ink { color: var(--po-ink); }
+.po-preview-app.po-standalone-preview .text-accent { color: var(--po-primary); }
+.po-preview-app.po-standalone-preview .po-auth-status {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--po-line);
+  border-radius: 8px;
+  background: var(--po-surface-muted);
+  color: var(--po-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.po-preview-app .po-automation-filters { grid-template-columns: minmax(220px,1fr) 165px 220px 195px; }
+@media (max-width: 1180px) {
+  .po-preview-app .po-automation-filters { grid-template-columns: minmax(0,1fr) minmax(150px,.55fr); }
+}
+@media (max-width: 760px) {
+  .po-preview-app .po-automation-filters { grid-template-columns: minmax(0,1fr); }
+  .po-preview-app .po-inspector-dialog { width: calc(100vw - 18px); }
+}
