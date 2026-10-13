@@ -246,6 +246,8 @@ export function LoginPreviewScreen({onNavigate}:{onNavigate:Go}) {
   const [showPreviewTools,setShowPreviewTools]=useState(false);
   const [verificationOutcome,setVerificationOutcome]=useState<"invalid"|"expired"|"too-many"|"accepted">("invalid");
   const [codeRequested,setCodeRequested]=useState(false);
+  const [verificationComplete,setVerificationComplete]=useState(false);
+  const [notice,setNotice]=useState("");
 
   function openEmail() {
     setStep("email");
@@ -259,13 +261,16 @@ export function LoginPreviewScreen({onNavigate}:{onNavigate:Go}) {
     }
     setError("");
     setCode("");
+    setVerificationComplete(false);
+    setNotice("");
     setCodeRequested(true);
     setStep("code");
   }
   function verifySampleCode() {
     if(code.length!==6) return;
-    if(verificationOutcome==="invalid") setError("That code is incorrect or has expired. Please check your inbox for the latest code.");
-    else if(verificationOutcome==="expired") setError("That code is incorrect or has expired. Please check your inbox for the latest code.");
+    setVerificationComplete(true);
+    setNotice("");
+    if(verificationOutcome==="invalid"||verificationOutcome==="expired") setError("That code is incorrect or has expired. Please check your inbox for the latest code.");
     else if(verificationOutcome==="too-many") setError("Too many incorrect attempts for that code. Please request a new one.");
     else setError("");
   }
@@ -306,12 +311,12 @@ export function LoginPreviewScreen({onNavigate}:{onNavigate:Go}) {
         <p className="po-auth-subtitle">We sent a 6-digit code to <strong>{email.trim()}</strong>. It expires in 10 minutes.</p>
         {error&&<div className="po-auth-error" role="alert">{error}</div>}
         <form className="po-auth-form" onSubmit={e=>{e.preventDefault();verifySampleCode();}}>
-          <label>Sign-in code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} autoFocus value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}} placeholder="123456" required/></label>
+          <label>Sign-in code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} autoFocus value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,"").slice(0,6));setError("");setNotice("");setVerificationComplete(false);}} placeholder="123456" required/></label>
           <button type="submit" className="po-auth-primary" disabled={code.length!==6}>Sign in</button>
         </form>
-        <p className="po-auth-resend">Didn't get it? <button type="button" disabled={codeRequested===false} onClick={()=>{setCode("");setError("Preview only: a new code would be sent. No email was sent.");}}>Send a new code</button> or <button type="button" onClick={()=>{setStep("email");setCode("");setError("");}}>use a different email</button>.</p>
-        {verificationOutcome==="accepted"&&!error&&code.length===6&&<div className="po-auth-success" role="status"><strong>Sample code accepted</strong><p>Authentication is not connected, so no session is created.</p><button type="button" className="po-auth-primary" onClick={()=>onNavigate("overview")}>Open dashboard preview</button></div>}
-        <div className="po-auth-preview-tools"><button type="button" onClick={()=>setShowPreviewTools(v=>!v)}>{showPreviewTools?"Hide preview tools":"Test sign-in states (preview only)"}</button>{showPreviewTools&&<label>Simulated verification result<select value={verificationOutcome} onChange={e=>{setVerificationOutcome(e.target.value as typeof verificationOutcome);setError("");}}><option value="invalid">Incorrect / expired code</option><option value="too-many">Too many attempts</option><option value="accepted">Successful code response</option></select></label>}</div>
+        <p className="po-auth-resend">Didn't get it? <button type="button" disabled={codeRequested===false} onClick={()=>{setCode("");setError("");setVerificationComplete(false);setNotice("Preview only: a new code would be sent. No email was sent.");}}>Send a new code</button> or <button type="button" onClick={()=>{setStep("email");setCode("");setError("");setNotice("");setVerificationComplete(false);}}>use a different email</button>.</p>{notice&&<div className="po-auth-status" role="status">{notice}</div>}
+        {verificationOutcome==="accepted"&&verificationComplete&&!error&&code.length===6&&<div className="po-auth-success" role="status"><strong>Sample code accepted</strong><p>Authentication is not connected, so no session is created.</p><button type="button" className="po-auth-primary" onClick={()=>onNavigate("overview")}>Open dashboard preview</button></div>}
+        <div className="po-auth-preview-tools"><button type="button" onClick={()=>setShowPreviewTools(v=>!v)}>{showPreviewTools?"Hide preview tools":"Test sign-in states (preview only)"}</button>{showPreviewTools&&<label>Simulated verification result<select value={verificationOutcome} onChange={e=>{setVerificationOutcome(e.target.value as typeof verificationOutcome);setError("");setNotice("");setVerificationComplete(false);}}><option value="invalid">Incorrect code</option><option value="expired">Expired code</option><option value="too-many">Too many attempts</option><option value="accepted">Successful code response</option></select></label>}</div>
       </>}
       {step!=="method"&&<p className="po-auth-help-link"><button type="button" onClick={()=>onNavigate("docs")}>Read documentation →</button></p>}
     </div>
