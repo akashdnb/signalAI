@@ -46,6 +46,7 @@ export function InboxPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+  const listRequestIdRef = useRef(0);
 
   const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
@@ -69,15 +70,23 @@ export function InboxPage() {
 
   async function reloadLeads() {
     if (!tenantId) return;
+    const requestId = ++listRequestIdRef.current;
     try {
       const result = await getLeadsPage(tenantId, page, PAGE_SIZE, {
         ...getFilters(),
         q: search.trim() || undefined,
       });
+      // Ignore late responses from an older filter/search/page request.
+      if (requestId !== listRequestIdRef.current) return;
       setPageData(result);
+      // Keep the selected thread and contact panel in the same result scope as the list.
+      setSelectedLeadId((currentId) =>
+        currentId && result.items.some((lead) => lead.id === currentId) ? currentId : null,
+      );
       if (result.page !== page) setPage(result.page);
       setError(null);
     } catch (err) {
+      if (requestId !== listRequestIdRef.current) return;
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         navigate("/login", { replace: true });
         return;
@@ -88,6 +97,12 @@ export function InboxPage() {
 
   useEffect(() => {
     setPage(1);
+    // Changing the query changes the conversation scope. Never keep a thread
+    // or contact panel selected from the previous result set.
+    setSelectedLeadId(null);
+    setComposeText("");
+    setPendingEntries([]);
+    setError(null);
   }, [tab, search]);
 
   useEffect(() => {
@@ -267,7 +282,25 @@ export function InboxPage() {
           {leads === null ? (
             <p className="muted p-3" role="status">{error ? "Conversations could not be loaded." : "Loading…"}</p>
           ) : leads.length === 0 ? (
-            <p className="muted p-3">No conversations match this view.</p>
+            <div className="p-3" role="status">
+              <p className="muted">No conversations match this view.</p>
+              {(tab !== "all" || search.trim()) && (
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    setTab("all");
+                    setSearch("");
+                    setPage(1);
+                    setSelectedLeadId(null);
+                    setComposeText("");
+                    setPendingEntries([]);
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
           ) : (
             <>
               <ul className="list" style={{ margin: 0 }}>
@@ -301,7 +334,12 @@ export function InboxPage() {
                   totalPages={pageData.totalPages}
                   total={pageData.total}
                   pageSize={pageData.pageSize}
-                  onPageChange={setPage}
+                  onPageChange={(nextPage) => {
+                    setSelectedLeadId(null);
+                    setComposeText("");
+                    setPendingEntries([]);
+                    setPage(nextPage);
+                  }}
                   label="conversations"
                 />
               )}
