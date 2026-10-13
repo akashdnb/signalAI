@@ -1864,3 +1864,30 @@
   .po-preview-app .po-leads-production-table { min-width: 980px; }
   .po-preview-app .po-leads-pagination { margin: 0 12px; flex-wrap: wrap; }
 }
+
+
+/* Audit fix: filtered inboxes never keep stale contact context visible. */
+.po-preview-app .po-thread-empty {
+  display: flex;
+  min-height: 360px;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: #fff;
+  text-align: center;
+}
+.po-preview-app .po-thread-empty > div { display: flex; max-width: 360px; flex-direction: column; align-items: center; gap: 10px; }
+.po-preview-app .po-empty-mark {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--po-line);
+  border-radius: 50%;
+  color: var(--po-muted);
+  font-size: 24px;
+}
+.po-preview-app .po-thread-empty h2 { margin: 3px 0 0; font-size: 16px; letter-spacing: -.02em; }
+.po-preview-app .po-thread-empty p, .po-preview-app .po-context-empty p { margin: 0; color: var(--po-muted); font-size: 11px; line-height: 1.65; }
+.po-preview-app .po-context-empty { min-height: 240px; }
