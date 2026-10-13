@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen } from "./PrecisionOperationsFullScreens";
+import { Logo } from "../components/Logo";
 import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
   IntegrationsIcon, LeadsIcon, SettingsIcon, TeamIcon, InstagramMarkIcon,
@@ -67,7 +68,7 @@ const leads = [
 ];
 
 function BrandMark() {
-  return <div className="po-brand" aria-label="SignalAI"><span className="po-brand-symbol" aria-hidden="true">s</span><span>signalAI</span></div>;
+  return <Logo size="md" className="po-brand" />;
 }
 
 function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?: string }) {
@@ -83,24 +84,20 @@ function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (n
   return (
     <aside className="po-sidebar" aria-label="Preview navigation">
       <BrandMark />
-      <div className="po-workspace-switcher" aria-label="Sample workspace">
-        <span className="po-workspace-avatar">CS</span><span className="po-workspace-name"><strong>Creator Studio</strong><small>Sample workspace</small></span><ChevronDownIcon className="po-icon-small" />
-      </div>
       <nav className="po-nav">
         <div className="po-nav-section">
           {navigation.filter((item) => item.section === "primary").map((item) => {
             const active = item.screen === selectedScreen;
             const Icon = item.icon;
-            return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">12</span>}</button>;
+            return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">5</span>}</button>;
           })}
         </div>
         <div className="po-nav-section po-nav-future"><div className="po-nav-coming-soon" aria-disabled="true"><ContactsIcon className="po-nav-icon"/><span>Contacts</span><small>SOON</small></div><div className="po-nav-coming-soon" aria-disabled="true"><BroadcastIcon className="po-nav-icon"/><span>Broadcasts</span><small>SOON</small></div></div>
         <div className="po-nav-divider" /><div className="po-nav-section"><p className="po-nav-label">Workspace</p>
           {navigation.filter((item) => item.section === "workspace").map((item) => { const Icon = item.icon; const active = item.screen === selectedScreen; return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>; })}
         </div>
-        <button type="button" className="po-nav-help" onClick={() => onNavigate("docs")}><BookIcon className="po-nav-icon" /> Help & documentation</button>
       </nav>
-      <div className="po-sidebar-footer"><span className="po-avatar po-avatar--small">CS</span><div><strong>Creator Studio</strong><small>Sample workspace · review only</small></div><DotsVerticalIcon className="po-icon-small" /></div>
+      <div className="po-plan-card"><span className="po-plan-label">Current Plan</span><strong>Trial</strong><button type="button" onClick={() => onNavigate("billing")}>Upgrade</button></div>
     </aside>
   );
 }
@@ -134,7 +131,7 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
   };
   const config = configs[screen] ?? configs.overview!;
   return <header className="po-page-header">
-    <div><div className="po-eyebrow">{config.eyebrow}</div><h1>{config.title}</h1><p>{config.description}</p></div>
+    <div><h1>{config.title}</h1><p>{config.description}</p></div>
     {screen === "automations" ? <button type="button" className="po-button po-button--quiet" onClick={() => onNavigate("docs")}><BookIcon className="po-button-icon"/> Docs</button> : null}
     {screen === "inbox" ? <div className="po-header-context"><span className="po-status-dot" /> Sample inbox <ChevronDownIcon className="po-icon-small" /></div> : null}
     {screen === "lead-detail" ? <button type="button" className="po-button po-button--secondary" onClick={() => onNavigate("leads")}>Back to leads</button> : null}
