@@ -100,3 +100,17 @@ A focused hosted run verified the node editor lifecycle and rich-message control
 - Editing a message and closing it opens the discard dialog above the inspector. **Keep editing** preserves the unsaved text; **Discard changes** closes and restores the original value.
 - The Message / Instagram layout / AI Settings tabs and all five layout modes were found. Text + buttons reveals button label, action, and HTTPS URL fields; applying stages the change locally and shows the correct confirmation.
 - The run observed that adding nodes updates the canvas but the footer count can continue to show 4. The footer was changed to use an explicit count derived from base nodes plus added nodes, with a live status announcement. **Recheck this counter after the current deployment.**
+
+
+### Builder count and per-node regression — latest live preview
+
+Latest regression run: [Builder count / node configuration QA](https://agent.tinyfish.ai/runs/7a55342d-b812-4a44-8bb9-f64d36116807).
+
+- Added one message node: visible nodes rose from 4 to 5; adding a palette AI reply raised them from 5 to 6. The current preview report confirms sequential numbering (01–06) and connector rendering.
+- Per-node values were retained independently across two message nodes: “AI reply draft A” and “Follow-up draft B”.
+- The Inspector open/close/discard guard remains verified by [the inspector flow run](https://agent.tinyfish.ai/runs/5facbe73-3179-4cc9-92d5-d202beb8ccf2).
+- Save still shows that nothing is written to the server.
+- **Drag-and-drop reorder is not fully browser-verified.** The nodes are draggable and reorder state is wired, but TinyFish could not execute a native HTML drag operation reliably. Do not treat this gesture as accepted until it is manually or otherwise reliably tested.
+- **Mobile layout also remains not directly verified at a 390px viewport.** The responsive styles and mobile automation cards exist, but the browser run could not resize the viewport.
+
+The preview remains an interactive design model, not a production-connected app. All sample data and operational actions are local.
