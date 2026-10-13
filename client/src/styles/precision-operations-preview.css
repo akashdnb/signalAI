@@ -1392,3 +1392,6 @@
   .po-preview-app .po-automation-desktop-table { display: block; }
   .po-preview-app .po-automation-mobile-list { display: none; }
 }
+
+/* Keep the destructive inspector confirmation above the still-mounted editor dialog. */
+.po-preview-app .po-inspector-discard-backdrop { z-index: 200; }
