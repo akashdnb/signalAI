@@ -107,6 +107,7 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
   selectedLeadName: string; automationName: string; automationStatus: string; onNavigate: (screen: PreviewScreen) => void;
 }) {
   const [moreOpen,setMoreOpen]=useState(false);
+  if (screen === "leads") return <header className="po-page-header po-page-header--leads"><h1>Leads</h1></header>;
   if (screen === "builder") return <header className="po-page-header po-builder-header">
     <div className="po-builder-heading"><div className="po-breadcrumb"><button type="button" onClick={() => onNavigate("automations")}>Automations</button><span aria-hidden="true">/</span><strong>{automationName}</strong></div><div className="po-title-row"><h1>{automationName}</h1><Tag tone={automationStatus==="Live"?"green":automationStatus==="Paused"?"neutral":"warning"}>{automationStatus==="Live"?"Live":automationStatus==="Paused"?"Paused":automationStatus==="Needs publishing"?"Needs publishing":"Draft · Not live"}</Tag></div><p>Review the trigger, reply behavior, lead capture, and account assignment before activating.</p></div>
     <div className="po-header-actions"><span className={"po-save-status" + (dirty ? " is-dirty" : "")} role="status"><span className="po-save-status-dot" />{dirty ? "Unsaved preview changes" : "Preview marked saved"}</span><button type="button" className="po-button po-button--quiet" onClick={()=>onNavigate("docs")}>Docs</button><button type="button" className="po-button po-button--secondary" onClick={onPreview}>Preview</button><button type="button" className="po-button po-button--quiet" onClick={onTest}><PlayIcon className="po-button-icon" /> Sample walkthrough</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button><div className="po-builder-more-wrap"><button type="button" aria-label="More automation actions" aria-expanded={moreOpen} className="po-button po-button--secondary po-builder-more-button" onClick={()=>setMoreOpen(v=>!v)}><DotsVerticalIcon/></button>{moreOpen&&<div className="po-dropdown po-builder-menu"><div className="po-dropdown-heading"><strong>Automation actions</strong><Tag>{automationStatus}</Tag></div><button type="button" onClick={()=>{setMoreOpen(false);onPreview();}}>Preview reply</button><button type="button" onClick={()=>{setMoreOpen(false);onTest();}}>Sample walkthrough</button><button type="button" onClick={()=>{setMoreOpen(false);onNavigate("docs");}}>Builder documentation</button><button type="button" disabled={automationStatus!=="Live"&&automationStatus!=="Paused"} onClick={()=>{setMoreOpen(false);onLifecycleAction(automationStatus==="Live"?"pause":"activate");}}>{automationStatus==="Live"?"Pause automation":automationStatus==="Paused"?"Activate automation":"Publish before activating"}</button><p>All lifecycle actions in this concept are local demonstrations.</p></div>}</div></div>
@@ -555,16 +556,62 @@ function InboxScreen() {
 }
 
 function LeadsScreen({ onOpenLead }: { onOpenLead: (name: string) => void }) {
-  const [query,setQuery]=useState(""); const [stage,setStage]=useState("All stages"); const [handoff,setHandoff]=useState("All handoff states"); const [sort,setSort]=useState("Last activity"); const [page,setPage]=useState(1);
-  const enriched=leads.map((lead,index)=>({...lead,sampleIndex:index,handoffStatus:index===1?"Needs attention":index===3?"Human handling":"AI handling",window:index===4?"Closed":"Open · "+[18,12,10,3][index%4]+"h left",firstSeen:["Today","Oct 11","Oct 10","Oct 08","Oct 05","Oct 03"][index%6]}));
-  const filteredLeads=useMemo(()=>enriched.filter(lead=>{const q=query.toLowerCase().trim();return (!q||lead.name.toLowerCase().includes(q)||lead.handle.toLowerCase().includes(q))&&(stage==="All stages"||lead.stage===stage)&&(handoff==="All handoff states"||lead.handoffStatus===handoff);}),[query,stage,handoff]);
-  const sortedLeads=[...filteredLeads].sort((a,b)=>sort==="Name A–Z"?a.name.localeCompare(b.name):sort==="Stage"?a.stage.localeCompare(b.stage):a.sampleIndex-b.sampleIndex); const pageCount=Math.max(1,Math.ceil(sortedLeads.length/5)); const pageLeads=sortedLeads.slice((page-1)*5,page*5);
-  return <section className="po-leads-screen" aria-label="Leads concept"><div className="po-sample-metrics-label"><span>ILLUSTRATIVE VALUES</span><small>Sample data for layout review · not production metrics</small></div>
-    <div className="po-metric-row"><div className="po-metric"><span>Total leads</span><strong>24</strong><small>Sample workspace</small></div><div className="po-metric"><span>New</span><strong>19</strong><small>Needs first contact</small></div><div className="po-metric"><span>Contacted</span><strong>3</strong><small>Follow-up in progress</small></div><div className="po-metric"><span>Qualified</span><strong>2</strong><small>Ready for review</small></div></div>
-    <div className="po-leads-table-wrap"><div className="po-table-toolbar"><div><h2>All sample leads</h2><p>Filter by pipeline stage and handoff status; open a profile for captured facts and history.</p></div><div className="po-table-controls"><label className="po-search"><SearchIcon/><input value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}} placeholder="Search by username…"/></label><label className="po-select-wrap"><span className="po-visually-hidden">Pipeline stage</span><select value={stage} onChange={e=>{setStage(e.target.value);setPage(1);}}><option>All stages</option>{["New","Contacted","Qualified","Meeting Scheduled","Won","Lost"].map(s=><option key={s}>{s}</option>)}</select><ChevronDownIcon/></label><label className="po-select-wrap"><span className="po-visually-hidden">Handoff status</span><select value={handoff} onChange={e=>{setHandoff(e.target.value);setPage(1);}}><option>All handoff states</option>{["AI handling","Needs attention","Human handling"].map(s=><option key={s}>{s}</option>)}</select><ChevronDownIcon/></label><label className="po-select-wrap"><span className="po-visually-hidden">Sort leads</span><select value={sort} onChange={e=>{setSort(e.target.value);setPage(1);}}><option>Last activity</option><option>Name A–Z</option><option>Stage</option></select><ChevronDownIcon/></label></div></div>
-      <div className="po-table-scroll"><table className="po-leads-table"><thead><tr><th scope="col">Username</th><th scope="col">Stage</th><th scope="col">Handoff</th><th scope="col">Last contact</th><th scope="col">Via</th><th scope="col">Messaging window</th><th scope="col">First seen</th></tr></thead><tbody>{pageLeads.map(lead=><tr key={lead.handle}><td><div className="po-table-lead"><span className="po-avatar po-avatar--small">{lead.name.split(" ").map(part=>part[0]).join("")}</span><span><button type="button" className="po-table-primary-link" onClick={()=>onOpenLead(lead.name)}>{lead.name}</button><small>{lead.handle}</small></span></div></td><td><Tag tone={lead.stage==="Qualified"?"green":lead.stage==="Contacted"?"blue":"neutral"}>{lead.stage}</Tag></td><td><Tag tone={lead.handoffStatus==="Needs attention"?"amber":lead.handoffStatus==="Human handling"?"blue":"purple"}>{lead.handoffStatus}</Tag></td><td className="po-time-cell" title={lead.activity}>{lead.activity}</td><td>{lead.source}</td><td><Tag tone={lead.window==="Closed"?"neutral":"green"}>{lead.window}</Tag></td><td>{lead.firstSeen}</td></tr>)}</tbody></table>{sortedLeads.length===0&&<div className="po-table-empty"><strong>No leads match these filters</strong><span>Clear the search or choose a different stage or handoff state.</span><button className="po-text-action" type="button" onClick={()=>{setQuery("");setStage("All stages");setHandoff("All handoff states");}}>Clear filters</button></div>}</div>
-      <div className="po-table-footer"><span>Showing {pageLeads.length} rows from {sortedLeads.length} illustrative sample records · 24 total leads in this sample workspace</span><div className="po-row-actions"><button type="button" disabled={page===1} onClick={()=>setPage(Math.max(1,page-1))}>Previous</button><span>Page {page} of {pageCount}</span><button type="button" disabled={page===pageCount} onClick={()=>setPage(Math.min(pageCount,page+1))}>Next</button></div></div>
-    </div><p className="po-help-text">Names, events, counts, and timestamps are sample values. No production leads are loaded or modified.</p></section>;
+  const [query,setQuery] = useState("");
+  const [stage,setStage] = useState("");
+  const [handoff,setHandoff] = useState("");
+  const [page,setPage] = useState(1);
+  const PAGE_SIZE=10;
+  const rows=leads.map((lead,index)=>({
+    ...lead,
+    username:lead.handle.replace(/^@/,""),
+    handoffStatus:index===1?"Needs attention":index===3?"Human is replying":"AI is replying",
+    window:index===0?"Open · 12h left":index===3?"Open · 3h left":"Closed",
+    firstSeen:["9/20/2026","9/20/2026","10/10/2026","9/20/2026","10/6/2026","10/3/2026","10/2/2026","10/1/2026","9/28/2026","9/26/2026"][index]??"9/20/2026",
+    unread:index===1||index===5,
+  }));
+  const filtered=useMemo(()=>rows.filter(lead=>{
+    const q=query.trim().toLowerCase();
+    return (!q||lead.username.toLowerCase().includes(q))&&(!stage||lead.stage===stage)&&(!handoff||lead.handoffStatus===handoff);
+  }),[query,stage,handoff]);
+  const pageCount=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
+  const clearFilters=()=>{setQuery("");setStage("");setHandoff("");setPage(1);};
+  return <section className="po-leads-screen" aria-label="Leads">
+    <section className="po-leads-production-card">
+      <div className="po-leads-filter-row">
+        <label className="po-visually-hidden" htmlFor="po-leads-stage-filter">Pipeline stage</label>
+        <select id="po-leads-stage-filter" aria-label="Pipeline stage" value={stage} onChange={event=>{setStage(event.target.value);setPage(1);}}>
+          <option value="">All stages</option>
+          {["New","Contacted","Qualified","Meeting Scheduled","Won","Lost"].map(value=><option key={value} value={value}>{value}</option>)}
+        </select>
+        <label className="po-visually-hidden" htmlFor="po-leads-handoff-filter">Handoff status</label>
+        <select id="po-leads-handoff-filter" aria-label="Handoff status" value={handoff} onChange={event=>{setHandoff(event.target.value);setPage(1);}}>
+          <option value="">All</option><option value="AI is replying">AI Handling</option><option value="Needs attention">Needs Attention</option><option value="Human is replying">Human Handling</option>
+        </select>
+        <label className="po-visually-hidden" htmlFor="po-leads-search">Search leads by username</label>
+        <input id="po-leads-search" type="search" aria-label="Search leads by username" placeholder="Search by username…" value={query} onChange={event=>{setQuery(event.target.value);setPage(1);}}/>
+      </div>
+      <div className="po-leads-production-table-scroll" aria-label="Scrollable leads table">
+        <table className="po-leads-table po-leads-production-table">
+          <thead><tr><th scope="col">Username</th><th scope="col">Stage</th><th scope="col">Handoff</th><th scope="col">Last contact</th><th scope="col">Via</th><th scope="col">Messaging window</th><th scope="col">First seen</th></tr></thead>
+          <tbody>
+            {pageRows.map((lead,index)=><tr key={lead.handle}>
+              <td><button type="button" className="po-lead-username" onClick={()=>onOpenLead(lead.name)}>{lead.unread&&<span className="po-lead-unread-dot" aria-hidden="true"/>}{lead.username}</button></td>
+              <td>{lead.stage}</td>
+              <td><Tag tone={lead.handoffStatus==="Needs attention"?"amber":lead.handoffStatus==="Human is replying"?"green":"purple"}>{lead.handoffStatus}</Tag></td>
+              <td className="po-time-cell">{lead.activity}</td>
+              <td>{lead.source}</td>
+              <td><Tag tone={lead.window==="Closed"?"neutral":"green"}>{lead.window}</Tag></td>
+              <td>{lead.firstSeen}</td>
+            </tr>)}
+          </tbody>
+        </table>
+        {filtered.length===0&&<div className="po-table-empty"><strong>No leads match these filters</strong><span>Clear the search or choose a different stage or handoff state.</span><button className="po-text-action" type="button" onClick={clearFilters}>Clear filters</button></div>}
+      </div>
+      {filtered.length>0&&<div className="po-leads-pagination"><span>Showing {pageRows.length} of {filtered.length} leads</span><div><button type="button" disabled={page===1} onClick={()=>setPage(value=>Math.max(1,value-1))}>Previous</button><span>Page {page} of {pageCount}</span><button type="button" disabled={page===pageCount} onClick={()=>setPage(value=>Math.min(pageCount,value+1))}>Next</button></div></div>}
+    </section>
+    <p className="po-leads-disclaimer">Sample values are shown for layout review. No production leads are loaded or modified.</p>
+  </section>;
 }
 
 function MessagePreviewDialog({ automationName, onClose }: { automationName: string; onClose: () => void }) {
