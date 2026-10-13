@@ -313,7 +313,8 @@ export function LoginPreviewScreen({onNavigate}:{onNavigate:Go}) {
       </>}
       {step==="code"&&<>
         <h1>Enter your code</h1>
-        <p className="po-auth-subtitle">We sent a 6-digit code to <strong>{email.trim()}</strong>. It expires in 10 minutes.</p>
+        <p className="po-auth-subtitle">In the real product, a 6-digit code would be sent to <strong>{email.trim()}</strong>. It expires in 10 minutes.</p>
+        <div className="po-auth-status" role="note">Preview only: no email was sent. Use “Test sign-in states” below to simulate verification.</div>
         {error&&<div className="po-auth-error" role="alert">{error}</div>}
         <form className="po-auth-form" onSubmit={e=>{e.preventDefault();verifySampleCode();}}>
           <label>Sign-in code<input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} autoFocus value={code} onChange={e=>{setCode(e.target.value.replace(/\D/g,"").slice(0,6));setError("");setNotice("");setVerificationComplete(false);}} placeholder="123456" required/></label>
