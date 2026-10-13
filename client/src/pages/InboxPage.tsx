@@ -331,9 +331,24 @@ export function InboxPage() {
               </div>
               <div className="border-t border-line p-3">
                 {selectedLead.handoffStatus !== "human" ? (
-                  <button className="btn-primary" disabled={busy} onClick={() => handleHandoff("takeover")}>
-                    Take over to reply
-                  </button>
+                  <div className="space-y-2">
+                    {!selectedLead.ownerUserId ? (
+                      <p className="muted small" role="status">
+                        Assign an owner in the lead panel before taking over this conversation.
+                      </p>
+                    ) : selectedLead.handoffStatus === "requested" ? (
+                      <p className="muted small" role="status">
+                        Human attention requested. This conversation is assigned to {members?.find((member) => member.userId === selectedLead.ownerUserId)?.email ?? "the current owner"}.
+                      </p>
+                    ) : null}
+                    <button
+                      className="btn-primary"
+                      disabled={busy || !selectedLead.ownerUserId}
+                      onClick={() => handleHandoff("takeover")}
+                    >
+                      {selectedLead.handoffStatus === "requested" ? "Take over conversation" : "Take over to reply"}
+                    </button>
+                  </div>
                 ) : (
                   <>
                     {humanAgentOnly ? (
