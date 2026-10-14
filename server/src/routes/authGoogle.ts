@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
@@ -29,6 +29,8 @@ interface GoogleJwk {
 interface GoogleJwks {
   keys: GoogleJwk[];
 }
+
+let jwksCache: { expiresAt: number; keys: GoogleJwk[] } | null = null;
 
 interface GoogleIdToken {
   iss?: unknown;
@@ -123,16 +125,20 @@ async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdentity> {
   }
 
   if (header.alg !== "RS256" || typeof header.kid !== "string") throw new Error("invalid_google_id_token");
-  const response = await fetch(GOOGLE_JWKS_URL, { signal: AbortSignal.timeout(5000) });
-  if (!response.ok) throw new Error("google_jwks_unavailable");
-  const jwks = await response.json() as GoogleJwks;
-  const jwk = jwks.keys.find((key) => key.kid === header.kid && key.kty === "RSA" && (!key.alg || key.alg === "RS256"));
+  let keys = jwksCache?.expiresAt && jwksCache.expiresAt > Date.now() ? jwksCache.keys : null;
+  if (!keys) {
+    const response = await fetch(GOOGLE_JWKS_URL, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error("google_jwks_unavailable");
+    const jwks = await response.json() as GoogleJwks;
+    keys = jwks.keys;
+    jwksCache = { keys, expiresAt: Date.now() + 60 * 60 * 1000 };
+  }
+  const jwk = keys.find((key) => key.kid === header.kid && key.kty === "RSA" && (!key.alg || key.alg === "RS256"));
   if (!jwk) throw new Error("unknown_google_signing_key");
 
-  const key = await import("node:crypto").then(({ createPublicKey }) => createPublicKey({ key: jwk as JsonWebKey, format: "jwk" }));
+  const key = createPublicKey({ key: jwk as JsonWebKey, format: "jwk" });
   const signature = base64UrlDecode(pieces[2]!);
   const signedContent = Buffer.from(`${pieces[0]}.${pieces[1]}`);
-  const { verify } = await import("node:crypto");
   if (!verify("RSA-SHA256", signedContent, key, signature)) throw new Error("invalid_google_id_token");
 
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
