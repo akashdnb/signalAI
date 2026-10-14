@@ -83,7 +83,8 @@ function safeEqualString(expected: string, actual: string): boolean {
 function safeReturnTo(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
   if (value.includes("\r") || value.includes("\n")) return "/";
-  return value;
+  // The OIDC callback is only intended to return to the login screen.
+  return value === "/login" ? value : "/";
 }
 
 function signedState(secret: string, payload: OAuthState): string {
@@ -157,6 +158,9 @@ async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdentity> {
   if (typeof payload.iat !== "number" || payload.iat * 1000 > Date.now() + 30_000) throw new Error("invalid_google_id_token");
   if (typeof payload.sub !== "string" || !payload.sub) throw new Error("invalid_google_id_token");
   if (typeof payload.email !== "string" || !payload.email.trim() || payload.email_verified !== true) throw new Error("google_email_not_verified");
+  if (Array.isArray(payload.aud) && payload.aud.length > 1 && (payload as GoogleIdToken & { azp?: unknown }).azp !== config.googleClientId) {
+    throw new Error("invalid_google_id_token");
+  }
   if (Array.isArray(payload.aud) && typeof config.googleClientId === "string" && payload.aud.length > 1) {
     const azp = (payload as GoogleIdToken & { azp?: unknown }).azp;
     if (azp !== config.googleClientId) throw new Error("invalid_google_id_token");
