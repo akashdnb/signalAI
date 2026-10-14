@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from "react";
+import { lazy, Suspense, useEffect, type ComponentType, type LazyExoticComponent } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
@@ -8,6 +8,7 @@ import "./styles/precision-operations-preview.css";
 import "./styles/precision-operations-design-system.css";
 import "./styles/precision-operations-final-fixes.css";
 import "./styles/precision-operations-color-tokens.css";
+import "./styles/precision-operations-palette-switcher.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() =>
@@ -31,6 +32,20 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage").then((module) => 
 const TeamPage = lazy(() => import("./pages/TeamPage").then((module) => ({ default: module.TeamPage })));
 const InvitationAcceptPage = lazy(() => import("./pages/InvitationAcceptPage").then((module) => ({ default: module.InvitationAcceptPage })));
 
+const previewPalettes = new Set(["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate"]);
+
+function PreviewPaletteBridge() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const palette = params.get("palette") ?? "navy-cobalt";
+    const isPreview = params.get("preview") === "precision-operations" || window.location.pathname === "/redesign-preview";
+    if (isPreview) document.body.dataset.poPalette = previewPalettes.has(palette) ? palette : "navy-cobalt";
+    else delete document.body.dataset.poPalette;
+    return () => delete document.body.dataset.poPalette;
+  }, []);
+  return null;
+}
+
 function PageLoadingFallback() {
   return <div role="status" className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle">Loading page…</div>;
 }
@@ -44,29 +59,32 @@ function HomeRedirect() {
   return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
 }
 export default function App() {
-  return <Routes>
-    <Route path="/redesign-preview" element={<LazyPage Page={PrecisionOperationsPreviewPage} />} />
-    <Route path="/" element={<HomeRedirect />} />
-    <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
-    <Route path="/docs/*" element={<LazyPage Page={DocsPage} />} />
-    <Route path="/login" element={<LazyPage Page={LoginPage} />} />
-    <Route path="/connect" element={<LazyPage Page={ConnectPage} />} />
-    <Route path="/invite" element={<LazyPage Page={InvitationAcceptPage} />} />
-    <Route path="/dashboard/:tenantId" element={<AppShell />}>
-      <Route index element={<LazyPage Page={DashboardPage} />} />
-      <Route path="settings" element={<LazyPage Page={SettingsPage} />} />
-      <Route path="leads/:leadId" element={<LazyPage Page={LeadDetailPage} />} />
-      <Route path="inbox" element={<LazyPage Page={InboxPage} />} />
-      <Route path="leads" element={<LazyPage Page={LeadsPage} />} />
-      <Route path="automation" element={<LazyPage Page={AutomationPage} />} />
-      <Route path="automation/journeys/:campaignId" element={<LazyPage Page={JourneyBuilderPage} />} />
-      <Route path="content" element={<LazyPage Page={ContentPage} />} />
-      <Route path="knowledge" element={<LazyPage Page={KnowledgePage} />} />
-      <Route path="analytics" element={<LazyPage Page={AnalyticsPage} />} />
-      <Route path="team" element={<LazyPage Page={TeamPage} />} />
-      <Route path="integrations" element={<LazyPage Page={IntegrationsPage} />} />
-      <Route path="billing" element={<LazyPage Page={BillingPage} />} />
-    </Route>
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>;
+  return <>
+    <PreviewPaletteBridge />
+    <Routes>
+      <Route path="/redesign-preview" element={<LazyPage Page={PrecisionOperationsPreviewPage} />} />
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
+      <Route path="/docs/*" element={<LazyPage Page={DocsPage} />} />
+      <Route path="/login" element={<LazyPage Page={LoginPage} />} />
+      <Route path="/connect" element={<LazyPage Page={ConnectPage} />} />
+      <Route path="/invite" element={<LazyPage Page={InvitationAcceptPage} />} />
+      <Route path="/dashboard/:tenantId" element={<AppShell />}>
+        <Route index element={<LazyPage Page={DashboardPage} />} />
+        <Route path="settings" element={<LazyPage Page={SettingsPage} />} />
+        <Route path="leads/:leadId" element={<LazyPage Page={LeadDetailPage} />} />
+        <Route path="inbox" element={<LazyPage Page={InboxPage} />} />
+        <Route path="leads" element={<LazyPage Page={LeadsPage} />} />
+        <Route path="automation" element={<LazyPage Page={AutomationPage} />} />
+        <Route path="automation/journeys/:campaignId" element={<LazyPage Page={JourneyBuilderPage} />} />
+        <Route path="content" element={<LazyPage Page={ContentPage} />} />
+        <Route path="knowledge" element={<LazyPage Page={KnowledgePage} />} />
+        <Route path="analytics" element={<LazyPage Page={AnalyticsPage} />} />
+        <Route path="team" element={<LazyPage Page={TeamPage} />} />
+        <Route path="integrations" element={<LazyPage Page={IntegrationsPage} />} />
+        <Route path="billing" element={<LazyPage Page={BillingPage} />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </>;
 }
