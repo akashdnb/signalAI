@@ -56,6 +56,7 @@ export async function upsertToken(
 export interface TokenHealthRow {
   tenantId: string;
   instagramAccountId: string;
+  instagramUsername: string | null;
   expiresAt: Date | null;
   status: "healthy" | "error";
 }
@@ -64,10 +65,11 @@ export async function listTokensDueForRefresh(pool: Pool, withinDays: number): P
   const result = await pool.query<{
     tenant_id: string;
     instagram_account_id: string;
+    instagram_username: string | null;
     expires_at: Date | null;
     status: "healthy" | "error";
   }>(
-    `select tenant_id, instagram_account_id, expires_at, status from meta_tokens
+    `select tenant_id, instagram_account_id, instagram_username, expires_at, status from meta_tokens
      where expires_at is not null
        and expires_at < now() + ($1 || ' days')::interval
        and updated_at < now() - interval '24 hours'`,
@@ -76,6 +78,7 @@ export async function listTokensDueForRefresh(pool: Pool, withinDays: number): P
   return result.rows.map((row) => ({
     tenantId: row.tenant_id,
     instagramAccountId: row.instagram_account_id,
+    instagramUsername: row.instagram_username,
     expiresAt: row.expires_at,
     status: row.status,
   }));
