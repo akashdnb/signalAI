@@ -291,6 +291,8 @@ export function assertRequiredConfig(): void {
     .map(([name]) => name);
 
   if (config.tokenKeyring.size === 0) missing.push("TOKEN_ENCRYPTION_KEYS");
+  // Google login remains optional for existing tenants, but OAuth is only enabled when
+  // all three settings are configured; the login route reports a recoverable error otherwise.
 
   if (missing.length > 0) {
     throw new Error(
