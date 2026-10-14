@@ -71,7 +71,7 @@ button {
   --accent-soft: #a78bfa;
   --accent-blue: #2563eb;
   --accent-cyan: #0e7490;
-  --brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb, #7c3aed);
+  --brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb, #7c3aed);\n  --signalai-logo-gradient-start: #22d3ee;\n  --signalai-logo-gradient-middle: #2563eb;\n  --signalai-logo-gradient-end: #7c3aed;\n  --signalai-logo-sparkle: #7c3aed;
   --ok-bg: #ecfdf5;
   --ok-text: #047857;
   --error-bg: #fef2f2;
