@@ -1,4 +1,4 @@
-import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify, createHmac } from "node:crypto";
+import { createPublicKey, randomBytes, timingSafeEqual, verify, createHmac } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
@@ -13,6 +13,14 @@ export const googleAuthRouter = Router();
 const STATE_COOKIE = "signalai_google_oauth_state";
 const HANDOFF_TTL_MS = 2 * 60 * 1000;
 const handoffTokens = new Map<string, { expiresAt: number; payload: { tenantId: string; token: string; email: string; firstName: string | null; lastName: string | null; picture: string | null } }>();
+const spentOAuthStates = new Map<string, number>();
+function spendStateOnce(state: string): boolean {
+  const now = Date.now();
+  for (const [value, expiresAt] of spentOAuthStates) if (expiresAt <= now) spentOAuthStates.delete(value);
+  if (spentOAuthStates.has(state)) return false;
+  spentOAuthStates.set(state, now + STATE_TTL_MS);
+  return true;
+}
 const STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_ISSUERS = new Set(["https://accounts.google.com", "accounts.google.com"]);
 const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
@@ -149,6 +157,10 @@ async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdentity> {
   if (typeof payload.iat !== "number" || payload.iat * 1000 > Date.now() + 30_000) throw new Error("invalid_google_id_token");
   if (typeof payload.sub !== "string" || !payload.sub) throw new Error("invalid_google_id_token");
   if (typeof payload.email !== "string" || !payload.email.trim() || payload.email_verified !== true) throw new Error("google_email_not_verified");
+  if (Array.isArray(payload.aud) && typeof config.googleClientId === "string" && payload.aud.length > 1) {
+    const azp = (payload as GoogleIdToken & { azp?: unknown }).azp;
+    if (azp !== config.googleClientId) throw new Error("invalid_google_id_token");
+  }
 
   const picture = typeof payload.picture === "string" && payload.picture.startsWith("https://") ? payload.picture : null;
   return {
@@ -209,7 +221,7 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
   if (typeof code !== "string" || typeof state !== "string" || !rawStateCookie) return redirectAuthError(res, "invalid_google_state");
   const statePayload = verifyState(config.sessionSecret, state);
   if (!statePayload) return redirectAuthError(res, "invalid_google_state");
-  if (!safeEqualString(statePayload.value, rawStateCookie)) return redirectAuthError(res, "invalid_google_state");
+  if (!safeEqualString(statePayload.value, rawStateCookie) || !spendStateOnce(state)) return redirectAuthError(res, "invalid_google_state");
   if (!config.googleOauthReady) return redirectAuthError(res, "google_not_configured");
 
   try {
