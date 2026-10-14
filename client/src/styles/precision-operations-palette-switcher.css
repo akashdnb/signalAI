@@ -1200,3 +1200,349 @@ body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button
     transition: none;
   }
 }
+
+/* Workspace bar polish: give usage and icon actions deliberate separation.
+   Hover communicates state through a soft surface, not a new visible border. */
+body:has(.po-preview-app) .po-preview-app .po-global-actions {
+  gap: 14px;
+  min-width: 0;
+}
+body:has(.po-preview-app) .po-preview-app .po-global-actions > .po-token-meter {
+  flex: 0 0 196px;
+  width: 196px;
+  min-width: 0;
+  margin-right: 10px;
+}
+body:has(.po-preview-app) .po-preview-app .po-global-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: 1px solid var(--po-color-transparent) !important;
+  border-color: var(--po-color-transparent) !important;
+  border-radius: 10px;
+  outline-offset: 2px;
+  box-shadow: none !important;
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-secondary);
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+body:has(.po-preview-app) .po-preview-app .po-global-icon:hover,
+body:has(.po-preview-app) .po-preview-app .po-global-icon[aria-expanded="true"] {
+  border-color: var(--po-color-transparent) !important;
+  background: var(--po-color-surface-hover) !important;
+  color: var(--po-color-ink);
+  box-shadow: none !important;
+  transform: translateY(-1px);
+}
+body:has(.po-preview-app) .po-preview-app .po-global-icon:active {
+  transform: translateY(0);
+  background: var(--po-color-surface-selected) !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-global-icon:focus-visible {
+  border-color: var(--po-color-transparent) !important;
+  outline: 2px solid var(--po-color-primary);
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-global-svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+}
+body:has(.po-preview-app) .po-preview-app .po-global-menu-wrap {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-wrap {
+  margin-left: 1px;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 184px;
+  min-height: 44px;
+  padding: 5px 8px 5px 6px;
+  border: 1px solid var(--po-color-transparent) !important;
+  border-color: var(--po-color-transparent) !important;
+  border-radius: 10px;
+  outline-offset: 2px;
+  box-shadow: none !important;
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-ink);
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button:hover,
+body:has(.po-preview-app) .po-preview-app .po-profile-button[aria-expanded="true"] {
+  border-color: var(--po-color-transparent) !important;
+  background: var(--po-color-surface-hover) !important;
+  color: var(--po-color-ink);
+  box-shadow: none !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button:focus-visible {
+  border-color: var(--po-color-transparent) !important;
+  outline: 2px solid var(--po-color-primary);
+  outline-offset: 2px;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button[aria-expanded="true"] {
+  background: var(--po-color-surface-selected) !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-avatar {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  outline: none;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button .po-profile-identity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button .po-profile-identity strong {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button .po-profile-identity small {
+  display: block;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-chevron {
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  color: var(--po-color-muted);
+  transition: transform 140ms ease, color 140ms ease;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-button[aria-expanded="true"] .po-profile-chevron {
+  transform: rotate(180deg);
+  color: var(--po-color-primary);
+}
+
+/* Account menu follows the familiar grouped account-switcher pattern: identity,
+   connected account choices, workspace actions, and a separated sign-out row. */
+body:has(.po-preview-app) .po-preview-app .po-profile-menu {
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 100;
+  width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(78vh, 620px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--po-color-border);
+  border-radius: 12px;
+  background: var(--po-color-surface);
+  box-shadow: 0 16px 38px var(--po-color-shadow-menu);
+  animation: po-account-menu-enter 120ms ease-out;
+  transform-origin: top right;
+}
+@keyframes po-account-menu-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 9px 13px;
+  border-bottom: 1px solid var(--po-color-border);
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-identity > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-identity strong {
+  color: var(--po-color-ink);
+  font-size: 13px;
+  font-weight: 750;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-identity small {
+  color: var(--po-color-muted);
+  font-size: 11px;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-section {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--po-color-border);
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-section:last-child {
+  padding-bottom: 3px;
+  border-bottom: 0;
+}
+body:has(.po-preview-app) .po-preview-app .po-menu-section-label {
+  margin: 0 8px 7px;
+  color: var(--po-color-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-account-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--po-color-transparent) !important;
+  border-radius: 8px;
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-ink);
+  text-align: left;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-account-option:hover,
+body:has(.po-preview-app) .po-preview-app .po-instagram-account-option:focus-visible {
+  border-color: var(--po-color-transparent) !important;
+  background: var(--po-color-surface-hover) !important;
+  outline: none;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-account-option:focus-visible {
+  outline: 2px solid var(--po-color-primary);
+  outline-offset: -2px;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-account-option.is-selected {
+  background: var(--po-color-primary-soft) !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--po-color-instagram-soft);
+  color: var(--po-color-instagram);
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-icon svg {
+  width: 16px;
+  height: 16px;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-copy strong {
+  color: var(--po-color-ink);
+  font-size: 12px;
+  font-weight: 750;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-copy small {
+  color: var(--po-color-muted);
+  font-size: 11px;
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-check {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--po-color-primary);
+}
+body:has(.po-preview-app) .po-preview-app .po-instagram-option-empty {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+body:has(.po-preview-app) .po-preview-app .po-menu-hint {
+  margin: 5px 8px 0;
+  color: var(--po-color-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-actions-section .po-profile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 9px;
+  border: 1px solid var(--po-color-transparent) !important;
+  border-radius: 8px;
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-ink);
+  font-size: 12px;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-actions-section .po-profile-menu-item:hover,
+body:has(.po-preview-app) .po-preview-app .po-profile-actions-section .po-profile-menu-item:focus-visible {
+  border-color: var(--po-color-transparent) !important;
+  background: var(--po-color-surface-hover) !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-item svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--po-color-muted);
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-signout-section .po-profile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 9px;
+  border: 1px solid var(--po-color-transparent) !important;
+  border-radius: 8px;
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-error);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-signout-section .po-profile-menu-item:hover,
+body:has(.po-preview-app) .po-preview-app .po-profile-signout-section .po-profile-menu-item:focus-visible {
+  border-color: var(--po-color-transparent) !important;
+  background: var(--po-color-error-soft) !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-profile-menu-item-symbol {
+  display: inline-flex;
+  justify-content: center;
+  width: 16px;
+  font-size: 17px;
+}
+@media (max-width: 760px) {
+  body:has(.po-preview-app) .po-preview-app .po-global-actions {
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  body:has(.po-preview-app) .po-preview-app .po-global-actions > .po-token-meter {
+    flex: 1 1 145px;
+    width: auto;
+    max-width: 175px;
+    margin-right: 6px;
+  }
+  body:has(.po-preview-app) .po-preview-app .po-profile-button {
+    min-width: 42px;
+    width: auto;
+    padding: 5px 6px;
+  }
+  body:has(.po-preview-app) .po-preview-app .po-profile-button .po-profile-identity {
+    display: none;
+  }
+  body:has(.po-preview-app) .po-preview-app .po-profile-chevron {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:has(.po-preview-app) .po-preview-app .po-global-icon,
+  body:has(.po-preview-app) .po-preview-app .po-profile-button,
+  body:has(.po-preview-app) .po-preview-app .po-profile-chevron {
+    transition: none;
+    animation: none;
+  }
+}
