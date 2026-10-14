@@ -60,6 +60,7 @@ export default function App() {
   return <><PreviewPaletteBridge /><Routes>
     <Route path="/redesign-preview" element={<LazyPage Page={PrecisionOperationsPreviewPage} />} />
     <Route path="/" element={<HomeRedirect />} />
+    {/* Public documentation endpoint: deliberately outside the authenticated dashboard shell. */}
     <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
     <Route path="/docs/*" element={<LazyPage Page={DocsPage} />} />
     <Route path="/login" element={<LazyPage Page={LoginPage} />} />
