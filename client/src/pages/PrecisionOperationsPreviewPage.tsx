@@ -107,10 +107,11 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
   selectedLeadName: string; automationName: string; automationStatus: string; onNavigate: (screen: PreviewScreen) => void;
 }) {
   const [moreOpen,setMoreOpen]=useState(false);
+  const moreRef = useDismissOnOutside(moreOpen, () => setMoreOpen(false));
   if (screen === "leads") return <header className="po-page-header po-page-header--leads"><h1>Leads</h1></header>;
   if (screen === "builder") return <header className="po-page-header po-builder-header">
     <div className="po-builder-heading"><div className="po-breadcrumb"><button type="button" onClick={() => onNavigate("automations")}>Automations</button><span aria-hidden="true">/</span><strong>{automationName}</strong></div><div className="po-title-row"><h1>{automationName}</h1><Tag tone={automationStatus==="Live"?"green":automationStatus==="Paused"?"blue":"warning"}>{automationStatus==="Live"?"Live":automationStatus==="Paused"?"Paused":automationStatus==="Needs publishing"?"Needs publishing":"Draft · Not live"}</Tag></div><p>Review the trigger, reply behavior, lead capture, and account assignment before activating.</p><span className={"po-save-status" + (dirty ? " is-dirty" : "")} role="status"><span className="po-save-status-dot" />{dirty ? "Unsaved preview changes" : "Preview marked saved"}</span></div>
-    <div className="po-header-actions"><button type="button" className="po-button po-button--quiet" onClick={()=>onNavigate("docs")}>Docs</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button><div className="po-builder-more-wrap"><button type="button" aria-label="More automation actions" aria-expanded={moreOpen} className="po-button po-button--secondary po-builder-more-button" onClick={()=>setMoreOpen(v=>!v)}><DotsVerticalIcon/></button>{moreOpen&&<div className="po-dropdown po-builder-menu"><div className="po-dropdown-heading"><strong>Automation actions</strong><Tag>{automationStatus}</Tag></div><button type="button" onClick={()=>{setMoreOpen(false);onPreview();}}>Preview reply</button><button type="button" onClick={()=>{setMoreOpen(false);onTest();}}>Run sample walkthrough</button><button type="button" onClick={()=>{setMoreOpen(false);onNavigate("docs");}}>Builder documentation</button><button type="button" disabled={automationStatus!=="Live"&&automationStatus!=="Paused"} onClick={()=>{setMoreOpen(false);onLifecycleAction(automationStatus==="Live"?"pause":"activate");}}>{automationStatus==="Live"?"Pause automation":automationStatus==="Paused"?"Activate automation":"Publish before activating"}</button><p>All lifecycle actions in this concept are local demonstrations.</p></div>}</div></div>
+    <div className="po-header-actions"><button type="button" className="po-button po-button--quiet" onClick={()=>onNavigate("docs")}>Docs</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button><div className="po-builder-more-wrap" ref={moreRef}><button type="button" aria-label="More automation actions" aria-expanded={moreOpen} className="po-button po-button--secondary po-builder-more-button" onClick={()=>setMoreOpen(v=>!v)}><DotsVerticalIcon/></button>{moreOpen&&<div className="po-dropdown po-builder-menu"><div className="po-dropdown-heading"><strong>Automation actions</strong><Tag>{automationStatus}</Tag></div><button type="button" onClick={()=>{setMoreOpen(false);onPreview();}}>Preview reply</button><button type="button" onClick={()=>{setMoreOpen(false);onTest();}}>Run sample walkthrough</button><button type="button" onClick={()=>{setMoreOpen(false);onNavigate("docs");}}>Builder documentation</button><button type="button" disabled={automationStatus!=="Live"&&automationStatus!=="Paused"} onClick={()=>{setMoreOpen(false);onLifecycleAction(automationStatus==="Live"?"pause":"activate");}}>{automationStatus==="Live"?"Pause automation":automationStatus==="Paused"?"Activate automation":"Publish before activating"}</button><p>All lifecycle actions in this concept are local demonstrations.</p></div>}</div></div>
   </header>;
   const configs: Record<string, { eyebrow: string; title: string; description: string }> = {
     overview: { eyebrow: "WORKSPACE SUMMARY", title: "Overview", description: "A clear view of what needs attention across your Instagram operations." },
@@ -175,6 +176,31 @@ function FlowNode({ node, selected, onClick, index, nodeId, onReorder, onRemove,
  * depends only on `open`; otherwise an inline arrow prop would re-run it on every
  * render and steal focus back while the user is typing.
  */
+/**
+ * Menus closed only by toggling their own button, so clicking anywhere else left
+ * them hanging open. Closes on a pointer press outside the wrapper and on Escape.
+ */
+function useDismissOnOutside(open: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const node = ref.current;
+      if (node && !node.contains(event.target as Node)) closeRef.current();
+    };
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") closeRef.current(); };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [open]);
+  return ref;
+}
+
 export function useModalDialog(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
@@ -797,12 +823,14 @@ function UnsavedChangesDialog({ onKeepEditing, onSaveAndLeave, onDiscard }: { on
 function WorkspaceBar({ onNavigate, theme, onToggleTheme }: { onNavigate: (screen: PreviewScreen) => void; theme: "light" | "dark"; onToggleTheme: () => void }) {
   const [notificationsOpen,setNotificationsOpen] = useState(false);
   const [profileOpen,setProfileOpen] = useState(false);
+  const notificationsRef = useDismissOnOutside(notificationsOpen, () => setNotificationsOpen(false));
+  const profileRef = useDismissOnOutside(profileOpen, () => setProfileOpen(false));
   return <header className="po-workspace-bar">
     <div className="po-account-health"><span className="po-instagram-chip"><InstagramMarkIcon /></span><div><strong>My workspace</strong><small><span className="po-status-dot" /> Connected · sample account · preview only</small></div></div>
     <div className="po-global-actions"><div className="po-token-meter" title="Sample usage meter; no real account data"><div><span>AI usage</span><strong>145.5K / 200K tokens</strong></div><div className="po-token-track"><span /></div></div>
       <button type="button" className="po-global-icon" aria-label={theme==="light"?"Switch to dark mode":"Switch to light mode"} onClick={onToggleTheme}>{theme==="light"?<MoonIcon className="po-global-svg"/>:<SunIcon className="po-global-svg"/>}</button>
-      <div className="po-global-menu-wrap"><button type="button" className="po-global-icon" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={()=>{setNotificationsOpen(v=>!v);setProfileOpen(false);}}><BellIcon className="po-global-svg"/></button>{notificationsOpen&&<div className="po-dropdown po-notifications-panel"><div className="po-dropdown-heading"><strong>Notifications</strong><Tag>Sample</Tag></div><div className="po-notification-row"><span className="po-notification-dot" /><span><strong>2 conversations need review</strong><small>Sample inbox · 12 minutes ago</small></span></div><div className="po-notification-row"><span className="po-notification-dot po-notification-dot--amber" /><span><strong>One draft is not published</strong><small>Lead qualification · Today</small></span></div><p>Notification examples only. No live events are being monitored.</p><button type="button" className="po-text-action" onClick={()=>{setNotificationsOpen(false);onNavigate("inbox");}}>Review inbox →</button></div>}</div>
-      <div className="po-global-menu-wrap"><button type="button" className="po-profile-button" aria-expanded={profileOpen} onClick={()=>{setProfileOpen(v=>!v);setNotificationsOpen(false);}}><span className="po-profile-avatar">A</span><span><strong>Alex Morgan</strong><small>Owner · sample user</small></span><ChevronDownIcon className="po-icon-small" /></button>{profileOpen&&<div className="po-dropdown po-profile-menu"><div className="po-dropdown-heading"><strong>Workspace account</strong><small>creatorstudio.example</small></div><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("team");}}>Team & members</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("settings");}}>Workspace settings</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("billing");}}>Plan & usage</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("docs");}}>Help & documentation</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("login");}}>Sign-in preview</button></div>}</div>
+      <div className="po-global-menu-wrap" ref={notificationsRef}><button type="button" className="po-global-icon" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={()=>{setNotificationsOpen(v=>!v);setProfileOpen(false);}}><BellIcon className="po-global-svg"/></button>{notificationsOpen&&<div className="po-dropdown po-notifications-panel"><div className="po-dropdown-heading"><strong>Notifications</strong><Tag>Sample</Tag></div><div className="po-notification-row"><span className="po-notification-dot" /><span><strong>2 conversations need review</strong><small>Sample inbox · 12 minutes ago</small></span></div><div className="po-notification-row"><span className="po-notification-dot po-notification-dot--amber" /><span><strong>One draft is not published</strong><small>Lead qualification · Today</small></span></div><p>Notification examples only. No live events are being monitored.</p><button type="button" className="po-text-action" onClick={()=>{setNotificationsOpen(false);onNavigate("inbox");}}>Review inbox →</button></div>}</div>
+      <div className="po-global-menu-wrap" ref={profileRef}><button type="button" className="po-profile-button" aria-expanded={profileOpen} onClick={()=>{setProfileOpen(v=>!v);setNotificationsOpen(false);}}><span className="po-profile-avatar">A</span><span><strong>Alex Morgan</strong><small>Owner · sample user</small></span><ChevronDownIcon className="po-icon-small" /></button>{profileOpen&&<div className="po-dropdown po-profile-menu"><div className="po-dropdown-heading"><strong>Workspace account</strong><small>creatorstudio.example</small></div><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("team");}}>Team & members</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("settings");}}>Workspace settings</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("billing");}}>Plan & usage</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("docs");}}>Help & documentation</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("login");}}>Sign-in preview</button></div>}</div>
     </div>
   </header>;
 }

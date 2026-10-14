@@ -90,7 +90,7 @@ body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker){f
 body:has(.po-preview-app) .po-flow-node-content small{font-size:12px;line-height:17px}
 body:has(.po-preview-app) .po-dialog-backdrop{background:rgba(15,23,42,.42);backdrop-filter:blur(2px)}
 body:has(.po-preview-app) .po-dialog,body:has(.po-preview-app) .po-modal,body:has(.po-preview-app) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
-body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
+body:has(.po-preview-app) input:not([type="checkbox"]):not([type="radio"]),body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
 body:has(.po-preview-app) input:focus,body:has(.po-preview-app) select:focus,body:has(.po-preview-app) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus)}
 body:has(.po-preview-app) label{color:var(--po-text-secondary);font-size:12px;line-height:18px;font-weight:600}
 body:has(.po-preview-app) table th{color:var(--po-text-muted);background:#fafbfc;font-size:11px;letter-spacing:.07em;font-weight:700}
@@ -161,7 +161,7 @@ body:has(.po-preview-app.is-dark) .po-leads-disclaimer{color:var(--po-primary)}
 body:has(.po-preview-app.is-dark) .po-leads-production-card,
 body:has(.po-preview-app.is-dark) .po-thread-empty{background:#1b211e;border-color:var(--po-border)}
 body:has(.po-preview-app.is-dark) .po-leads-filter-row select{background:#202723;color:var(--po-text)}
-body:has(.po-preview-app.is-dark) .po-leads-production-table th{background:#302746;color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table th{background:#202723;color:var(--po-text-muted)}
 body:has(.po-preview-app.is-dark) .po-leads-production-table td{color:var(--po-text-secondary);border-bottom-color:var(--po-border)}
 body:has(.po-preview-app.is-dark) .po-leads-production-table tbody tr:hover{background:#202723}
 body:has(.po-preview-app.is-dark) .po-time-cell{color:var(--po-text-muted)!important}
@@ -207,16 +207,18 @@ body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px}
 
 body:has(.po-preview-app) .po-preview-app select{
   appearance:none;-webkit-appearance:none;min-height:40px;
-  padding:0 32px 0 12px;border-radius:var(--po-radius-md);
-  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23626a7c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 11px center;background-size:14px 14px}
+  padding:0 32px 0 12px;border-radius:var(--po-radius-md)}
+/* As a shorthand, and specific enough to survive the per-screen rules that set a plain
+ * `background:` - which resets repeat/position/size and left the chevron tiling. */
+body:has(.po-preview-app) .po-preview-app select:not([multiple]){
+  background:var(--po-surface) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23626a7c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 11px center/14px 14px}
 /* .po-select-wrap draws its own chevron element, so it must not get a second one. */
 body:has(.po-preview-app) .po-preview-app .po-select-wrap select{background-image:none;padding-right:30px}
 body:has(.po-preview-app) .po-select-wrap svg{right:11px;width:14px;height:14px}
 body:has(.po-preview-app) .po-select-wrap{min-height:40px}
 body:has(.po-preview-app) .po-preview-app .po-detail-control select{min-height:36px;padding:0 30px 0 10px;background-position:right 9px center}
-body:has(.po-preview-app) .po-preview-app.is-dark select{
-  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2393a098' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")}
+body:has(.po-preview-app) .po-preview-app.is-dark select:not([multiple]){
+  background:var(--po-surface) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2393a098' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 11px center/14px 14px}
 body:has(.po-preview-app) .po-preview-app.is-dark .po-select-wrap select{background-image:none}
 
 /* ---- Heading and control roles, by element ---------------------------------
@@ -231,7 +233,7 @@ body:has(.po-preview-app) .po-preview-app h3{font-size:16px;font-weight:700;line
 /* The sign-in hero is display copy, not a section heading. */
 body:has(.po-preview-app) .po-preview-app .po-auth-brand h2{font-size:40px;font-weight:800;line-height:1.13}
 /* Form controls had drifted to three weights (400/500/600) across screens. */
-body:has(.po-preview-app) .po-preview-app input,
+body:has(.po-preview-app) .po-preview-app input:not([type="checkbox"]):not([type="radio"]),
 body:has(.po-preview-app) .po-preview-app select,
 body:has(.po-preview-app) .po-preview-app textarea,
 body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px;font-weight:500}
@@ -318,7 +320,8 @@ body:has(.po-preview-app) .po-preview-app .po-leads-pagination button::after,
 body:has(.po-preview-app) .po-preview-app .po-row-actions button::after{
   content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   min-width:44px;min-height:44px;width:100%;height:100%}
-body:has(.po-preview-app) .po-preview-app input[type="checkbox"]{width:18px;height:18px;flex:0 0 auto}
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"],
+body:has(.po-preview-app) .po-preview-app input[type="radio"]{width:18px;height:18px;flex:0 0 auto;appearance:auto;-webkit-appearance:auto;accent-color:var(--po-primary);background:initial;border:initial;border-radius:initial}
 @media (pointer: coarse){
   /* Every real control, not just the ones with a .po-button class. Links sitting
      inside a line of text keep their size (WCAG 2.5.8 exempts inline links). */

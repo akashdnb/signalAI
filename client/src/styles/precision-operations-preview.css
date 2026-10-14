@@ -28,7 +28,10 @@
 .po-preview-app button, .po-preview-app input, .po-preview-app textarea, .po-preview-app select { font: inherit; }
 .po-preview-app button { cursor: pointer; }
 .po-preview-app button:disabled { cursor: not-allowed; opacity: .48; }
-.po-preview-app :where(button, input, textarea, select, a, [tabindex]):focus-visible { outline: 2px solid var(--po-primary); outline-offset: 3px; }
+.po-preview-app :where(button, input, textarea, select, a, [tabindex]):focus-visible { outline: 2px solid var(--po-primary); outline-offset: 2px; }
+/* On a small icon button a 3px offset read as a second, detached box around the
+   hover highlight. Hug the control instead - the ring stays, it just fits. */
+.po-preview-app :where(.po-global-icon, .po-icon-button, .po-profile-button):focus-visible { outline-offset: 1px; }
 .po-preview-app .po-skip-link { position: absolute; top: 8px; left: 8px; z-index: 100; padding: 10px 12px; border-radius: 6px; background: var(--po-ink); color: white; transform: translateY(-150%); }
 .po-preview-app .po-skip-link:focus { transform: translateY(0); }
 .po-preview-app .po-sidebar { position: sticky; top: 0; display: flex; flex: 0 0 226px; flex-direction: column; width: 226px; height: 100vh; min-height: 560px; padding: 22px 14px 14px; background: #ffffff; border-right: 1px solid var(--po-line); }
@@ -1750,7 +1753,7 @@
   min-height: 40px;
   border: 1px solid var(--po-line-strong);
   border-radius: 8px;
-  background: var(--po-surface);
+  background-color: var(--po-surface);
   color: var(--po-ink);
   font-size: 14px;
   line-height: 22px;
