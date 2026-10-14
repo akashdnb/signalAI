@@ -325,3 +325,135 @@ body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search input
   box-shadow: none;
   background: transparent;
 }
+
+/* Shared form/action geometry contract.
+ * The legacy pages mixed content-box inputs (min-height + vertical padding),
+ * 36/40/48px control rules, and buttons with independent vertical padding. That
+ * made buttons sit lower than their labelled controls in Settings, Knowledge,
+ * filters and other inline form rows. Use border-box geometry everywhere. */
+body:has(.po-preview-app) .po-preview-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body:has(.po-preview-app) .po-preview-app select:not([multiple]) {
+  box-sizing: border-box;
+  min-height: 40px;
+  margin-block: 0;
+  border-radius: var(--po-radius-control);
+  line-height: 1.25;
+}
+body:has(.po-preview-app) .po-preview-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]) {
+  padding: 0 12px;
+}
+body:has(.po-preview-app) .po-preview-app select:not([multiple]) {
+  padding: 0 34px 0 12px;
+}
+body:has(.po-preview-app) .po-preview-app textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 0;
+  padding: 10px 12px;
+  border-radius: var(--po-radius-control);
+  line-height: 1.5;
+}
+
+/* Search inputs are visually part of their bordered wrappers, so reset them
+   after the shared control rule instead of giving them a second 40px box. */
+body:has(.po-preview-app) .po-preview-app .po-search input:not([type="checkbox"]):not([type="radio"]) {
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  background: var(--po-color-transparent);
+}
+body:has(.po-preview-app) .po-preview-app .po-search input:focus,
+body:has(.po-preview-app) .po-preview-app .po-search input:focus-visible {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Medium action buttons match the 40px form-control height. Their old padding
+   was added on top of the min-height in some browsers, creating uneven rows. */
+body:has(.po-preview-app) .po-preview-app .po-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin-block: 0;
+  padding: 0 14px;
+  line-height: 1.25;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Preserve the existing compact actions where they live beside status/copy,
+   not beside a primary form control. */
+body:has(.po-preview-app) .po-preview-app .po-composer-actions .po-button,
+body:has(.po-preview-app) .po-preview-app .po-inspector-footer .po-button {
+  min-height: 32px;
+  padding: 4px 9px;
+}
+body:has(.po-preview-app) .po-preview-app .po-post-actions .po-button {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+body:has(.po-preview-app) .po-preview-app .po-appearance-mode-option,
+body:has(.po-preview-app) .po-preview-app .po-appearance-palette-option {
+  margin-block: 0;
+}
+
+/* Keep label/control groups shrink-safe and align their action to the actual
+   control box, not to an inconsistent content-box height. */
+body:has(.po-preview-app) .po-preview-app .po-add-field,
+body:has(.po-preview-app) .po-preview-app .po-scoring-rule,
+body:has(.po-preview-app) .po-preview-app .po-test-question,
+body:has(.po-preview-app) .po-preview-app .po-automation-filters,
+body:has(.po-preview-app) .po-preview-app .po-leads-filter-row {
+  min-width: 0;
+}
+body:has(.po-preview-app) .po-preview-app .po-add-field label,
+body:has(.po-preview-app) .po-preview-app .po-scoring-rule label,
+body:has(.po-preview-app) .po-preview-app .po-test-question label,
+body:has(.po-preview-app) .po-preview-app .po-field-block,
+body:has(.po-preview-app) .po-preview-app .po-inspector-fields label,
+body:has(.po-preview-app) .po-preview-app .po-automation-filter,
+body:has(.po-preview-app) .po-preview-app .po-automation-search {
+  box-sizing: border-box;
+  min-width: 0;
+  line-height: 1.4;
+}
+body:has(.po-preview-app) .po-preview-app .po-add-field > .po-button,
+body:has(.po-preview-app) .po-preview-app .po-scoring-rule > .po-button,
+body:has(.po-preview-app) .po-preview-app .po-test-question > .po-button {
+  align-self: end;
+  height: 40px;
+  min-height: 40px;
+  margin: 0;
+}
+
+/* Builder/inbox text areas keep their component-specific minimum heights but
+   share the same border-box sizing and inner padding as the rest of the UI. */
+body:has(.po-preview-app) .po-preview-app .po-field-block textarea,
+body:has(.po-preview-app) .po-preview-app .po-inspector-fields textarea,
+body:has(.po-preview-app) .po-preview-app .po-composer textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: var(--po-radius-control);
+}
+@media (max-width: 640px) {
+  body:has(.po-preview-app) .po-preview-app .po-test-question > .po-button {
+    justify-self: start;
+  }
+  body:has(.po-preview-app) .po-preview-app .po-add-field > .po-button,
+  body:has(.po-preview-app) .po-preview-app .po-scoring-rule > .po-button {
+    justify-self: start;
+  }
+}
