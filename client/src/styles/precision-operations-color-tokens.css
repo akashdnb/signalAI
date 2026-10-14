@@ -7,6 +7,20 @@
  * palette later only requires changing this layer.
  */
 
+/* Shared brand-mark and provider-logo tokens. Third-party provider marks keep
+   their official colors; preview palette rules override only SignalAI's mark. */
+:root {
+  --signalai-logo-gradient-start: #22d3ee;
+  --signalai-logo-gradient-middle: #2563eb;
+  --signalai-logo-gradient-end: #7c3aed;
+  --signalai-logo-sparkle: #7c3aed;
+  --po-color-brand-google-blue: #4285f4;
+  --po-color-brand-google-green: #34a853;
+  --po-color-brand-google-yellow: #fbbc05;
+  --po-color-brand-google-red: #ea4335;
+  --po-color-brand-facebook-blue: #0866ff;
+}
+
 body:has(.po-preview-app) {
   /* Surfaces */
   --po-color-canvas: #f1f5fa;
@@ -620,11 +634,6 @@ body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --signalai-logo-gra
 body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#86efac; --signalai-logo-gradient-middle:#4ade80; --signalai-logo-gradient-end:#15803d; --signalai-logo-sparkle:#4ade80; }
 body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fdba74; --signalai-logo-gradient-middle:#fb923c; --signalai-logo-gradient-end:#c2410c; --signalai-logo-sparkle:#fb923c; }
 body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#e2e8f0; --signalai-logo-gradient-middle:#94a3b8; --signalai-logo-gradient-end:#475569; --signalai-logo-sparkle:#cbd5e1; }
-
-body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(1) { stop-color:var(--signalai-logo-gradient-start) !important; }
-body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(2) { stop-color:var(--signalai-logo-gradient-middle) !important; }
-body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(3) { stop-color:var(--signalai-logo-gradient-end) !important; }
-body[data-po-palette] .po-preview-app .po-brand svg > path:last-child { fill:var(--signalai-logo-sparkle) !important; }
 
 /* Settings appearance-picker tokens: the miniature previews and swatches are
    independent of the currently selected palette so all options stay scannable. */
