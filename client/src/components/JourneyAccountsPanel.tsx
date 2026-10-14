@@ -121,7 +121,7 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
                 >
                   {savingId === account.id
                     ? "Saving…"
-                    : `${bound ? "✓ " : ""}@${account.instagramAccountId}${healthy ? "" : " · Needs attention"}`}
+                    : `${bound ? "✓ " : ""}@${account.instagramUsername ?? account.instagramAccountId}${healthy ? "" : " · Needs attention"}`}
                 </button>
               );
             })}

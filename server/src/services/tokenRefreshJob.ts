@@ -35,6 +35,7 @@ export async function runTokenRefreshSweep(pool: Pool, keyring: Map<string, Buff
       await upsertToken(pool, keyring, {
         tenantId: token.tenantId,
         instagramAccountId: token.instagramAccountId,
+        instagramUsername: token.instagramUsername ?? undefined,
         accessToken: refreshed.access_token,
         expiresAt,
       });

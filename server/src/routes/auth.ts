@@ -8,7 +8,13 @@ import { registerInstagramTrialUse } from "../db/instagramTrialHistory.js";
 import { endTrialImmediately } from "../db/tenants.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
-import { OAUTH_NONCE_COOKIE, createOAuthState, nonceMatches, parseCookie, verifyOAuthState } from "../lib/oauthState.js";
+import {
+  OAUTH_NONCE_COOKIE,
+  createOAuthState,
+  nonceMatches,
+  parseCookie,
+  verifyOAuthState,
+} from "../lib/oauthState.js";
 import {
   buildAuthorizationUrl,
   exchangeCodeForShortLivedToken,
@@ -143,16 +149,24 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
     await upsertToken(pool, config.tokenKeyring, {
       tenantId,
       instagramAccountId: profile.id,
+      instagramUsername: profile.username,
       accessToken: longLived.access_token,
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000),
     });
 
+    // A valid token is useful even if the provider's app-subscription step
+    // fails. Preserve its credential and expose the actual recovery condition.
     try {
       await subscribeToWebhooks(longLived.access_token);
     } catch (err) {
       console.error("Instagram webhook subscription failed:", err);
       Sentry.captureException(err);
-      await markTokenError(pool, tenantId, profile.id, "Couldn't subscribe to Instagram notifications — try reconnecting.");
+      await markTokenError(
+        pool,
+        tenantId,
+        profile.id,
+        "Instagram connected, but SignalAI couldn't subscribe to messages/comments. Check Instagram permissions and reconnect.",
+      );
     }
 
     const trialUse = await registerInstagramTrialUse(pool, profile.id, tenantId);

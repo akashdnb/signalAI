@@ -4,6 +4,7 @@ export interface ConnectedInstagramAccount {
   id: string;
   tenantId: string;
   instagramAccountId: string;
+  instagramUsername: string | null;
   status: "healthy" | "error";
   lastError: string | null;
   lastCheckedAt: string;
@@ -19,6 +20,7 @@ function mapRow(row: Record<string, unknown>): ConnectedInstagramAccount {
     id: String(row.id),
     tenantId: String(row.tenant_id),
     instagramAccountId: String(row.instagram_account_id),
+    instagramUsername: row.instagram_username == null ? null : String(row.instagram_username),
     status: String(row.status) as ConnectedInstagramAccount["status"],
     lastError: row.last_error == null ? null : String(row.last_error),
     lastCheckedAt: String(row.last_checked_at),
@@ -39,8 +41,8 @@ export async function listConnectedInstagramAccounts(
   tenantId: string,
 ): Promise<ConnectedInstagramAccount[]> {
   const result = await pool.query(
-    `select id, tenant_id, instagram_account_id, status, last_error,
-            last_checked_at, expires_at, created_at, updated_at
+    `select id, tenant_id, instagram_account_id, instagram_username,
+            status, last_error, last_checked_at, expires_at, created_at, updated_at
        from meta_tokens
       where tenant_id = $1
       order by created_at asc`,
@@ -56,8 +58,8 @@ export async function getConnectedInstagramAccount(
   accountId: string,
 ): Promise<ConnectedInstagramAccount | null> {
   const result = await pool.query(
-    `select id, tenant_id, instagram_account_id, status, last_error,
-            last_checked_at, expires_at, created_at, updated_at
+    `select id, tenant_id, instagram_account_id, instagram_username,
+            status, last_error, last_checked_at, expires_at, created_at, updated_at
        from meta_tokens
       where tenant_id = $1 and id = $2
       limit 1`,
@@ -142,8 +144,8 @@ export async function getConnectedInstagramAccountByProviderId(
   instagramAccountId: string,
 ): Promise<ConnectedInstagramAccount | null> {
   const result = await pool.query(
-    `select id, tenant_id, instagram_account_id, status, last_error,
-            last_checked_at, expires_at, created_at, updated_at
+    `select id, tenant_id, instagram_account_id, instagram_username,
+            status, last_error, last_checked_at, expires_at, created_at, updated_at
        from meta_tokens
       where instagram_account_id = $1
       limit 1`,
