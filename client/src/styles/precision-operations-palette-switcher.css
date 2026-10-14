@@ -1128,14 +1128,16 @@ body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button
   max-width: 280px;
 }
 .po-preview-app .po-sidebar-resize-handle {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 35;
   flex: 0 0 8px;
   width: 8px;
   min-width: 8px;
+  height: 100vh;
   margin-left: -4px;
   margin-right: -4px;
-  align-self: stretch;
+  align-self: flex-start;
   cursor: col-resize;
   touch-action: none;
   user-select: none;
