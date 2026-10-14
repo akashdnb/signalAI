@@ -11,6 +11,7 @@ import { Sentry } from "../lib/sentry.js";
 export const googleAuthRouter = Router();
 
 const STATE_COOKIE = "signalai_google_oauth_state";
+const STATE_TTL_MS = 10 * 60 * 1000;
 const HANDOFF_TTL_MS = 2 * 60 * 1000;
 const handoffTokens = new Map<string, { expiresAt: number; payload: { tenantId: string; token: string; email: string; firstName: string | null; lastName: string | null; picture: string | null } }>();
 const spentOAuthStates = new Map<string, number>();
@@ -21,7 +22,6 @@ function spendStateOnce(state: string): boolean {
   spentOAuthStates.set(state, now + STATE_TTL_MS);
   return true;
 }
-const STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_ISSUERS = new Set(["https://accounts.google.com", "accounts.google.com"]);
 const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
