@@ -133,6 +133,10 @@ export function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [authInitializing, setAuthInitializing] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("google_auth") === "success" && Boolean(params.get("handoff"));
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -149,9 +153,13 @@ export function LoginPage() {
       };
       setError(messages[authError] ?? "Google sign-in could not be completed. Please try again.");
       window.history.replaceState({}, document.title, window.location.pathname);
+      setAuthInitializing(false);
       return;
     }
-    if (!handoff || params.get("google_auth") !== "success") return;
+    if (!handoff || params.get("google_auth") !== "success") {
+      setAuthInitializing(false);
+      return;
+    }
 
     let cancelled = false;
     setSubmitting(true);
@@ -168,7 +176,10 @@ export function LoginPage() {
         setError(err instanceof Error ? err.message : "Google sign-in could not be completed.");
       })
       .finally(() => {
-        if (!cancelled) setSubmitting(false);
+        if (!cancelled) {
+          setSubmitting(false);
+          setAuthInitializing(false);
+        }
       });
     return () => { cancelled = true; };
   }, [navigate]);
@@ -224,6 +235,10 @@ export function LoginPage() {
       return;
     }
     setUnavailableProvider(provider);
+  }
+
+  if (authInitializing) {
+    return <div className="min-h-screen" style={{ background: "var(--auth-gradient)" }} aria-busy="true" />;
   }
 
   if (step === "method") {
@@ -290,7 +305,7 @@ export function LoginPage() {
               id="code"
               type="text"
               inputMode="numeric"
-              pattern="\d{6}"
+              pattern="\\d{6}"
               maxLength={6}
               autoFocus
               value={code}
