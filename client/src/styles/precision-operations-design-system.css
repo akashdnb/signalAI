@@ -90,7 +90,7 @@ body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker){f
 body:has(.po-preview-app) .po-flow-node-content small{font-size:12px;line-height:17px}
 body:has(.po-preview-app) .po-dialog-backdrop{background:rgba(15,23,42,.42);backdrop-filter:blur(2px)}
 body:has(.po-preview-app) .po-dialog,body:has(.po-preview-app) .po-modal,body:has(.po-preview-app) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
-body:has(.po-preview-app) input:not([type="checkbox"]):not([type="radio"]),body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
+body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
 body:has(.po-preview-app) input:focus,body:has(.po-preview-app) select:focus,body:has(.po-preview-app) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus)}
 body:has(.po-preview-app) label{color:var(--po-text-secondary);font-size:12px;line-height:18px;font-weight:600}
 body:has(.po-preview-app) table th{color:var(--po-text-muted);background:#fafbfc;font-size:11px;letter-spacing:.07em;font-weight:700}
@@ -233,7 +233,7 @@ body:has(.po-preview-app) .po-preview-app h3{font-size:16px;font-weight:700;line
 /* The sign-in hero is display copy, not a section heading. */
 body:has(.po-preview-app) .po-preview-app .po-auth-brand h2{font-size:40px;font-weight:800;line-height:1.13}
 /* Form controls had drifted to three weights (400/500/600) across screens. */
-body:has(.po-preview-app) .po-preview-app input:not([type="checkbox"]):not([type="radio"]),
+body:has(.po-preview-app) .po-preview-app input,
 body:has(.po-preview-app) .po-preview-app select,
 body:has(.po-preview-app) .po-preview-app textarea,
 body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px;font-weight:500}
@@ -320,8 +320,30 @@ body:has(.po-preview-app) .po-preview-app .po-leads-pagination button::after,
 body:has(.po-preview-app) .po-preview-app .po-row-actions button::after{
   content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   min-width:44px;min-height:44px;width:100%;height:100%}
+/* Drawn rather than native: a native box inherits the field styling above and the
+ * engines disagree about what to paint, which is why unchecked boxes came out
+ * solid black. This renders identically everywhere. */
 body:has(.po-preview-app) .po-preview-app input[type="checkbox"],
-body:has(.po-preview-app) .po-preview-app input[type="radio"]{width:18px;height:18px;flex:0 0 auto;appearance:auto;-webkit-appearance:auto;accent-color:var(--po-primary);background:initial;border:initial;border-radius:initial}
+body:has(.po-preview-app) .po-preview-app input[type="radio"]{
+  appearance:none;-webkit-appearance:none;flex:0 0 auto;margin:0;
+  width:18px;height:18px;padding:0;cursor:pointer;
+  border:1.5px solid var(--po-border-strong);border-radius:4px;
+  background-color:var(--po-surface);background-image:none;
+  background-repeat:no-repeat;background-position:center;background-size:12px 12px;
+  box-shadow:none}
+body:has(.po-preview-app) .po-preview-app input[type="radio"]{border-radius:50%}
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"]:checked{
+  border-color:var(--po-primary);background-color:var(--po-primary);background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5l3.5 3.5L13 5'/%3E%3C/svg%3E")}
+body:has(.po-preview-app) .po-preview-app input[type="radio"]:checked{
+  border-color:var(--po-primary);background-color:var(--po-primary);
+  box-shadow:inset 0 0 0 3.5px var(--po-surface)}
+/* White on the lavender accent is 2.36:1; keep the production accent for the filled
+   state, as the buttons do. */
+body:has(.po-preview-app) .po-preview-app.is-dark input[type="checkbox"]:checked,
+body:has(.po-preview-app) .po-preview-app.is-dark input[type="radio"]:checked{
+  border-color:#7c3aed;background-color:#7c3aed}
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"]:disabled,
+body:has(.po-preview-app) .po-preview-app input[type="radio"]:disabled{opacity:.5;cursor:not-allowed}
 @media (pointer: coarse){
   /* Every real control, not just the ones with a .po-button class. Links sitting
      inside a line of text keep their size (WCAG 2.5.8 exempts inline links). */
