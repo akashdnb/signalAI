@@ -873,7 +873,7 @@ export function PrecisionOperationsPreviewPage() {
     const requested = params.get("palette") ?? "navy-cobalt";
     const aliases: Record<string, PreviewPalette> = { "indigo-blue": "navy-cobalt", "green-slate": "forest-slate" };
     const normalized = aliases[requested] ?? requested;
-    return (["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate"] as string[]).includes(normalized)
+    return (["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate", "ocean-blue", "rose-graphite", "amber-minimal"] as string[]).includes(normalized)
       ? normalized as PreviewPalette
       : "navy-cobalt";
   });
