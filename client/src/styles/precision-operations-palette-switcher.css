@@ -605,3 +605,64 @@ body:has(.po-preview-app) .po-preview-app #po-scoring-rule > .po-button {
     justify-self: start;
   }
 }
+
+/* Automation filters previously mixed a 44px search wrapper with select
+   controls sized by older per-screen min-height rules. Give both the same
+   outer box dimensions; the input inside the search remains borderless. */
+body:has(.po-preview-app) .po-preview-app .po-automation-filters .po-automation-search .po-search,
+body:has(.po-preview-app) .po-preview-app .po-automation-filters .po-automation-filter > select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px;
+  margin: 0 !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-automation-filters .po-automation-search .po-search > input {
+  box-sizing: border-box;
+  height: auto;
+  min-height: 0 !important;
+  max-height: none;
+  padding: 0;
+}
+
+/* The builder's "create captured field" row has three fields and one action.
+   Keep it as a small form grid instead of stacking content-box labels and a
+   button with different baselines in the inspector. */
+body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end !important;
+  gap: 12px;
+  min-width: 0;
+}
+body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > label {
+  display: grid !important;
+  grid-template-rows: auto 40px;
+  align-content: end;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  margin: 0 !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > label > input,
+body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > label > select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  margin: 0 !important;
+}
+body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button {
+  height: 40px !important;
+  min-height: 40px !important;
+  align-self: end !important;
+  justify-self: start;
+  margin: 0 !important;
+}
+@media (max-width: 640px) {
+  body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
