@@ -49,6 +49,9 @@ export const config = {
   get googleRedirectUri() {
     return stripTrailingSlashes(process.env.GOOGLE_REDIRECT_URI ?? "");
   },
+  get googleOauthReady() {
+    return Boolean(this.googleClientId && this.googleClientSecret && this.googleRedirectUri);
+  },
   // Enable only after Meta has approved HUMAN_AGENT messaging for this app.
   // Disabled by default so ordinary deployments never send a policy tag they
   // are not approved to use.
