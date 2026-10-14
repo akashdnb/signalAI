@@ -9,6 +9,12 @@ import {
 } from "../components/icons";
 
 type PreviewScreen = FullPreviewScreen;
+type PreviewInstagramAccount = "sample_fitness" | "studio_owner" | "northside_fit";
+const previewInstagramAccounts: { id: PreviewInstagramAccount; handle: string; label: string }[] = [
+  { id: "sample_fitness", handle: "@sample_fitness", label: "Sample Fitness" },
+  { id: "studio_owner", handle: "@studio_owner", label: "Studio Owner" },
+  { id: "northside_fit", handle: "@northside_fit", label: "Northside Fitness" },
+];
 type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
 type BuilderSeed = { triggerType: string; keywords: string };
 type NodeEditorConfig = {
@@ -884,17 +890,141 @@ function UnsavedChangesDialog({ onKeepEditing, onSaveAndLeave, onDiscard }: { on
   return <div className="po-modal-backdrop" role="presentation"><section ref={dialogRef} tabIndex={-1} className="po-modal po-unsaved-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-unsaved-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span></div><span className="po-eyebrow">UNSAVED CHANGES</span><h2 id="po-unsaved-title">Leave the builder?</h2><p>You have preview changes that haven't been marked saved. In the real product, choose whether to save or discard before leaving the automation.</p><div className="po-modal-footer po-unsaved-actions"><button type="button" className="po-button po-button--quiet" onClick={onKeepEditing}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={onDiscard}>Discard changes</button><button type="button" className="po-button po-button--primary" onClick={onSaveAndLeave}>Save & leave</button></div></section></div>;
 }
 
-function WorkspaceBar({ onNavigate, theme, onToggleTheme }: { onNavigate: (screen: PreviewScreen) => void; theme: "light" | "dark"; onToggleTheme: () => void }) {
+function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSwitchInstagramAccount }: {
+  onNavigate: (screen: PreviewScreen) => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+  instagramAccount: PreviewInstagramAccount;
+  onSwitchInstagramAccount: (account: PreviewInstagramAccount) => void;
+}) {
   const [notificationsOpen,setNotificationsOpen] = useState(false);
   const [profileOpen,setProfileOpen] = useState(false);
   const notificationsRef = useDismissOnOutside(notificationsOpen, () => setNotificationsOpen(false));
   const profileRef = useDismissOnOutside(profileOpen, () => setProfileOpen(false));
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
+  const activeInstagramAccount = previewInstagramAccounts.find(account => account.id === instagramAccount) ?? previewInstagramAccounts[0]!;
+  useEffect(() => {
+    if (!profileOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      profileRef.current?.querySelector<HTMLElement>('[role="menuitemradio"]')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [profileOpen]);
+  const handleProfileMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"],[role="menuitemradio"]'));
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setProfileOpen(false);
+      profileTriggerRef.current?.focus();
+      return;
+    }
+    if (!["ArrowDown","ArrowUp","Home","End"].includes(event.key) || items.length === 0) return;
+    event.preventDefault();
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    const nextIndex = event.key === "Home" ? 0
+      : event.key === "End" ? items.length - 1
+      : event.key === "ArrowDown" ? (currentIndex + 1 + items.length) % items.length
+      : (currentIndex - 1 + items.length) % items.length;
+    items[nextIndex]?.focus();
+  };
+  const chooseInstagramAccount = (account: PreviewInstagramAccount) => {
+    onSwitchInstagramAccount(account);
+    setProfileOpen(false);
+    window.requestAnimationFrame(() => profileTriggerRef.current?.focus());
+  };
+  const menuNavigate = (screen: PreviewScreen) => {
+    setProfileOpen(false);
+    onNavigate(screen);
+  };
   return <header className="po-workspace-bar">
-    <div className="po-account-health"><span className="po-instagram-chip"><InstagramMarkIcon /></span><div><strong>My workspace</strong><small><span className="po-status-dot" /> Connected · sample account · preview only</small></div></div>
-    <div className="po-global-actions"><div className="po-token-meter" title="Sample usage meter; no real account data"><div><span>AI usage</span><strong>145.5K / 200K tokens</strong></div><div className="po-token-track"><span /></div></div>
-      <button type="button" className="po-global-icon" aria-label={theme==="light"?"Switch to dark mode":"Switch to light mode"} onClick={onToggleTheme}>{theme==="light"?<MoonIcon className="po-global-svg"/>:<SunIcon className="po-global-svg"/>}</button>
-      <div className="po-global-menu-wrap" ref={notificationsRef}><button type="button" className="po-global-icon" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={()=>{setNotificationsOpen(v=>!v);setProfileOpen(false);}}><BellIcon className="po-global-svg"/></button>{notificationsOpen&&<div className="po-dropdown po-notifications-panel"><div className="po-dropdown-heading"><strong>Notifications</strong><Tag>Sample</Tag></div><div className="po-notification-row"><span className="po-notification-dot" /><span><strong>2 conversations need review</strong><small>Sample inbox · 12 minutes ago</small></span></div><div className="po-notification-row"><span className="po-notification-dot po-notification-dot--amber" /><span><strong>One draft is not published</strong><small>Lead qualification · Today</small></span></div><p>Notification examples only. No live events are being monitored.</p><button type="button" className="po-text-action" onClick={()=>{setNotificationsOpen(false);onNavigate("inbox");}}>Review inbox →</button></div>}</div>
-      <div className="po-global-menu-wrap" ref={profileRef}><button type="button" className="po-profile-button" aria-expanded={profileOpen} onClick={()=>{setProfileOpen(v=>!v);setNotificationsOpen(false);}}><span className="po-profile-avatar">A</span><span><strong>Alex Morgan</strong><small>Owner · sample user</small></span><ChevronDownIcon className="po-icon-small" /></button>{profileOpen&&<div className="po-dropdown po-profile-menu"><div className="po-dropdown-heading"><strong>Workspace account</strong><small>creatorstudio.example</small></div><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("team");}}>Team & members</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("settings");}}>Workspace settings</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("billing");}}>Plan & usage</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("docs");}}>Help & documentation</button><button type="button" onClick={()=>{setProfileOpen(false);onNavigate("login");}}>Sign-in preview</button></div>}</div>
+    <div className="po-account-health">
+      <span className="po-instagram-chip"><InstagramMarkIcon /></span>
+      <div>
+        <strong>My workspace</strong>
+        <small><span className="po-status-dot" /> Connected · {activeInstagramAccount.handle} · preview only</small>
+      </div>
+    </div>
+    <div className="po-global-actions">
+      <div className="po-token-meter" title="Sample usage meter; no real account data">
+        <div><span>AI usage</span><strong>145.5K / 200K tokens</strong></div>
+        <div className="po-token-track"><span /></div>
+      </div>
+      <button
+        type="button"
+        className="po-global-icon"
+        aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+        title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+        onClick={onToggleTheme}
+      >{theme === "light" ? <MoonIcon className="po-global-svg" /> : <SunIcon className="po-global-svg" />}</button>
+      <div className="po-global-menu-wrap" ref={notificationsRef}>
+        <button
+          type="button"
+          className="po-global-icon"
+          aria-label="Notifications"
+          aria-haspopup="dialog"
+          aria-expanded={notificationsOpen}
+          title="Notifications"
+          onClick={() => { setNotificationsOpen(v => !v); setProfileOpen(false); }}
+        ><BellIcon className="po-global-svg" /></button>
+        {notificationsOpen && <div className="po-dropdown po-notifications-panel" role="dialog" aria-label="Notifications">
+          <div className="po-dropdown-heading"><strong>Notifications</strong><Tag>Sample</Tag></div>
+          <div className="po-notification-row"><span className="po-notification-dot" /><span><strong>2 conversations need review</strong><small>Sample inbox · 12 minutes ago</small></span></div>
+          <div className="po-notification-row"><span className="po-notification-dot po-notification-dot--amber" /><span><strong>One draft is not published</strong><small>Lead qualification · Today</small></span></div>
+          <p>Notification examples only. No live events are being monitored.</p>
+          <button type="button" className="po-text-action" onClick={() => { setNotificationsOpen(false); onNavigate("inbox"); }}>Review inbox →</button>
+        </div>}
+      </div>
+      <div className="po-global-menu-wrap po-profile-menu-wrap" ref={profileRef}>
+        <button
+          ref={profileTriggerRef}
+          type="button"
+          className="po-profile-button"
+          aria-label="Account menu for Alex Morgan"
+          aria-haspopup="menu"
+          aria-expanded={profileOpen}
+          aria-controls="po-profile-menu"
+          title="Account and connected Instagram"
+          onClick={() => { setProfileOpen(v => !v); setNotificationsOpen(false); }}
+        >
+          <span className="po-profile-avatar">A</span>
+          <span className="po-profile-identity"><strong>Alex Morgan</strong><small>Owner · sample user</small></span>
+          <ChevronDownIcon className="po-profile-chevron" />
+        </button>
+        {profileOpen && <div id="po-profile-menu" className="po-dropdown po-profile-menu" role="menu" aria-label="Account and connected Instagram" onKeyDown={handleProfileMenuKeyDown}>
+          <div className="po-profile-menu-identity">
+            <span className="po-profile-avatar">A</span>
+            <span><strong>Alex Morgan</strong><small>Owner · sample user</small></span>
+          </div>
+          <div className="po-profile-menu-section">
+            <p className="po-menu-section-label">INSTAGRAM ACCOUNT</p>
+            {previewInstagramAccounts.map(account => {
+              const selected = account.id === instagramAccount;
+              return <button
+                type="button"
+                key={account.id}
+                role="menuitemradio"
+                aria-checked={selected}
+                className={"po-instagram-account-option" + (selected ? " is-selected" : "")}
+                onClick={() => chooseInstagramAccount(account.id)}
+              >
+                <span className="po-instagram-option-icon"><InstagramMarkIcon /></span>
+                <span className="po-instagram-option-copy"><strong>{account.handle}</strong><small>{account.label}</small></span>
+                {selected ? <CheckCircleIcon className="po-instagram-option-check" /> : <span className="po-instagram-option-empty" />}
+              </button>;
+            })}
+            <p className="po-menu-hint">Preview accounts only. Switching here does not change a live Instagram connection.</p>
+          </div>
+          <div className="po-profile-menu-section po-profile-actions-section">
+            <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("settings")}><SettingsIcon /><span>Workspace settings</span></button>
+            <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("billing")}><CreditCardIcon /><span>Plan &amp; usage</span></button>
+            <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("docs")}><BookIcon /><span>Help &amp; documentation</span></button>
+          </div>
+          <div className="po-profile-menu-section po-profile-signout-section">
+            <button type="button" role="menuitem" className="po-profile-menu-item is-danger" onClick={() => menuNavigate("login")}><span className="po-profile-menu-item-symbol" aria-hidden="true">↪</span><span>Sign out</span></button>
+            <p className="po-menu-hint">Preview only · opens the sign-in demo; no live session is ended.</p>
+          </div>
+        </div>}
+      </div>
     </div>
   </header>;
 }
@@ -933,6 +1063,10 @@ export function PrecisionOperationsPreviewPage() {
   const [selectedLeadOwner,setSelectedLeadOwner] = useState("Unassigned");
   const [selectedLeadHandoff,setSelectedLeadHandoff] = useState(true);
   const [theme,setTheme] = useState<"light"|"dark">(() => new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light");
+  const [instagramAccount,setInstagramAccount] = useState<PreviewInstagramAccount>(() => {
+    const requested = new URLSearchParams(window.location.search).get("igAccount");
+    return previewInstagramAccounts.some(account => account.id === requested) ? requested as PreviewInstagramAccount : "sample_fitness";
+  });
   const [sidebarCollapsed,setSidebarCollapsed] = useState(() => new URLSearchParams(window.location.search).get("sidebar") !== "expanded");
   const [sidebarWidth,setSidebarWidth] = useState(() => {
     try {
@@ -1011,6 +1145,13 @@ export function PrecisionOperationsPreviewPage() {
     setSidebarWidth(Math.max(180, Math.min(280, next)));
   };
   const resetSidebarWidth = () => setSidebarWidth(226);
+  const changeInstagramAccount = (next: PreviewInstagramAccount) => {
+    setInstagramAccount(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    params.set("igAccount", next);
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
   const changeTheme = (next: "light"|"dark") => {
     setTheme(next);
     const params = new URLSearchParams(window.location.search);
@@ -1118,5 +1259,5 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")} instagramAccount={instagramAccount} onSwitchInstagramAccount={changeInstagramAccount}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
