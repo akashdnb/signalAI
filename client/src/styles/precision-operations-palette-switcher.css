@@ -311,3 +311,13 @@ body:has(.po-preview-app) .po-preview-app .po-search input:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The generic field focus rule has higher specificity than the base search-input
+   reset. Override it specifically so focus is painted once by the wrapper only. */
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search input:focus,
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
