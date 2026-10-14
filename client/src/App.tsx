@@ -41,7 +41,9 @@ function PreviewPaletteBridge() {
     const isPreview = params.get("preview") === "precision-operations" || window.location.pathname === "/redesign-preview";
     if (isPreview) document.body.dataset.poPalette = previewPalettes.has(palette) ? palette : "navy-cobalt";
     else delete document.body.dataset.poPalette;
-    return () => delete document.body.dataset.poPalette;
+    return () => {
+      delete document.body.dataset.poPalette;
+    };
   }, []);
   return null;
 }
