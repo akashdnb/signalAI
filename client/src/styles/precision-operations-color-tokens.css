@@ -133,6 +133,19 @@ body:has(.po-preview-app) {
   --po-amber-soft: var(--po-color-warning-soft);
 }
 
+/* Bridge the app's Tailwind accent aliases into the preview token system. This
+   keeps utility links, focus styles and text-accent elements palette-aware,
+   while leaving the production app's root accent unchanged. */
+.po-preview-app {
+  --accent: var(--po-color-primary);
+  --accent-hover: var(--po-color-primary-hover);
+  --accent-soft: var(--po-color-primary-soft);
+  --accent-blue: var(--po-color-primary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+}
+
 /* Legacy hard-coded component colors are redirected here so palette changes
  * remain centralized while the preview stylesheet is progressively cleaned. */
 .po-preview-app .po-sidebar,
