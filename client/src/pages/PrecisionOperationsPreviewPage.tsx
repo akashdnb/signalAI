@@ -1132,7 +1132,8 @@ export function PrecisionOperationsPreviewPage() {
   const resetSidebarWidth = () => setSidebarWidth(226);
   const openPublicDocs = (slug = "introduction") => {
     const safeSlug = slug.replace(/[^a-z0-9-]/gi, "");
-    window.open(`/docs/${safeSlug || "introduction"}`, "_blank", "noopener,noreferrer");
+    const docsUrl = new URL(`/docs/${safeSlug || "introduction"}`, "https://signalai-bui.onrender.com");
+    window.open(docsUrl.toString(), "_blank", "noopener,noreferrer");
   };
   const changeInstagramAccount = (next: PreviewInstagramAccount) => {
     setInstagramAccount(next);
