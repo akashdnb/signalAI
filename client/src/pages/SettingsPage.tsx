@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FieldDefinitionsPanel } from "../components/FieldDefinitionsPanel";
 import { GuardrailsConfigPanel } from "../components/GuardrailsConfigPanel";
 import { ScoringRulesPanel } from "../components/ScoringRulesPanel";
-import { BellIcon, CreditCardIcon, SettingsIcon, TeamIcon, UserIcon, LifeBuoyIcon } from "../components/icons";
+import { CreditCardIcon, SettingsIcon, TeamIcon, UserIcon, LifeBuoyIcon } from "../components/icons";
 import { useTenant } from "../context/TenantContext";
 
 type SettingsSection = "general" | "team" | "billing" | "lead-fields" | "ai-behavior" | "forbidden-topics" | "escalation" | "scoring" | "notifications" | "appearance" | "profile" | "support";
@@ -98,7 +98,7 @@ function NotificationRow({ title, description }: { title: string; description: s
   return <div className="flex items-center justify-between gap-4 p-4"><div><strong className="text-sm text-ink">{title}</strong><p className="mt-1 text-xs text-subtle">{description}</p></div><span className="rounded-full bg-chip px-2.5 py-1 text-[10px] font-semibold text-subtle">Workspace</span></div>;
 }
 
-function PersonalPanel({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+function PersonalPanel({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
   return <section className="rounded-xl border border-line bg-card p-5 shadow-sm"><div className="flex items-start gap-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">{icon}</span><div><h3 className="font-semibold text-ink">{title}</h3><p className="mt-1 text-sm text-subtle">{description}</p></div></div></section>;
 }
 
@@ -106,6 +106,6 @@ function SupportPanel() {
   return <section className="rounded-xl border border-line bg-card p-5 shadow-sm"><div className="flex items-start gap-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-chip text-accent"><LifeBuoyIcon className="h-5 w-5" /></span><div><h3 className="font-semibold text-ink">Support</h3><p className="mt-1 text-sm text-subtle">Find product help or contact the SignalAI team.</p></div></div><div className="mt-5 flex flex-wrap gap-3"><button type="button" className="rounded-lg border border-line bg-card px-3 py-2 text-sm font-semibold text-ink">Open help center</button><button type="button" className="rounded-lg border border-line bg-card px-3 py-2 text-sm font-semibold text-ink">Contact support</button></div></section>;
 }
 
-function LinkPanel({ title, description, to, action, icon }: { title: string; description: string; to: string; action: string; icon: React.ReactNode }) {
+function LinkPanel({ title, description, to, action, icon }: { title: string; description: string; to: string; action: string; icon: ReactNode }) {
   return <section className="rounded-xl border border-line bg-card p-5 shadow-sm"><div className="flex items-start gap-4"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">{icon}</span><div><h3 className="font-semibold text-ink">{title}</h3><p className="mt-1 text-sm text-subtle">{description}</p></div></div><Link className="mt-5 inline-flex rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white no-underline hover:bg-accent-hover" to={to}>{action}</Link></section>;
 }
