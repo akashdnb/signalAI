@@ -7,6 +7,7 @@ import {
   BotIcon, SendIcon, ListChecksIcon, SearchIcon, PlayIcon, PlusIcon,
   ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, SunIcon, MoonIcon, BellIcon, CreditCardIcon, PanelLeftCloseIcon, PanelLeftOpenIcon,
 } from "../components/icons";
+import { ConnectedAccountSwitcher } from "../components/ui";
 
 type PreviewScreen = FullPreviewScreen;
 type PreviewInstagramAccount = "sample_fitness" | "studio_owner" | "northside_fit";
@@ -906,7 +907,7 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
   useEffect(() => {
     if (!profileOpen) return;
     const frame = window.requestAnimationFrame(() => {
-      profileRef.current?.querySelector<HTMLElement>('[role="menuitemradio"]')?.focus();
+      profileRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
   }, [profileOpen]);
@@ -927,23 +928,21 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
       : (currentIndex - 1 + items.length) % items.length;
     items[nextIndex]?.focus();
   };
-  const chooseInstagramAccount = (account: PreviewInstagramAccount) => {
-    onSwitchInstagramAccount(account);
-    setProfileOpen(false);
-    window.requestAnimationFrame(() => profileTriggerRef.current?.focus());
-  };
   const menuNavigate = (screen: PreviewScreen) => {
     setProfileOpen(false);
     onNavigate(screen);
   };
   return <header className="po-workspace-bar">
-    <div className="po-account-health">
-      <span className="po-instagram-chip"><InstagramMarkIcon /></span>
-      <div>
-        <strong>My workspace</strong>
-        <small><span className="po-status-dot" /> Connected · {activeInstagramAccount.handle} · preview only</small>
-      </div>
-    </div>
+    <ConnectedAccountSwitcher
+      workspaceName="My workspace"
+      providerLabel="Instagram"
+      providerIcon={<InstagramMarkIcon />}
+      accounts={previewInstagramAccounts}
+      selectedAccountId={instagramAccount}
+      onSelect={(accountId) => onSwitchInstagramAccount(accountId as PreviewInstagramAccount)}
+      onManageAccounts={() => { setProfileOpen(false); setNotificationsOpen(false); onNavigate("integrations"); }}
+      previewOnly
+    />
     <div className="po-global-actions">
       <div className="po-token-meter" title="Sample usage meter; no real account data">
         <div><span>AI usage</span><strong>145.5K / 200K tokens</strong></div>
@@ -994,25 +993,6 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
           <div className="po-profile-menu-identity">
             <span className="po-profile-avatar">A</span>
             <span><strong>Alex Morgan</strong><small>Owner · sample user</small></span>
-          </div>
-          <div className="po-profile-menu-section">
-            <p className="po-menu-section-label">INSTAGRAM ACCOUNT</p>
-            {previewInstagramAccounts.map(account => {
-              const selected = account.id === instagramAccount;
-              return <button
-                type="button"
-                key={account.id}
-                role="menuitemradio"
-                aria-checked={selected}
-                className={"po-instagram-account-option" + (selected ? " is-selected" : "")}
-                onClick={() => chooseInstagramAccount(account.id)}
-              >
-                <span className="po-instagram-option-icon"><InstagramMarkIcon /></span>
-                <span className="po-instagram-option-copy"><strong>{account.handle}</strong><small>{account.label}</small></span>
-                {selected ? <CheckCircleIcon className="po-instagram-option-check" /> : <span className="po-instagram-option-empty" />}
-              </button>;
-            })}
-            <p className="po-menu-hint">Preview accounts only. Switching here does not change a live Instagram connection.</p>
           </div>
           <div className="po-profile-menu-section po-profile-actions-section">
             <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("settings")}><SettingsIcon /><span>Workspace settings</span></button>
