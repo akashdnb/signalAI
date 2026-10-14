@@ -7,8 +7,8 @@ body:has(.po-preview-app) {
   --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-legacy-hex-f1eafe);
   --po-success:var(--po-color-legacy-hex-087f5b); --po-success-soft:var(--po-color-legacy-hex-eaf8f2); --po-warning:var(--po-color-legacy-hex-a15c00); --po-warning-soft:var(--po-color-legacy-hex-fff6df);
   --po-info:var(--po-color-legacy-hex-2563eb); --po-info-soft:var(--po-color-legacy-hex-eef4ff); --po-radius-sm:6px; --po-radius-md:8px;
-  --po-radius-lg:12px; --po-radius-xl:16px; --po-focus:0 0 0 3px var(--po-color-legacy-rgba-124-58-237-18);
-  --po-shadow-dialog:0 24px 60px var(--po-color-legacy-rgba-15-23-42-18); background:var(--po-bg); color:var(--po-text);
+  --po-radius-lg:12px; --po-radius-xl:16px; --po-focus:0 0 0 3px var(--po-color-focus-shadow-strong);
+  --po-shadow-dialog:0 24px 60px var(--po-color-shadow-modal); background:var(--po-bg); color:var(--po-text);
 }
 body:has(.po-preview-app),body:has(.po-preview-app) button,body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px;line-height:1.2;letter-spacing:-.025em;font-weight:800}
@@ -34,7 +34,7 @@ body:has(.po-preview-app) .po-button--secondary:hover:not(:disabled){background:
 body:has(.po-preview-app) .po-button--quiet{background:var(--po-color-transparent);color:var(--po-text-secondary)}
 body:has(.po-preview-app) .po-button--quiet:hover:not(:disabled){background:var(--po-color-legacy-hex-f3f4f7);color:var(--po-text)}
 body:has(.po-preview-app) .po-button:active:not(:disabled){transform:translateY(1px)}
-body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid var(--po-color-transparent);border-radius:999px;font-size:12px;line-height:17px;font-weight:700;var(--po-color-white)-space:nowrap}
+body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid var(--po-color-transparent);border-radius:999px;font-size:12px;line-height:17px;font-weight:700;white-space:nowrap}
 body:has(.po-preview-app) .po-tag--neutral{background:var(--po-color-notice-bg);color:var(--po-color-legacy-hex-596273)}
 body:has(.po-preview-app) .po-tag--purple{background:var(--po-primary-soft);color:var(--po-primary)}
 body:has(.po-preview-app) .po-tag--green{background:var(--po-success-soft);color:var(--po-success)}
@@ -81,14 +81,14 @@ body:has(.po-preview-app) .po-builder-tabs button,body:has(.po-preview-app) .po-
 body:has(.po-preview-app) .po-palette{background:var(--po-surface);border-right:1px solid var(--po-border)}
 body:has(.po-preview-app) .po-palette-item{border-radius:var(--po-radius-md);padding:10px 8px}
 body:has(.po-preview-app) .po-palette-item:hover{background:var(--po-color-legacy-hex-f8f6fc)}
-body:has(.po-preview-app) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:12px;background:var(--po-surface);box-shadow:0 2px 5px var(--po-color-legacy-rgba-15-23-42-04);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
-body:has(.po-preview-app) .po-flow-node:hover,body:has(.po-preview-app) .po-flow-node.is-selected{border-color:var(--po-color-legacy-hex-9b72ed);box-shadow:0 8px 24px var(--po-color-legacy-rgba-124-58-237-1)}
-body:has(.po-preview-app) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px var(--po-color-legacy-rgba-124-58-237-1)}
+body:has(.po-preview-app) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:12px;background:var(--po-surface);box-shadow:0 2px 5px var(--po-color-shadow-card);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
+body:has(.po-preview-app) .po-flow-node:hover,body:has(.po-preview-app) .po-flow-node.is-selected{border-color:var(--po-color-legacy-hex-9b72ed);box-shadow:0 8px 24px var(--po-color-focus-shadow)}
+body:has(.po-preview-app) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px var(--po-color-focus-shadow)}
 body:has(.po-preview-app) .po-flow-node-kicker{color:var(--po-color-neutral-label);font-size:11px;letter-spacing:.08em;font-weight:700}
 body:has(.po-preview-app) .po-flow-node-content strong{font-size:14px;line-height:20px}
 body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker){font-size:14px;line-height:20px}
 body:has(.po-preview-app) .po-flow-node-content small{font-size:12px;line-height:17px}
-body:has(.po-preview-app) .po-dialog-backdrop{background:var(--po-color-legacy-rgba-15-23-42-42);backdrop-filter:blur(2px)}
+body:has(.po-preview-app) .po-dialog-backdrop{background:var(--po-color-modal-backdrop);backdrop-filter:blur(2px)}
 body:has(.po-preview-app) .po-dialog,body:has(.po-preview-app) .po-modal,body:has(.po-preview-app) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
 body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
 body:has(.po-preview-app) input:focus,body:has(.po-preview-app) select:focus,body:has(.po-preview-app) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus)}
@@ -109,8 +109,8 @@ body:has(.po-preview-app.is-dark) {
   --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-purple-soft);
   --po-success:var(--po-color-success); --po-success-soft:var(--po-color-success-soft); --po-warning:var(--po-color-warning); --po-warning-soft:var(--po-color-warning-soft);
   --po-info:var(--po-color-legacy-hex-8ab4ff); --po-info-soft:var(--po-color-legacy-hex-1e2a40);
-  --po-focus:0 0 0 3px var(--po-color-legacy-rgba-180-154-245-3);
-  --po-shadow-dialog:0 24px 60px var(--po-color-legacy-rgba-0-0-0-5);
+  --po-focus:0 0 0 3px var(--po-color-focus-shadow-dark);
+  --po-shadow-dialog:0 24px 60px var(--po-color-shadow-modal-dark);
 }
 /* Hardcoded light values from the block above that have no token to follow. */
 body:has(.po-preview-app.is-dark) .po-nav-item{color:var(--po-text-secondary)}
@@ -196,7 +196,7 @@ body:has(.po-preview-app.is-dark) .po-leads-pagination span{color:var(--po-text-
  * paddings, and every select except .po-select-wrap used the native OS arrow,
  * which sits flush against the right border.
  */
-body:has(.po-preview-app) .po-preview-app .po-button{var(--po-color-white)-space:nowrap;flex-shrink:0;width:auto}
+body:has(.po-preview-app) .po-preview-app .po-button{white-space:nowrap;flex-shrink:0;width:auto}
 
 body:has(.po-preview-app) .po-preview-app .po-search,
 body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search{
