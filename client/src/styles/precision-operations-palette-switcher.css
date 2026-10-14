@@ -103,3 +103,53 @@ body[data-po-palette] .po-preview-app .po-trigger-badge.is-both { border-color:v
 body[data-po-palette] .po-preview-app .po-brand .text-accent { color:var(--po-color-primary) !important; }
 body[data-po-palette] .po-preview-app.is-dark .po-profile-avatar { background:var(--po-color-primary-action); color:#fff; }
 body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table .po-tag--neutral { background:var(--po-color-neutral-soft); border-color:var(--po-color-neutral-border); color:var(--po-color-neutral-text); }
+
+/* Align dark legacy tokens with the dark palette surface tokens as well as the
+   accent tokens. Earlier .is-dark rules have greater specificity than the
+   legacy aliases, so restate these aliases at the same scoped specificity. */
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-canvas: var(--po-color-canvas);
+  --po-surface: var(--po-color-surface);
+  --po-surface-muted: var(--po-color-surface-muted);
+  --po-ink: var(--po-color-ink);
+  --po-secondary: var(--po-color-secondary);
+  --po-muted: var(--po-color-muted);
+  --po-line: var(--po-color-border);
+  --po-line-strong: var(--po-color-border-strong);
+  --po-primary: var(--po-color-primary);
+  --po-primary-hover: var(--po-color-primary-hover);
+  --po-primary-soft: var(--po-color-primary-soft);
+  --po-green: var(--po-color-success);
+  --po-green-soft: var(--po-color-success-soft);
+  --po-amber: var(--po-color-warning);
+  --po-amber-soft: var(--po-color-warning-soft);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-plan-card,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-card,
+body[data-po-palette] .po-preview-app.is-dark .po-thread-empty {
+  background: var(--po-color-surface);
+  border-color: var(--po-color-border);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-preview-notice {
+  border-color: var(--po-color-border);
+  background: var(--po-color-notice-bg);
+  color: var(--po-color-notice-text);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-nav-item:hover:not(.is-active),
+body[data-po-palette] .po-preview-app.is-dark .po-palette-item:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-conversation:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-automation-table tbody tr:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table tbody tr:hover {
+  background: var(--po-color-surface-hover);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-automation-table th,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-table th,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table th,
+body[data-po-palette] .po-preview-app.is-dark table th {
+  background: var(--po-color-neutral-table-head);
+  color: var(--po-color-neutral-table-head-text);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-canvas-workspace {
+  background-color: var(--po-color-canvas-bg);
+  background-image: radial-gradient(var(--po-color-canvas-grid) .85px, transparent .85px);
+}
