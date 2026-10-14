@@ -4,7 +4,7 @@ import { AutomationIcon, InstagramMarkIcon, SearchIcon, PlusIcon, ChevronDownIco
 import { Logo } from "../components/Logo";
 
 export type FullPreviewScreen = "overview" | "automations" | "builder" | "inbox" | "leads" | "lead-detail" | "knowledge" | "content" | "analytics" | "integrations" | "team" | "billing" | "settings" | "docs" | "login" | "connect-error" | "invite";
-export type PreviewPalette = "navy-cobalt" | "teal-emerald" | "slate-cyan" | "forest-slate" | "orange-amber" | "neutral-slate";
+export type PreviewPalette = "navy-cobalt" | "teal-emerald" | "slate-cyan" | "forest-slate" | "orange-amber" | "neutral-slate" | "ocean-blue" | "rose-graphite" | "amber-minimal";
 type Go = (screen: FullPreviewScreen) => void;
 function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?: string }) { return <span className={"po-tag po-tag--" + tone}>{children}</span>; }
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) { return <section className={"po-content-panel " + className}>{children}</section>; }
@@ -235,6 +235,9 @@ const appearancePalettes: { value: PreviewPalette; label: string; description: s
   { value: "forest-slate", label: "Forest & Slate", description: "Grounded green" },
   { value: "orange-amber", label: "Orange & Amber", description: "Warm and energetic" },
   { value: "neutral-slate", label: "Neutral Slate", description: "Low-colour and understated" },
+  { value: "ocean-blue", label: "Ocean Blue", description: "Clear blue with deep ocean surfaces" },
+  { value: "rose-graphite", label: "Rose & Graphite", description: "Warm rose on restrained graphite" },
+  { value: "amber-minimal", label: "Amber Minimal", description: "Warm amber with quiet, earthy neutrals" },
 ];
 
 export function SettingsScreen({ theme, palette, onChangeTheme, onChangePalette }: {
