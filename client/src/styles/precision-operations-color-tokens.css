@@ -284,7 +284,7 @@ body:has(.po-preview-app.is-dark) {
 
 .po-preview-app.is-dark .po-flow-node.is-selected { box-shadow: inset 3px 0 0 var(--po-color-primary), 0 0 0 2px var(--po-color-primary-border); }
 .po-preview-app.is-dark .po-canvas-workspace { background-color: var(--po-color-canvas-bg); background-image: radial-gradient(var(--po-color-canvas-grid) .85px, transparent .85px); }
-.po-preview-app.is-dark .po-post-art { color: #18231c; }
+.po-preview-app.is-dark .po-post-art { color: var(--po-color-legacy-hex-18231c); }
 .po-preview-app.is-dark .po-status-dot { background: var(--po-color-success); }
 .po-preview-app.is-dark .po-message--outgoing > span { background: var(--po-color-purple-message); border-color: var(--po-color-purple-message-border); }
 .po-preview-app.is-dark .po-tag--purple { background: var(--po-color-primary-soft); border-color: var(--po-color-primary-border); color: var(--po-color-primary-strong); }
