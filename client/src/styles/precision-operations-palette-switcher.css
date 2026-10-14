@@ -45,9 +45,11 @@ body:has(.po-preview-app) .po-preview-app .po-search:focus-within {
 }
 body:has(.po-preview-app) .po-preview-app .po-search input:focus,
 body:has(.po-preview-app) .po-preview-app .po-search input:focus-visible {
-  border-color: var(--po-color-transparent);
-  outline: none;
-  box-shadow: none;
+  border: 0 !important;
+  border-color: var(--po-color-transparent) !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
 }
 
 /* The search input lives inside a bordered wrapper. Give focus to the wrapper
