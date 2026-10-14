@@ -124,12 +124,14 @@ export function IntegrationsPage() {
                   </span>
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-2">
-                      <strong>Instagram account</strong>
+                      <strong>{account.instagramUsername ? `@${account.instagramUsername}` : "Instagram account"}</strong>
                       <span className={account.status === "healthy" ? "pill pill-ok" : "pill pill-error"}>
                         {account.status === "healthy" ? "Healthy" : "Needs attention"}
                       </span>
                     </span>
-                    <p className="muted small mt-1 mb-0">SignalAI currently shows the technical account ID because the connected-account response does not include the Instagram handle.</p>
+                    {!account.instagramUsername && (
+                      <p className="muted small mt-1 mb-0">The handle will appear after this account is successfully reconnected.</p>
+                    )}
                     <p className="muted small mt-1 mb-0">Instagram account ID: <code>{account.instagramAccountId}</code></p>
                     <p className="muted small mt-1 mb-0">Last checked: {formatDate(account.lastCheckedAt)}</p>
                     {account.expiresAt && <p className="muted small mt-1 mb-0">Connection credential expires: {formatDate(account.expiresAt)}</p>}

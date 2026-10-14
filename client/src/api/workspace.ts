@@ -65,6 +65,7 @@ export interface ConnectedInstagramAccount {
   id: string;
   tenantId: string;
   instagramAccountId: string;
+  instagramUsername: string | null;
   status: "healthy" | "error";
   lastError: string | null;
   lastCheckedAt: string;
@@ -94,7 +95,7 @@ export const workspaceApi = {
     ),
 
   resendInvitation: (tenantId: string, invitationId: string) =>
-    request<{ invitation: WorkspaceInvitation; delivery: "sent" | "failed" }>(
+    request<{ invitation: WorkspaceInvitation; delivery: "failed" | "sent" }>(
       `/tenants/${tenantId}/invitations/${invitationId}/resend`,
       { method: "POST" },
     ),

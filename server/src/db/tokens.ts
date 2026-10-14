@@ -7,6 +7,7 @@ export async function upsertToken(
   params: {
     tenantId: string;
     instagramAccountId: string;
+    instagramUsername?: string;
     accessToken: string;
     expiresAt?: Date;
   },
@@ -16,10 +17,14 @@ export async function upsertToken(
   const { ciphertext } = encryptToken(params.accessToken, key, keyVersion);
 
   await pool.query(
-    `insert into meta_tokens (tenant_id, instagram_account_id, encrypted_token, key_version, expires_at)
-     values ($1, $2, $3, $4, $5)
+    `insert into meta_tokens (
+       tenant_id, instagram_account_id, instagram_username,
+       encrypted_token, key_version, expires_at
+     )
+     values ($1, $2, $3, $4, $5, $6)
      on conflict (instagram_account_id)
      do update set tenant_id = excluded.tenant_id,
+                    instagram_username = coalesce(excluded.instagram_username, meta_tokens.instagram_username),
                     encrypted_token = excluded.encrypted_token,
                     key_version = excluded.key_version,
                     expires_at = excluded.expires_at,
@@ -27,7 +32,14 @@ export async function upsertToken(
                     last_error = null,
                     last_checked_at = now(),
                     updated_at = now()`,
-    [params.tenantId, params.instagramAccountId, ciphertext, keyVersion, params.expiresAt ?? null],
+    [
+      params.tenantId,
+      params.instagramAccountId,
+      params.instagramUsername ?? null,
+      ciphertext,
+      keyVersion,
+      params.expiresAt ?? null,
+    ],
   );
 
   await pool.query(
