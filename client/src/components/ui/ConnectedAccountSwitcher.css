@@ -451,3 +451,50 @@ body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-swi
   border-color: var(--po-color-primary);
   box-shadow: 0 0 0 3px var(--po-color-primary-soft);
 }
+
+/* Keep the workspace header compact: status is communicated by the dot, while
+   the account handle is the only secondary text shown outside the picker. */
+.po-preview-app .sai-account-switcher {
+  max-width: min(440px, 44vw);
+}
+.po-preview-app .sai-account-switcher__trigger {
+  gap: 10px;
+}
+.po-preview-app .sai-account-switcher__identity {
+  gap: 3px;
+}
+.po-preview-app .sai-account-switcher__header-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+.po-preview-app .sai-account-switcher__current-handle {
+  display: inline-block;
+  min-width: 0;
+  max-width: 22ch;
+  overflow: hidden;
+  color: var(--po-color-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.po-preview-app .sai-account-switcher__status-dot.is-disconnected {
+  background: var(--po-color-error);
+}
+.po-preview-app .sai-account-switcher__option-copy > small.is-connected .sai-account-switcher__status-dot {
+  background: var(--po-color-success);
+}
+.po-preview-app .sai-account-switcher__option-copy > small.is-disconnected .sai-account-switcher__status-dot {
+  background: var(--po-color-error);
+}
+@media (max-width: 760px) {
+  .po-preview-app .sai-account-switcher {
+    max-width: min(100%, 440px);
+  }
+  .po-preview-app .sai-account-switcher__current-handle {
+    max-width: 22ch;
+  }
+}
