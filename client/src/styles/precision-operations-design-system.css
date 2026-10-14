@@ -98,9 +98,9 @@ body:has(.po-preview-app) table td{font-size:14px;color:var(--po-text)}
 body:has(.po-preview-app) .po-preview-notice{border:1px solid var(--po-color-legacy-hex-ddd5ee);background:var(--po-color-legacy-hex-faf8ff);color:var(--po-color-legacy-hex-5e566d);border-radius:var(--po-radius-md);font-size:12px}
 /* Dark theme.
  * The token block above is light-only and is set on `body`, so without this the
- * preview's dark mode (.po-preview-app.is-dark, which redefines a *different*
- * namespace in precision-operations-preview.css) left --po-text #111827 on a
- * #1b211e surface — 1.08:1. Same specificity as the light block (0,1,1), so
+ * preview's dark mode (.po-preview-app.is-dark, which redefines a different
+ * namespace in precision-operations-preview.css) left the light text token on a
+ * dark surface at insufficient contrast. Same specificity as the light block, so
  * source order decides; keep this last.
  */
 body:has(.po-preview-app.is-dark) {
