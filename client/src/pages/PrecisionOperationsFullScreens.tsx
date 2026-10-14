@@ -235,9 +235,10 @@ const appearancePalettes: { value: PreviewPalette; label: string; description: s
   { value: "forest-slate", label: "Forest & Slate", description: "Grounded green" },
   { value: "orange-amber", label: "Orange & Amber", description: "Warm and energetic" },
   { value: "neutral-slate", label: "Neutral Slate", description: "Low-colour and understated" },
-  { value: "ocean-blue", label: "Ocean Blue", description: "Cool ocean tones with a sky accent" },
-  { value: "rose-graphite", label: "Rose & Graphite", description: "Warm rose on restrained graphite" },
-  { value: "amber-minimal", label: "Amber Minimal", description: "Earthy amber with quiet neutrals" },
+  { value: "ocean-sky", label: "Ocean & Sky", description: "Deep blue with a clear sky accent" },
+  { value: "jade-mint", label: "Jade & Mint", description: "Fresh green with mint highlights" },
+  { value: "rose-slate", label: "Rose & Slate", description: "Warm rose on a cool neutral base" },
+  { value: "amber-graphite", label: "Amber & Graphite", description: "Warm accent on charcoal neutrals" },
 ];
 
 export function SettingsScreen({ theme, palette, onChangeTheme, onChangePalette }: {
