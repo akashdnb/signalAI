@@ -4,6 +4,10 @@ import type { Queryable } from "./types.js";
 export interface User {
   id: string;
   email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePictureUrl: string | null;
+  googleSubject: string | null;
   createdAt: Date;
   sessionVersion: number;
 }
@@ -11,6 +15,10 @@ export interface User {
 interface UserRow {
   id: string;
   email: string;
+  first_name: string | null;
+  last_name: string | null;
+  profile_picture_url: string | null;
+  google_subject: string | null;
   created_at: Date;
   session_version: number;
 }
@@ -19,6 +27,10 @@ function toUser(row: UserRow): User {
   return {
     id: row.id,
     email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    profilePictureUrl: row.profile_picture_url,
+    googleSubject: row.google_subject,
     createdAt: row.created_at,
     sessionVersion: row.session_version,
   };
