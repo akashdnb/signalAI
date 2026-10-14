@@ -97,6 +97,13 @@ export async function refreshLongLivedToken(longLivedToken: string): Promise<Lon
 
 interface InstagramProfile {
   id: string;
+  /**
+   * The APP-SCOPED user id (`/me` `id`). This is what accounts connected
+   * before 9ccc0ae stored as `instagram_account_id`, so reconnecting such an
+   * account needs it to recognise that the authorised account is the same
+   * physical account even though its stored id predates the user_id switch.
+   */
+  appScopedId?: string;
   username: string;
 }
 
@@ -113,10 +120,14 @@ interface InstagramProfile {
  * inbound event, so every webhook was dropped by the `continue` in
  * ingestWebhookEvents — no error, no log, no row. The comment trigger
  * simply never fired, while OAuth, tokens and campaigns all looked healthy.
+ *
+ * We still read `id` alongside `user_id`: a reconnect of an account that was
+ * connected before that switch compares the stored (app-scoped) id against
+ * this, so it can confirm the same account and heal the row to `user_id`.
  */
 export async function fetchInstagramProfile(accessToken: string): Promise<InstagramProfile> {
   const url = new URL(`${GRAPH_BASE_URL}/me`);
-  url.searchParams.set("fields", "user_id,username");
+  url.searchParams.set("fields", "id,user_id,username");
   url.searchParams.set("access_token", accessToken);
 
   const res = await fetch(url);
@@ -124,12 +135,16 @@ export async function fetchInstagramProfile(accessToken: string): Promise<Instag
     throw new Error(`Fetching Instagram profile failed: ${res.status} ${await res.text()}`);
   }
 
-  const body = (await res.json()) as { user_id?: string | number; username?: string };
+  const body = (await res.json()) as { id?: string | number; user_id?: string | number; username?: string };
   if (body.user_id === undefined || !body.username) {
     throw new Error("Instagram /me did not return user_id and username — cannot identify the account");
   }
   // Returned as a number by some API versions; entry.id arrives as a string.
-  return { id: String(body.user_id), username: body.username };
+  return {
+    id: String(body.user_id),
+    appScopedId: body.id === undefined ? undefined : String(body.id),
+    username: body.username,
+  };
 }
 
 /**

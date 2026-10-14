@@ -115,6 +115,28 @@ export async function deleteConnectedInstagramAccount(
   }
 }
 
+/**
+ * Repoints an existing connected-account row from the id it was stored under
+ * to the canonical professional `user_id`, keeping the row's primary key (and
+ * therefore every `campaign_instagram_accounts.meta_token_id` journey binding)
+ * intact. Used to heal accounts connected before the id scheme switched from
+ * the app-scoped `id` to `user_id`; the subsequent `upsertToken` then updates
+ * this same row instead of inserting a duplicate.
+ */
+export async function repointInstagramAccountId(
+  pool: Queryable,
+  tenantId: string,
+  fromInstagramAccountId: string,
+  toInstagramAccountId: string,
+): Promise<void> {
+  await pool.query(
+    `update meta_tokens
+        set instagram_account_id = $3, updated_at = now()
+      where tenant_id = $1 and instagram_account_id = $2`,
+    [tenantId, fromInstagramAccountId, toInstagramAccountId],
+  );
+}
+
 export async function getConnectedInstagramAccountByProviderId(
   pool: Queryable,
   instagramAccountId: string,

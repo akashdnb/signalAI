@@ -107,7 +107,9 @@ describe("instagramOAuth", () => {
     });
 
     const profile = await fetchInstagramProfile("token");
-    expect(profile).toEqual({ id: "17841408728501893", username: "real_handle" });
+    // Also surfaces the app-scoped id so a reconnect of an account stored under
+    // it (before the user_id switch) can recognise the same physical account.
+    expect(profile).toEqual({ id: "17841408728501893", appScopedId: "38839853485630499", username: "real_handle" });
   });
 
   it("requests the user_id field rather than id", async () => {

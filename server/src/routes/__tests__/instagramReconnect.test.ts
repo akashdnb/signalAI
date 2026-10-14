@@ -25,10 +25,10 @@ vi.mock("../../lib/instagramOAuth.js", async () => {
   };
 });
 
-function mockSuccessfulExchange(accountId: string, token = `token-${accountId}`) {
+function mockSuccessfulExchange(accountId: string, token = `token-${accountId}`, appScopedId?: string) {
   vi.mocked(exchangeCodeForShortLivedToken).mockResolvedValue({ access_token: "short", user_id: "u1" });
   vi.mocked(exchangeForLongLivedToken).mockResolvedValue({ access_token: token, expires_in: 5184000 });
-  vi.mocked(fetchInstagramProfile).mockResolvedValue({ id: accountId, username: accountId });
+  vi.mocked(fetchInstagramProfile).mockResolvedValue({ id: accountId, appScopedId, username: accountId });
   vi.mocked(subscribeToWebhooks).mockResolvedValue(undefined);
 }
 
@@ -135,5 +135,49 @@ describe("Instagram reconnect lifecycle", () => {
     const rows = await pool.query("select instagram_account_id from meta_tokens where tenant_id = $1 order by instagram_account_id", [tenant.id]);
     expect(rows.rowCount).toBe(1);
     expect(rows.rows[0].instagram_account_id).toBe("acct-1");
+  });
+
+  it("heals an account connected under its app-scoped id by repointing the row to user_id", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    // Pre-fix connection: stored under the app-scoped id, as rows created
+    // before the id scheme switched to user_id were.
+    mockSuccessfulExchange("legacy-app-scoped");
+    const firstAgent = request.agent(app);
+    const firstStartUrl = await mintStartUrl(app, tenant.id, authHeader);
+    const firstStart = await firstAgent.get(firstStartUrl);
+    await firstAgent.get("/auth/instagram/callback").query({ code: "auth-code", state: extractState(firstStart.headers.location) });
+
+    const tokenRow = await pool.query<{ id: string }>("select id from meta_tokens where tenant_id = $1 and instagram_account_id = 'legacy-app-scoped'", [tenant.id]);
+    const accountId = tokenRow.rows[0]!.id;
+    const campaign = await createCampaign(pool, tenant.id, "Legacy journey", ["hello"]);
+    await attachCampaignToInstagramAccount(pool, tenant.id, campaign.id, accountId);
+    await deleteConnectedInstagramAccount(pool, tenant.id, accountId);
+
+    // Reconnect: Instagram returns the canonical user_id, but the app-scoped id
+    // matches what the row was stored under — same physical account.
+    mockSuccessfulExchange("17841-user-id", "healed-token", "legacy-app-scoped");
+    const reconnectAgent = request.agent(app);
+    const reconnectStartUrl = await mintStartUrl(app, tenant.id, authHeader, accountId);
+    const reconnectStart = await reconnectAgent.get(reconnectStartUrl);
+    const reconnect = await reconnectAgent.get("/auth/instagram/callback").query({ code: "auth-code", state: extractState(reconnectStart.headers.location) });
+    expect(reconnect.status).toBe(302);
+    expect(reconnect.headers.location).toBe(`${APP_BASE_URL}/dashboard/${tenant.id}?connected=1`);
+
+    // The row was repointed in place: same primary key, canonical id, healthy,
+    // with no duplicate row left behind.
+    const rows = await pool.query("select id, instagram_account_id, status from meta_tokens where tenant_id = $1", [tenant.id]);
+    expect(rows.rowCount).toBe(1);
+    expect(rows.rows[0].id).toBe(accountId);
+    expect(rows.rows[0].instagram_account_id).toBe("17841-user-id");
+    expect(rows.rows[0].status).toBe("healthy");
+
+    const binding = await pool.query(
+      "select enabled from campaign_instagram_accounts where campaign_id = $1 and meta_token_id = $2",
+      [campaign.id, accountId],
+    );
+    expect(binding.rows[0].enabled).toBe(true);
   });
 });

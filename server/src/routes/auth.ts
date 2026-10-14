@@ -2,7 +2,7 @@ import { Router, type Response } from "express";
 import { config, isProduction } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { findTenantByInstagramAccountId } from "../db/accounts.js";
-import { getConnectedInstagramAccount, } from "../db/connectedAccounts.js";
+import { getConnectedInstagramAccount, repointInstagramAccountId } from "../db/connectedAccounts.js";
 import { markTokenError, upsertToken } from "../db/tokens.js";
 import { registerInstagramTrialUse } from "../db/instagramTrialHistory.js";
 import { endTrialImmediately } from "../db/tenants.js";
@@ -116,13 +116,28 @@ authRouter.get("/auth/instagram/callback", async (req, res) => {
     const pool = getPool();
     const tenantId = statePayload.tenantId;
 
-    if (statePayload.instagramAccountId && statePayload.instagramAccountId !== profile.id) {
+    // On a reconnect the state carries the id of the account being reconnected.
+    // It must be the same physical account that just authorised — matched by
+    // the canonical user_id, or by the app-scoped id for accounts connected
+    // before the id scheme switched to user_id (see fetchInstagramProfile).
+    // Any other value means a different Instagram account was authorised.
+    const reconnectId = statePayload.instagramAccountId;
+    const isSameAccount =
+      !reconnectId || reconnectId === profile.id || reconnectId === profile.appScopedId;
+    if (!isSameAccount) {
       return redirectToConnectError(res, "account_mismatch");
     }
 
     const existingTenantId = await findTenantByInstagramAccountId(pool, profile.id);
     if (existingTenantId && existingTenantId !== tenantId) {
       return redirectToConnectError(res, "account_already_connected");
+    }
+
+    // Legacy account: stored under its app-scoped id. Repoint the existing row
+    // to the canonical user_id so the upsert refreshes it (and its journey
+    // bindings) in place rather than inserting a duplicate.
+    if (reconnectId && reconnectId !== profile.id) {
+      await repointInstagramAccountId(pool, tenantId, reconnectId, profile.id);
     }
 
     await upsertToken(pool, config.tokenKeyring, {
