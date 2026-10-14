@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError, requestOtp, saveSession, verifyOtp } from "../api";
+import { API_BASE_URL, ApiError, requestOtp, saveSession, verifyOtp } from "../api";
 import { InboxIcon } from "../components/icons";
 import { Logo } from "../components/Logo";
 
@@ -41,12 +41,7 @@ function MetaIcon() {
 
 type SsoProvider = "google" | "meta";
 
-/**
- * Google/Meta OAuth aren't wired up server-side yet. Kept fully enabled
- * (no `disabled` attribute/dimming) so they read as real options rather
- * than dead UI — clicking one reveals an inline "not yet" note instead of
- * graying the button out upfront.
- */
+/** Keep the not-yet-configured Meta sign-in affordance explicit; Google is wired through the server OIDC flow. */
 function SsoButton({
   provider,
   icon,
@@ -185,6 +180,10 @@ export function LoginPage() {
   }
 
   function handleSsoClick(provider: SsoProvider) {
+    if (provider === "google") {
+      window.location.assign(`${API_BASE_URL}/auth/google/start?returnTo=/login`);
+      return;
+    }
     setUnavailableProvider(provider);
   }
 
@@ -199,7 +198,7 @@ export function LoginPage() {
             provider="google"
             icon={<GoogleIcon />}
             label="Continue with Google"
-            unavailable={unavailableProvider === "google"}
+            unavailable={false}
             onClick={() => handleSsoClick("google")}
           />
           <SsoButton
