@@ -12,6 +12,6 @@ export async function resetDb(pool: Pool): Promise<void> {
   // follows FKs that reference the truncated table, and neither of those
   // is referenced BY tenants, so they need listing explicitly.
   await pool.query(
-    "truncate table lead_pii, lead_events, leads, customers, meta_tokens, tenants, users, email_otp_codes restart identity cascade",
+    "truncate table lead_pii, lead_events, leads, customers, meta_tokens, tenants, users, email_otp_codes, google_oauth_states, google_login_handoffs restart identity cascade",
   );
 }

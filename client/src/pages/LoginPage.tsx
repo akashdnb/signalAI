@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError, requestOtp, saveSession, verifyOtp } from "../api";
+import { API_BASE_URL, ApiError, exchangeGoogleHandoff, requestOtp, saveSession, verifyOtp } from "../api";
 import { InboxIcon } from "../components/icons";
 import { Logo } from "../components/Logo";
 
@@ -41,12 +41,7 @@ function MetaIcon() {
 
 type SsoProvider = "google" | "meta";
 
-/**
- * Google/Meta OAuth aren't wired up server-side yet. Kept fully enabled
- * (no `disabled` attribute/dimming) so they read as real options rather
- * than dead UI — clicking one reveals an inline "not yet" note instead of
- * graying the button out upfront.
- */
+/** Keep the not-yet-configured Meta sign-in affordance explicit; Google is wired through the server OIDC flow. */
 function SsoButton({
   provider,
   icon,
@@ -104,19 +99,9 @@ function MarketingColumn() {
   );
 }
 
-/**
- * One shared, full-bleed background (no separate dark/light halves) with
- * the marketing content sitting directly on it and a compact floating card
- * for the auth step — matching the mock, which is a single page with an
- * elevated card, not a split screen.
- */
 function LoginLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen" style={{ background: "var(--auth-gradient)" }}>
-      {/* justify-center + a fixed gap (not justify-between inside a wide
-          max-width) keeps the two columns adjacent at any viewport width —
-          the outer margin grows on wide screens instead of the gap between
-          them stretching into dead space. */}
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-14 px-6 py-16 lg:flex-row lg:items-center">
         <MarketingColumn />
         <div className="w-full max-w-sm shrink-0">
@@ -129,7 +114,6 @@ function LoginLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Login is the app's entry point — Instagram connects from inside the dashboard afterward, not the other way around. A 6-digit email code, entered on this same page: no redirect, no leaving the tab. */
 export function LoginPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"method" | "email" | "code">("method");
@@ -138,6 +122,56 @@ export function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [authInitializing, setAuthInitializing] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("google_auth") === "success" && Boolean(params.get("handoff"));
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("auth_error");
+    const handoff = params.get("handoff");
+    if (authError) {
+      const messages: Record<string, string> = {
+        google_not_configured: "Google sign-in is not configured yet. Please use email for now.",
+        google_sign_in_cancelled: "Google sign-in was cancelled.",
+        invalid_google_state: "The sign-in session expired or could not be verified. Please try again.",
+        google_sign_in_failed: "Google sign-in failed. Please try again or use email.",
+        google_identity_conflict: "This Google account is linked differently. Please use your existing sign-in method.",
+        google_token_exchange_failed: "Google could not complete sign-in. Please try again.",
+      };
+      setError(messages[authError] ?? "Google sign-in could not be completed. Please try again.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setAuthInitializing(false);
+      return;
+    }
+    if (!handoff || params.get("google_auth") !== "success") {
+      setAuthInitializing(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSubmitting(true);
+    setError(null);
+    window.history.replaceState({}, document.title, window.location.pathname);
+    void exchangeGoogleHandoff(handoff)
+      .then((session) => {
+        if (cancelled) return;
+        saveSession(session);
+        navigate(`/dashboard/${session.tenantId}`, { replace: true });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Google sign-in could not be completed.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSubmitting(false);
+          setAuthInitializing(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   async function handleRequestCode(e: React.FormEvent) {
     e.preventDefault();
@@ -185,7 +219,15 @@ export function LoginPage() {
   }
 
   function handleSsoClick(provider: SsoProvider) {
+    if (provider === "google") {
+      window.location.assign(`${API_BASE_URL}/auth/google/start?returnTo=/login`);
+      return;
+    }
     setUnavailableProvider(provider);
+  }
+
+  if (authInitializing) {
+    return <div className="min-h-screen" style={{ background: "var(--auth-gradient)" }} aria-busy="true" />;
   }
 
   if (step === "method") {
@@ -193,41 +235,20 @@ export function LoginPage() {
       <LoginLayout>
         <h1 className="m-0 text-center text-2xl font-bold text-ink">Welcome back</h1>
         <p className="mt-1 text-center text-sm text-subtle">Sign in to your account</p>
-
         <div className="mt-6 space-y-3">
-          <SsoButton
-            provider="google"
-            icon={<GoogleIcon />}
-            label="Continue with Google"
-            unavailable={unavailableProvider === "google"}
-            onClick={() => handleSsoClick("google")}
-          />
-          <SsoButton
-            provider="meta"
-            icon={<MetaIcon />}
-            label="Continue with Meta"
-            unavailable={unavailableProvider === "meta"}
-            onClick={() => handleSsoClick("meta")}
-          />
-          <button
-            type="button"
-            onClick={() => setStep("email")}
-            className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink transition-colors hover:bg-chip"
-          >
+          <SsoButton provider="google" icon={<GoogleIcon />} label="Continue with Google" unavailable={false} onClick={() => handleSsoClick("google")} />
+          <SsoButton provider="meta" icon={<MetaIcon />} label="Continue with Meta" unavailable={unavailableProvider === "meta"} onClick={() => handleSsoClick("meta")} />
+          <button type="button" onClick={() => setStep("email")} className="flex w-full items-center justify-center gap-3 rounded-[10px] border border-line bg-card px-4 py-[0.6rem] text-[0.95rem] font-semibold text-ink transition-colors hover:bg-chip">
             <InboxIcon className="h-4 w-4" />
             Continue with Email
           </button>
         </div>
-
         <p className="mt-6 text-center text-xs text-subtle">
           By continuing, you agree to our <span className="text-accent">Terms &amp; Privacy Policy</span>.
         </p>
-
         <p className="mt-4 text-center text-sm text-subtle">
           New here?{" "}
-          <button type="button" className="link-button font-medium text-accent" onClick={() => setStep("email")}>
-            Create an account
-          </button>
+          <button type="button" className="link-button font-medium text-accent" onClick={() => setStep("email")}>Create an account</button>
         </p>
       </LoginLayout>
     );
@@ -237,54 +258,19 @@ export function LoginPage() {
     return (
       <LoginLayout>
         <h1 className="m-0 text-2xl font-bold text-ink">Enter your code</h1>
-        <p className="mt-2 text-sm text-subtle">
-          We sent a 6-digit code to <strong className="text-ink">{email.trim()}</strong>. It expires in 10 minutes.
-        </p>
-
+        <p className="mt-2 text-sm text-subtle">We sent a 6-digit code to <strong className="text-ink">{email.trim()}</strong>. It expires in 10 minutes.</p>
         {error && <div className="banner banner-error mt-4">{error}</div>}
-
         <form onSubmit={handleVerifyCode} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="code" className="text-sm font-medium text-ink">
-              Sign-in code
-            </label>
-            <input
-              id="code"
-              type="text"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
-              autoFocus
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="123456"
-              required
-              className="text-center text-lg tracking-[0.5em]"
-            />
+            <label htmlFor="code" className="text-sm font-medium text-ink">Sign-in code</label>
+            <input id="code" type="text" inputMode="numeric" pattern="\d{6}" maxLength={6} autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" required className="text-center text-lg tracking-[0.5em]" />
           </div>
-          <button type="submit" className="btn-primary w-full" disabled={code.trim().length !== 6 || submitting}>
-            {submitting ? "Verifying…" : "Sign in"}
-          </button>
+          <button type="submit" className="btn-primary w-full" disabled={code.trim().length !== 6 || submitting}>{submitting ? "Verifying…" : "Sign in"}</button>
         </form>
-
         <p className="mt-6 text-sm text-subtle">
           Didn't get it?{" "}
-          <button type="button" className="link-button font-medium text-ink" onClick={handleResend} disabled={submitting}>
-            Send a new code
-          </button>{" "}
-          or{" "}
-          <button
-            type="button"
-            className="link-button font-medium text-ink"
-            onClick={() => {
-              setStep("email");
-              setCode("");
-              setError(null);
-            }}
-          >
-            use a different email
-          </button>
-          .
+          <button type="button" className="link-button font-medium text-ink" onClick={handleResend} disabled={submitting}>Send a new code</button>{" "}or{" "}
+          <button type="button" className="link-button font-medium text-ink" onClick={() => { setStep("email"); setCode(""); setError(null); }}>use a different email</button>.
         </p>
       </LoginLayout>
     );
@@ -292,36 +278,16 @@ export function LoginPage() {
 
   return (
     <LoginLayout>
-      <button
-        type="button"
-        onClick={() => setStep("method")}
-        className="link-button mb-4 text-sm font-medium text-subtle hover:text-ink"
-      >
-        ← Back
-      </button>
+      <button type="button" onClick={() => setStep("method")} className="link-button mb-4 text-sm font-medium text-subtle hover:text-ink">← Back</button>
       <h1 className="m-0 text-2xl font-bold text-ink">Sign in with email</h1>
       <p className="mt-2 text-sm text-subtle">Enter your email to get a 6-digit sign-in code — no password to remember.</p>
-
       {error && <div className="banner banner-error mt-4">{error}</div>}
-
       <form onSubmit={handleRequestCode} className="mt-6 space-y-4">
         <div>
-          <label htmlFor="email" className="text-sm font-medium text-ink">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-            required
-            autoFocus
-          />
+          <label htmlFor="email" className="text-sm font-medium text-ink">Email</label>
+          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required autoFocus />
         </div>
-        <button type="submit" className="btn-primary w-full" disabled={!email.trim() || submitting}>
-          {submitting ? "Sending…" : "Send sign-in code"}
-        </button>
+        <button type="submit" className="btn-primary w-full" disabled={!email.trim() || submitting}>{submitting ? "Sending…" : "Send sign-in code"}</button>
       </form>
     </LoginLayout>
   );

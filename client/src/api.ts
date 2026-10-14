@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+const API_BASE = API_BASE_URL;
 
 /**
  * Identity Refactor U3: the SERVER session token only ever identifies a
@@ -14,6 +15,9 @@ export interface Session {
   token: string;
   /** Set client-side after OTP verify, for display only (e.g. the sidebar account block) — the server doesn't return it as part of the session. */
   email?: string;
+  firstName?: string;
+  lastName?: string;
+  picture?: string;
 }
 
 const SESSION_KEY = "signalai.session";
@@ -135,6 +139,27 @@ export async function requestOtp(email: string): Promise<void> {
  */
 export async function verifyOtp(email: string, code: string): Promise<Session> {
   return request<Session>("/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) });
+}
+
+
+/** Exchange a short-lived, single-use Google callback handoff for the SignalAI session. */
+export async function exchangeGoogleHandoff(handoff: string): Promise<Session> {
+  const res = await fetch(`${API_BASE}/auth/google/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ handoff }),
+  });
+  if (!res.ok) {
+    let message = "Google sign-in could not be completed";
+    try {
+      const body = await res.json();
+      message = body.error ?? message;
+    } catch {
+      // Keep a user-safe fallback when an upstream error is not JSON.
+    }
+    throw new ApiError(res.status, message);
+  }
+  return res.json() as Promise<Session>;
 }
 
 /** Onboarding wizard (R5): the vertical a tenant picked. null = hasn't gone through the wizard yet — 'other' is a real, explicit choice, not the same as unset. */

@@ -4,6 +4,10 @@ import type { Queryable } from "./types.js";
 export interface User {
   id: string;
   email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePictureUrl: string | null;
+  googleSubject: string | null;
   createdAt: Date;
   sessionVersion: number;
 }
@@ -11,6 +15,10 @@ export interface User {
 interface UserRow {
   id: string;
   email: string;
+  first_name: string | null;
+  last_name: string | null;
+  profile_picture_url: string | null;
+  google_subject: string | null;
   created_at: Date;
   session_version: number;
 }
@@ -19,6 +27,10 @@ function toUser(row: UserRow): User {
   return {
     id: row.id,
     email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    profilePictureUrl: row.profile_picture_url,
+    googleSubject: row.google_subject,
     createdAt: row.created_at,
     sessionVersion: row.session_version,
   };
@@ -39,6 +51,52 @@ export async function findOrCreateUserByEmail(pool: Queryable, email: string): P
     [normalized],
   );
   return toUser(result.rows[0]!);
+}
+
+/**
+ * Resolve a Google OIDC identity to the canonical SignalAI user. Google
+ * subject IDs are immutable; verified email is only used to connect an
+ * existing email-OTP account on the first Google sign-in.
+ */
+export async function findOrCreateUserByGoogle(
+  pool: Queryable,
+  profile: { sub: string; email: string; givenName?: string | null; familyName?: string | null; picture?: string | null },
+): Promise<User> {
+  const normalized = normalizeEmail(profile.email);
+  // A verified Google email can attach to a legacy email-OTP user exactly
+  // once. The immutable Google subject is globally unique via migration.
+  // coalesce preserves profile fields if Google omits them in a later login.
+  const result = await pool.query<UserRow>(
+    `insert into users (email, first_name, last_name, profile_picture_url, google_subject)
+     values ($1, $2, $3, $4, $5)
+     on conflict (email) do update set
+       first_name = coalesce(excluded.first_name, users.first_name),
+       last_name = coalesce(excluded.last_name, users.last_name),
+       profile_picture_url = coalesce(excluded.profile_picture_url, users.profile_picture_url),
+       google_subject = coalesce(users.google_subject, excluded.google_subject)
+     where users.google_subject is null or users.google_subject = excluded.google_subject
+     returning *`,
+    [normalized, profile.givenName?.trim() || null, profile.familyName?.trim() || null, profile.picture || null, profile.sub],
+  );
+  if (!result.rows[0]) throw new Error("google_identity_conflict");
+  const user = toUser(result.rows[0]);
+  if (user.googleSubject !== profile.sub) throw new Error("google_identity_conflict");
+  return user;
+}
+
+export async function updateUserProfile(
+  pool: Queryable,
+  userId: string,
+  profile: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null },
+): Promise<void> {
+  await pool.query(
+    `update users set
+       first_name = coalesce($2, first_name),
+       last_name = coalesce($3, last_name),
+       profile_picture_url = coalesce($4, profile_picture_url)
+     where id = $1`,
+    [userId, profile.firstName?.trim() || null, profile.lastName?.trim() || null, profile.profilePictureUrl || null],
+  );
 }
 
 export async function getUserById(pool: Pool, userId: string): Promise<User | null> {
