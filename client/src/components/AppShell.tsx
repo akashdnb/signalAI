@@ -148,6 +148,9 @@ function MobileAccountSheet({
   account,
   usage,
   email,
+  firstName,
+  lastName,
+  picture,
   onClose,
   onLogout,
 }: {
@@ -155,10 +158,15 @@ function MobileAccountSheet({
   account: AccountHealth | null;
   usage: UsageSummary | null;
   email?: string;
+  firstName?: string;
+  lastName?: string;
+  picture?: string;
   onClose: () => void;
   onLogout: () => void;
 }) {
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
+  const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
+  const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
   return (
     <BottomSheet title="Account" onClose={onClose}>
@@ -198,11 +206,13 @@ function MobileAccountSheet({
       )}
 
       <div className="mt-5 flex items-center gap-3 border-t border-line pt-4">
-        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-base font-semibold text-white">
-          {(email?.charAt(0) ?? "?").toUpperCase()}
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-base font-semibold text-white">
+          {picture ? (
+            <img src={picture} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+          ) : profileInitial}
         </span>
         <div>
-          <div className="text-base font-medium text-ink">{deriveDisplayName(email)}</div>
+          <div className="text-base font-medium text-ink">{profileName}</div>
           <div className="text-sm text-subtle">Owner</div>
         </div>
       </div>
@@ -229,16 +239,24 @@ function AccountHeader({
   account,
   usage,
   email,
+  firstName,
+  lastName,
+  picture,
   onLogout,
 }: {
   tenant: TenantSummary | null;
   account: AccountHealth | null;
   usage: UsageSummary | null;
   email?: string;
+  firstName?: string;
+  lastName?: string;
+  picture?: string;
   onLogout: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
+  const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
+  const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
   return (
     <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
@@ -296,11 +314,13 @@ function AccountHeader({
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-chip"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
-              {(email?.charAt(0) ?? "?").toUpperCase()}
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-sm font-semibold text-white">
+              {picture ? (
+                <img src={picture} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+              ) : profileInitial}
             </span>
             <span className="text-left leading-tight">
-              <span className="block text-sm font-medium text-ink">{deriveDisplayName(email)}</span>
+              <span className="block text-sm font-medium text-ink">{profileName}</span>
               <span className="block text-xs text-subtle">Owner</span>
             </span>
             <ChevronDownIcon className="h-4 w-4 text-subtle" />
@@ -564,11 +584,22 @@ export function AppShell() {
             className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
             onClick={() => setMobileAccountOpen(true)}
           >
-            {(session?.email?.charAt(0) ?? "?").toUpperCase()}
+            {session?.picture ? (
+              <img src={session.picture} alt="" referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" />
+            ) : (session?.firstName?.charAt(0) || session?.email?.charAt(0) || "?").toUpperCase()}
           </button>
         </header>
 
-        <AccountHeader tenant={tenant} account={account} usage={usage} email={session?.email} onLogout={handleLogout} />
+        <AccountHeader
+          tenant={tenant}
+          account={account}
+          usage={usage}
+          email={session?.email}
+          firstName={session?.firstName}
+          lastName={session?.lastName}
+          picture={session?.picture}
+          onLogout={handleLogout}
+        />
 
         {mobileAccountOpen && (
           <MobileAccountSheet
@@ -576,6 +607,9 @@ export function AppShell() {
             account={account}
             usage={usage}
             email={session?.email}
+            firstName={session?.firstName}
+            lastName={session?.lastName}
+            picture={session?.picture}
             onClose={() => setMobileAccountOpen(false)}
             onLogout={handleLogout}
           />
