@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { CheckCircleIcon, ChevronDownIcon, SettingsIcon, PlusIcon } from "../icons";
+import { CheckCircleIcon, ChevronDownIcon } from "../icons";
 import "./ConnectedAccountSwitcher.css";
 
 export type ConnectedAccountSwitcherOption = { id: string; handle: string; label: string; connected?: boolean };
@@ -15,29 +15,92 @@ const ACCOUNT_SCREENS = new Set(["inbox", "leads", "content", "analytics"]);
 function currentScreen() { return new URLSearchParams(window.location.search).get("screen") ?? "overview"; }
 function updatePreviewQuery(values: Record<string, string>) { const params = new URLSearchParams(window.location.search); params.set("preview", "precision-operations"); Object.entries(values).forEach(([key, value]) => params.set(key, value)); window.history.replaceState(null, "", window.location.pathname + "?" + params.toString()); }
 function InstagramContextFilter({ accounts, selectedAccountId, onSelect }: Pick<ConnectedAccountSwitcherProps, "accounts" | "selectedAccountId" | "onSelect">) {
-  const [value, setValue] = useState(selectedAccountId || "all"); const [target, setTarget] = useState<Element | null>(null); const screen = currentScreen();
-  useEffect(() => { const selector = screen === "leads" ? ".po-leads-filter-row" : screen === "analytics" ? ".po-analytics-controls" : ".po-screen-toolbar"; const sync = () => setTarget(document.querySelector(selector)); sync(); const frame = window.requestAnimationFrame(sync); return () => window.cancelAnimationFrame(frame); }, [screen]);
-  useEffect(() => { const next = new URLSearchParams(window.location.search).get("igAccount"); setValue(next && accounts.some(account => account.id === next) ? next : "all"); }, [accounts]);
+  const [value, setValue] = useState(selectedAccountId || "all");
+  const [target, setTarget] = useState<Element | null>(null);
+  const screen = currentScreen();
+  useEffect(() => {
+    const selector = screen === "leads" ? ".po-leads-filter-row" : screen === "analytics" ? ".po-analytics-controls" : ".po-screen-toolbar";
+    const sync = () => setTarget(document.querySelector(selector));
+    sync();
+    const frame = window.requestAnimationFrame(sync);
+    return () => window.cancelAnimationFrame(frame);
+  }, [screen]);
+  useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("igAccount");
+    setValue(next && accounts.some(account => account.id === next) ? next : "all");
+  }, [accounts]);
   if (!ACCOUNT_SCREENS.has(screen) || !target) return null;
   const label = screen === "inbox" ? "Instagram account" : "Account";
-  return createPortal(<label className="sai-account-switcher__search" style={{ margin: 0, minWidth: 0, maxWidth: "260px" }}><span style={{ color: "var(--po-color-muted)", fontSize: "11px", fontWeight: 750, whiteSpace: "nowrap" }}>{label}</span><select aria-label={`${label} filter`} value={value} onChange={event => { const next = event.target.value; setValue(next); if (next !== "all") onSelect(next); updatePreviewQuery({ igAccount: next }); window.dispatchEvent(new CustomEvent("signalai:account-filter-change", { detail: { accountId: next, screen } })); }} style={{ flex: 1, minWidth: 110, height: 36, border: 0, outline: 0, background: "transparent", color: "var(--po-color-ink)", fontSize: "12px", fontWeight: 700 }}><option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs reconnect" : ""}</option>)}</select><ChevronDownIcon aria-hidden="true" /></label>, target);
+  return createPortal(
+    <label className="sai-account-switcher__search" style={{ margin: 0, minWidth: 0, maxWidth: "260px" }}>
+      <span style={{ color: "var(--po-color-muted)", fontSize: "11px", fontWeight: 750, whiteSpace: "nowrap" }}>{label}</span>
+      <select aria-label={`${label} filter`} value={value} onChange={event => { const next = event.target.value; setValue(next); if (next !== "all") onSelect(next); updatePreviewQuery({ igAccount: next }); window.dispatchEvent(new CustomEvent("signalai:account-filter-change", { detail: { accountId: next, screen } })); }} style={{ flex: 1, minWidth: 110, height: 36, border: 0, outline: 0, background: "transparent", color: "var(--po-color-ink)", fontSize: "12px", fontWeight: 700 }}>
+        <option value="all">All accounts</option>
+        {accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs reconnect" : ""}</option>)}
+      </select>
+      <ChevronDownIcon aria-hidden="true" />
+    </label>,
+    target,
+  );
 }
 export function ConnectedAccountSwitcher({ workspaceName, accounts, selectedAccountId, onSelect, providerLabel, providerIcon, onManageAccounts, previewOnly }: ConnectedAccountSwitcherProps) {
-  void providerLabel; void providerIcon; void onManageAccounts; void previewOnly;
-  const [open, setOpen] = useState(false); const [createOpen, setCreateOpen] = useState(false); const [manageOpen, setManageOpen] = useState(false); const [workspaceDraft, setWorkspaceDraft] = useState(""); const [workspaceEditName, setWorkspaceEditName] = useState("");
+  void providerLabel;
+  void providerIcon;
+  void onManageAccounts;
+  void previewOnly;
+  const [open, setOpen] = useState(false);
   const [workspaceId, setWorkspaceId] = useState(() => new URLSearchParams(window.location.search).get("workspace") ?? "my-workspace");
-  const rootRef = useRef<HTMLDivElement>(null); const triggerRef = useRef<HTMLButtonElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const selectedWorkspace = WORKSPACES.find(workspace => workspace.id === workspaceId) ?? WORKSPACES[0]!;
-  useEffect(() => { if (!open && !createOpen && !manageOpen) return; const dismiss = (event: KeyboardEvent) => { if (event.key !== "Escape") return; event.preventDefault(); setOpen(false); setCreateOpen(false); setManageOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()); }; document.addEventListener("keydown", dismiss); return () => document.removeEventListener("keydown", dismiss); }, [open, createOpen, manageOpen]);
-  useEffect(() => { if (!open) return; const dismissOnOutsidePointer = (event: PointerEvent) => { if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false); }; document.addEventListener("pointerdown", dismissOnOutsidePointer); return () => document.removeEventListener("pointerdown", dismissOnOutsidePointer); }, [open]);
-  const selectWorkspace = (workspace: Workspace) => { setWorkspaceId(workspace.id); updatePreviewQuery({ workspace: workspace.id }); setOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()); };
-  const createWorkspace = () => { const name = workspaceDraft.trim(); if (!name) return; const next: Workspace = { id: `preview-${Date.now()}`, name, description: "Preview workspace", initials: name.slice(0, 2).toUpperCase() }; WORKSPACES.push(next); setWorkspaceId(next.id); setWorkspaceDraft(""); setCreateOpen(false); setOpen(false); updatePreviewQuery({ workspace: next.id }); };
-  const openManageWorkspace = () => { setOpen(false); setWorkspaceEditName(selectedWorkspace.name); setManageOpen(true); };
-  const saveWorkspace = () => { const name = workspaceEditName.trim(); if (!name) return; const workspace = WORKSPACES.find(item => item.id === selectedWorkspace.id); if (workspace) { workspace.name = name; workspace.initials = name.slice(0, 2).toUpperCase(); } setManageOpen(false); updatePreviewQuery({ workspace: selectedWorkspace.id }); };
+
+  useEffect(() => {
+    if (!open) return;
+    const dismissOnOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
+    };
+    document.addEventListener("pointerdown", dismissOnOutsidePointer);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOnOutsidePointer);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [open]);
+
+  const selectWorkspace = (workspace: Workspace) => {
+    setWorkspaceId(workspace.id);
+    updatePreviewQuery({ workspace: workspace.id });
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
   const screen = currentScreen();
-  return <><div className="sai-account-switcher" ref={rootRef}><button ref={triggerRef} type="button" className="sai-account-switcher__trigger" aria-label={`Switch workspace. Current workspace ${selectedWorkspace.name}`} aria-haspopup="menu" aria-expanded={open} aria-controls="sai-workspace-menu" onClick={() => setOpen(current => !current)}><span className="sai-account-switcher__provider-chip" aria-hidden="true">{selectedWorkspace.initials}</span><span className="sai-account-switcher__identity"><strong>{selectedWorkspace.name || workspaceName}</strong><small>Workspace</small></span><ChevronDownIcon className="sai-account-switcher__chevron" aria-hidden="true" /></button>
-  {open && <div id="sai-workspace-menu" className="sai-account-switcher__panel" role="menu" aria-label="Workspaces"><div className="sai-account-switcher__panel-heading"><div><strong>Workspaces</strong><small>Switch business context</small></div><span className="sai-account-switcher__provider-label">Workspace</span></div><div className="sai-account-switcher__options">{WORKSPACES.map(workspace => <button key={workspace.id} type="button" role="menuitemradio" aria-checked={workspace.id === selectedWorkspace.id} className={"sai-account-switcher__option" + (workspace.id === selectedWorkspace.id ? " is-selected" : "")} onClick={() => selectWorkspace(workspace)}><span className="sai-account-switcher__option-icon" aria-hidden="true">{workspace.initials}</span><span className="sai-account-switcher__option-copy"><strong>{workspace.name}</strong><small>{workspace.description}</small></span>{workspace.id === selectedWorkspace.id && <CheckCircleIcon className="sai-account-switcher__selected-icon" aria-hidden="true" />}</button>)}</div><div className="sai-account-switcher__footer"><button type="button" className="sai-account-switcher__manage" role="menuitem" onClick={() => setCreateOpen(true)}><PlusIcon aria-hidden="true" />Create workspace</button><button type="button" className="sai-account-switcher__manage" role="menuitem" onClick={openManageWorkspace}><SettingsIcon aria-hidden="true" />Manage workspace</button><p>Preview only · switching does not load or move real data.</p></div></div>}
-  {createOpen && <div className="po-modal-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && setCreateOpen(false)}><section className="po-modal" role="dialog" aria-modal="true" aria-labelledby="sai-create-workspace-title"><div className="po-modal-top"><span className="po-modal-icon"><PlusIcon /></span><button type="button" className="po-icon-button" aria-label="Close create workspace dialog" onClick={() => setCreateOpen(false)}>×</button></div><span className="po-eyebrow">WORKSPACE SETUP · PREVIEW</span><h2 id="sai-create-workspace-title">Create a workspace</h2><p>Keep connected accounts, automations, knowledge, leads, and team access separate.</p><label className="po-field-block">Workspace name<input autoFocus maxLength={60} value={workspaceDraft} onChange={event => setWorkspaceDraft(event.target.value)} placeholder="e.g. Acme Studio" /></label><div className="po-warning-note"><span>i</span><span><strong>Preview only</strong><small>This does not create a backend workspace.</small></span></div><div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={() => setCreateOpen(false)}>Cancel</button><button type="button" className="po-button po-button--primary" disabled={!workspaceDraft.trim()} onClick={createWorkspace}>Create workspace</button></div></section></div>}
-  {manageOpen && <div className="po-modal-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && setManageOpen(false)}><section className="po-modal" role="dialog" aria-modal="true" aria-labelledby="sai-manage-workspace-title"><div className="po-modal-top"><span className="po-modal-icon"><SettingsIcon /></span><button type="button" className="po-icon-button" aria-label="Close workspace management dialog" onClick={() => setManageOpen(false)}>×</button></div><span className="po-eyebrow">WORKSPACE · PREVIEW</span><h2 id="sai-manage-workspace-title">Manage workspace</h2><p>Update the workspace identity. Connected accounts, automations, knowledge, leads, and team access remain scoped to this workspace.</p><label className="po-field-block">Workspace name<input autoFocus maxLength={60} value={workspaceEditName} onChange={event => setWorkspaceEditName(event.target.value)} /></label><div className="po-warning-note"><span>i</span><span><strong>Preview only</strong><small>No backend workspace or membership data is changed.</small></span></div><div className="po-modal-footer"><button type="button" className="po-button po-button--secondary" onClick={() => setManageOpen(false)}>Cancel</button><button type="button" className="po-button po-button--primary" disabled={!workspaceEditName.trim()} onClick={saveWorkspace}>Save changes</button></div></section></div>}
-  </div>{ACCOUNT_SCREENS.has(screen) && <InstagramContextFilter accounts={accounts} selectedAccountId={selectedAccountId} onSelect={onSelect} />}</>;
+  return <>
+    <div className="sai-account-switcher" ref={rootRef}>
+      <button ref={triggerRef} type="button" className="sai-account-switcher__trigger" aria-label={`Switch workspace. Current workspace ${selectedWorkspace.name || workspaceName}`} aria-haspopup="menu" aria-expanded={open} aria-controls="sai-workspace-menu" onClick={() => setOpen(current => !current)}>
+        <span className="sai-account-switcher__provider-chip" aria-hidden="true">{selectedWorkspace.initials}</span>
+        <span className="sai-account-switcher__identity"><strong>{selectedWorkspace.name || workspaceName}</strong><small>Workspace</small></span>
+        <ChevronDownIcon className="sai-account-switcher__chevron" aria-hidden="true" />
+      </button>
+      {open && <div id="sai-workspace-menu" className="sai-account-switcher__panel" role="menu" aria-label="Switch workspace">
+        <div className="sai-account-switcher__panel-heading">
+          <div><strong>Switch workspace</strong><small>Select the business context you want to work in.</small></div>
+        </div>
+        <div className="sai-account-switcher__options">
+          {WORKSPACES.map(workspace => <button key={workspace.id} type="button" role="menuitemradio" aria-checked={workspace.id === selectedWorkspace.id} className={"sai-account-switcher__option" + (workspace.id === selectedWorkspace.id ? " is-selected" : "")} onClick={() => selectWorkspace(workspace)}>
+            <span className="sai-account-switcher__option-icon" aria-hidden="true">{workspace.initials}</span>
+            <span className="sai-account-switcher__option-copy"><strong>{workspace.name}</strong><small>{workspace.description}</small></span>
+            {workspace.id === selectedWorkspace.id && <CheckCircleIcon className="sai-account-switcher__selected-icon" aria-hidden="true" />}
+          </button>)}
+        </div>
+      </div>}
+    </div>
+    {ACCOUNT_SCREENS.has(screen) && <InstagramContextFilter accounts={accounts} selectedAccountId={selectedAccountId} onSelect={onSelect} />}
+  </>;
 }
