@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen, type PreviewPalette } from "./PrecisionOperationsFullScreens";
 import { Logo } from "../components/Logo";
 import {
@@ -84,11 +84,10 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resi
   onToggleCollapsed: () => void;
   width: number;
   resizing: boolean;
-  resizeOffset: React.MutableRefObject<number>;
-  onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onResizeMove: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onResizeEnd: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onResizeKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onResizeMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onResizeEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onResizeKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   onResetWidth: () => void;
 }) {
   const selectedScreen = screen === "builder" ? "automations" : screen === "lead-detail" ? "leads" : screen;
@@ -979,26 +978,26 @@ export function PrecisionOperationsPreviewPage() {
     params.set("sidebar", next ? "collapsed" : "expanded");
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
   };
-  const resizeSidebarStart = (event: React.PointerEvent<HTMLDivElement>) => {
+  const resizeSidebarStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (sidebarCollapsed || event.pointerType === "touch" && window.matchMedia("(max-width: 760px)").matches) return;
     event.preventDefault();
     sidebarResizeOffset.current = event.clientX - event.currentTarget.getBoundingClientRect().left;
     event.currentTarget.setPointerCapture(event.pointerId);
     setSidebarResizing(true);
   };
-  const resizeSidebarMove = (event: React.PointerEvent<HTMLDivElement>) => {
+  const resizeSidebarMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!sidebarResizing || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const root = event.currentTarget.parentElement;
     if (!root) return;
     const rootLeft = root.getBoundingClientRect().left;
-    const nextWidth = Math.max(180, Math.min(280, Math.round(event.clientX - rootLeft - sidebarResizeOffset.current)));
+    const nextWidth = Math.max(180, Math.min(280, Math.round(event.clientX - rootLeft - sidebarResizeOffset.current + 4)));
     setSidebarWidth(nextWidth);
   };
-  const resizeSidebarEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+  const resizeSidebarEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setSidebarResizing(false);
   };
-  const resizeSidebarByKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const resizeSidebarByKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     let next: number | null = null;
     const step = event.shiftKey ? 20 : 10;
     if (event.key === "ArrowLeft") next = sidebarWidth - step;
@@ -1117,5 +1116,5 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} resizeOffset={sidebarResizeOffset} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
