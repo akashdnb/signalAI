@@ -903,7 +903,6 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
   const notificationsRef = useDismissOnOutside(notificationsOpen, () => setNotificationsOpen(false));
   const profileRef = useDismissOnOutside(profileOpen, () => setProfileOpen(false));
   const profileTriggerRef = useRef<HTMLButtonElement>(null);
-  const activeInstagramAccount = previewInstagramAccounts.find(account => account.id === instagramAccount) ?? previewInstagramAccounts[0]!;
   useEffect(() => {
     if (!profileOpen) return;
     const frame = window.requestAnimationFrame(() => {
@@ -989,7 +988,7 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
           <span className="po-profile-identity"><strong>Alex Morgan</strong><small>Owner · sample user</small></span>
           <ChevronDownIcon className="po-profile-chevron" />
         </button>
-        {profileOpen && <div id="po-profile-menu" className="po-dropdown po-profile-menu" role="menu" aria-label="Account and connected Instagram" onKeyDown={handleProfileMenuKeyDown}>
+        {profileOpen && <div id="po-profile-menu" className="po-dropdown po-profile-menu" role="menu" aria-label="Alex Morgan account menu" onKeyDown={handleProfileMenuKeyDown}>
           <div className="po-profile-menu-identity">
             <span className="po-profile-avatar">A</span>
             <span><strong>Alex Morgan</strong><small>Owner · sample user</small></span>
