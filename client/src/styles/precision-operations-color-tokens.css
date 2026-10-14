@@ -717,3 +717,47 @@ body[data-po-palette="amber-minimal"] .po-preview-app.is-dark { --signalai-logo-
 .po-preview-app .po-appearance-palette-option[data-palette="ocean-blue"] { --po-appearance-swatch-1:#075985; --po-appearance-swatch-2:#0284c7; --po-appearance-swatch-3:#38bdf8; --po-appearance-swatch-4:#e0f2fe; }
 .po-preview-app .po-appearance-palette-option[data-palette="rose-graphite"] { --po-appearance-swatch-1:#9f1239; --po-appearance-swatch-2:#e11d48; --po-appearance-swatch-3:#fb7185; --po-appearance-swatch-4:#fff1f2; }
 .po-preview-app .po-appearance-palette-option[data-palette="amber-minimal"] { --po-appearance-swatch-1:#92400e; --po-appearance-swatch-2:#d97706; --po-appearance-swatch-3:#fbbf24; --po-appearance-swatch-4:#fffbeb; }
+
+/* Preview focus shadows and light/dark thumbnails resolve from the active
+   semantic primary token. Each palette has its own dark surface preview. */
+body[data-po-palette] .po-preview-app {
+  --po-color-focus-shadow: color-mix(in srgb, var(--po-color-primary) 12%, transparent);
+  --po-color-focus-shadow-strong: color-mix(in srgb, var(--po-color-primary) 20%, transparent);
+  --po-color-focus-shadow-dark: color-mix(in srgb, var(--po-color-primary) 32%, transparent);
+}
+body[data-po-palette="navy-cobalt"] .po-preview-app {
+  --po-color-mode-light-canvas:#f1f5fa; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#e2e8f0; --po-color-mode-light-accent:#1e3a8a;
+  --po-color-mode-dark-canvas:#0b1220; --po-color-mode-dark-surface:#111827; --po-color-mode-dark-sidebar:#172033; --po-color-mode-dark-accent:#60a5fa;
+}
+body[data-po-palette="teal-emerald"] .po-preview-app {
+  --po-color-mode-light-canvas:#f3faf7; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#dceee6; --po-color-mode-light-accent:#065f4a;
+  --po-color-mode-dark-canvas:#071c1a; --po-color-mode-dark-surface:#0c2925; --po-color-mode-dark-sidebar:#12372f; --po-color-mode-dark-accent:#34d399;
+}
+body[data-po-palette="slate-cyan"] .po-preview-app {
+  --po-color-mode-light-canvas:#f1f7fa; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#dce8ee; --po-color-mode-light-accent:#0f172a;
+  --po-color-mode-dark-canvas:#081724; --po-color-mode-dark-surface:#0d2333; --po-color-mode-dark-sidebar:#123348; --po-color-mode-dark-accent:#22d3ee;
+}
+body[data-po-palette="forest-slate"] .po-preview-app {
+  --po-color-mode-light-canvas:#f4f8f3; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#deeadc; --po-color-mode-light-accent:#14532d;
+  --po-color-mode-dark-canvas:#0d1c15; --po-color-mode-dark-surface:#14271b; --po-color-mode-dark-sidebar:#1d3827; --po-color-mode-dark-accent:#4ade80;
+}
+body[data-po-palette="orange-amber"] .po-preview-app {
+  --po-color-mode-light-canvas:#fff8f1; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#f2e4d6; --po-color-mode-light-accent:#c2410c;
+  --po-color-mode-dark-canvas:#21170f; --po-color-mode-dark-surface:#2a1d13; --po-color-mode-dark-sidebar:#382819; --po-color-mode-dark-accent:#fb923c;
+}
+body[data-po-palette="neutral-slate"] .po-preview-app {
+  --po-color-mode-light-canvas:#f5f7fa; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#e3e8ef; --po-color-mode-light-accent:#334155;
+  --po-color-mode-dark-canvas:#11151b; --po-color-mode-dark-surface:#1b2028; --po-color-mode-dark-sidebar:#242b35; --po-color-mode-dark-accent:#cbd5e1;
+}
+body[data-po-palette="ocean-blue"] .po-preview-app {
+  --po-color-mode-light-canvas:#f1f8fc; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#d9e9f3; --po-color-mode-light-accent:#075985;
+  --po-color-mode-dark-canvas:#081c2c; --po-color-mode-dark-surface:#0d293d; --po-color-mode-dark-sidebar:#14364d; --po-color-mode-dark-accent:#38bdf8;
+}
+body[data-po-palette="rose-graphite"] .po-preview-app {
+  --po-color-mode-light-canvas:#fff6f7; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#f2dfe4; --po-color-mode-light-accent:#9f1239;
+  --po-color-mode-dark-canvas:#21151a; --po-color-mode-dark-surface:#2b1c23; --po-color-mode-dark-sidebar:#39242d; --po-color-mode-dark-accent:#fb7185;
+}
+body[data-po-palette="amber-minimal"] .po-preview-app {
+  --po-color-mode-light-canvas:#fffbef; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#f0e4ca; --po-color-mode-light-accent:#92400e;
+  --po-color-mode-dark-canvas:#1e1810; --po-color-mode-dark-surface:#2a2116; --po-color-mode-dark-sidebar:#372b1b; --po-color-mode-dark-accent:#fbbf24;
+}
