@@ -18,4 +18,3 @@ const sampleConversations = [
   { handle:"@maya_runs", preview:"Is this available for beginners?", time:"27m", status:"AI handling", tone:"purple", initial:"MR" },
 ];
 
-/* ...UNCHANGED_CODE_BELOW_SETTINGS_COMPONENT... */
