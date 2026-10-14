@@ -252,7 +252,8 @@ export function SettingsScreen({ theme, palette, onChangeTheme, onChangePalette 
     const screen = params.get("screen");
     const requested = params.get("settingsSection")
       ?? (screen === "team" ? "Team & access" : screen === "billing" ? "Plan & billing" : null);
-    return requested && settingsSections.includes(requested as SettingsSection) ? requested as SettingsSection : "Appearance";
+    const normalized = requested === "Fields" ? "Lead fields" : requested;
+    return normalized && settingsSections.includes(normalized as SettingsSection) ? normalized as SettingsSection : "Appearance";
   });
   const [notice,setNotice]=useState("");
   const [newField,setNewField]=useState("");
