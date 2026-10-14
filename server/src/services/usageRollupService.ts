@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { getDailyTokenTotals } from "../db/tokenUsage.js";
 import { upsertDailyUsageRollup, listUnsyncedRollups, markRollupSynced } from "../db/dailyUsageRollup.js";
 import { getTenant } from "../db/tenants.js";
+import { getWorkspaceCoverage, getBillingAccount } from "../db/billingAccounts.js";
 import { getStripeClient, isBillingConfigured } from "../lib/stripeClient.js";
 import { Sentry } from "../lib/sentry.js";
 
@@ -49,12 +50,24 @@ export async function syncUsageRollupsToStripe(pool: Pool): Promise<{ reported: 
   let resolved = 0;
 
   for (const rollup of rollups) {
-    const tenant = await getTenant(pool, rollup.tenantId);
-    const canReport =
-      isBillingConfigured() &&
-      !!config.stripeMeterEventName &&
-      tenant?.billingStatus === "active" &&
-      !!tenant.stripeCustomerId;
+    // Agency Bulk Billing: a plan-covered workspace reports its usage under
+    // the PLAN's Stripe customer, not its own. Multiple covered workspaces'
+    // same-day meter events share that customer (each keeps its own unique
+    // identifier = rollup.id, so none is deduped away) and Stripe sums them
+    // into the plan's single metered line — the aggregate the agency pays.
+    // A workspace with no active plan falls back to its own per-tenant
+    // subscription, exactly as before.
+    const coverage = await getWorkspaceCoverage(pool, rollup.tenantId);
+    let reportCustomerId: string | null = null;
+    if (coverage && coverage.billingStatus === "active") {
+      const account = await getBillingAccount(pool, coverage.billingAccountId);
+      reportCustomerId = account?.stripeCustomerId ?? null;
+    } else {
+      const tenant = await getTenant(pool, rollup.tenantId);
+      if (tenant?.billingStatus === "active") reportCustomerId = tenant.stripeCustomerId;
+    }
+
+    const canReport = isBillingConfigured() && !!config.stripeMeterEventName && !!reportCustomerId;
 
     if (!canReport) {
       await markRollupSynced(pool, rollup.id);
@@ -65,13 +78,13 @@ export async function syncUsageRollupsToStripe(pool: Pool): Promise<{ reported: 
     try {
       const stripe = getStripeClient();
       const totalTokens = rollup.promptTokens + rollup.completionTokens;
-      // Stripe Billing Meter Events: one event per (tenant, day) — the
-      // meter itself (configured on the Stripe dashboard, named by
-      // stripeMeterEventName) is what turns this into a metered price
-      // line item on the tenant's subscription.
+      // Stripe Billing Meter Events: one event per (tenant, day) reported to
+      // whichever customer actually pays (the plan's, or the tenant's own) —
+      // the meter (named by stripeMeterEventName) turns this into a metered
+      // line item on that customer's subscription.
       await stripe.billing.meterEvents.create({
         event_name: config.stripeMeterEventName,
-        payload: { value: String(totalTokens), stripe_customer_id: tenant.stripeCustomerId! },
+        payload: { value: String(totalTokens), stripe_customer_id: reportCustomerId! },
         timestamp: Math.floor(new Date(rollup.usageDate).getTime() / 1000),
         // Stripe enforces uniqueness on this within a rolling 24h+ window
         // — rollup.id is stable per (tenant, day), so a retry after the

@@ -4,7 +4,8 @@ import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { requireTenantRole, verifyBearerSession } from "../lib/tenantAuth.js";
 import { normalizeEmail, getUserById } from "../db/users.js";
-import { getTenant } from "../db/tenants.js";
+import { getTenant, updateTenant } from "../db/tenants.js";
+import { validateWorkspaceName, validateWorkspaceDescription } from "../lib/workspaceValidation.js";
 import {
   createTenantInvitation,
   getPendingInvitationForEmail,
@@ -44,6 +45,43 @@ function isValidEmail(value: unknown): value is string {
 function isInvitationRole(value: unknown): value is "admin" | "member" {
   return value === "admin" || value === "member";
 }
+
+/**
+ * Agency Workspaces: edit a workspace's display fields. Owner/admin only —
+ * renaming a workspace changes what every member sees in the switcher and
+ * header. `name` and `description` are validated against PII and length
+ * (R14-05) before the write. A request that changes neither field is a 400,
+ * not a silent no-op.
+ */
+workspaceManagementRouter.patch(
+  "/tenants/:tenantId",
+  requireTenantRole("owner", "admin"),
+  async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const fields: { name?: string; description?: string | null } = {};
+
+    if ("name" in body) {
+      const name = validateWorkspaceName(body.name);
+      if (!name.ok) return res.status(400).json({ error: name.error });
+      fields.name = name.value;
+    }
+    if ("description" in body) {
+      const description = validateWorkspaceDescription(body.description);
+      if (!description.ok) return res.status(400).json({ error: description.error });
+      fields.description = description.value;
+    }
+    if (fields.name === undefined && fields.description === undefined) {
+      return res.status(400).json({ error: "provide a name or description to update" });
+    }
+
+    const tenant = await updateTenant(getPool(), req.params.tenantId!, fields);
+    if (!tenant) return res.status(404).json({ error: "tenant not found" });
+
+    return res.json({
+      workspace: { tenantId: tenant.id, name: tenant.name, description: tenant.description },
+    });
+  },
+);
 
 workspaceManagementRouter.get(
   "/tenants/:tenantId/members",

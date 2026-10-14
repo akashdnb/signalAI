@@ -31,6 +31,8 @@ import { leadScoringRulesRouter } from "./routes/leadScoringRules.js";
 import { fieldDefinitionsRouter } from "./routes/fieldDefinitions.js";
 import { onboardingRouter } from "./routes/onboarding.js";
 import { workspaceManagementRouter } from "./routes/workspaceManagement.js";
+import { workspacesRouter } from "./routes/workspaces.js";
+import { billingAccountsRouter } from "./routes/billingAccounts.js";
 import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
@@ -82,6 +84,8 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(googleAuthRouter);
+  app.use(workspacesRouter);
+  app.use(billingAccountsRouter);
   app.use(workspaceManagementRouter);
 
   app.use(paginationRouter);

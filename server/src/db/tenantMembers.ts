@@ -11,6 +11,19 @@ export async function isTenantMember(pool: Queryable, tenantId: string, userId: 
   return (result.rowCount ?? 0) > 0;
 }
 
+/** The caller's role in a tenant, or null if they are not a member. Used by agency-plan management to require workspace ownership before covering it. */
+export async function getTenantMemberRole(
+  pool: Queryable,
+  tenantId: string,
+  userId: string,
+): Promise<"owner" | "admin" | "member" | null> {
+  const result = await pool.query<{ role: "owner" | "admin" | "member" }>(
+    `select role from tenant_members where tenant_id = $1 and user_id = $2 limit 1`,
+    [tenantId, userId],
+  );
+  return result.rows[0]?.role ?? null;
+}
+
 export async function addTenantMember(
   pool: Queryable,
   tenantId: string,
@@ -36,6 +49,44 @@ export async function listTenantsForUser(pool: Queryable, userId: string): Promi
     [userId],
   );
   return result.rows.map((row) => ({ tenantId: row.tenant_id, role: row.role }));
+}
+
+/** A membership role as stored in tenant_members — owner at creation, admin/member via invitations. */
+export type WorkspaceRole = "owner" | "admin" | "member";
+
+export interface WorkspaceSummary {
+  tenantId: string;
+  name: string;
+  description: string | null;
+  role: WorkspaceRole;
+}
+
+/**
+ * Agency Workspaces: the full list a logged-in user can switch between,
+ * joined with the display fields the switcher needs (name, description).
+ * `listTenantsForUser` above returns only ids/roles for the per-request
+ * membership check; this is the richer read for the BUI workspace menu.
+ */
+export async function listWorkspacesForUser(pool: Queryable, userId: string): Promise<WorkspaceSummary[]> {
+  const result = await pool.query<{
+    tenant_id: string;
+    name: string;
+    description: string | null;
+    role: WorkspaceRole;
+  }>(
+    `select tm.tenant_id, t.name, t.description, tm.role
+       from tenant_members tm
+       join tenants t on t.id = tm.tenant_id
+      where tm.user_id = $1
+      order by tm.created_at`,
+    [userId],
+  );
+  return result.rows.map((row) => ({
+    tenantId: row.tenant_id,
+    name: row.name,
+    description: row.description,
+    role: row.role,
+  }));
 }
 
 export interface TenantMemberSummary {

@@ -99,6 +99,14 @@ export const config = {
   get stripeGrowthPriceId() {
     return process.env.STRIPE_GROWTH_PRICE_ID ?? "";
   },
+  // Agency Bulk Billing: the per-workspace (licensed, quantity-based) price
+  // for the agency plan. The subscription's quantity tracks how many
+  // workspaces the plan covers; the metered token line (stripeMeterEventName)
+  // rides on the same subscription. Optional — unset degrades the agency
+  // checkout to a clear 503, same shape as every other Stripe price here.
+  get stripeAgencyPriceId() {
+    return process.env.STRIPE_AGENCY_PRICE_ID ?? "";
+  },
   // Phase 2B Daily Usage Rollup -> Stripe Metered Billing: the Billing
   // Meter's event_name, configured on the Stripe dashboard side. Unset
   // means the rollup job still aggregates internally (that's the real
