@@ -10,6 +10,7 @@ import "./styles/precision-operations-final-fixes.css";
 import "./styles/precision-operations-color-tokens.css";
 import "./styles/precision-operations-palette-switcher.css";
 import "./styles/workspace-settings-preview.css";
+import "./styles/precision-operations-settings-legacy-override.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() => import("./pages/PrecisionOperationsPreviewPage").then((module) => ({ default: module.PrecisionOperationsPreviewPage })));
@@ -43,7 +44,38 @@ function PreviewPaletteBridge() {
     const isPreview = params.get("preview") === "precision-operations" || window.location.pathname === "/redesign-preview";
     if (isPreview) document.body.dataset.poPalette = previewPalettes.has(palette) ? palette : "navy-cobalt";
     else delete document.body.dataset.poPalette;
-    return () => { delete document.body.dataset.poPalette; };
+
+    const syncSettingsUrl = (url: string | URL | null | undefined) => {
+      if (!url) return;
+      const next = new URL(String(url), window.location.href);
+      const isSettings = next.searchParams.get("preview") === "precision-operations" && next.searchParams.get("screen") === "settings";
+      if (isSettings && !next.searchParams.get("settingsSection")) {
+        next.searchParams.set("settingsSection", "Team & access");
+        return next.toString();
+      }
+      return next.toString();
+    };
+    const originalPushState = window.history.pushState.bind(window.history);
+    const originalReplaceState = window.history.replaceState.bind(window.history);
+    const wrappedPushState: History["pushState"] = (state, title, url) => originalPushState(state, title, syncSettingsUrl(url));
+    const wrappedReplaceState: History["replaceState"] = (state, title, url) => originalReplaceState(state, title, syncSettingsUrl(url));
+    window.history.pushState = wrappedPushState;
+    window.history.replaceState = wrappedReplaceState;
+    const syncBody = () => {
+      const current = new URL(window.location.href);
+      if (current.searchParams.get("preview") === "precision-operations" && current.searchParams.get("screen") === "settings") document.body.dataset.poSettingsRedesign = "true";
+      else delete document.body.dataset.poSettingsRedesign;
+    };
+    syncBody();
+    const onPopState = () => syncBody();
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      delete document.body.dataset.poPalette;
+      delete document.body.dataset.poSettingsRedesign;
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      window.removeEventListener("popstate", onPopState);
+    };
   }, []);
   return null;
 }
