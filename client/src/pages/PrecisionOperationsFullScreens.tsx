@@ -4,7 +4,7 @@ import { AutomationIcon, InstagramMarkIcon, SearchIcon, PlusIcon, ChevronDownIco
 import { Logo } from "../components/Logo";
 
 export type FullPreviewScreen = "overview" | "automations" | "builder" | "inbox" | "leads" | "lead-detail" | "knowledge" | "content" | "analytics" | "integrations" | "team" | "billing" | "settings" | "docs" | "login" | "connect-error" | "invite";
-export type PreviewPalette = "navy-cobalt" | "teal-emerald" | "slate-cyan" | "forest-slate" | "orange-amber" | "neutral-slate" | "ocean-blue" | "rose-graphite" | "amber-minimal";
+export type PreviewPalette = "navy-cobalt" | "teal-emerald" | "slate-cyan" | "forest-slate" | "orange-amber" | "neutral-slate" | "ocean-blue" | "rose-graphite" | "amber-minimal" | "ocean-sky" | "jade-mint" | "rose-slate" | "amber-graphite";
 type Go = (screen: FullPreviewScreen) => void;
 function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?: string }) { return <span className={"po-tag po-tag--" + tone}>{children}</span>; }
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) { return <section className={"po-content-panel " + className}>{children}</section>; }
