@@ -428,3 +428,26 @@
     transition: none;
   }
 }
+
+/* The legacy preview has intentionally high-specificity control reset rules.
+   Keep this search field borderless inside its own wrapper so it never picks up
+   a second outline or the global 40px text-input padding. */
+body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):focus,
+body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):focus-visible {
+  box-sizing: border-box !important;
+  height: 37px !important;
+  min-height: 0 !important;
+  max-height: 37px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: var(--po-color-transparent) !important;
+}
+body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search:focus-within {
+  border-color: var(--po-color-primary);
+  box-shadow: 0 0 0 3px var(--po-color-primary-soft);
+}
