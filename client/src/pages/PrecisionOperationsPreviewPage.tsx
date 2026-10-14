@@ -123,7 +123,7 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
     integrations: { eyebrow: "CONNECTED ACCOUNTS", title: "Integrations", description: "Understand which Instagram accounts are connected and whether they are healthy." },
     team: { eyebrow: "WORKSPACE ACCESS", title: "Team", description: "Manage workspace members, invitations, and roles." },
     billing: { eyebrow: "PLAN & USAGE", title: "Billing", description: "Understand plan state, usage, quota limits, and billing availability." },
-    settings: { eyebrow: "WORKSPACE CONFIGURATION", title: "Settings", description: "Configure lead fields, AI behavior, forbidden topics, escalation, and scoring." },
+    settings: { eyebrow: "WORKSPACE CONFIGURATION", title: "Settings", description: "Manage appearance, workspace access, plan and usage, and automation behavior." },
     docs: { eyebrow: "GUIDANCE", title: "Documentation", description: "Browse setup, workflow, publishing, analytics, and troubleshooting guidance." },
     login: { eyebrow: "SIGN IN", title: "Sign in", description: "Access the SignalAI workspace." },
     "connect-error": { eyebrow: "CONNECTION RECOVERY", title: "Instagram connection", description: "Recover from an unsuccessful Instagram OAuth callback." },
