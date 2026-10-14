@@ -287,7 +287,7 @@ body:has(.po-preview-app.is-dark) {
 /* Compatibility tokens for legacy illustrations and uncommon states. Every
    retained color value in the preview is declared here rather than embedded
    in a component stylesheet. Use a semantic token when updating these states. */
-.po-preview-app {
+body:has(.po-preview-app) {
   --po-color-white: #ffffff;
   --po-color-black: #000000;
   --po-color-transparent: transparent;
