@@ -457,3 +457,151 @@ body:has(.po-preview-app) .po-preview-app .po-composer textarea {
     justify-self: start;
   }
 }
+
+/* Explicit row geometry for the three inline forms that previously drifted.
+ * The old rows aligned the full label box (caption + control) inconsistently,
+ * while older rules also let input padding increase the visual control height.
+ * Grid gives the control and action their own boxes with the same bottom edge. */
+body:has(.po-preview-app) .po-preview-app .po-retrieval-test .po-test-question {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  align-items: end !important;
+  justify-items: stretch;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+body:has(.po-preview-app) .po-preview-app .po-retrieval-test .po-test-question > label {
+  display: grid !important;
+  grid-template-rows: auto 40px;
+  align-content: end;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 6px;
+  line-height: 1.35;
+}
+body:has(.po-preview-app) .po-preview-app .po-retrieval-test .po-test-question > label > input {
+  display: block;
+  width: 100%;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 0 12px;
+}
+body:has(.po-preview-app) .po-preview-app .po-retrieval-test .po-test-question > .po-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  align-self: end !important;
+  margin: 0 !important;
+  padding: 0 16px;
+  line-height: 1;
+}
+
+body:has(.po-preview-app) .po-preview-app #po-add-field {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) max-content;
+  align-items: end !important;
+  gap: 12px;
+  min-width: 0;
+}
+body:has(.po-preview-app) .po-preview-app #po-add-field > label {
+  display: grid !important;
+  grid-template-rows: auto 40px;
+  align-content: end;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.35;
+}
+body:has(.po-preview-app) .po-preview-app #po-add-field > label > input,
+body:has(.po-preview-app) .po-preview-app #po-add-field > label > select {
+  width: 100%;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  box-sizing: border-box;
+  margin: 0 !important;
+}
+body:has(.po-preview-app) .po-preview-app #po-add-field > .po-button {
+  width: auto !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  align-self: end !important;
+  margin: 0 !important;
+  padding: 0 14px;
+}
+
+body:has(.po-preview-app) .po-preview-app #po-scoring-rule {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 96px max-content;
+  align-items: end !important;
+  gap: 12px;
+  min-width: 0;
+}
+body:has(.po-preview-app) .po-preview-app #po-scoring-rule > label {
+  display: grid !important;
+  grid-template-rows: auto 40px;
+  align-content: end;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.35;
+}
+body:has(.po-preview-app) .po-preview-app #po-scoring-rule > label > input {
+  width: 100%;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  box-sizing: border-box;
+  margin: 0 !important;
+}
+body:has(.po-preview-app) .po-preview-app #po-scoring-rule > .po-button {
+  width: auto !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px;
+  align-self: end !important;
+  margin: 0 !important;
+  padding: 0 14px;
+}
+
+@media (max-width: 760px) {
+  body:has(.po-preview-app) .po-preview-app #po-add-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body:has(.po-preview-app) .po-preview-app #po-add-field > .po-button {
+    justify-self: start;
+  }
+}
+@media (max-width: 640px) {
+  body:has(.po-preview-app) .po-preview-app .po-retrieval-test .po-test-question {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body:has(.po-preview-app) .po-preview-app .po-retrieval-test .po-test-question > .po-button {
+    justify-self: start;
+  }
+  body:has(.po-preview-app) .po-preview-app #po-scoring-rule {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+  body:has(.po-preview-app) .po-preview-app #po-scoring-rule > .po-button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
