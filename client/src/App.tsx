@@ -10,6 +10,7 @@ import "./styles/precision-operations-final-fixes.css";
 import "./styles/precision-operations-color-tokens.css";
 import "./styles/precision-operations-palette-switcher.css";
 import "./styles/precision-settings-preview.css";
+import "./styles/precision-settings-preview-fixes.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() => import("./pages/PrecisionOperationsPreviewPage").then((module) => ({ default: module.PrecisionOperationsPreviewPage })));
