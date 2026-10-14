@@ -403,9 +403,9 @@
 .po-preview-app .po-token-meter { width: 196px; }
 .po-preview-app .po-token-meter > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 7px; color: var(--po-muted); font-size: 14px; white-space: nowrap; }
 .po-preview-app .po-token-meter strong { color: var(--po-secondary); font-size: 14px; font-weight: 700; white-space: nowrap; }
-.po-preview-app .po-token-track, .po-preview-app .po-usage-track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--po-color-legacy-hex-e7dff8); }
+.po-preview-app .po-token-track, .po-preview-app .po-usage-track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--po-color-primary-soft); }
 .po-preview-app .po-token-track { margin-top: 5px; }
-.po-preview-app .po-token-track span, .po-preview-app .po-usage-track span { display: block; height: 100%; border-radius: inherit; background: var(--po-info); }
+.po-preview-app .po-token-track span, .po-preview-app .po-usage-track span { display: block; height: 100%; border-radius: inherit; background: var(--po-color-chart-1); }
 .po-preview-app .po-token-track span { width: 72.7%; }
 .po-preview-app .po-global-menu-wrap { position: relative; }
 .po-preview-app .po-global-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--po-color-transparent); border-radius: 6px; background: var(--po-color-transparent); color: var(--po-secondary); font-size: 20px; }
