@@ -270,6 +270,7 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
         picture: user.profilePictureUrl,
       },
     });
+    for (const [key, value] of handoffTokens) if (value.expiresAt <= Date.now()) handoffTokens.delete(key);
     const destination = safeReturnTo(statePayload.returnTo);
     const redirect = new URL(destination, config.appBaseUrl);
     redirect.searchParams.set("google_auth", "success");
