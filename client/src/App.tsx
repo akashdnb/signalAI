@@ -36,6 +36,14 @@ const InvitationAcceptPage = lazy(() => import("./pages/InvitationAcceptPage").t
 const previewPalettes = new Set(["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate", "ocean-blue", "rose-graphite", "amber-minimal", "ocean-sky", "jade-mint", "rose-slate", "amber-graphite"]);
 const previewPaletteAliases: Record<string, string> = { "indigo-blue": "navy-cobalt", "green-slate": "forest-slate" };
 
+if (typeof window !== "undefined") {
+  const initialParams = new URLSearchParams(window.location.search);
+  if (initialParams.get("preview") === "precision-operations" && initialParams.get("screen") === "settings" && !initialParams.get("settingsSection")) {
+    initialParams.set("settingsSection", "Team & access");
+    window.history.replaceState(null, "", window.location.pathname + "?" + initialParams.toString());
+  }
+}
+
 function PreviewPaletteBridge() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
