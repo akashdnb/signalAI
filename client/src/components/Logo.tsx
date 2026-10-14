@@ -4,8 +4,8 @@
  * "signal"+"AI" wordmark at any size without a network round-trip. The
  * wordmark itself is rendered as text, not the brand kit's flattened SVG
  * text, so "signal" can track the current surface's ink color (light/dark)
- * while "AI" stays the fixed brand purple, matching every wordmark variant
- * in the brand kit.
+ * while "AI" keeps its brand accent. Both mark colors come from shared tokens
+ * so preview themes can recolor the icon without editing this component.
  */
 import { useId } from "react";
 
