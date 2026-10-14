@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { useModalDialog } from "./PrecisionOperationsPreviewPage";
-import { AutomationIcon, InstagramMarkIcon, SearchIcon, PlusIcon, ChevronDownIcon, CheckCircleIcon, InboxIcon, DotsVerticalIcon, SendIcon } from "../components/icons";
+import { AutomationIcon, InstagramMarkIcon, SearchIcon, PlusIcon, ChevronDownIcon, CheckCircleIcon, InboxIcon, DotsVerticalIcon, SendIcon, SunIcon, MoonIcon } from "../components/icons";
 import { Logo } from "../components/Logo";
 
 export type FullPreviewScreen = "overview" | "automations" | "builder" | "inbox" | "leads" | "lead-detail" | "knowledge" | "content" | "analytics" | "integrations" | "team" | "billing" | "settings" | "docs" | "login" | "connect-error" | "invite";
+export type PreviewPalette = "navy-cobalt" | "teal-emerald" | "slate-cyan" | "forest-slate" | "orange-amber" | "neutral-slate";
 type Go = (screen: FullPreviewScreen) => void;
 function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?: string }) { return <span className={"po-tag po-tag--" + tone}>{children}</span>; }
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) { return <section className={"po-content-panel " + className}>{children}</section>; }
@@ -224,18 +225,95 @@ export function BillingScreen() {
   return <section><div className="po-plan-state"><div><span className="po-eyebrow">CURRENT PLAN</span><h2>Trial</h2><p>Example beta workspace · billing isn't configured in this preview.</p></div><Tag tone="warning">Trial · sample</Tag></div><div className="po-billing-grid"><Panel><PanelTitle title="AI token usage" description="Tokens consumed by supported AI operations."/><div className="po-usage-value"><strong>145,474</strong><span>/ 200,000 tokens</span></div><div className="po-usage-track"><span style={{width:"72.7%"}}/></div><div className="po-usage-meta"><span>72.7% used</span><span>Reset date not configured</span></div></Panel><Panel><PanelTitle title="Direct messages" description="Outbound DMs against the illustrative plan cap."/><div className="po-usage-value"><strong>66</strong><span>/ 200 messages</span></div><div className="po-usage-track"><span style={{width:"33%"}}/></div><div className="po-usage-meta"><span>33% used</span><span>Reset date not configured</span></div></Panel></div><Panel><PanelTitle title="What happens at the limit?" description="The cap policy should be understandable before the workspace reaches it." action={<button className="po-text-action" type="button" onClick={()=>setShowLimits(v=>!v)}>{showLimits?"Hide detail ↑":"View details ↓"}</button>}/>{showLimits&&<div className="po-definition-block"><strong>Production requirements</strong><p>State whether automations pause, whether human replies remain possible, which admins are warned, and when quotas reset. The preview doesn't infer this policy.</p></div>}<div className="po-billing-facts"><div><span>Plan renewal</span><strong>Not configured</strong></div><div><span>Payment method</span><strong>Not configured</strong></div><div><span>Invoices</span><strong>No billing data</strong></div></div><div className="po-billing-actions"><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("Upgrade isn't enabled in this preview. No payment was started.")}>Explore upgrade</button><span>No payment flow is connected.</span></div></Panel>{notice&&<div className="po-inline-notice" role="status">{notice}</div>}</section>;
 }
 
-export function SettingsScreen() {
-  const [section,setSection]=useState(() => {
+const settingsSections = ["Appearance", "Fields", "AI behavior", "Forbidden topics", "Escalation", "Scoring"] as const;
+type SettingsSection = typeof settingsSections[number];
+
+const appearancePalettes: { value: PreviewPalette; label: string; description: string }[] = [
+  { value: "navy-cobalt", label: "Navy & Cobalt", description: "Clear, confident blue" },
+  { value: "teal-emerald", label: "Teal & Emerald", description: "Calm and approachable" },
+  { value: "slate-cyan", label: "Slate & Cyan", description: "Neutral with a crisp accent" },
+  { value: "forest-slate", label: "Forest & Slate", description: "Grounded green" },
+  { value: "orange-amber", label: "Orange & Amber", description: "Warm and energetic" },
+  { value: "neutral-slate", label: "Neutral Slate", description: "Low-colour and understated" },
+];
+
+export function SettingsScreen({ theme, palette, onChangeTheme, onChangePalette }: {
+  theme: "light" | "dark";
+  palette: PreviewPalette;
+  onChangeTheme: (theme: "light" | "dark") => void;
+  onChangePalette: (palette: PreviewPalette) => void;
+}) {
+  const [section,setSection]=useState<SettingsSection>(() => {
     const requested = new URLSearchParams(window.location.search).get("settingsSection");
-    return requested && ["Fields","AI behavior","Forbidden topics","Escalation","Scoring"].includes(requested) ? requested : "Fields";
-  }); const [notice,setNotice]=useState(""); const [newField,setNewField]=useState(""); const [fieldType,setFieldType]=useState("Text"); const [ai,setAi]=useState("Be honest. If the knowledge source doesn't contain an answer, ask a follow-up or route to a teammate."); const [forbidden,setForbidden]=useState("Medical diagnosis, guaranteed outcomes, private customer data"); const [escalation,setEscalation]=useState("Refund request, complaint, low confidence, request to speak with a person"); const [rule,setRule]=useState("Clear purchase intent"); const [score,setScore]=useState("20");
-  return <section><div className="po-settings-layout"><nav className="po-settings-nav" aria-label="Settings sections">{["Fields","AI behavior","Forbidden topics","Escalation","Scoring"].map(t=><button type="button" className={section===t?"is-active":""} key={t} onClick={()=>setSection(t)}>{t}</button>)}</nav><div className="po-settings-body">
-    {section==="Fields"&&<Panel><PanelTitle title="Lead fields" description="Use business-friendly labels; keep technical keys secondary." action={<Tag>Sample schema</Tag>}/><div className="po-field-table"><div className="po-field-table-row po-field-table-row--header"><span>Label</span><span>Technical key</span><span>Type</span><span>Used for</span><span/></div>{[["Interest","automation_interest","Text","Lead qualification"],["Use case","automation_use_case","Text","Lead qualification"],["Comment volume","comment_volume","Number","Scoring"],["Preferred contact","preferred_contact","Text","Follow-up"],["Phone number","phone_number","Phone","Contact details"]].map(row=><div className="po-field-table-row" key={row[1]}>{row.map((v,i)=><span key={i} className={i===1?"po-technical-key":""}>{v}</span>)}<button type="button" className="po-text-action" onClick={()=>setNotice("Removal would show the journeys that use "+row[0]+". No field was deleted.")}>Remove</button></div>)}</div><div className="po-add-field"><label>Field label<input value={newField} onChange={e=>setNewField(e.target.value)} placeholder="e.g. Budget range"/></label><label>Type<select value={fieldType} onChange={e=>setFieldType(e.target.value)}>{["Text","Number","Email","Phone","Date","Country"].map(v=><option key={v}>{v}</option>)}</select></label><button type="button" className="po-button po-button--secondary" disabled={!newField.trim()} onClick={()=>{setNotice("Field "+newField+" ("+fieldType+") shown as a local preview only.");setNewField("");}}>Add field</button></div></Panel>}
-    {section==="AI behavior"&&<Panel><PanelTitle title="AI behavior" description="How the assistant responds when context is incomplete or uncertain."/><label className="po-field-block">Instructions<textarea rows={6} value={ai} onChange={e=>setAi(e.target.value)}/></label><p className="po-inline-help">Never invent facts, prices, availability, or guarantees.</p><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("AI behavior updated locally in preview only.")}>Save AI behavior</button></Panel>}
-    {section==="Forbidden topics"&&<Panel><PanelTitle title="Forbidden topics" description="Topics where the assistant should refuse, defer, or escalate."/><label className="po-field-block">Topic list<textarea rows={5} value={forbidden} onChange={e=>setForbidden(e.target.value)}/></label><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("Forbidden-topic draft updated locally only.")}>Save forbidden topics</button></Panel>}
-    {section==="Escalation"&&<Panel><PanelTitle title="Escalation rules" description="Situations that require human attention."/><label className="po-field-block">Escalation triggers<textarea rows={5} value={escalation} onChange={e=>setEscalation(e.target.value)}/></label><div className="po-warning-note"><span>!</span><span><strong>Ownership matters</strong><small>A human handoff should assign a teammate or appear in an unassigned work queue.</small></span></div><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("Escalation rules updated locally in preview only.")}>Save escalation rules</button></Panel>}
-    {section==="Scoring"&&<Panel><PanelTitle title="Custom scoring rules" description="Show the signal, points, and reason behind score changes."/><div className="po-scoring-rule"><label>Rule name<input value={rule} onChange={e=>setRule(e.target.value)}/></label><label>Points<input type="number" value={score} onChange={e=>setScore(e.target.value)}/></label><button type="button" className="po-button po-button--secondary" onClick={()=>setNotice("Rule "+rule+" (+"+score+") exists only in preview state.")}>Add rule</button></div><div className="po-row-actions"><button type="button" onClick={()=>setNotice("Sample scoring rule editor opened locally.")}>Edit rule</button><button type="button" onClick={()=>setNotice("Removal confirmation would list affected journeys and leads.")}>Remove rule</button></div></Panel>}
-  </div></div>{notice&&<div className="po-inline-notice" role="status">{notice}</div>}</section>;
+    return requested && settingsSections.includes(requested as SettingsSection) ? requested as SettingsSection : "Fields";
+  });
+  const [notice,setNotice]=useState("");
+  const [newField,setNewField]=useState("");
+  const [fieldType,setFieldType]=useState("Text");
+  const [ai,setAi]=useState("Be honest. If the knowledge source doesn't contain an answer, ask a follow-up or route to a teammate.");
+  const [forbidden,setForbidden]=useState("Medical diagnosis, guaranteed outcomes, private customer data");
+  const [escalation,setEscalation]=useState("Refund request, complaint, low confidence, request to speak with a person");
+  const [rule,setRule]=useState("Clear purchase intent");
+  const [score,setScore]=useState("20");
+  const chooseSection = (next: SettingsSection) => {
+    setSection(next);
+    setNotice("");
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    params.set("screen", "settings");
+    params.set("settingsSection", next);
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
+  return <section>
+    <div className="po-settings-layout">
+      <nav className="po-settings-nav" aria-label="Settings sections">
+        {settingsSections.map(t=><button type="button" className={section===t?"is-active":""} key={t} aria-current={section===t?"page":undefined} onClick={()=>chooseSection(t)}>{t}</button>)}
+      </nav>
+      <div className="po-settings-body">
+        {section==="Appearance"&&<Panel className="po-appearance-settings">
+          <PanelTitle eyebrow="WORKSPACE PREFERENCES" title="Appearance" description="Choose a theme and accent palette for this preview."/>
+          <section className="po-appearance-group" aria-labelledby="po-appearance-mode-title">
+            <div className="po-appearance-group-heading">
+              <h3 id="po-appearance-mode-title">Theme mode</h3>
+              <p>Switch between light and dark surfaces.</p>
+            </div>
+            <div className="po-appearance-mode-options" role="group" aria-label="Theme mode">
+              <button type="button" className={"po-appearance-mode-option"+(theme==="light"?" is-selected":"")} data-theme="light" aria-pressed={theme==="light"} onClick={()=>onChangeTheme("light")}>
+                <span className="po-appearance-mode-preview" aria-hidden="true"><span/><span/><i/></span>
+                <span className="po-appearance-option-copy"><strong><SunIcon/>Light</strong><small>Bright surfaces</small></span>
+                {theme==="light"&&<CheckCircleIcon className="po-appearance-selected-icon"/>}
+              </button>
+              <button type="button" className={"po-appearance-mode-option"+(theme==="dark"?" is-selected":"")} data-theme="dark" aria-pressed={theme==="dark"} onClick={()=>onChangeTheme("dark")}>
+                <span className="po-appearance-mode-preview" aria-hidden="true"><span/><span/><i/></span>
+                <span className="po-appearance-option-copy"><strong><MoonIcon/>Dark</strong><small>Reduced luminance</small></span>
+                {theme==="dark"&&<CheckCircleIcon className="po-appearance-selected-icon"/>}
+              </button>
+            </div>
+          </section>
+          <section className="po-appearance-group" aria-labelledby="po-appearance-palette-title">
+            <div className="po-appearance-group-heading">
+              <h3 id="po-appearance-palette-title">Accent palette</h3>
+              <p>Preview the palette across navigation, actions, selected items and the brand mark.</p>
+            </div>
+            <div className="po-appearance-palette-grid" role="group" aria-label="Accent palette">
+              {appearancePalettes.map(item=><button type="button" key={item.value} className={"po-appearance-palette-option"+(palette===item.value?" is-selected":"")} data-palette={item.value} aria-pressed={palette===item.value} onClick={()=>onChangePalette(item.value)}>
+                <span className="po-appearance-swatches" aria-hidden="true"><i/><i/><i/><i/></span>
+                <span className="po-appearance-option-copy"><strong>{item.label}</strong><small>{item.description}</small></span>
+                {palette===item.value&&<CheckCircleIcon className="po-appearance-selected-icon"/>}
+              </button>)}
+            </div>
+            <p className="po-appearance-note">Your selection is reflected in the preview URL, so you can bookmark or share a combination.</p>
+          </section>
+        </Panel>}
+        {section==="Fields"&&<Panel><PanelTitle title="Lead fields" description="Use business-friendly labels; keep technical keys secondary." action={<Tag>Sample schema</Tag>}/><div className="po-field-table"><div className="po-field-table-row po-field-table-row--header"><span>Label</span><span>Technical key</span><span>Type</span><span>Used for</span><span/></div>{[["Interest","automation_interest","Text","Lead qualification"],["Use case","automation_use_case","Text","Lead qualification"],["Comment volume","comment_volume","Number","Scoring"],["Preferred contact","preferred_contact","Text","Follow-up"],["Phone number","phone_number","Phone","Contact details"]].map(row=><div className="po-field-table-row" key={row[1]}>{row.map((v,i)=><span key={i} className={i===1?"po-technical-key":""}>{v}</span>)}<button type="button" className="po-text-action" onClick={()=>setNotice("Removal would show the journeys that use "+row[0]+". No field was deleted.")}>Remove</button></div>)}</div><div className="po-add-field"><label>Field label<input value={newField} onChange={e=>setNewField(e.target.value)} placeholder="e.g. Budget range"/></label><label>Type<select value={fieldType} onChange={e=>setFieldType(e.target.value)}>{["Text","Number","Email","Phone","Date","Country"].map(v=><option key={v}>{v}</option>)}</select></label><button type="button" className="po-button po-button--secondary" disabled={!newField.trim()} onClick={()=>{setNotice("Field "+newField+" ("+fieldType+") shown as a local preview only.");setNewField("");}}>Add field</button></div></Panel>}
+        {section==="AI behavior"&&<Panel><PanelTitle title="AI behavior" description="How the assistant responds when context is incomplete or uncertain."/><label className="po-field-block">Instructions<textarea rows={6} value={ai} onChange={e=>setAi(e.target.value)}/></label><p className="po-inline-help">Never invent facts, prices, availability, or guarantees.</p><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("AI behavior updated locally in preview only.")}>Save AI behavior</button></Panel>}
+        {section==="Forbidden topics"&&<Panel><PanelTitle title="Forbidden topics" description="Topics where the assistant should refuse, defer, or escalate."/><label className="po-field-block">Topic list<textarea rows={5} value={forbidden} onChange={e=>setForbidden(e.target.value)}/></label><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("Forbidden-topic draft updated locally only.")}>Save forbidden topics</button></Panel>}
+        {section==="Escalation"&&<Panel><PanelTitle title="Escalation rules" description="Situations that require human attention."/><label className="po-field-block">Escalation triggers<textarea rows={5} value={escalation} onChange={e=>setEscalation(e.target.value)}/></label><div className="po-warning-note"><span>!</span><span><strong>Ownership matters</strong><small>A human handoff should assign a teammate or appear in an unassigned work queue.</small></span></div><button type="button" className="po-button po-button--primary" onClick={()=>setNotice("Escalation rules updated locally in preview only.")}>Save escalation rules</button></Panel>}
+        {section==="Scoring"&&<Panel><PanelTitle title="Custom scoring rules" description="Show the signal, points, and reason behind score changes."/><div className="po-scoring-rule"><label>Rule name<input value={rule} onChange={e=>setRule(e.target.value)}/></label><label>Points<input type="number" value={score} onChange={e=>setScore(e.target.value)}/></label><button type="button" className="po-button po-button--secondary" onClick={()=>setNotice("Rule "+rule+" (+"+score+") exists only in preview state.")}>Add rule</button></div><div className="po-row-actions"><button type="button" onClick={()=>setNotice("Sample scoring rule editor opened locally.")}>Edit rule</button><button type="button" onClick={()=>setNotice("Removal confirmation would list affected journeys and leads.")}>Remove rule</button></div></Panel>}
+      </div>
+    </div>
+    {notice&&<div className="po-inline-notice" role="status">{notice}</div>}
+  </section>;
 }
 
 export function DocsScreen() {
