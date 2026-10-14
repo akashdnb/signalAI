@@ -15,42 +15,41 @@
   min-width: 0;
   min-height: 48px;
   padding: 4px 8px 4px 4px;
-  border: 1px solid var(--po-color-transparent) !important;
+  border: 1px solid transparent !important;
   border-radius: 11px;
-  background: var(--po-color-transparent) !important;
+  background: transparent !important;
   color: var(--po-color-ink);
   text-align: left;
-  cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition: background-color 140ms ease;
 }
 
 .po-preview-app .sai-account-switcher__trigger:hover,
 .po-preview-app .sai-account-switcher__trigger[aria-expanded="true"] {
-  border-color: var(--po-color-transparent) !important;
   background: var(--po-color-surface-hover) !important;
 }
 
-.po-preview-app .sai-account-switcher__trigger:focus-visible {
+.po-preview-app .sai-account-switcher__trigger:focus-visible,
+.po-preview-app .sai-account-switcher__option:focus-visible {
   outline: 2px solid var(--po-color-primary);
   outline-offset: 2px;
 }
 
-.po-preview-app .sai-account-switcher__provider-chip {
+.po-preview-app .sai-account-switcher__provider-chip,
+.po-preview-app .sai-account-switcher__option-icon {
   display: inline-flex;
-  flex: 0 0 42px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
+  background: var(--po-color-primary-soft);
+  color: var(--po-color-primary);
+  font-weight: 800;
+}
+
+.po-preview-app .sai-account-switcher__provider-chip {
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: var(--po-color-instagram-soft);
-  color: var(--po-color-instagram);
-}
-
-.po-preview-app .sai-account-switcher__provider-chip svg {
-  display: block;
-  width: 22px;
-  height: 22px;
+  font-size: 12px;
 }
 
 .po-preview-app .sai-account-switcher__identity {
@@ -58,12 +57,11 @@
   flex: 1 1 auto;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .po-preview-app .sai-account-switcher__identity strong {
   overflow: hidden;
-  color: var(--po-color-ink);
   font-size: 14px;
   font-weight: 800;
   line-height: 1.3;
@@ -72,29 +70,12 @@
 }
 
 .po-preview-app .sai-account-switcher__identity small {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 6px;
-  overflow: hidden;
   color: var(--po-color-secondary);
   font-size: 12px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.po-preview-app .sai-account-switcher__status-dot {
-  display: inline-block;
-  flex: 0 0 7px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--po-color-success);
+  line-height: 1.3;
 }
 
 .po-preview-app .sai-account-switcher__chevron {
-  display: block;
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
@@ -109,21 +90,17 @@
 
 .po-preview-app .sai-account-switcher__panel {
   position: absolute;
-  top: calc(100% + 9px);
+  top: calc(100% + 8px);
   left: 0;
   z-index: 110;
-  display: flex;
-  width: 360px;
-  max-width: min(360px, calc(100vw - 24px));
-  max-height: min(74vh, 600px);
-  flex-direction: column;
+  width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
   overflow: hidden;
   padding: 8px;
   border: 1px solid var(--po-color-border);
-  border-radius: 13px;
+  border-radius: 12px;
   background: var(--po-color-surface);
   box-shadow: 0 16px 40px var(--po-color-shadow-menu);
-  color: var(--po-color-ink);
   transform-origin: top left;
   animation: sai-account-switcher-enter 120ms ease-out;
 }
@@ -134,23 +111,17 @@
 }
 
 .po-preview-app .sai-account-switcher__panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 8px 12px;
+  padding: 9px 10px 11px;
   border-bottom: 1px solid var(--po-color-border);
 }
 
 .po-preview-app .sai-account-switcher__panel-heading > div {
   display: flex;
-  min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .po-preview-app .sai-account-switcher__panel-heading strong {
-  color: var(--po-color-ink);
   font-size: 13px;
   font-weight: 800;
 }
@@ -160,14 +131,68 @@
   font-size: 11px;
 }
 
-.po-preview-app .sai-account-switcher__provider-label {
-  flex: 0 0 auto;
-  padding: 4px 7px;
-  border-radius: 6px;
-  background: var(--po-color-instagram-soft);
-  color: var(--po-color-instagram);
+.po-preview-app .sai-account-switcher__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+}
+
+.po-preview-app .sai-account-switcher__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 54px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent !important;
+  color: var(--po-color-ink);
+  text-align: left;
+}
+
+.po-preview-app .sai-account-switcher__option:hover,
+.po-preview-app .sai-account-switcher__option.is-selected {
+  background: var(--po-color-primary-soft) !important;
+}
+
+.po-preview-app .sai-account-switcher__option-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   font-size: 10px;
-  font-weight: 750;
+}
+
+.po-preview-app .sai-account-switcher__option-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.po-preview-app .sai-account-switcher__option-copy strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.po-preview-app .sai-account-switcher__option-copy small {
+  overflow: hidden;
+  color: var(--po-color-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.po-preview-app .sai-account-switcher__selected-icon {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  color: var(--po-color-primary);
 }
 
 .po-preview-app .sai-account-switcher__search {
@@ -188,313 +213,14 @@
   box-shadow: 0 0 0 3px var(--po-color-primary-soft);
 }
 
-.po-preview-app .sai-account-switcher__search svg {
-  display: block;
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-}
-
-.po-preview-app .sai-account-switcher__search input,
-.po-preview-app .sai-account-switcher__search input:focus,
-.po-preview-app .sai-account-switcher__search input:focus-visible {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  height: 37px;
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-  border: 0 !important;
-  border-radius: 0;
-  outline: none;
-  box-shadow: none !important;
-  background: var(--po-color-transparent);
-  color: var(--po-color-ink);
-  font-size: 12px;
-}
-
-.po-preview-app .sai-account-switcher__search input::placeholder {
-  color: var(--po-color-placeholder);
-}
-
-.po-preview-app .sai-account-switcher__options {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  gap: 3px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.po-preview-app .sai-account-switcher__option {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  min-width: 0;
-  min-height: 59px;
-  padding: 7px 8px;
-  border: 1px solid var(--po-color-transparent) !important;
-  border-radius: 9px;
-  background: var(--po-color-transparent) !important;
-  color: var(--po-color-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.po-preview-app .sai-account-switcher__option:hover,
-.po-preview-app .sai-account-switcher__option:focus-visible {
-  border-color: var(--po-color-transparent) !important;
-  outline: none;
-  background: var(--po-color-surface-hover) !important;
-}
-
-.po-preview-app .sai-account-switcher__option:focus-visible {
-  outline: 2px solid var(--po-color-primary);
-  outline-offset: -2px;
-}
-
-.po-preview-app .sai-account-switcher__option.is-selected {
-  background: var(--po-color-primary-soft) !important;
-}
-
-.po-preview-app .sai-account-switcher__option-icon {
-  display: inline-flex;
-  flex: 0 0 34px;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--po-color-instagram-soft);
-  color: var(--po-color-instagram);
-}
-
-.po-preview-app .sai-account-switcher__option-icon svg {
-  display: block;
-  width: 17px;
-  height: 17px;
-}
-
-.po-preview-app .sai-account-switcher__option-copy {
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.po-preview-app .sai-account-switcher__option-copy > strong {
-  overflow: hidden;
-  color: var(--po-color-ink);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.po-preview-app .sai-account-switcher__option-copy > small {
-  overflow: hidden;
-  color: var(--po-color-muted);
-  font-size: 11px;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.po-preview-app .sai-account-switcher__option-copy > small.is-connected,
-.po-preview-app .sai-account-switcher__option-copy > small.is-disconnected {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.po-preview-app .sai-account-switcher__option-copy > small.is-disconnected {
-  color: var(--po-color-warning);
-}
-
-.po-preview-app .sai-account-switcher__option-copy .sai-account-switcher__status-dot {
-  width: 6px;
-  height: 6px;
-  flex-basis: 6px;
-}
-
-.po-preview-app .sai-account-switcher__selected-icon {
-  display: block;
-  flex: 0 0 17px;
-  width: 17px;
-  height: 17px;
-  color: var(--po-color-primary);
-}
-
-.po-preview-app .sai-account-switcher__empty {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 5px;
-  padding: 20px 12px;
-}
-
-.po-preview-app .sai-account-switcher__empty strong {
-  color: var(--po-color-ink);
-  font-size: 12px;
-}
-
-.po-preview-app .sai-account-switcher__empty small {
-  color: var(--po-color-muted);
-  font-size: 11px;
-}
-
-.po-preview-app .sai-account-switcher__footer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 10px 8px 4px;
-  border-top: 1px solid var(--po-color-border);
-}
-
-.po-preview-app .sai-account-switcher__footer p {
-  margin: 0;
-  color: var(--po-color-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.po-preview-app .sai-account-switcher__manage {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 34px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--po-color-transparent);
-  color: var(--po-color-primary);
-  font-size: 12px;
-  font-weight: 750;
-  text-align: left;
-  cursor: pointer;
-}
-
-.po-preview-app .sai-account-switcher__manage:hover,
-.po-preview-app .sai-account-switcher__manage:focus-visible {
-  outline: none;
-  background: var(--po-color-surface-hover);
-}
-
-.po-preview-app .sai-account-switcher__manage:focus-visible {
-  outline: 2px solid var(--po-color-primary);
-  outline-offset: -2px;
-}
-
 @media (max-width: 760px) {
-  .sai-account-switcher {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: none;
-  }
-  .po-preview-app .sai-account-switcher__trigger {
-    max-width: 100%;
-    min-height: 44px;
-  }
-  .po-preview-app .sai-account-switcher__provider-chip {
-    flex-basis: 36px;
-    width: 36px;
-    height: 36px;
-  }
-  .po-preview-app .sai-account-switcher__identity strong {
-    font-size: 13px;
-  }
-  .po-preview-app .sai-account-switcher__identity small {
-    font-size: 11px;
-  }
-  .po-preview-app .sai-account-switcher__panel {
-    right: 0;
-    left: auto;
-    width: min(360px, calc(100vw - 24px));
-  }
+  .sai-account-switcher { flex: 1 1 100%; width: 100%; max-width: none; }
+  .po-preview-app .sai-account-switcher__trigger { min-height: 44px; }
+  .po-preview-app .sai-account-switcher__provider-chip { width: 36px; height: 36px; }
+  .po-preview-app .sai-account-switcher__panel { right: 0; left: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .po-preview-app .sai-account-switcher__trigger,
   .po-preview-app .sai-account-switcher__chevron,
-  .po-preview-app .sai-account-switcher__panel {
-    animation: none;
-    transition: none;
-  }
-}
-
-/* The legacy preview has intentionally high-specificity control reset rules.
-   Keep this search field borderless inside its own wrapper so it never picks up
-   a second outline or the global 40px text-input padding. */
-body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
-body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):focus,
-body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):focus-visible {
-  box-sizing: border-box !important;
-  height: 37px !important;
-  min-height: 0 !important;
-  max-height: 37px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  outline: 0 !important;
-  box-shadow: none !important;
-  background: var(--po-color-transparent) !important;
-}
-body:has(.po-preview-app) .po-preview-app .sai-account-switcher .sai-account-switcher__search:focus-within {
-  border-color: var(--po-color-primary);
-  box-shadow: 0 0 0 3px var(--po-color-primary-soft);
-}
-
-/* Keep the workspace header compact: status is communicated by the dot, while
-   the account handle is the only secondary text shown outside the picker. */
-.po-preview-app .sai-account-switcher {
-  max-width: min(440px, 44vw);
-}
-.po-preview-app .sai-account-switcher__trigger {
-  gap: 10px;
-}
-.po-preview-app .sai-account-switcher__identity {
-  gap: 3px;
-}
-.po-preview-app .sai-account-switcher__header-status {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  overflow: hidden;
-}
-.po-preview-app .sai-account-switcher__current-handle {
-  display: inline-block;
-  min-width: 0;
-  max-width: 22ch;
-  overflow: hidden;
-  color: var(--po-color-secondary);
-  font-size: 12px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.po-preview-app .sai-account-switcher__status-dot.is-disconnected {
-  background: var(--po-color-error);
-}
-.po-preview-app .sai-account-switcher__option-copy > small.is-connected .sai-account-switcher__status-dot {
-  background: var(--po-color-success);
-}
-.po-preview-app .sai-account-switcher__option-copy > small.is-disconnected .sai-account-switcher__status-dot {
-  background: var(--po-color-error);
-}
-@media (max-width: 760px) {
-  .po-preview-app .sai-account-switcher {
-    max-width: min(100%, 440px);
-  }
-  .po-preview-app .sai-account-switcher__current-handle {
-    max-width: 22ch;
-  }
+  .po-preview-app .sai-account-switcher__panel { animation: none; transition: none; }
 }
