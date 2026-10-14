@@ -30,7 +30,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage").then((module) => 
 const TeamPage = lazy(() => import("./pages/TeamPage").then((module) => ({ default: module.TeamPage })));
 const InvitationAcceptPage = lazy(() => import("./pages/InvitationAcceptPage").then((module) => ({ default: module.InvitationAcceptPage })));
 
-const previewPalettes = new Set(["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate", "ocean-sky", "jade-mint", "rose-slate", "amber-graphite"]);
+const previewPalettes = new Set(["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate", "ocean-blue", "rose-graphite", "amber-minimal"]);
 const previewPaletteAliases: Record<string, string> = { "indigo-blue": "navy-cobalt", "green-slate": "forest-slate" };
 
 function PreviewPaletteBridge() {
