@@ -63,12 +63,15 @@ export async function findOrCreateUserByGoogle(
   profile: { sub: string; email: string; givenName?: string | null; familyName?: string | null; picture?: string | null },
 ): Promise<User> {
   const normalized = normalizeEmail(profile.email);
+  // A verified Google email can attach to a legacy email-OTP user exactly
+  // once. The immutable Google subject is globally unique via migration.
+  // coalesce preserves profile fields if Google omits them in a later login.
   const result = await pool.query<UserRow>(
     `insert into users (email, first_name, last_name, profile_picture_url, google_subject)
      values ($1, $2, $3, $4, $5)
      on conflict (email) do update set
-       first_name = coalesce(users.first_name, excluded.first_name),
-       last_name = coalesce(users.last_name, excluded.last_name),
+       first_name = coalesce(excluded.first_name, users.first_name),
+       last_name = coalesce(excluded.last_name, users.last_name),
        profile_picture_url = coalesce(excluded.profile_picture_url, users.profile_picture_url),
        google_subject = coalesce(users.google_subject, excluded.google_subject)
      where users.google_subject is null or users.google_subject = excluded.google_subject
@@ -77,9 +80,7 @@ export async function findOrCreateUserByGoogle(
   );
   if (!result.rows[0]) throw new Error("google_identity_conflict");
   const user = toUser(result.rows[0]);
-  if (user.googleSubject && user.googleSubject !== profile.sub) {
-    throw new Error("google_identity_conflict");
-  }
+  if (user.googleSubject !== profile.sub) throw new Error("google_identity_conflict");
   return user;
 }
 
