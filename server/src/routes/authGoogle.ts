@@ -165,7 +165,7 @@ function redirectAuthError(res: import("express").Response, reason: string) {
 }
 
 googleAuthRouter.get("/auth/google/start", (req, res) => {
-  if (!config.googleClientId || !config.googleClientSecret || !config.googleRedirectUri) {
+  if (!config.googleOauthReady) {
     return redirectAuthError(res, "google_not_configured");
   }
 
@@ -210,7 +210,7 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
   const statePayload = verifyState(config.sessionSecret, state);
   if (!statePayload) return redirectAuthError(res, "invalid_google_state");
   if (!safeEqualString(statePayload.value, rawStateCookie)) return redirectAuthError(res, "invalid_google_state");
-  if (!config.googleClientId || !config.googleClientSecret || !config.googleRedirectUri) return redirectAuthError(res, "google_not_configured");
+  if (!config.googleOauthReady) return redirectAuthError(res, "google_not_configured");
 
   try {
     const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
