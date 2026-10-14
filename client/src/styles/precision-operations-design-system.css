@@ -86,7 +86,8 @@ body:has(.po-preview-app) .po-flow-node:hover,body:has(.po-preview-app) .po-flow
 body:has(.po-preview-app) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px rgba(124,58,237,.1)}
 body:has(.po-preview-app) .po-flow-node-kicker{color:#6b746e;font-size:11px;letter-spacing:.08em;font-weight:700}
 body:has(.po-preview-app) .po-flow-node-content strong{font-size:14px;line-height:20px}
-body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker),body:has(.po-preview-app) .po-flow-node-content small{font-size:14px;line-height:21px}
+body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker){font-size:14px;line-height:20px}
+body:has(.po-preview-app) .po-flow-node-content small{font-size:12px;line-height:17px}
 body:has(.po-preview-app) .po-dialog-backdrop{background:rgba(15,23,42,.42);backdrop-filter:blur(2px)}
 body:has(.po-preview-app) .po-dialog,body:has(.po-preview-app) .po-modal,body:has(.po-preview-app) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
 body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
@@ -266,6 +267,11 @@ body:has(.po-preview-app) .po-preview-app .po-flow-node.is-new{
   border-color:var(--po-primary);box-shadow:0 0 0 3px var(--po-primary-soft)}
 body:has(.po-preview-app) .po-preview-app .po-flow-notice-undo{margin-left:2px;padding:0 2px;border:0;background:transparent;color:inherit;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 body:has(.po-preview-app) .po-preview-app .po-flow-node-shell{position:relative;display:flex;width:100%}
+/* The remove control and the drag grip were both pinned to the node's top-right and
+ * overlapped. The grip moves to the vertical centre; the content keeps clear of both. */
+body:has(.po-preview-app) .po-preview-app .po-flow-node-end{align-self:center}
+body:has(.po-preview-app) .po-preview-app .po-flow-node{min-height:0;padding:12px 13px}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell:has(.po-flow-node-remove) .po-flow-node-content{padding-right:24px}
 body:has(.po-preview-app) .po-preview-app .po-flow-node-shell > .po-flow-node{flex:1;min-width:0}
 body:has(.po-preview-app) .po-preview-app .po-flow-node-remove{
   position:absolute;top:8px;right:8px;z-index:2;display:inline-flex;align-items:center;
@@ -279,6 +285,21 @@ body:has(.po-preview-app) .po-preview-app .po-flow-node-remove:hover{
 body:has(.po-preview-app) .po-preview-app .po-flow-node-remove::after{
   content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   min-width:44px;min-height:44px;width:100%;height:100%}
+
+/* ---- Filter row + builder header spacing -----------------------------------
+ * The search column and the select columns carried different label/control
+ * spacing and three competing min-heights (43 -> 44 -> 39), so the search box
+ * sat 13px below the selects. Bottom-aligning the row and settling on one
+ * control height lines them up.
+ */
+body:has(.po-preview-app) .po-preview-app .po-automation-filters{align-items:end}
+body:has(.po-preview-app) .po-preview-app .po-automation-search,
+body:has(.po-preview-app) .po-preview-app .po-automation-filter{display:flex;min-width:0;flex-direction:column;gap:7px}
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search{min-height:40px}
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search input{min-height:38px}
+/* The builder header stacked an 18px padding under a 24px margin, leaving 43px
+ * of empty space between the title block and the tabs. */
+body:has(.po-preview-app) .po-preview-app .po-builder-header{padding-bottom:14px;margin-bottom:14px}
 
 /* ---- Pointer targets ------------------------------------------------------
  * AGENTS.md: layouts must work "without ... tiny touch targets". Row checkboxes
