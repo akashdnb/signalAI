@@ -977,3 +977,25 @@ body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button
     display: flex;
   }
 }
+
+/* Keep the plan shortcut's inline icon sized in the expanded layout too. SVGs
+   without explicit dimensions use a large intrinsic viewport in some browsers. */
+.po-preview-app .po-plan-card > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.po-preview-app .po-plan-card > button .po-plan-icon {
+  display: block;
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+}
+.po-preview-app.is-sidebar-collapsed .po-plan-card > button .po-plan-icon {
+  flex-basis: 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
