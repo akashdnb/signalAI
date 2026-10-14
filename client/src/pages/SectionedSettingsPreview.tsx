@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SettingsScreen, type PreviewPalette } from "./PrecisionOperationsFullScreens";
-import { BellIcon, CreditCardIcon, SettingsIcon, UserIcon, LifeBuoyIcon } from "../components/icons";
+import { BellIcon, SettingsIcon, UserIcon, LifeBuoyIcon } from "../components/icons";
 
 type Section =
   | "general"
@@ -41,9 +41,23 @@ const personalSections: Array<{ id: Section; label: string; description: string 
   { id: "support", label: "Support", description: "Help and support resources" },
 ];
 
+const legacySectionById: Record<Exclude<Section, "general" | "notifications" | "profile" | "support">, string> = {
+  team: "Team & access",
+  billing: "Plan & billing",
+  "lead-fields": "Lead fields",
+  "ai-behavior": "AI behavior",
+  "forbidden-topics": "Forbidden topics",
+  escalation: "Escalation",
+  scoring: "Scoring",
+  appearance: "Appearance",
+};
+
 function readSection(): Section {
-  const requested = new URLSearchParams(window.location.search).get("settingsSection") as Section | null;
-  return [...workspaceSections, ...personalSections].some(item => item.id === requested) ? requested! : "general";
+  const requested = new URLSearchParams(window.location.search).get("settingsSection");
+  const byId = [...workspaceSections, ...personalSections].find(item => item.id === requested)?.id;
+  if (byId) return byId;
+  const byLegacyLabel = Object.entries(legacySectionById).find(([, label]) => label === requested)?.[0] as Section | undefined;
+  return byLegacyLabel ?? "general";
 }
 
 function selectSection(next: Section, setSection: (section: Section) => void) {
@@ -51,35 +65,21 @@ function selectSection(next: Section, setSection: (section: Section) => void) {
   const params = new URLSearchParams(window.location.search);
   params.set("preview", "precision-operations");
   params.set("screen", "settings");
-  params.set("settingsSection", next);
+  params.set("settingsSection", next in legacySectionById ? legacySectionById[next as keyof typeof legacySectionById] : next);
   window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
 }
 
-function SectionedSettingsCard({ icon: Icon, title, description, children }: { icon: typeof SettingsIcon; title: string; description: string; children: React.ReactNode }) {
+function SectionedSettingsCard({ icon: Icon, title, description, children }: { icon: typeof SettingsIcon; title: string; description: string; children: ReactNode }) {
   return <section className="po-content-panel po-sectioned-settings-card"><header className="po-panel-title"><div><span className="po-eyebrow">WORKSPACE SETTINGS</span><h2>{title}</h2><p>{description}</p></div><span className="po-settings-scope">Workspace scoped</span></header>{children}</section>;
 }
 
 export function SectionedSettingsPreview({ theme, palette, onChangeTheme, onChangePalette }: Props) {
   const [section, setSection] = useState<Section>(readSection);
-  const active = [...workspaceSections, ...personalSections].find(item => item.id === section)!;
   const workspaceRole = "Owner";
 
   const renderExisting = () => {
-    const mapped: Record<string, string> = {
-      team: "Team & access",
-      billing: "Plan & billing",
-      "lead-fields": "Lead fields",
-      "ai-behavior": "AI behavior",
-      "forbidden-topics": "Forbidden topics",
-      escalation: "Escalation",
-      scoring: "Scoring",
-      appearance: "Appearance",
-    };
-    const existingSection = mapped[section];
+    const existingSection = legacySectionById[section as keyof typeof legacySectionById];
     if (!existingSection) return null;
-    const params = new URLSearchParams(window.location.search);
-    params.set("settingsSection", existingSection);
-    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
     return <SettingsScreen key={existingSection} theme={theme} palette={palette} onChangeTheme={onChangeTheme} onChangePalette={onChangePalette} />;
   };
 
