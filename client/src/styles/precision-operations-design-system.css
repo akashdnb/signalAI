@@ -170,6 +170,19 @@ body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--green{back
 body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--amber{background:#3b301e;color:#f0c36a}
 body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--blue{background:#1e2a40;color:#8ab4ff}
 body:has(.po-preview-app.is-dark) .po-lead-username{color:#8ab4ff}
+/* Icon chips are pastel tints with no dark counterpart, so they rendered as bright
+ * squares on the dark canvas - most visible in the builder palette and flow nodes. */
+body:has(.po-preview-app.is-dark) .po-nav-count{background:#302746;color:#cdb8ff}
+body:has(.po-preview-app.is-dark) .po-instagram-chip,
+body:has(.po-preview-app.is-dark) .po-palette-icon,
+body:has(.po-preview-app.is-dark) .po-flow-node-icon,
+body:has(.po-preview-app.is-dark) .po-inspector-icon{background:#2b2342;border-color:#453a63}
+body:has(.po-preview-app.is-dark) .po-palette-icon--instagram,
+body:has(.po-preview-app.is-dark) .po-flow-node-icon--trigger,
+body:has(.po-preview-app.is-dark) .po-inspector-icon.po-flow-node-icon--trigger{background:#3a2535;border-color:#5a3b50}
+body:has(.po-preview-app.is-dark) .po-flow-node-icon--goal,
+body:has(.po-preview-app.is-dark) .po-inspector-icon.po-flow-node-icon--goal{background:#1e3328;border-color:#2f4d3b}
+body:has(.po-preview-app.is-dark) .po-flow-node-icon--followup{background:#1e2a40;border-color:#32455f}
 body:has(.po-preview-app.is-dark) .po-token-track,
 body:has(.po-preview-app.is-dark) .po-usage-track{background:#2a332d}
 body:has(.po-preview-app.is-dark) .po-leads-pagination,

@@ -77,6 +77,7 @@
 .po-preview-app .po-tag--blue { border-color: #cbdff4; background: #eaf3fc; color: #285c91; }
 .po-preview-app .po-tag--neutral { border-color: #dfe4de; background: #f4f5f2; color: #4d5852; }
 .po-preview-app .po-header-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
+.po-preview-app .po-builder-heading .po-save-status { margin: 10px 0 0; }
 .po-preview-app .po-save-status { display: inline-flex; align-items: center; gap: 6px; margin-right: 5px; color: var(--po-muted); font-size: 12px; white-space: nowrap; }
 .po-preview-app .po-save-status.is-dirty { color: #8d5b16; }
 .po-preview-app .po-save-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #a9b2ac; }
@@ -173,6 +174,10 @@
 .po-preview-app .po-inspector-option > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 3px; }
 .po-preview-app .po-inspector-option strong { font-size: 14px; }
 .po-preview-app .po-inspector-option small { color: var(--po-muted); font-size: 12px; line-height: 1.45; }
+/* The tabpanel wrapper sits between .po-inspector (the flex column) and the footer,
+ * so the footer's `margin-top: auto` resolved to 0 and it stopped sitting at the
+ * bottom - it overlapped the last field instead. The panel carries the column. */
+.po-preview-app .po-inspector-panel { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .po-preview-app .po-inspector-footer { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 20px; }
 .po-preview-app .po-inspector-footer > span { color: var(--po-muted); font-size: 12px; }
 .po-preview-app .po-screen-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 54px; border-bottom: 1px solid var(--po-line); }
@@ -446,6 +451,7 @@
 .po-preview-app .po-minibars { display: flex; align-items: stretch; gap: 12px; height: 150px; padding: 12px 0 0; }
 .po-preview-app .po-minibar-col { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 8px; }
 .po-preview-app .po-minibar-track { display: flex; flex: 1; align-items: flex-end; width: 100%; overflow: hidden; border-bottom: 1px solid var(--po-line); background: linear-gradient(to bottom, transparent 24%, var(--po-line) 25%, transparent 26%, transparent 49%, var(--po-line) 50%, transparent 51%, transparent 74%, var(--po-line) 75%, transparent 76%); }
+.po-preview-app .po-minibar-value { color: var(--po-muted); font-size: 11px; font-weight: 600; line-height: 1.2; }
 .po-preview-app .po-minibar-track span { display: block; width: 100%; min-height: 4px; background: var(--po-info); border-radius: 3px 3px 0 0; }
 .po-preview-app .po-minibar-col small { color: var(--po-muted); font-size: 12px; }
 .po-preview-app .po-stage-list { display: flex; flex-direction: column; gap: 13px; margin-top: 20px; }
@@ -1268,7 +1274,7 @@
   max-height: none;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 22px 18px;
+  padding: 0 22px 0;
   border: 0;
   background: var(--po-surface);
 }
@@ -1277,6 +1283,8 @@
   position: sticky;
   bottom: 0;
   margin-top: auto;
+  padding-bottom: 18px;
+  border-top: 1px solid var(--po-line);
   background: var(--po-surface);
 }
 .po-preview-app .po-automation-filters {
