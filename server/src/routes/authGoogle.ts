@@ -1,4 +1,4 @@
-import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify } from "node:crypto";
+import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify, createHmac } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
@@ -11,6 +11,8 @@ import { Sentry } from "../lib/sentry.js";
 export const googleAuthRouter = Router();
 
 const STATE_COOKIE = "signalai_google_oauth_state";
+const HANDOFF_TTL_MS = 2 * 60 * 1000;
+const handoffTokens = new Map<string, { expiresAt: number; payload: { tenantId: string; token: string; email: string; firstName: string | null; lastName: string | null; picture: string | null } }>();
 const STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_ISSUERS = new Set(["https://accounts.google.com", "accounts.google.com"]);
 const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
@@ -78,14 +80,14 @@ function safeReturnTo(value: unknown): string {
 
 function signedState(secret: string, payload: OAuthState): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = createHash("sha256").update(secret).update(".").update(body).digest("base64url");
+  const signature = createHmac("sha256", secret).update(body).digest("base64url");
   return `${body}.${signature}`;
 }
 
 function verifyState(secret: string, state: string): OAuthState | null {
   const [body, signature] = state.split(".");
   if (!body || !signature) return null;
-  const expected = createHash("sha256").update(secret).update(".").update(body).digest("base64url");
+  const expected = createHmac("sha256", secret).update(body).digest("base64url");
   if (!safeEqualString(expected, signature)) return null;
   try {
     const payload = JSON.parse(base64UrlDecode(body).toString("utf8")) as OAuthState;
@@ -244,21 +246,36 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
     const tenantId = tenants[0]!.tenantId;
     const sessionVersion = (await getUserSessionVersion(pool, user.id)) ?? 1;
     const token = createSessionToken(config.sessionSecret, user.id, sessionVersion);
+    const handoff = randomBytes(32).toString("base64url");
+    handoffTokens.set(handoff, {
+      expiresAt: Date.now() + HANDOFF_TTL_MS,
+      payload: {
+        tenantId,
+        token,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        picture: user.profilePictureUrl,
+      },
+    });
     const destination = safeReturnTo(statePayload.returnTo);
     const redirect = new URL(destination, config.appBaseUrl);
-    redirect.hash = new URLSearchParams({
-      google_auth: "success",
-      tenantId,
-      token,
-      email: user.email,
-      firstName: user.firstName ?? "",
-      lastName: user.lastName ?? "",
-      picture: user.profilePictureUrl ?? "",
-    }).toString();
+    redirect.searchParams.set("google_auth", "success");
+    redirect.searchParams.set("handoff", handoff);
     return res.redirect(redirect.toString());
   } catch (err) {
     console.error("Google OAuth callback failed:", err);
     Sentry.captureException(err);
     return redirectAuthError(res, "google_sign_in_failed");
   }
+});
+
+
+googleAuthRouter.post("/auth/google/exchange", (req, res) => {
+  const handoff = req.body?.handoff;
+  if (typeof handoff !== "string" || !handoff) return res.status(400).json({ error: "invalid_google_handoff" });
+  const entry = handoffTokens.get(handoff);
+  handoffTokens.delete(handoff);
+  if (!entry || entry.expiresAt <= Date.now()) return res.status(401).json({ error: "expired_google_handoff" });
+  return res.status(200).json(entry.payload);
 });
