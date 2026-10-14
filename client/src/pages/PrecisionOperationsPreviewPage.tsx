@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen } from "./PrecisionOperationsFullScreens";
+import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen, type PreviewPalette } from "./PrecisionOperationsFullScreens";
 import { Logo } from "../components/Logo";
 import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
@@ -868,6 +868,32 @@ export function PrecisionOperationsPreviewPage() {
   const [selectedLeadOwner,setSelectedLeadOwner] = useState("Unassigned");
   const [selectedLeadHandoff,setSelectedLeadHandoff] = useState(true);
   const [theme,setTheme] = useState<"light"|"dark">(() => new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light");
+  const [palette,setPalette] = useState<PreviewPalette>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("palette") ?? "navy-cobalt";
+    const aliases: Record<string, PreviewPalette> = { "indigo-blue": "navy-cobalt", "green-slate": "forest-slate" };
+    const normalized = aliases[requested] ?? requested;
+    return (["navy-cobalt", "teal-emerald", "slate-cyan", "forest-slate", "orange-amber", "neutral-slate"] as string[]).includes(normalized)
+      ? normalized as PreviewPalette
+      : "navy-cobalt";
+  });
+  const changeTheme = (next: "light"|"dark") => {
+    setTheme(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    params.set("theme", next);
+    params.set("palette", palette);
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
+  const changePalette = (next: PreviewPalette) => {
+    setPalette(next);
+    document.body.dataset.poPalette = next;
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    params.set("theme", theme);
+    params.set("palette", next);
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
   const applyNavigation = (next: PreviewScreen) => {
     setScreen(next);
     setSavedNotice(false);
@@ -949,10 +975,10 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "integrations" ? <IntegrationsScreen />
     : screen === "team" ? <TeamScreen />
     : screen === "billing" ? <BillingScreen />
-    : screen === "settings" ? <SettingsScreen />
+    : screen === "settings" ? <SettingsScreen theme={theme} palette={palette} onChangeTheme={changeTheme} onChangePalette={changePalette} />
     : screen === "docs" ? <DocsScreen />
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>setTheme(v=>{ const next=v==="light"?"dark":"light"; const params=new URLSearchParams(window.location.search); params.set("preview","precision-operations"); params.set("theme",next); window.history.replaceState(null,"",window.location.pathname+"?"+params.toString()); return next; })}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
