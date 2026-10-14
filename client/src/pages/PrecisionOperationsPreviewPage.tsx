@@ -120,7 +120,7 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
       <div className="po-plan-card">
         <span className="po-plan-label">Current Plan</span>
         <strong>Trial</strong>
-        <button type="button" aria-label="View plan and usage" data-tooltip={collapsed ? "View plan & usage" : undefined} onClick={() => onNavigate("billing")}><CreditCardIcon className="po-plan-icon" /><span>View plan &amp; usage</span></button>
+        <button type="button" aria-label="View plan and usage" data-tooltip={collapsed ? "View plan & usage" : undefined} onClick={() => onNavigate("billing")}><CreditCardIcon className="po-plan-icon" width={17} height={17} /><span>View plan &amp; usage</span></button>
       </div>
     </aside>
   );
