@@ -78,7 +78,8 @@ describe("users", () => {
     expect(googleUser.lastName).toBe("Last");
     expect(googleUser.profilePictureUrl).toBe("https://example.com/profile.png");
     expect(googleUser.googleSubject).toBe("google-subject-1");
-    expect(await pool.query("select count(*)::int as count from users")).toMatchObject({ rows: [{ count: 1 }] });
+    const count = await pool.query("select count(*)::int as count from users");
+    expect(count.rows[0]?.count).toBe(1);
   });
 
   it("rejects a different Google subject attempting to link to an already linked email", async () => {
