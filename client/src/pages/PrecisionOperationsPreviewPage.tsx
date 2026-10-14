@@ -3,9 +3,9 @@ import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, C
 import { Logo } from "../components/Logo";
 import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
-  IntegrationsIcon, LeadsIcon, SettingsIcon, TeamIcon, InstagramMarkIcon,
+  IntegrationsIcon, LeadsIcon, SettingsIcon, InstagramMarkIcon,
   BotIcon, SendIcon, ListChecksIcon, SearchIcon, PlayIcon, PlusIcon,
-  ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, CreditCardIcon, SunIcon, MoonIcon, BellIcon,
+  ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, SunIcon, MoonIcon, BellIcon,
 } from "../components/icons";
 
 type PreviewScreen = FullPreviewScreen;
@@ -31,8 +31,6 @@ const navigation: NavigationItem[] = [
   { label: "Content", icon: ContentIcon, screen: "content", section: "primary" },
   { label: "Analytics", icon: AnalyticsIcon, screen: "analytics", section: "primary" },
   { label: "Integrations", icon: IntegrationsIcon, screen: "integrations", section: "workspace" },
-  { label: "Team", icon: TeamIcon, screen: "team", section: "workspace" },
-  { label: "Billing", icon: CreditCardIcon, screen: "billing", section: "workspace" },
   { label: "Settings", icon: SettingsIcon, screen: "settings", section: "workspace" },
 ];
 
@@ -844,6 +842,7 @@ export function PrecisionOperationsPreviewPage() {
   const [screen,setScreen] = useState<PreviewScreen>(() => {
     const requested = new URLSearchParams(window.location.search).get("screen");
     if (!requested) return "overview";
+    if (requested === "team" || requested === "billing") return "settings";
     if (validScreens.includes(requested as PreviewScreen)) return requested as PreviewScreen;
     return screenAliases[requested] ?? "overview";
   });
@@ -885,6 +884,14 @@ export function PrecisionOperationsPreviewPage() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [screen]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const legacyScreen = params.get("screen");
+    if (legacyScreen !== "team" && legacyScreen !== "billing") return;
+    params.set("screen", "settings");
+    params.set("settingsSection", legacyScreen === "team" ? "Team & access" : "Plan & billing");
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  }, []);
   const changeTheme = (next: "light"|"dark") => {
     setTheme(next);
     const params = new URLSearchParams(window.location.search);
@@ -903,11 +910,15 @@ export function PrecisionOperationsPreviewPage() {
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
   };
   const applyNavigation = (next: PreviewScreen) => {
-    setScreen(next);
+    const settingsSection = next === "team" ? "Team & access" : next === "billing" ? "Plan & billing" : null;
+    const targetScreen: PreviewScreen = settingsSection ? "settings" : next;
+    setScreen(targetScreen);
     setSavedNotice(false);
     const params = new URLSearchParams(window.location.search);
     params.set("preview","precision-operations");
-    params.set("screen",next);
+    params.set("screen",targetScreen);
+    if (settingsSection) params.set("settingsSection", settingsSection);
+    else if (targetScreen !== "settings") params.delete("settingsSection");
     window.history.replaceState(null,"",window.location.pathname+"?"+params.toString());
   };
   const go = (next: PreviewScreen) => {
