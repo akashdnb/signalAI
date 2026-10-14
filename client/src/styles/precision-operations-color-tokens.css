@@ -283,3 +283,339 @@ body:has(.po-preview-app.is-dark) {
 .po-preview-app.is-dark .po-nav-coming-soon small { background: var(--po-color-primary-soft); color: var(--po-color-primary-strong); }
 .po-preview-app.is-dark.po-standalone-preview .po-auth-layout { background: var(--po-color-auth-gradient); }
 .po-preview-app.is-dark.po-standalone-preview .po-auth-error { border-color: var(--po-color-auth-error-border); background: var(--po-color-auth-error-bg); color: var(--po-color-auth-error-text); }
+
+
+/* Compatibility tokens for the remaining illustrations and rare states in the
+   legacy preview CSS. Keep these values here; component styles should reference
+   the named token instead of embedding a literal color. */
+.po-preview-app {
+  --po-color-white: #ffffff;
+  --po-color-black: #000000;
+  --po-color-transparent: transparent;
+  --po-color-current: currentColor;
+  --po-color-legacy-hex-f8fafc: #f8fafc;
+  --po-color-legacy-hex-87908a: #87908a;
+  --po-color-legacy-hex-e0e4ea: #e0e4ea;
+  --po-color-legacy-hex-eef0ed: #eef0ed;
+  --po-color-legacy-hex-cbdff4: #cbdff4;
+  --po-color-legacy-hex-eaf3fc: #eaf3fc;
+  --po-color-legacy-hex-285c91: #285c91;
+  --po-color-legacy-hex-8d5b16: #8d5b16;
+  --po-color-legacy-hex-a9b2ac: #a9b2ac;
+  --po-color-legacy-hex-9ba69f: #9ba69f;
+  --po-color-legacy-hex-f3d8e6: #f3d8e6;
+  --po-color-legacy-hex-fff0f6: #fff0f6;
+  --po-color-legacy-hex-e5e8e2: #e5e8e2;
+  --po-color-legacy-rgb-28-39-31-3: rgb(28 39 31 / 3%);
+  --po-color-legacy-hex-aaa1cb: #aaa1cb;
+  --po-color-legacy-rgb-109-54-216-8: rgb(109 54 216 / 8%);
+  --po-color-legacy-hex-e1daf5: #e1daf5;
+  --po-color-legacy-hex-59645d: #59645d;
+  --po-color-legacy-hex-9aa39c: #9aa39c;
+  --po-color-legacy-hex-c4cbc4: #c4cbc4;
+  --po-color-legacy-hex-edf0eb: #edf0eb;
+  --po-color-legacy-hex-e0d9f5: #e0d9f5;
+  --po-color-legacy-hex-ebe4fb: #ebe4fb;
+  --po-color-legacy-hex-5737a7: #5737a7;
+  --po-color-legacy-hex-fcfdfa: #fcfdfa;
+  --po-color-legacy-hex-f5f6f2: #f5f6f2;
+  --po-color-legacy-hex-ab4c87: #ab4c87;
+  --po-color-legacy-hex-c9dfd1: #c9dfd1;
+  --po-color-legacy-hex-edf7f0: #edf7f0;
+  --po-color-legacy-rgb-19-27-22-40: rgb(19 27 22 / 40%);
+  --po-color-legacy-rgb-19-27-22-18: rgb(19 27 22 / 18%);
+  --po-color-legacy-hex-e1d9f5: #e1d9f5;
+  --po-color-legacy-hex-b5beb6: #b5beb6;
+  --po-color-legacy-hex-19875b: #19875b;
+  --po-color-legacy-hex-e7dff8: #e7dff8;
+  --po-color-legacy-rgb-15-23-42-13: rgb(15 23 42 / 13%);
+  --po-color-legacy-hex-eee7d8: #eee7d8;
+  --po-color-legacy-hex-d7dcca: #d7dcca;
+  --po-color-legacy-hex-1c2b22: #1c2b22;
+  --po-color-legacy-hex-ece2d2: #ece2d2;
+  --po-color-legacy-hex-f6f3eb: #f6f3eb;
+  --po-color-legacy-hex-d2ded1: #d2ded1;
+  --po-color-legacy-hex-e7e9ef: #e7e9ef;
+  --po-color-legacy-hex-f6f4ed: #f6f4ed;
+  --po-color-legacy-hex-d6deed: #d6deed;
+  --po-color-legacy-hex-d7ded8: #d7ded8;
+  --po-color-legacy-hex-edf0e8: #edf0e8;
+  --po-color-legacy-hex-b9cdc2: #b9cdc2;
+  --po-color-legacy-rgb-37-61-47-23: rgb(37 61 47 / 23%);
+  --po-color-legacy-rgb-255-255-255-13: rgb(255 255 255 / 13%);
+  --po-color-legacy-hex-f1d4e5: #f1d4e5;
+  --po-color-legacy-hex-171d19: #171d19;
+  --po-color-legacy-hex-354139: #354139;
+  --po-color-legacy-hex-18231c: #18231c;
+  --po-color-legacy-rgb-180-154-245-14: rgb(180 154 245 / 14%);
+  --po-color-legacy-hex-1f3446: #1f3446;
+  --po-color-legacy-hex-344b60: #344b60;
+  --po-color-legacy-hex-a9d6ff: #a9d6ff;
+  --po-color-legacy-hex-355744: #355744;
+  --po-color-legacy-hex-a1e0b9: #a1e0b9;
+  --po-color-legacy-hex-5a482b: #5a482b;
+  --po-color-legacy-hex-8c9690: #8c9690;
+  --po-color-legacy-hex-66528a: #66528a;
+  --po-color-legacy-hex-ffaaa4: #ffaaa4;
+  --po-color-legacy-hex-e7defb: #e7defb;
+  --po-color-legacy-hex-eef1fc: #eef1fc;
+  --po-color-legacy-hex-dcf0fb: #dcf0fb;
+  --po-color-legacy-rgb-148-163-184-24: rgb(148 163 184 / 24%);
+  --po-color-legacy-rgb-15-23-42-25: rgb(15 23 42 / 25%);
+  --po-color-legacy-hex-fecaca: #fecaca;
+  --po-color-legacy-hex-fef2f2: #fef2f2;
+  --po-color-legacy-hex-991b1b: #991b1b;
+  --po-color-legacy-hex-201a3d: #201a3d;
+  --po-color-legacy-hex-171d34: #171d34;
+  --po-color-legacy-hex-0d1f30: #0d1f30;
+  --po-color-legacy-hex-7f1d1d: #7f1d1d;
+  --po-color-legacy-hex-351c24: #351c24;
+  --po-color-legacy-rgb-15-23-42-15: rgb(15 23 42 / 15%);
+  --po-color-legacy-hex-b91c1c: #b91c1c;
+  --po-color-legacy-hex-d8d5e2: #d8d5e2;
+  --po-color-legacy-hex-e8e5ef: #e8e5ef;
+  --po-color-legacy-hex-817b91: #817b91;
+  --po-color-legacy-hex-3b354c: #3b354c;
+  --po-color-legacy-hex-2b2736: #2b2736;
+  --po-color-legacy-hex-a19bad: #a19bad;
+  --po-color-legacy-rgb-15-23-42-4: rgb(15 23 42 / 4%);
+  --po-color-legacy-hex-5b21b6: #5b21b6;
+  --po-color-legacy-hex-fafbfc: #fafbfc;
+  --po-color-legacy-hex-fafaff: #fafaff;
+  --po-color-legacy-hex-2563eb: #2563eb;
+  --po-color-legacy-hex-4c1d95: #4c1d95;
+  --po-color-legacy-hex-d1fae5: #d1fae5;
+  --po-color-legacy-hex-047857: #047857;
+  --po-color-legacy-hex-fef3c7: #fef3c7;
+  --po-color-legacy-hex-92400e: #92400e;
+  --po-color-legacy-hex-667085: #667085;
+  --po-color-legacy-hex-a8aebb: #a8aebb;
+  --po-color-legacy-hex-f6f7fb: #f6f7fb;
+  --po-color-legacy-hex-626a7c: #626a7c;
+  --po-color-legacy-hex-e5e7eb: #e5e7eb;
+  --po-color-legacy-hex-d8dce5: #d8dce5;
+  --po-color-legacy-hex-f1eafe: #f1eafe;
+  --po-color-legacy-hex-087f5b: #087f5b;
+  --po-color-legacy-hex-eaf8f2: #eaf8f2;
+  --po-color-legacy-hex-a15c00: #a15c00;
+  --po-color-legacy-hex-fff6df: #fff6df;
+  --po-color-legacy-hex-eef4ff: #eef4ff;
+  --po-color-legacy-rgba-124-58-237-18: rgba(124,58,237,.18);
+  --po-color-legacy-rgba-15-23-42-18: rgba(15,23,42,.18);
+  --po-color-legacy-hex-273142: #273142;
+  --po-color-legacy-hex-f7f5fb: #f7f5fb;
+  --po-color-legacy-hex-fbfbfd: #fbfbfd;
+  --po-color-legacy-hex-fafafa: #fafafa;
+  --po-color-legacy-hex-c9ced8: #c9ced8;
+  --po-color-legacy-hex-f3f4f7: #f3f4f7;
+  --po-color-legacy-hex-596273: #596273;
+  --po-color-legacy-hex-eef0f4: #eef0f4;
+  --po-color-legacy-hex-faf9fd: #faf9fd;
+  --po-color-legacy-hex-fcfbff: #fcfbff;
+  --po-color-legacy-hex-b4bbc7: #b4bbc7;
+  --po-color-legacy-hex-f8f6fc: #f8f6fc;
+  --po-color-legacy-rgba-15-23-42-04: rgba(15,23,42,.04);
+  --po-color-legacy-hex-9b72ed: #9b72ed;
+  --po-color-legacy-rgba-124-58-237-1: rgba(124,58,237,.1);
+  --po-color-legacy-rgba-15-23-42-42: rgba(15,23,42,.42);
+  --po-color-legacy-hex-ddd5ee: #ddd5ee;
+  --po-color-legacy-hex-faf8ff: #faf8ff;
+  --po-color-legacy-hex-5e566d: #5e566d;
+  --po-color-legacy-hex-8ab4ff: #8ab4ff;
+  --po-color-legacy-hex-1e2a40: #1e2a40;
+  --po-color-legacy-rgba-180-154-245-3: rgba(180,154,245,.3);
+  --po-color-legacy-rgba-0-0-0-5: rgba(0,0,0,.5);
+  --po-color-legacy-hex-55605a: #55605a;
+  --po-color-legacy-hex-262e29: #262e29;
+  --po-color-legacy-hex-6d7a72: #6d7a72;
+  --po-color-legacy-hex-3a3350: #3a3350;
+  --po-color-legacy-hex-1e1a2b: #1e1a2b;
+  --po-color-legacy-hex-c7c0d6: #c7c0d6;
+  --po-color-legacy-hex-cdb8ff: #cdb8ff;
+  --po-color-legacy-hex-2b2342: #2b2342;
+  --po-color-legacy-hex-453a63: #453a63;
+  --po-color-legacy-hex-3a2535: #3a2535;
+  --po-color-legacy-hex-5a3b50: #5a3b50;
+  --po-color-legacy-hex-1e3328: #1e3328;
+  --po-color-legacy-hex-2f4d3b: #2f4d3b;
+  --po-color-legacy-hex-32455f: #32455f;
+  --po-color-legacy-hex-2a332d: #2a332d;
+}
+
+
+/* Preview-only palette switcher.
+ * Use ?palette=navy-cobalt|teal-emerald|slate-cyan|forest-slate|orange-amber|neutral-slate
+ * together with ?theme=light|dark.
+ */
+
+body[data-po-palette] .po-preview-app {
+  /* Stable semantic states: brand changes must not change meaning. */
+  --po-color-success: #059669; --po-color-success-soft: #ecfdf5; --po-color-success-border: #a7f3d0; --po-color-success-strong: #047857;
+  --po-color-warning: #d97706; --po-color-warning-soft: #fffbeb; --po-color-warning-border: #fde68a; --po-color-warning-dot: #f59e0b;
+  --po-color-error: #dc2626; --po-color-error-soft: #fef2f2; --po-color-error-border: #fecaca;
+  --po-color-info: #0284c7; --po-color-info-soft: #f0f9ff; --po-color-info-border: #bae6fd;
+  --po-color-trigger: #db2777; --po-color-trigger-soft: #fdf2f8; --po-color-trigger-border: #fbcfe8;
+  --po-color-goal: #059669; --po-color-goal-soft: #ecfdf5; --po-color-goal-border: #a7f3d0;
+  --po-color-instagram: #db2777; --po-color-instagram-soft: #fdf2f8;
+
+  /* Explicitly bridge legacy tokens: later dark-mode stylesheets still declare
+     --po-primary directly, so the selected palette must set it at this scope. */
+  --po-primary: var(--po-color-primary);
+  --po-primary-hover: var(--po-color-primary-hover);
+  --po-primary-soft: var(--po-color-primary-soft);
+}
+
+/* Light palettes */
+body[data-po-palette="navy-cobalt"] .po-preview-app { --po-color-primary:#1e3a8a; --po-color-primary-hover:#2563eb; --po-color-primary-soft:#eff6ff; --po-color-primary-border:#bfdbfe; --po-color-primary-strong:#1d4ed8; --po-color-primary-deep:#1e40af; --po-color-primary-action:#1e3a8a; --po-color-primary-action-hover:#1d4ed8; }
+body[data-po-palette="teal-emerald"] .po-preview-app { --po-color-primary:#065f4a; --po-color-primary-hover:#10b981; --po-color-primary-soft:#ecfdf5; --po-color-primary-border:#a7f3d0; --po-color-primary-strong:#047857; --po-color-primary-deep:#064e3b; --po-color-primary-action:#065f4a; --po-color-primary-action-hover:#047857; }
+body[data-po-palette="slate-cyan"] .po-preview-app { --po-color-primary:#0f172a; --po-color-primary-hover:#06b6d4; --po-color-primary-soft:#e0f2fe; --po-color-primary-border:#bae6fd; --po-color-primary-strong:#0891b2; --po-color-primary-deep:#164e63; --po-color-primary-action:#0f172a; --po-color-primary-action-hover:#164e63; }
+body[data-po-palette="forest-slate"] .po-preview-app { --po-color-primary:#14532d; --po-color-primary-hover:#16a34a; --po-color-primary-soft:#f0fdf4; --po-color-primary-border:#bbf7d0; --po-color-primary-strong:#15803d; --po-color-primary-deep:#166534; --po-color-primary-action:#14532d; --po-color-primary-action-hover:#166534; }
+body[data-po-palette="orange-amber"] .po-preview-app { --po-color-primary:#c2410c; --po-color-primary-hover:#f97316; --po-color-primary-soft:#fff7ed; --po-color-primary-border:#fed7aa; --po-color-primary-strong:#c2410c; --po-color-primary-deep:#9a3412; --po-color-primary-action:#c2410c; --po-color-primary-action-hover:#9a3412; }
+body[data-po-palette="neutral-slate"] .po-preview-app { --po-color-primary:#334155; --po-color-primary-hover:#475569; --po-color-primary-soft:#f1f5f9; --po-color-primary-border:#cbd5e1; --po-color-primary-strong:#334155; --po-color-primary-deep:#1e293b; --po-color-primary-action:#334155; --po-color-primary-action-hover:#1e293b; }
+
+/* Existing preview selectors call these legacy purple names. Redirect them to
+ * the selected brand so the palette changes the active/selected states too. */
+body[data-po-palette] .po-preview-app {
+  --po-color-purple-soft:var(--po-color-primary-soft); --po-color-purple-border:var(--po-color-primary-border); --po-color-purple-icon:var(--po-color-primary-soft);
+  --po-color-purple-count:var(--po-color-primary-soft); --po-color-purple-count-text:var(--po-color-primary-strong); --po-color-purple-selected:var(--po-color-primary-soft);
+  --po-color-purple-message:var(--po-color-primary-soft); --po-color-purple-message-border:var(--po-color-primary-border);
+}
+body[data-po-palette] .po-preview-app .po-flow-node:hover { border-color:var(--po-color-primary-border); }
+body[data-po-palette] .po-preview-app .po-filter-tabs button span { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-nav-coming-soon small { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+
+/* Shared dark foundation. */
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-color-canvas:#0b1220; --po-color-surface:#111827; --po-color-surface-muted:#172033; --po-color-surface-subtle:#172033; --po-color-surface-hover:#1e293b;
+  --po-color-ink:#f8fafc; --po-color-secondary:#cbd5e1; --po-color-muted:#94a3b8; --po-color-muted-strong:#cbd5e1; --po-color-placeholder:#94a3b8;
+  --po-color-border:#273449; --po-color-border-strong:#3b4a60; --po-color-border-subtle:#273449; --po-color-border-hover:#64748b;
+  --po-color-neutral-field:#172033; --po-color-neutral-field-text:#dbe4ee; --po-color-neutral-soft:#172033; --po-color-neutral-border:#334155; --po-color-neutral-text:#cbd5e1;
+  --po-color-neutral-quiet:#1e293b; --po-color-neutral-table-head:#172033; --po-color-neutral-table-head-text:#94a3b8; --po-color-neutral-table-text:#cbd5e1;
+  --po-color-neutral-label:#94a3b8; --po-color-neutral-muted:#64748b; --po-color-canvas-bg:#0f172a; --po-color-canvas-topline:#111827;
+  --po-color-canvas-grid:#334155; --po-color-canvas-watermark:#64748b; --po-color-connector:#64748b; --po-color-connector-arrow:#94a3b8;
+  --po-color-footer-text:#94a3b8; --po-color-notice-bg:#172033; --po-color-notice-text:#cbd5e1; --po-color-notice-strong:#f8fafc; --po-color-notice-dot:#94a3b8;
+  --po-color-neutral-avatar-bg:#1e293b; --po-color-neutral-avatar-border:#334155; --po-color-neutral-avatar-text:#cbd5e1; --po-color-neutral-icon-border:#334155;
+}
+
+/* Dark palettes use bright accents for selected text and dark, contrast-safe
+ * fills for buttons carrying white text. */
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --po-color-primary:#60a5fa; --po-color-primary-hover:#93c5fd; --po-color-primary-soft:#172554; --po-color-primary-border:#1d4ed8; --po-color-primary-strong:#bfdbfe; --po-color-primary-deep:#93c5fd; --po-color-primary-action:#1d4ed8; --po-color-primary-action-hover:#1e40af; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --po-color-primary:#34d399; --po-color-primary-hover:#6ee7b7; --po-color-primary-soft:#063b2f; --po-color-primary-border:#047857; --po-color-primary-strong:#a7f3d0; --po-color-primary-deep:#6ee7b7; --po-color-primary-action:#047857; --po-color-primary-action-hover:#065f46; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --po-color-primary:#22d3ee; --po-color-primary-hover:#67e8f9; --po-color-primary-soft:#0c3340; --po-color-primary-border:#0e7490; --po-color-primary-strong:#a5f3fc; --po-color-primary-deep:#67e8f9; --po-color-primary-action:#155e75; --po-color-primary-action-hover:#164e63; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --po-color-primary:#4ade80; --po-color-primary-hover:#86efac; --po-color-primary-soft:#12351f; --po-color-primary-border:#166534; --po-color-primary-strong:#bbf7d0; --po-color-primary-deep:#86efac; --po-color-primary-action:#15803d; --po-color-primary-action-hover:#166534; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --po-color-primary:#fb923c; --po-color-primary-hover:#fdba74; --po-color-primary-soft:#3b2417; --po-color-primary-border:#9a3412; --po-color-primary-strong:#fed7aa; --po-color-primary-deep:#fdba74; --po-color-primary-action:#c2410c; --po-color-primary-action-hover:#9a3412; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --po-color-primary:#cbd5e1; --po-color-primary-hover:#e2e8f0; --po-color-primary-soft:#1e293b; --po-color-primary-border:#475569; --po-color-primary-strong:#f1f5f9; --po-color-primary-deep:#e2e8f0; --po-color-primary-action:#475569; --po-color-primary-action-hover:#334155; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-color-purple-soft:var(--po-color-primary-soft); --po-color-purple-border:var(--po-color-primary-border); --po-color-purple-icon:var(--po-color-primary-soft);
+  --po-color-purple-count:var(--po-color-primary-soft); --po-color-purple-count-text:var(--po-color-primary-strong); --po-color-purple-selected:var(--po-color-primary-soft);
+  --po-color-purple-message:var(--po-color-primary-soft); --po-color-purple-message-border:var(--po-color-primary-border);
+}
+
+/* Legacy dark selectors still contain the original purple in the design-system
+ * and final-fixes layers. Higher-scoped rules below intentionally win for the
+ * selected preview palette only; status colours remain semantic and unchanged. */
+body[data-po-palette] .po-preview-app .po-button--primary,
+body[data-po-palette] .po-preview-app .po-plan-card > button {
+  border-color:var(--po-color-primary-action);
+  background:var(--po-color-primary-action);
+  color:#fff;
+}
+body[data-po-palette] .po-preview-app .po-button--primary:hover:not(:disabled),
+body[data-po-palette] .po-preview-app .po-plan-card > button:hover {
+  border-color:var(--po-color-primary-action-hover);
+  background:var(--po-color-primary-action-hover);
+  color:#fff;
+}
+body[data-po-palette] .po-preview-app .po-nav-item.is-active {
+  background:var(--po-color-primary-soft);
+  color:var(--po-color-primary);
+  box-shadow:inset 2px 0 0 var(--po-color-primary);
+}
+body[data-po-palette] .po-preview-app .po-nav-item.is-active::before { background:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-nav-count { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-conversation.is-selected { background:var(--po-color-primary-soft); }
+body[data-po-palette] .po-preview-app .po-message--outgoing > span { background:var(--po-color-primary-soft); border-color:var(--po-color-primary-border); }
+body[data-po-palette] .po-preview-app .po-tag--purple { background:var(--po-color-primary-soft); border-color:var(--po-color-primary-border); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-leads-production-table .po-tag--purple { background:var(--po-color-primary-soft); border-color:var(--po-color-primary-border); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-leads-production-table .po-tag--neutral { background:var(--po-color-neutral-soft); border-color:var(--po-color-neutral-border); color:var(--po-color-neutral-text); }
+body[data-po-palette] .po-preview-app .po-nav-coming-soon small { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-lead-unread-dot { background:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-leads-pagination button:not(:disabled) { color:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-leads-disclaimer { color:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-trigger-badge.is-comment,
+body[data-po-palette] .po-preview-app .po-trigger-badge.is-both { border-color:var(--po-color-primary-border); background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-brand .text-accent { color:var(--po-color-primary) !important; }
+body[data-po-palette] .po-preview-app.is-dark .po-profile-avatar { background:var(--po-color-primary-action); color:#fff; }
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table .po-tag--neutral { background:var(--po-color-neutral-soft); border-color:var(--po-color-neutral-border); color:var(--po-color-neutral-text); }
+
+/* Align dark legacy tokens with the dark palette surface tokens as well as the
+   accent tokens. Earlier .is-dark rules have greater specificity than the
+   legacy aliases, so restate these aliases at the same scoped specificity. */
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-canvas: var(--po-color-canvas);
+  --po-surface: var(--po-color-surface);
+  --po-surface-muted: var(--po-color-surface-muted);
+  --po-ink: var(--po-color-ink);
+  --po-secondary: var(--po-color-secondary);
+  --po-muted: var(--po-color-muted);
+  --po-line: var(--po-color-border);
+  --po-line-strong: var(--po-color-border-strong);
+  --po-primary: var(--po-color-primary);
+  --po-primary-hover: var(--po-color-primary-hover);
+  --po-primary-soft: var(--po-color-primary-soft);
+  --po-green: var(--po-color-success);
+  --po-green-soft: var(--po-color-success-soft);
+  --po-amber: var(--po-color-warning);
+  --po-amber-soft: var(--po-color-warning-soft);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-plan-card,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-card,
+body[data-po-palette] .po-preview-app.is-dark .po-thread-empty {
+  background: var(--po-color-surface);
+  border-color: var(--po-color-border);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-preview-notice {
+  border-color: var(--po-color-border);
+  background: var(--po-color-notice-bg);
+  color: var(--po-color-notice-text);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-nav-item:hover:not(.is-active),
+body[data-po-palette] .po-preview-app.is-dark .po-palette-item:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-conversation:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-automation-table tbody tr:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table tbody tr:hover {
+  background: var(--po-color-surface-hover);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-automation-table th,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-table th,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table th,
+body[data-po-palette] .po-preview-app.is-dark table th {
+  background: var(--po-color-neutral-table-head);
+  color: var(--po-color-neutral-table-head-text);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-canvas-workspace {
+  background-color: var(--po-color-canvas-bg);
+  background-image: radial-gradient(var(--po-color-canvas-grid) .85px, transparent .85px);
+}
+
+/* Recolor the inlined brand mark only inside this preview. The shared Logo
+   component keeps its original production colors everywhere else. */
+body[data-po-palette="navy-cobalt"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#60a5fa; --po-logo-gradient-middle:#2563eb; --po-logo-gradient-end:#1e3a8a; --po-logo-sparkle:#1e3a8a; }
+body[data-po-palette="teal-emerald"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#34d399; --po-logo-gradient-middle:#10b981; --po-logo-gradient-end:#065f4a; --po-logo-sparkle:#065f4a; }
+body[data-po-palette="slate-cyan"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#67e8f9; --po-logo-gradient-middle:#06b6d4; --po-logo-gradient-end:#0f172a; --po-logo-sparkle:#0891b2; }
+body[data-po-palette="forest-slate"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#86efac; --po-logo-gradient-middle:#16a34a; --po-logo-gradient-end:#14532d; --po-logo-sparkle:#14532d; }
+body[data-po-palette="orange-amber"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#fdba74; --po-logo-gradient-middle:#f97316; --po-logo-gradient-end:#c2410c; --po-logo-sparkle:#c2410c; }
+body[data-po-palette="neutral-slate"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#94a3b8; --po-logo-gradient-middle:#475569; --po-logo-gradient-end:#334155; --po-logo-sparkle:#334155; }
+
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --po-logo-gradient-start:#93c5fd; --po-logo-gradient-middle:#60a5fa; --po-logo-gradient-end:#2563eb; --po-logo-sparkle:#60a5fa; }
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --po-logo-gradient-start:#6ee7b7; --po-logo-gradient-middle:#34d399; --po-logo-gradient-end:#047857; --po-logo-sparkle:#34d399; }
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --po-logo-gradient-start:#67e8f9; --po-logo-gradient-middle:#22d3ee; --po-logo-gradient-end:#0e7490; --po-logo-sparkle:#22d3ee; }
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --po-logo-gradient-start:#86efac; --po-logo-gradient-middle:#4ade80; --po-logo-gradient-end:#15803d; --po-logo-sparkle:#4ade80; }
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --po-logo-gradient-start:#fdba74; --po-logo-gradient-middle:#fb923c; --po-logo-gradient-end:#c2410c; --po-logo-sparkle:#fb923c; }
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --po-logo-gradient-start:#e2e8f0; --po-logo-gradient-middle:#94a3b8; --po-logo-gradient-end:#475569; --po-logo-sparkle:#cbd5e1; }
+
+body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(1) { stop-color:var(--po-logo-gradient-start) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(2) { stop-color:var(--po-logo-gradient-middle) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(3) { stop-color:var(--po-logo-gradient-end) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg > path:last-child { fill:var(--po-logo-sparkle) !important; }
