@@ -284,15 +284,26 @@ body:has(.po-preview-app.is-dark) {
 .po-preview-app.is-dark.po-standalone-preview .po-auth-layout { background: var(--po-color-auth-gradient); }
 .po-preview-app.is-dark.po-standalone-preview .po-auth-error { border-color: var(--po-color-auth-error-border); background: var(--po-color-auth-error-bg); color: var(--po-color-auth-error-text); }
 
-
-/* Compatibility tokens for the remaining illustrations and rare states in the
-   legacy preview CSS. Keep these values here; component styles should reference
-   the named token instead of embedding a literal color. */
+/* Compatibility tokens for legacy illustrations and uncommon states. Every
+   retained color value in the preview is declared here rather than embedded
+   in a component stylesheet. Use a semantic token when updating these states. */
 .po-preview-app {
   --po-color-white: #ffffff;
   --po-color-black: #000000;
   --po-color-transparent: transparent;
   --po-color-current: currentColor;
+  --po-color-shadow-card: rgb(15 23 42 / 4%);
+  --po-color-shadow-modal: rgb(15 23 42 / 18%);
+  --po-color-shadow-menu: rgb(15 23 42 / 13%);
+  --po-color-shadow-menu-strong: rgb(15 23 42 / 15%);
+  --po-color-shadow-soft: rgb(15 23 42 / 25%);
+  --po-color-shadow-modal-dark: rgb(0 0 0 / 50%);
+  --po-color-focus-shadow: rgb(124 58 237 / 10%);
+  --po-color-focus-shadow-strong: rgb(124 58 237 / 18%);
+  --po-color-focus-shadow-dark: rgb(180 154 245 / 30%);
+  --po-color-focus-shadow-soft: rgb(109 54 216 / 8%);
+  --po-color-art-shadow: rgb(37 61 47 / 23%);
+  --po-color-white-glaze: rgb(255 255 255 / 13%);
   --po-color-legacy-hex-f8fafc: #f8fafc;
   --po-color-legacy-hex-87908a: #87908a;
   --po-color-legacy-hex-e0e4ea: #e0e4ea;
@@ -306,9 +317,7 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-f3d8e6: #f3d8e6;
   --po-color-legacy-hex-fff0f6: #fff0f6;
   --po-color-legacy-hex-e5e8e2: #e5e8e2;
-  --po-color-legacy-rgb-28-39-31-3: rgb(28 39 31 / 3%);
   --po-color-legacy-hex-aaa1cb: #aaa1cb;
-  --po-color-legacy-rgb-109-54-216-8: rgb(109 54 216 / 8%);
   --po-color-legacy-hex-e1daf5: #e1daf5;
   --po-color-legacy-hex-59645d: #59645d;
   --po-color-legacy-hex-9aa39c: #9aa39c;
@@ -322,13 +331,10 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-ab4c87: #ab4c87;
   --po-color-legacy-hex-c9dfd1: #c9dfd1;
   --po-color-legacy-hex-edf7f0: #edf7f0;
-  --po-color-legacy-rgb-19-27-22-40: rgb(19 27 22 / 40%);
-  --po-color-legacy-rgb-19-27-22-18: rgb(19 27 22 / 18%);
   --po-color-legacy-hex-e1d9f5: #e1d9f5;
   --po-color-legacy-hex-b5beb6: #b5beb6;
   --po-color-legacy-hex-19875b: #19875b;
   --po-color-legacy-hex-e7dff8: #e7dff8;
-  --po-color-legacy-rgb-15-23-42-13: rgb(15 23 42 / 13%);
   --po-color-legacy-hex-eee7d8: #eee7d8;
   --po-color-legacy-hex-d7dcca: #d7dcca;
   --po-color-legacy-hex-1c2b22: #1c2b22;
@@ -341,13 +347,10 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-d7ded8: #d7ded8;
   --po-color-legacy-hex-edf0e8: #edf0e8;
   --po-color-legacy-hex-b9cdc2: #b9cdc2;
-  --po-color-legacy-rgb-37-61-47-23: rgb(37 61 47 / 23%);
-  --po-color-legacy-rgb-255-255-255-13: rgb(255 255 255 / 13%);
   --po-color-legacy-hex-f1d4e5: #f1d4e5;
   --po-color-legacy-hex-171d19: #171d19;
   --po-color-legacy-hex-354139: #354139;
   --po-color-legacy-hex-18231c: #18231c;
-  --po-color-legacy-rgb-180-154-245-14: rgb(180 154 245 / 14%);
   --po-color-legacy-hex-1f3446: #1f3446;
   --po-color-legacy-hex-344b60: #344b60;
   --po-color-legacy-hex-a9d6ff: #a9d6ff;
@@ -361,7 +364,6 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-eef1fc: #eef1fc;
   --po-color-legacy-hex-dcf0fb: #dcf0fb;
   --po-color-legacy-rgb-148-163-184-24: rgb(148 163 184 / 24%);
-  --po-color-legacy-rgb-15-23-42-25: rgb(15 23 42 / 25%);
   --po-color-legacy-hex-fecaca: #fecaca;
   --po-color-legacy-hex-fef2f2: #fef2f2;
   --po-color-legacy-hex-991b1b: #991b1b;
@@ -370,7 +372,6 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-0d1f30: #0d1f30;
   --po-color-legacy-hex-7f1d1d: #7f1d1d;
   --po-color-legacy-hex-351c24: #351c24;
-  --po-color-legacy-rgb-15-23-42-15: rgb(15 23 42 / 15%);
   --po-color-legacy-hex-b91c1c: #b91c1c;
   --po-color-legacy-hex-d8d5e2: #d8d5e2;
   --po-color-legacy-hex-e8e5ef: #e8e5ef;
@@ -378,7 +379,6 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-3b354c: #3b354c;
   --po-color-legacy-hex-2b2736: #2b2736;
   --po-color-legacy-hex-a19bad: #a19bad;
-  --po-color-legacy-rgb-15-23-42-4: rgb(15 23 42 / 4%);
   --po-color-legacy-hex-5b21b6: #5b21b6;
   --po-color-legacy-hex-fafbfc: #fafbfc;
   --po-color-legacy-hex-fafaff: #fafaff;
@@ -400,8 +400,6 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-a15c00: #a15c00;
   --po-color-legacy-hex-fff6df: #fff6df;
   --po-color-legacy-hex-eef4ff: #eef4ff;
-  --po-color-legacy-rgba-124-58-237-18: rgba(124,58,237,.18);
-  --po-color-legacy-rgba-15-23-42-18: rgba(15,23,42,.18);
   --po-color-legacy-hex-273142: #273142;
   --po-color-legacy-hex-f7f5fb: #f7f5fb;
   --po-color-legacy-hex-fbfbfd: #fbfbfd;
@@ -414,17 +412,12 @@ body:has(.po-preview-app.is-dark) {
   --po-color-legacy-hex-fcfbff: #fcfbff;
   --po-color-legacy-hex-b4bbc7: #b4bbc7;
   --po-color-legacy-hex-f8f6fc: #f8f6fc;
-  --po-color-legacy-rgba-15-23-42-04: rgba(15,23,42,.04);
   --po-color-legacy-hex-9b72ed: #9b72ed;
-  --po-color-legacy-rgba-124-58-237-1: rgba(124,58,237,.1);
-  --po-color-legacy-rgba-15-23-42-42: rgba(15,23,42,.42);
   --po-color-legacy-hex-ddd5ee: #ddd5ee;
   --po-color-legacy-hex-faf8ff: #faf8ff;
   --po-color-legacy-hex-5e566d: #5e566d;
   --po-color-legacy-hex-8ab4ff: #8ab4ff;
   --po-color-legacy-hex-1e2a40: #1e2a40;
-  --po-color-legacy-rgba-180-154-245-3: rgba(180,154,245,.3);
-  --po-color-legacy-rgba-0-0-0-5: rgba(0,0,0,.5);
   --po-color-legacy-hex-55605a: #55605a;
   --po-color-legacy-hex-262e29: #262e29;
   --po-color-legacy-hex-6d7a72: #6d7a72;
