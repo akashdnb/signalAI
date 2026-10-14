@@ -453,15 +453,15 @@
 .po-preview-app .po-chart-summary span { color: var(--po-muted); font-size: 14px; }
 .po-preview-app .po-minibars { display: flex; align-items: stretch; gap: 12px; height: 150px; padding: 12px 0 0; }
 .po-preview-app .po-minibar-col { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 8px; }
-.po-preview-app .po-minibar-track { display: flex; flex: 1; align-items: flex-end; width: 100%; overflow: hidden; border-bottom: 1px solid var(--po-line); background: linear-gradient(to bottom, var(--po-color-transparent) 24%, var(--po-line) 25%, var(--po-color-transparent) 26%, var(--po-color-transparent) 49%, var(--po-line) 50%, var(--po-color-transparent) 51%, var(--po-color-transparent) 74%, var(--po-line) 75%, var(--po-color-transparent) 76%); }
+.po-preview-app .po-minibar-track { display: flex; flex: 1; align-items: flex-end; width: 100%; overflow: hidden; border-bottom: 1px solid var(--po-color-chart-grid); background: linear-gradient(to bottom, var(--po-color-transparent) 24%, var(--po-color-chart-grid) 25%, var(--po-color-transparent) 26%, var(--po-color-transparent) 49%, var(--po-color-chart-grid) 50%, var(--po-color-transparent) 51%, var(--po-color-transparent) 74%, var(--po-color-chart-grid) 75%, var(--po-color-transparent) 76%); }
 .po-preview-app .po-minibar-value { color: var(--po-muted); font-size: 11px; font-weight: 600; line-height: 1.2; }
-.po-preview-app .po-minibar-track span { display: block; width: 100%; min-height: 4px; background: var(--po-info); border-radius: 3px 3px 0 0; }
+.po-preview-app .po-minibar-track span { display: block; width: 100%; min-height: 4px; background: var(--po-color-chart-1); border-radius: 3px 3px 0 0; }
 .po-preview-app .po-minibar-col small { color: var(--po-muted); font-size: 12px; }
 .po-preview-app .po-stage-list { display: flex; flex-direction: column; gap: 13px; margin-top: 20px; }
 .po-preview-app .po-stage-row { display: grid; grid-template-columns: 85px minmax(40px,1fr) 24px 44px; align-items: center; gap: 8px; color: var(--po-secondary); font-size: 14px; }
 .po-preview-app .po-stage-row strong { color: var(--po-ink); font-size: 14px; text-align: right; }
 .po-preview-app .po-stage-track { height: 7px; overflow: hidden; border-radius: 6px; background: var(--po-line); }
-.po-preview-app .po-stage-track span { display: block; height: 100%; background: var(--po-info); }
+.po-preview-app .po-stage-track span { display: block; height: 100%; background: var(--po-color-chart-1); }
 .po-preview-app .po-note-line { display: flex; align-items: flex-start; gap: 7px; margin-top: 17px; padding-top: 12px; border-top: 1px solid var(--po-line); color: var(--po-muted); font-size: 12px; line-height: 1.5; }
 .po-preview-app .po-note-line svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--po-green); }
 .po-preview-app .po-action-row { display: flex; align-items: center; gap: 11px; width: 100%; padding: 11px 0; border: 0; border-top: 1px solid var(--po-line); background: var(--po-color-transparent); color: var(--po-ink); text-align: left; }
