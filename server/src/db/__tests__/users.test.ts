@@ -8,6 +8,7 @@ import {
   getUserById,
   getUserSessionVersion,
   normalizeEmail,
+  findOrCreateUserByGoogle,
 } from "../users.js";
 
 describe("users", () => {
@@ -58,6 +59,45 @@ describe("users", () => {
     expect((await getUserById(pool, created.id))?.id).toBe(created.id);
     expect((await getUserByEmail(pool, "creator@example.com"))?.id).toBe(created.id);
     expect(await getUserById(pool, "00000000-0000-0000-0000-000000000000")).toBeNull();
+  });
+
+  it("captures Google profile fields and reuses an existing email-OTP identity", async () => {
+    const pool = getPool();
+    const emailUser = await findOrCreateUserByEmail(pool, "  person@example.com ");
+    const googleUser = await findOrCreateUserByGoogle(pool, {
+      sub: "google-subject-1",
+      email: "PERSON@example.com",
+      givenName: "First",
+      familyName: "Last",
+      picture: "https://example.com/profile.png",
+    });
+
+    expect(googleUser.id).toBe(emailUser.id);
+    expect(googleUser.email).toBe("person@example.com");
+    expect(googleUser.firstName).toBe("First");
+    expect(googleUser.lastName).toBe("Last");
+    expect(googleUser.profilePictureUrl).toBe("https://example.com/profile.png");
+    expect(googleUser.googleSubject).toBe("google-subject-1");
+    expect(await pool.query("select count(*)::int as count from users")).toMatchObject({ rows: [{ count: 1 }] });
+  });
+
+  it("rejects a different Google subject attempting to link to an already linked email", async () => {
+    const pool = getPool();
+    await findOrCreateUserByGoogle(pool, {
+      sub: "google-subject-a",
+      email: "linked@example.com",
+      givenName: "Person",
+      familyName: "One",
+      picture: null,
+    });
+
+    await expect(findOrCreateUserByGoogle(pool, {
+      sub: "google-subject-b",
+      email: "LINKED@example.com",
+      givenName: "Person",
+      familyName: "Two",
+      picture: null,
+    })).rejects.toThrow("google_identity_conflict");
   });
 
   it("session_version starts at 1 and bumps independently per user", async () => {
