@@ -71,10 +71,12 @@ export async function findOrCreateUserByGoogle(
        last_name = coalesce(users.last_name, excluded.last_name),
        profile_picture_url = coalesce(excluded.profile_picture_url, users.profile_picture_url),
        google_subject = coalesce(users.google_subject, excluded.google_subject)
+     where users.google_subject is null or users.google_subject = excluded.google_subject
      returning *`,
     [normalized, profile.givenName?.trim() || null, profile.familyName?.trim() || null, profile.picture || null, profile.sub],
   );
-  const user = toUser(result.rows[0]!);
+  if (!result.rows[0]) throw new Error("google_identity_conflict");
+  const user = toUser(result.rows[0]);
   if (user.googleSubject && user.googleSubject !== profile.sub) {
     throw new Error("google_identity_conflict");
   }
