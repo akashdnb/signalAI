@@ -999,3 +999,122 @@ body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button
   height: 18px;
   margin: 0;
 }
+
+/* A single brand control owns the collapsed sidebar toggle. In expanded mode,
+   keep SignalAI as a static wordmark and a borderless collapse icon beside it.
+   In collapsed mode, the logo itself transforms into the expand affordance on
+   hover/focus, avoiding the competing logo + expand-button combination. */
+.po-preview-app .po-sidebar-brand-control {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0 !important;
+  border-radius: 8px;
+  outline: none;
+  box-shadow: none !important;
+  background: var(--po-color-transparent) !important;
+  color: inherit;
+  cursor: default;
+}
+.po-preview-app .po-sidebar-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.po-preview-app .po-sidebar-brand-expand-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--po-color-secondary);
+}
+.po-preview-app .po-sidebar-toggle {
+  border: 0 !important;
+  border-color: var(--po-color-transparent) !important;
+  border-radius: 8px;
+  outline: none;
+  box-shadow: none !important;
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-secondary);
+}
+.po-preview-app .po-sidebar-toggle:hover,
+.po-preview-app .po-sidebar-toggle:focus-visible {
+  background: var(--po-color-transparent) !important;
+  color: var(--po-color-primary);
+  box-shadow: none !important;
+}
+.po-preview-app .po-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--po-color-primary);
+  outline-offset: 2px;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-row {
+  justify-content: center;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed {
+  position: relative;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-sidebar-brand-logo {
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-brand > svg {
+  display: block;
+  width: 24px !important;
+  height: 24px !important;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-brand > span:last-child {
+  display: none !important;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-sidebar-brand-expand-icon {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-sidebar-brand-expand-icon svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed:hover,
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed:focus-visible {
+  background: var(--po-color-surface-hover) !important;
+  cursor: pointer;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed:hover .po-sidebar-brand-logo,
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed:focus-visible .po-sidebar-brand-logo {
+  opacity: 0;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed:hover .po-sidebar-brand-expand-icon,
+.po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed:focus-visible .po-sidebar-brand-expand-icon {
+  display: inline-flex;
+}
+.po-preview-app.is-sidebar-collapsed .po-sidebar-toggle {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .po-preview-app.is-sidebar-collapsed .po-sidebar-brand-control.is-collapsed .po-sidebar-brand-logo {
+    transition: none;
+  }
+}
