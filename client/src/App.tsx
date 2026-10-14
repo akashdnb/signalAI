@@ -7,6 +7,7 @@ import "./styles/product-polish-phase5.css";
 import "./styles/precision-operations-preview.css";
 import "./styles/precision-operations-design-system.css";
 import "./styles/precision-operations-final-fixes.css";
+import "./styles/precision-operations-color-tokens.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() =>
