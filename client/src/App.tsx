@@ -53,7 +53,6 @@ function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) { retu
 function HomeRedirect() {
   const params = new URLSearchParams(window.location.search);
   const isPrecisionPreview = params.get("preview") === "precision-operations";
-  if (isPrecisionPreview && params.get("screen") === "settings") return <LazyPage Page={WorkspaceSettingsPreviewPage} />;
   if (isPrecisionPreview) return <LazyPage Page={PrecisionOperationsPreviewPage} />;
   const session = loadSession();
   return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
