@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen, type PreviewPalette } from "./PrecisionOperationsFullScreens";
+import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen, type PreviewPalette } from "./PrecisionOperationsFullScreens";
 import { Logo } from "../components/Logo";
 import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
@@ -173,16 +173,16 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resi
   );
 }
 
-function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLifecycleAction, selectedLeadName, automationName, automationStatus, onNavigate }: {
+function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLifecycleAction, selectedLeadName, automationName, automationStatus, onNavigate, onOpenDocs }: {
   screen: PreviewScreen; dirty: boolean; onSave: () => void; onTest: () => void; onPreview: () => void; onPublish: () => void; onLifecycleAction: (action: "pause"|"activate") => void;
-  selectedLeadName: string; automationName: string; automationStatus: string; onNavigate: (screen: PreviewScreen) => void;
+  selectedLeadName: string; automationName: string; automationStatus: string; onNavigate: (screen: PreviewScreen) => void; onOpenDocs: (slug?: string) => void;
 }) {
   const [moreOpen,setMoreOpen]=useState(false);
   const moreRef = useDismissOnOutside(moreOpen, () => setMoreOpen(false));
   if (screen === "leads") return <header className="po-page-header po-page-header--leads"><h1>Leads</h1></header>;
   if (screen === "builder") return <header className="po-page-header po-builder-header">
     <div className="po-builder-heading"><div className="po-breadcrumb"><button type="button" onClick={() => onNavigate("automations")}>Automations</button><span aria-hidden="true">/</span><strong>{automationName}</strong></div><div className="po-title-row"><h1>{automationName}</h1><Tag tone={automationStatus==="Live"?"green":automationStatus==="Paused"?"blue":"warning"}>{automationStatus==="Live"?"Live":automationStatus==="Paused"?"Paused":automationStatus==="Needs publishing"?"Needs publishing":"Draft · Not live"}</Tag></div><p>Review the trigger, reply behavior, lead capture, and account assignment before activating.</p><span className={"po-save-status" + (dirty ? " is-dirty" : "")} role="status"><span className="po-save-status-dot" />{dirty ? "Unsaved preview changes" : "Preview marked saved"}</span></div>
-    <div className="po-header-actions"><button type="button" className="po-button po-button--quiet" onClick={()=>onNavigate("docs")}>Docs</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button><div className="po-builder-more-wrap" ref={moreRef}><button type="button" aria-label="More automation actions" aria-expanded={moreOpen} className="po-button po-button--secondary po-builder-more-button" onClick={()=>setMoreOpen(v=>!v)}><DotsVerticalIcon/></button>{moreOpen&&<div className="po-dropdown po-builder-menu"><div className="po-dropdown-heading"><strong>Automation actions</strong><Tag>{automationStatus}</Tag></div><button type="button" onClick={()=>{setMoreOpen(false);onPreview();}}>Preview reply</button><button type="button" onClick={()=>{setMoreOpen(false);onTest();}}>Run sample walkthrough</button><button type="button" onClick={()=>{setMoreOpen(false);onNavigate("docs");}}>Builder documentation</button><button type="button" disabled={automationStatus!=="Live"&&automationStatus!=="Paused"} onClick={()=>{setMoreOpen(false);onLifecycleAction(automationStatus==="Live"?"pause":"activate");}}>{automationStatus==="Live"?"Pause automation":automationStatus==="Paused"?"Activate automation":"Publish before activating"}</button><p>All lifecycle actions in this concept are local demonstrations.</p></div>}</div></div>
+    <div className="po-header-actions"><button type="button" className="po-button po-button--quiet" onClick={()=>onOpenDocs("journey-builder")}>Docs ↗</button><button type="button" className="po-button po-button--secondary" disabled={!dirty} onClick={onSave}>Save changes</button><button type="button" className="po-button po-button--primary" onClick={onPublish}>Publish</button><div className="po-builder-more-wrap" ref={moreRef}><button type="button" aria-label="More automation actions" aria-expanded={moreOpen} className="po-button po-button--secondary po-builder-more-button" onClick={()=>setMoreOpen(v=>!v)}><DotsVerticalIcon/></button>{moreOpen&&<div className="po-dropdown po-builder-menu"><div className="po-dropdown-heading"><strong>Automation actions</strong><Tag>{automationStatus}</Tag></div><button type="button" onClick={()=>{setMoreOpen(false);onPreview();}}>Preview reply</button><button type="button" onClick={()=>{setMoreOpen(false);onTest();}}>Run sample walkthrough</button><button type="button" onClick={()=>{setMoreOpen(false);onOpenDocs("journey-builder");}}>Builder documentation ↗</button><button type="button" disabled={automationStatus!=="Live"&&automationStatus!=="Paused"} onClick={()=>{setMoreOpen(false);onLifecycleAction(automationStatus==="Live"?"pause":"activate");}}>{automationStatus==="Live"?"Pause automation":automationStatus==="Paused"?"Activate automation":"Publish before activating"}</button><p>All lifecycle actions in this concept are local demonstrations.</p></div>}</div></div>
   </header>;
   const configs: Record<string, { eyebrow: string; title: string; description: string }> = {
     overview: { eyebrow: "WORKSPACE SUMMARY", title: "Overview", description: "A clear view of what needs attention across your Instagram operations." },
@@ -197,7 +197,6 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
     team: { eyebrow: "WORKSPACE ACCESS", title: "Team", description: "Manage workspace members, invitations, and roles." },
     billing: { eyebrow: "PLAN & USAGE", title: "Billing", description: "Understand plan state, usage, quota limits, and billing availability." },
     settings: { eyebrow: "WORKSPACE CONFIGURATION", title: "Settings", description: "Manage appearance, workspace access, plan and usage, and automation behavior." },
-    docs: { eyebrow: "GUIDANCE", title: "Documentation", description: "Browse setup, workflow, publishing, analytics, and troubleshooting guidance." },
     login: { eyebrow: "SIGN IN", title: "Sign in", description: "Access the SignalAI workspace." },
     "connect-error": { eyebrow: "CONNECTION RECOVERY", title: "Instagram connection", description: "Recover from an unsuccessful Instagram OAuth callback." },
     invite: { eyebrow: "WORKSPACE ACCESS", title: "Invitation", description: "Review an invitation that may be expired, invalid, or require sign-in." },
@@ -205,7 +204,7 @@ function PageHeader({ screen, dirty, onSave, onTest, onPreview, onPublish, onLif
   const config = configs[screen] ?? configs.overview!;
   return <header className="po-page-header">
     <div><h1>{config.title}</h1><p>{config.description}</p></div>
-    {screen === "automations" ? <button type="button" className="po-button po-button--quiet" onClick={() => onNavigate("docs")}><BookIcon className="po-button-icon"/> Docs</button> : null}
+    {screen === "automations" ? <button type="button" className="po-button po-button--quiet" onClick={() => onOpenDocs("automations")}><BookIcon className="po-button-icon"/> Docs ↗</button> : null}
     {screen === "inbox" ? <div className="po-header-context"><span className="po-status-dot" /> Sample inbox <ChevronDownIcon className="po-icon-small" /></div> : null}
     {screen === "lead-detail" ? <button type="button" className="po-button po-button--secondary" onClick={() => onNavigate("leads")}>Back to leads</button> : null}
   </header>;
@@ -891,8 +890,9 @@ function UnsavedChangesDialog({ onKeepEditing, onSaveAndLeave, onDiscard }: { on
   return <div className="po-modal-backdrop" role="presentation"><section ref={dialogRef} tabIndex={-1} className="po-modal po-unsaved-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-unsaved-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span></div><span className="po-eyebrow">UNSAVED CHANGES</span><h2 id="po-unsaved-title">Leave the builder?</h2><p>You have preview changes that haven't been marked saved. In the real product, choose whether to save or discard before leaving the automation.</p><div className="po-modal-footer po-unsaved-actions"><button type="button" className="po-button po-button--quiet" onClick={onKeepEditing}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={onDiscard}>Discard changes</button><button type="button" className="po-button po-button--primary" onClick={onSaveAndLeave}>Save & leave</button></div></section></div>;
 }
 
-function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSwitchInstagramAccount }: {
+function WorkspaceBar({ onNavigate, onOpenDocs, theme, onToggleTheme, instagramAccount, onSwitchInstagramAccount }: {
   onNavigate: (screen: PreviewScreen) => void;
+  onOpenDocs: (slug?: string) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   instagramAccount: PreviewInstagramAccount;
@@ -996,7 +996,7 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
           <div className="po-profile-menu-section po-profile-actions-section">
             <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("settings")}><SettingsIcon /><span>Workspace settings</span></button>
             <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("billing")}><CreditCardIcon /><span>Plan &amp; usage</span></button>
-            <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => menuNavigate("docs")}><BookIcon /><span>Help &amp; documentation</span></button>
+            <button type="button" role="menuitem" className="po-profile-menu-item" onClick={() => { setProfileOpen(false); onOpenDocs("introduction"); }}><BookIcon /><span>Help &amp; documentation ↗</span></button>
           </div>
           <div className="po-profile-menu-section po-profile-signout-section">
             <button type="button" role="menuitem" className="po-profile-menu-item is-danger" onClick={() => menuNavigate("login")}><span className="po-profile-menu-item-symbol" aria-hidden="true">↪</span><span>Sign out</span></button>
@@ -1009,14 +1009,14 @@ function WorkspaceBar({ onNavigate, theme, onToggleTheme, instagramAccount, onSw
 }
 
 export function PrecisionOperationsPreviewPage() {
-  const validScreens: PreviewScreen[] = ["overview","automations","builder","inbox","leads","lead-detail","knowledge","content","analytics","integrations","team","billing","settings","docs","login","connect-error","invite"];
+  const validScreens: PreviewScreen[] = ["overview","automations","builder","inbox","leads","lead-detail","knowledge","content","analytics","integrations","team","billing","settings","login","connect-error","invite"];
   const screenAliases: Record<string, PreviewScreen> = {
     "connection-recovery": "connect-error",
     "invitation-recovery": "invite",
   };
   const [screen,setScreen] = useState<PreviewScreen>(() => {
     const requested = new URLSearchParams(window.location.search).get("screen");
-    if (!requested) return "overview";
+    if (!requested || requested === "docs") return "overview";
     if (requested === "team" || requested === "billing") return "settings";
     if (validScreens.includes(requested as PreviewScreen)) return requested as PreviewScreen;
     return screenAliases[requested] ?? "overview";
@@ -1069,6 +1069,12 @@ export function PrecisionOperationsPreviewPage() {
       ? normalized as PreviewPalette
       : "navy-cobalt";
   });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("screen") !== "docs") return;
+    params.set("screen", "overview");
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString() + window.location.hash);
+  }, []);
   useEffect(() => {
     const targetId = decodeURIComponent(window.location.hash.slice(1));
     if (!targetId) return;
@@ -1124,6 +1130,10 @@ export function PrecisionOperationsPreviewPage() {
     setSidebarWidth(Math.max(180, Math.min(280, next)));
   };
   const resetSidebarWidth = () => setSidebarWidth(226);
+  const openPublicDocs = (slug = "introduction") => {
+    const safeSlug = slug.replace(/[^a-z0-9-]/gi, "");
+    window.open(`/docs/${safeSlug || "introduction"}`, "_blank", "noopener,noreferrer");
+  };
   const changeInstagramAccount = (next: PreviewInstagramAccount) => {
     setInstagramAccount(next);
     const params = new URLSearchParams(window.location.search);
@@ -1234,9 +1244,8 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "team" ? <TeamScreen />
     : screen === "billing" ? <BillingScreen />
     : screen === "settings" ? <SettingsScreen theme={theme} palette={palette} onChangeTheme={changeTheme} onChangePalette={changePalette} />
-    : screen === "docs" ? <DocsScreen />
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")} instagramAccount={instagramAccount} onSwitchInstagramAccount={changeInstagramAccount}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} onOpenDocs={openPublicDocs} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")} instagramAccount={instagramAccount} onSwitchInstagramAccount={changeInstagramAccount}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go} onOpenDocs={openPublicDocs}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
