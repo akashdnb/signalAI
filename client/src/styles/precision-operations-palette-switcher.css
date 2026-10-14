@@ -27,6 +27,29 @@
   border-radius: var(--po-radius-control);
 }
 
+/* Keep one visible focus treatment across all text, select and textarea
+   controls. Search fields draw their ring on the wrapper, never twice. */
+body:has(.po-preview-app) .po-preview-app input:not([type="checkbox"]):not([type="radio"]):focus,
+body:has(.po-preview-app) .po-preview-app input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+body:has(.po-preview-app) .po-preview-app select:focus,
+body:has(.po-preview-app) .po-preview-app select:focus-visible,
+body:has(.po-preview-app) .po-preview-app textarea:focus,
+body:has(.po-preview-app) .po-preview-app textarea:focus-visible {
+  outline: none;
+  border-color: var(--po-color-primary);
+  box-shadow: 0 0 0 3px var(--po-color-primary-soft);
+}
+body:has(.po-preview-app) .po-preview-app .po-search:focus-within {
+  border-color: var(--po-color-primary);
+  box-shadow: 0 0 0 3px var(--po-color-primary-soft);
+}
+body:has(.po-preview-app) .po-preview-app .po-search input:focus,
+body:has(.po-preview-app) .po-preview-app .po-search input:focus-visible {
+  border-color: var(--po-color-transparent);
+  outline: none;
+  box-shadow: none;
+}
+
 /* The search input lives inside a bordered wrapper. Give focus to the wrapper
    only; the nested input must not paint its own border, outline or shadow. */
 .po-preview-app .po-automation-search .po-search {
