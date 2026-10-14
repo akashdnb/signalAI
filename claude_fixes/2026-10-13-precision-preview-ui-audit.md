@@ -196,3 +196,35 @@ Verified on the live deployment: page title, subtitle, eyebrow, panel heading, p
 0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; build and `oxlint` clean.
 
 **Repeat of the CDN trap:** the first live verification reported 600 for inputs on three pages. Direct measurement of the same elements with a fresh cache-buster showed 500 on both local and live — the edge had served a stale `index.html`. Always confirm a suspicious live reading against the specific element before treating it as a real difference.
+
+---
+
+# Round 6 — automation builder review (14 October 2026)
+
+Commit `df9e317`, deploy `dep-db7gvms9v7es73c1p2vg` (live). Reviewed all four builder tabs plus the node inspector, in both themes, exercising the interactions rather than only looking at them.
+
+## Fixed
+
+**Modal dialogs were broken app-wide.** Every dialog carries `aria-modal="true"`, but none moved focus into itself, none trapped focus, and none closed on Escape — measured, a keyboard user tabbed straight through the page behind an open dialog (**25 of 25 tabs landed outside**, in the sidebar nav). Added one `useModalDialog` hook — focus in, Tab trapped, Escape closes, focus restored — and wired it to **all twelve dialogs** across both screen files. `onClose` is held in a ref so the effect depends only on the open flag; with the inline arrow props it would otherwise re-run every render and steal focus back mid-typing.
+
+**Inspector footer overlapped the last field.** Two causes, one of them mine: the tabpanel wrapper added in round 2's ARIA fix sat between `.po-inspector` (the flex column) and the footer, so `margin-top: auto` resolved to `0px`; and the scroll container's `padding-bottom: 18px` left a strip under the pinned footer that content scrolled into, because a sticky `bottom: 0` resolves *inside* the scrollport's padding. The panel now carries the flex column and the padding moved onto the footer.
+
+**Dark mode.** Five icon-chip fills had no dark counterpart and rendered as bright squares on the dark canvas: palette icons, flow-node icons, the inspector icon, the Instagram chip and the nav count badge.
+
+**Results chart had gridlines but no values** — magnitudes were unreadable. Each bar now carries its value and the `aria-label` lists them. Applied to the overview and analytics charts too, which share the markup.
+
+**Header.** Six controls across two misaligned rows at four visual weights, with the save status inside the button row. `Preview` and `Run sample walkthrough` were *already* duplicated in the overflow menu, so the header keeps Docs / Save changes / Publish / overflow on one row and the status moved under the subtitle. Also fixed the `Draft`/`Paused` tone collision in the builder header — round 4 only fixed it in the table.
+
+## Checked and found already correct
+
+Node add and select, the step counter incrementing, dirty-state detection, the unsaved-changes guard on tab switch, and keyboard reachability of every flow node. Three earlier "failures" in my own test harness were artifacts — synthetic `input` events don't trigger React's onChange, and a 40-press tab loop was too short. Re-tested with real typing and a longer loop, all four behaved correctly.
+
+## Noted, not fixed
+
+- The `po-integrations-modal` dialog exists in the code but no visible control on the Integrations screen opens it. It is wired to the hook, so it will behave correctly if it becomes reachable. Outside the builder's scope.
+- Chart values render as a row above the columns rather than pinned to each bar's top. Legible and consistent, but could be refined.
+- The flow canvas is still a narrow centred column with large empty margins either side.
+
+## Verified
+
+All twelve dialogs trap focus and close on Escape with no page errors, re-confirmed against the live deployment; 0 light fills left in dark mode on any builder tab; 0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; build and `oxlint` clean.
