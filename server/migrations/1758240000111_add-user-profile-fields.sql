@@ -9,8 +9,8 @@ alter table users
 create unique index users_google_subject_idx on users (google_subject) where google_subject is not null;
 
 -- Down Migration
- drop index if exists users_google_subject_idx;
- alter table users drop column google_subject;
- alter table users drop column profile_picture_url;
- alter table users drop column last_name;
- alter table users drop column first_name;
+drop index if exists users_google_subject_idx;
+alter table users drop column google_subject;
+alter table users drop column profile_picture_url;
+alter table users drop column last_name;
+alter table users drop column first_name;
