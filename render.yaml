@@ -27,6 +27,13 @@ services:
         sync: false
       - key: INSTAGRAM_REDIRECT_URI
         sync: false
+      # Google OpenID Connect sign-in (callback: https://signalai-server.onrender.com/auth/google/callback)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://signalai-server.onrender.com/auth/google/callback
       # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
       - key: TOKEN_ENCRYPTION_KEYS
         sync: false
