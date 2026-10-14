@@ -46,7 +46,7 @@ body[data-po-settings-redesign="true"] .po-appearance-mode-option:focus-visible{
 body[data-po-settings-redesign="true"] .po-appearance-mode-preview{position:relative;width:82px;height:54px;border:1px solid #dce3ec;border-radius:7px;background:#eef2f7;display:flex;align-items:center;gap:4px;padding:6px;flex:none;overflow:hidden;}
 body[data-po-settings-redesign="true"] .po-appearance-mode-preview span:nth-child(1){width:20px;height:100%;background:#dce4ef;border-radius:3px;}
 body[data-po-settings-redesign="true"] .po-appearance-mode-preview span:nth-child(2){flex:1;height:100%;background:#fff;border-radius:3px;}
-body[data-po-settings-redesign="true"] .po-appearance-mode-preview i{position:absolute;left:43px;bottom:7px;width:22px;height:7px;margin:0;background:#24469a;border-radius:3px;display:block;}
+body[data-po-settings-redesign="true"] .po-appearance-mode-preview i{position:absolute;left:43px;bottom:7px;width:22px!important;max-width:22px!important;height:7px!important;min-width:22px!important;flex:0 0 22px!important;margin:0;background:#24469a;border-radius:3px;display:block;}
 body[data-po-settings-redesign="true"] .po-appearance-mode-option[data-theme="dark"] .po-appearance-mode-preview{background:#0f172a;border-color:#1f2937;}
 body[data-po-settings-redesign="true"] .po-appearance-mode-option[data-theme="dark"] .po-appearance-mode-preview span:nth-child(1){background:#172033;}
 body[data-po-settings-redesign="true"] .po-appearance-mode-option[data-theme="dark"] .po-appearance-mode-preview span:nth-child(2){background:#253148;}
