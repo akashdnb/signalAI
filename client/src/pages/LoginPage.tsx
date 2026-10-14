@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL, ApiError, requestOtp, saveSession, verifyOtp } from "../api";
 import { InboxIcon } from "../components/icons";
@@ -133,6 +133,45 @@ export function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("auth_error");
+    const handoff = params.get("handoff");
+    if (authError) {
+      const messages: Record<string, string> = {
+        google_not_configured: "Google sign-in is not configured yet. Please use email for now.",
+        google_sign_in_cancelled: "Google sign-in was cancelled.",
+        invalid_google_state: "The sign-in session expired or could not be verified. Please try again.",
+        google_sign_in_failed: "Google sign-in failed. Please try again or use email.",
+        google_identity_conflict: "This Google account is linked differently. Please use your existing sign-in method.",
+        google_token_exchange_failed: "Google could not complete sign-in. Please try again.",
+      };
+      setError(messages[authError] ?? "Google sign-in could not be completed. Please try again.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+    if (!handoff || params.get("google_auth") !== "success") return;
+
+    let cancelled = false;
+    setSubmitting(true);
+    setError(null);
+    window.history.replaceState({}, document.title, window.location.pathname);
+    void exchangeGoogleHandoff(handoff)
+      .then((session) => {
+        if (cancelled) return;
+        saveSession(session);
+        navigate(`/dashboard/${session.tenantId}`, { replace: true });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Google sign-in could not be completed.");
+      })
+      .finally(() => {
+        if (!cancelled) setSubmitting(false);
+      });
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   async function handleRequestCode(e: React.FormEvent) {
     e.preventDefault();
