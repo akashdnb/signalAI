@@ -594,24 +594,24 @@ body[data-po-palette] .po-preview-app.is-dark .po-canvas-workspace {
 
 /* Recolor the inlined brand mark only inside this preview. The shared Logo
    component keeps its original production colors everywhere else. */
-body[data-po-palette="navy-cobalt"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#60a5fa; --po-logo-gradient-middle:#2563eb; --po-logo-gradient-end:#1e3a8a; --po-logo-sparkle:#1e3a8a; }
-body[data-po-palette="teal-emerald"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#34d399; --po-logo-gradient-middle:#10b981; --po-logo-gradient-end:#065f4a; --po-logo-sparkle:#065f4a; }
-body[data-po-palette="slate-cyan"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#67e8f9; --po-logo-gradient-middle:#06b6d4; --po-logo-gradient-end:#0f172a; --po-logo-sparkle:#0891b2; }
-body[data-po-palette="forest-slate"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#86efac; --po-logo-gradient-middle:#16a34a; --po-logo-gradient-end:#14532d; --po-logo-sparkle:#14532d; }
-body[data-po-palette="orange-amber"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#fdba74; --po-logo-gradient-middle:#f97316; --po-logo-gradient-end:#c2410c; --po-logo-sparkle:#c2410c; }
-body[data-po-palette="neutral-slate"] .po-preview-app:not(.is-dark) { --po-logo-gradient-start:#94a3b8; --po-logo-gradient-middle:#475569; --po-logo-gradient-end:#334155; --po-logo-sparkle:#334155; }
+body[data-po-palette="navy-cobalt"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#60a5fa; --signalai-logo-gradient-middle:#2563eb; --signalai-logo-gradient-end:#1e3a8a; --signalai-logo-sparkle:#1e3a8a; }
+body[data-po-palette="teal-emerald"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#34d399; --signalai-logo-gradient-middle:#10b981; --signalai-logo-gradient-end:#065f4a; --signalai-logo-sparkle:#065f4a; }
+body[data-po-palette="slate-cyan"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#67e8f9; --signalai-logo-gradient-middle:#06b6d4; --signalai-logo-gradient-end:#0f172a; --signalai-logo-sparkle:#0891b2; }
+body[data-po-palette="forest-slate"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#86efac; --signalai-logo-gradient-middle:#16a34a; --signalai-logo-gradient-end:#14532d; --signalai-logo-sparkle:#14532d; }
+body[data-po-palette="orange-amber"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#fdba74; --signalai-logo-gradient-middle:#f97316; --signalai-logo-gradient-end:#c2410c; --signalai-logo-sparkle:#c2410c; }
+body[data-po-palette="neutral-slate"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#94a3b8; --signalai-logo-gradient-middle:#475569; --signalai-logo-gradient-end:#334155; --signalai-logo-sparkle:#334155; }
 
-body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --po-logo-gradient-start:#93c5fd; --po-logo-gradient-middle:#60a5fa; --po-logo-gradient-end:#2563eb; --po-logo-sparkle:#60a5fa; }
-body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --po-logo-gradient-start:#6ee7b7; --po-logo-gradient-middle:#34d399; --po-logo-gradient-end:#047857; --po-logo-sparkle:#34d399; }
-body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --po-logo-gradient-start:#67e8f9; --po-logo-gradient-middle:#22d3ee; --po-logo-gradient-end:#0e7490; --po-logo-sparkle:#22d3ee; }
-body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --po-logo-gradient-start:#86efac; --po-logo-gradient-middle:#4ade80; --po-logo-gradient-end:#15803d; --po-logo-sparkle:#4ade80; }
-body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --po-logo-gradient-start:#fdba74; --po-logo-gradient-middle:#fb923c; --po-logo-gradient-end:#c2410c; --po-logo-sparkle:#fb923c; }
-body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --po-logo-gradient-start:#e2e8f0; --po-logo-gradient-middle:#94a3b8; --po-logo-gradient-end:#475569; --po-logo-sparkle:#cbd5e1; }
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#93c5fd; --signalai-logo-gradient-middle:#60a5fa; --signalai-logo-gradient-end:#2563eb; --signalai-logo-sparkle:#60a5fa; }
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#6ee7b7; --signalai-logo-gradient-middle:#34d399; --signalai-logo-gradient-end:#047857; --signalai-logo-sparkle:#34d399; }
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#67e8f9; --signalai-logo-gradient-middle:#22d3ee; --signalai-logo-gradient-end:#0e7490; --signalai-logo-sparkle:#22d3ee; }
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#86efac; --signalai-logo-gradient-middle:#4ade80; --signalai-logo-gradient-end:#15803d; --signalai-logo-sparkle:#4ade80; }
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fdba74; --signalai-logo-gradient-middle:#fb923c; --signalai-logo-gradient-end:#c2410c; --signalai-logo-sparkle:#fb923c; }
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#e2e8f0; --signalai-logo-gradient-middle:#94a3b8; --signalai-logo-gradient-end:#475569; --signalai-logo-sparkle:#cbd5e1; }
 
-body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(1) { stop-color:var(--po-logo-gradient-start) !important; }
-body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(2) { stop-color:var(--po-logo-gradient-middle) !important; }
-body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(3) { stop-color:var(--po-logo-gradient-end) !important; }
-body[data-po-palette] .po-preview-app .po-brand svg > path:last-child { fill:var(--po-logo-sparkle) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(1) { stop-color:var(--signalai-logo-gradient-start) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(2) { stop-color:var(--signalai-logo-gradient-middle) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(3) { stop-color:var(--signalai-logo-gradient-end) !important; }
+body[data-po-palette] .po-preview-app .po-brand svg > path:last-child { fill:var(--signalai-logo-sparkle) !important; }
 
 /* Settings appearance-picker tokens: the miniature previews and swatches are
    independent of the currently selected palette so all options stay scannable. */
