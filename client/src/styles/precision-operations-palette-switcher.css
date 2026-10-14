@@ -924,3 +924,56 @@ body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button
     transition: none;
   }
 }
+
+/* At medium desktop widths, preserve the user's explicit choice. The previous
+   automatic 74px breakpoint made the toggle appear to do nothing while the
+   responsive stylesheet kept labels hidden regardless of state. */
+@media (max-width: 1080px) and (min-width: 761px) {
+  .po-preview-app:not(.is-sidebar-collapsed) .po-sidebar {
+    flex: 0 0 220px !important;
+    width: 220px !important;
+    min-width: 220px;
+    padding: 0 14px 14px !important;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-sidebar-brand-row {
+    justify-content: space-between;
+    margin-right: -14px;
+    margin-left: -14px;
+    padding-right: 13px;
+    padding-left: 13px;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-sidebar-brand-row .po-brand {
+    flex: initial;
+    width: auto;
+    justify-content: flex-start;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-sidebar-brand-row .po-brand > span:last-child {
+    display: inline !important;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-nav {
+    margin-top: 30px !important;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-nav-item {
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px !important;
+    font-size: 14px !important;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-nav-item > span:not(.po-nav-count) {
+    display: inline !important;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-nav-label {
+    display: block;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-nav-divider {
+    width: auto;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-plan-card {
+    display: flex;
+  }
+  .po-preview-app.is-sidebar-collapsed .po-plan-card {
+    display: flex;
+  }
+}
