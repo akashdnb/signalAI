@@ -53,6 +53,7 @@ interface GoogleIdentity {
 
 interface OAuthState {
   value: string;
+  nonce: string;
   returnTo: string;
   createdAt: number;
 }
@@ -86,7 +87,7 @@ function verifyState(secret: string, state: string): OAuthState | null {
   if (!safeEqualString(expected, signature)) return null;
   try {
     const payload = JSON.parse(base64UrlDecode(body).toString("utf8")) as OAuthState;
-    if (typeof payload.value !== "string" || typeof payload.createdAt !== "number") return null;
+    if (typeof payload.value !== "string" || typeof payload.nonce !== "string" || typeof payload.returnTo !== "string" || typeof payload.createdAt !== "number") return null;
     if (Date.now() - payload.createdAt > STATE_TTL_MS || payload.createdAt > Date.now() + 30_000) return null;
     return payload;
   } catch {
@@ -160,8 +161,10 @@ googleAuthRouter.get("/auth/google/start", (req, res) => {
     return redirectAuthError(res, "google_not_configured");
   }
 
+  const nonce = randomBytes(32).toString("base64url");
   const verifierState: OAuthState = {
     value: randomBytes(32).toString("base64url"),
+    nonce,
     returnTo: safeReturnTo(req.query.returnTo),
     createdAt: Date.now(),
   };
@@ -181,22 +184,9 @@ googleAuthRouter.get("/auth/google/start", (req, res) => {
     response_type: "code",
     scope: "openid email profile",
     state,
-    nonce: randomBytes(32).toString("base64url"),
+    nonce,
     prompt: "select_account",
   }).toString();
-  // Persist the OIDC nonce separately inside signed state for callback validation.
-  const payload = verifyState(config.sessionSecret, state)!;
-  const nonce = new URLSearchParams(url.search).get("nonce")!;
-  payload.value = `${payload.value}.${nonce}`;
-  const fixedState = signedState(config.sessionSecret, payload);
-  res.cookie(STATE_COOKIE, verifierState.value, {
-    httpOnly: true,
-    secure: config.nodeEnv === "production",
-    sameSite: "lax",
-    maxAge: STATE_TTL_MS,
-    path: "/auth/google",
-  });
-  url.searchParams.set("state", fixedState);
   return res.redirect(url.toString());
 });
 
@@ -211,8 +201,7 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
   if (typeof code !== "string" || typeof state !== "string" || !rawStateCookie) return redirectAuthError(res, "invalid_google_state");
   const statePayload = verifyState(config.sessionSecret, state);
   if (!statePayload) return redirectAuthError(res, "invalid_google_state");
-  const [cookieValue, nonce] = statePayload.value.split(".");
-  if (!cookieValue || !nonce || !safeEqualString(cookieValue, rawStateCookie)) return redirectAuthError(res, "invalid_google_state");
+  if (!safeEqualString(statePayload.value, rawStateCookie)) return redirectAuthError(res, "invalid_google_state");
   if (!config.googleClientId || !config.googleClientSecret || !config.googleRedirectUri) return redirectAuthError(res, "google_not_configured");
 
   try {
@@ -234,7 +223,7 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
     const identity = await verifyGoogleIdToken(tokens.id_token);
     // Check the OIDC nonce claim against the nonce generated before redirect.
     const tokenPayload = JSON.parse(base64UrlDecode(tokens.id_token.split(".")[1]!).toString("utf8")) as { nonce?: unknown };
-    if (tokenPayload.nonce !== nonce) return redirectAuthError(res, "invalid_google_state");
+    if (tokenPayload.nonce !== statePayload.nonce) return redirectAuthError(res, "invalid_google_state");
 
     const pool = getPool();
     const user = await findOrCreateUserByGoogle(pool, identity);
