@@ -5,7 +5,7 @@ import {
   AnalyticsIcon, AutomationIcon, BookIcon, ContentIcon, HomeIcon, InboxIcon,
   IntegrationsIcon, LeadsIcon, SettingsIcon, InstagramMarkIcon,
   BotIcon, SendIcon, ListChecksIcon, SearchIcon, PlayIcon, PlusIcon,
-  ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, SunIcon, MoonIcon, BellIcon,
+  ChevronDownIcon, DotsVerticalIcon, CheckCircleIcon, SunIcon, MoonIcon, BellIcon, CreditCardIcon, PanelLeftCloseIcon, PanelLeftOpenIcon,
 } from "../components/icons";
 
 type PreviewScreen = FullPreviewScreen;
@@ -77,25 +77,51 @@ function PreviewNotice() {
   return <div className="po-preview-notice" role="note"><span className="po-preview-notice-dot" aria-hidden="true" /><div><strong>Redesign preview</strong><span>Sample workspace · Actions are demonstrational. No Instagram messages are sent and no data is saved.</span></div></div>;
 }
 
-function Sidebar({ screen, onNavigate }: { screen: PreviewScreen; onNavigate: (next: PreviewScreen) => void }) {
+function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
+  screen: PreviewScreen;
+  onNavigate: (next: PreviewScreen) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
   const selectedScreen = screen === "builder" ? "automations" : screen === "lead-detail" ? "leads" : screen;
   return (
-    <aside className="po-sidebar" aria-label="Preview navigation">
-      <div className="po-sidebar-brand-row"><BrandMark /></div>
-      <nav className="po-nav">
+    <aside className={"po-sidebar" + (collapsed ? " is-collapsed" : "")} aria-label="Preview navigation">
+      <div className="po-sidebar-brand-row">
+        <BrandMark />
+        <button
+          type="button"
+          className="po-sidebar-toggle"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={collapsed}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+        </button>
+      </div>
+      <nav className="po-nav" aria-label="Main navigation">
         <div className="po-nav-section">
           {navigation.filter((item) => item.section === "primary").map((item) => {
             const active = item.screen === selectedScreen;
             const Icon = item.icon;
-            return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">5</span>}</button>;
+            return <button key={item.label} type="button" title={collapsed ? item.label : undefined} aria-label={item.label} className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">5</span>}</button>;
           })}
         </div>
-        
-        <div className="po-nav-divider" /><div className="po-nav-section"><p className="po-nav-label">Workspace</p>
-          {navigation.filter((item) => item.section === "workspace").map((item) => { const Icon = item.icon; const active = item.screen === selectedScreen; return <button key={item.label} type="button" className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>; })}
+        <div className="po-nav-divider" />
+        <div className="po-nav-section">
+          <p className="po-nav-label">Workspace</p>
+          {navigation.filter((item) => item.section === "workspace").map((item) => {
+            const Icon = item.icon;
+            const active = item.screen === selectedScreen;
+            return <button key={item.label} type="button" title={collapsed ? item.label : undefined} aria-label={item.label} className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>;
+          })}
         </div>
       </nav>
-      <div className="po-plan-card"><span className="po-plan-label">Current Plan</span><strong>Trial</strong><button type="button" onClick={() => onNavigate("billing")}>View plan &amp; usage</button></div>
+      <div className="po-plan-card" title={collapsed ? "View plan & usage" : undefined}>
+        <span className="po-plan-label">Current Plan</span>
+        <strong>Trial</strong>
+        <button type="button" aria-label="View plan and usage" title={collapsed ? "View plan & usage" : undefined} onClick={() => onNavigate("billing")}><CreditCardIcon className="po-plan-icon" /><span>View plan &amp; usage</span></button>
+      </div>
     </aside>
   );
 }
@@ -867,6 +893,7 @@ export function PrecisionOperationsPreviewPage() {
   const [selectedLeadOwner,setSelectedLeadOwner] = useState("Unassigned");
   const [selectedLeadHandoff,setSelectedLeadHandoff] = useState(true);
   const [theme,setTheme] = useState<"light"|"dark">(() => new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light");
+  const [sidebarCollapsed,setSidebarCollapsed] = useState(() => new URLSearchParams(window.location.search).get("sidebar") === "collapsed");
   const [palette,setPalette] = useState<PreviewPalette>(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("palette") ?? "navy-cobalt";
@@ -892,6 +919,15 @@ export function PrecisionOperationsPreviewPage() {
     params.set("settingsSection", legacyScreen === "team" ? "Team & access" : "Plan & billing");
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
   }, []);
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    if (next) params.set("sidebar", "collapsed");
+    else params.delete("sidebar");
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
   const changeTheme = (next: "light"|"dark") => {
     setTheme(next);
     const params = new URLSearchParams(window.location.search);
@@ -999,5 +1035,5 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
