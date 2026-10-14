@@ -104,7 +104,7 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
           {navigation.filter((item) => item.section === "primary").map((item) => {
             const active = item.screen === selectedScreen;
             const Icon = item.icon;
-            return <button key={item.label} type="button" title={collapsed ? item.label : undefined} aria-label={item.label} className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">5</span>}</button>;
+            return <button key={item.label} type="button" data-tooltip={collapsed ? item.label : undefined} aria-label={item.label} className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span>{item.label === "Inbox" && <span className="po-nav-count">5</span>}</button>;
           })}
         </div>
         <div className="po-nav-divider" />
@@ -113,14 +113,14 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
           {navigation.filter((item) => item.section === "workspace").map((item) => {
             const Icon = item.icon;
             const active = item.screen === selectedScreen;
-            return <button key={item.label} type="button" title={collapsed ? item.label : undefined} aria-label={item.label} className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>;
+            return <button key={item.label} type="button" data-tooltip={collapsed ? item.label : undefined} aria-label={item.label} className={"po-nav-item" + (active ? " is-active" : "")} aria-current={active ? "page" : undefined} onClick={() => item.screen && onNavigate(item.screen)}><Icon className="po-nav-icon" /><span>{item.label}</span></button>;
           })}
         </div>
       </nav>
-      <div className="po-plan-card" title={collapsed ? "View plan & usage" : undefined}>
+      <div className="po-plan-card">
         <span className="po-plan-label">Current Plan</span>
         <strong>Trial</strong>
-        <button type="button" aria-label="View plan and usage" title={collapsed ? "View plan & usage" : undefined} onClick={() => onNavigate("billing")}><CreditCardIcon className="po-plan-icon" /><span>View plan &amp; usage</span></button>
+        <button type="button" aria-label="View plan and usage" data-tooltip={collapsed ? "View plan & usage" : undefined} onClick={() => onNavigate("billing")}><CreditCardIcon className="po-plan-icon" /><span>View plan &amp; usage</span></button>
       </div>
     </aside>
   );
