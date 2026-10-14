@@ -1902,3 +1902,44 @@
 .po-preview-app .po-thread-empty h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: -.02em; }
 .po-preview-app .po-thread-empty p, .po-preview-app .po-context-empty p { margin: 0; color: var(--po-muted); font-size: 14px; line-height: 1.65; }
 .po-preview-app .po-context-empty { min-height: 240px; }
+
+/* Knowledge retrieval form: align the input and action on the control baseline. */
+.po-preview-app .po-test-question {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.po-preview-app .po-test-question label {
+  display: flex;
+  min-width: 0;
+  flex: initial;
+  flex-direction: column;
+  gap: 7px;
+}
+.po-preview-app .po-test-question input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+}
+.po-preview-app .po-test-question > .po-button {
+  min-height: 40px;
+  align-self: end;
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .po-preview-app .po-test-question {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .po-preview-app .po-test-question > .po-button {
+    justify-self: start;
+  }
+}
+
+/* Each categorical lead-stage bar gets its own palette-specific series token. */
+.po-preview-app .po-stage-list .po-stage-row:nth-child(1) .po-stage-track span { background: var(--po-color-chart-1); }
+.po-preview-app .po-stage-list .po-stage-row:nth-child(2) .po-stage-track span { background: var(--po-color-chart-2); }
+.po-preview-app .po-stage-list .po-stage-row:nth-child(3) .po-stage-track span { background: var(--po-color-chart-3); }
+.po-preview-app .po-stage-list .po-stage-row:nth-child(4) .po-stage-track span { background: var(--po-color-chart-4); }
+.po-preview-app .po-stage-list .po-stage-row:nth-child(5) .po-stage-track span { background: var(--po-color-chart-5); }
