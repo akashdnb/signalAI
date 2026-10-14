@@ -9,6 +9,13 @@ export type ConnectedAccountSwitcherOption = {
   connected?: boolean;
 };
 
+const HEADER_HANDLE_MAX_LENGTH = 22;
+
+function truncateAccountHandle(handle: string, maxLength = HEADER_HANDLE_MAX_LENGTH) {
+  if (handle.length <= maxLength) return handle;
+  return `${handle.slice(0, maxLength - 3)}...`;
+}
+
 export type ConnectedAccountSwitcherProps = {
   workspaceName: string;
   providerLabel: string;
@@ -87,7 +94,7 @@ export function ConnectedAccountSwitcher({
         ref={triggerRef}
         type="button"
         className="sai-account-switcher__trigger"
-        aria-label={`Switch ${providerLabel} account. Current account ${selectedAccount?.handle ?? "not selected"}`}
+        aria-label={`Switch ${providerLabel} account. Current account ${selectedAccount?.handle ?? "not selected"}; ${selectedAccount?.connected === false ? "disconnected" : "connected"}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={`sai-account-switcher-panel-${listId}`}
@@ -96,11 +103,15 @@ export function ConnectedAccountSwitcher({
         <span className="sai-account-switcher__provider-chip" aria-hidden="true">{providerIcon}</span>
         <span className="sai-account-switcher__identity">
           <strong>{workspaceName}</strong>
-          <small>
-            <span className="sai-account-switcher__status-dot" />
-            {selectedAccount
-              ? `Connected · ${selectedAccount.handle}${previewOnly ? " · preview only" : ""}`
-              : `No ${providerLabel} account selected`}
+          <small className="sai-account-switcher__header-status">
+            <span
+              className={"sai-account-switcher__status-dot" + (selectedAccount?.connected === false || !selectedAccount ? " is-disconnected" : "")}
+              aria-label={selectedAccount?.connected === false || !selectedAccount ? "Disconnected" : "Connected"}
+              title={selectedAccount?.connected === false || !selectedAccount ? "Disconnected" : "Connected"}
+            />
+            <span className="sai-account-switcher__current-handle">
+              {selectedAccount ? truncateAccountHandle(selectedAccount.handle) : "No account selected"}
+            </span>
           </small>
         </span>
         <ChevronDownIcon className="sai-account-switcher__chevron" aria-hidden="true" />
@@ -115,7 +126,7 @@ export function ConnectedAccountSwitcher({
         >
           <div className="sai-account-switcher__panel-heading">
             <div>
-              <strong>Connected {providerLabel} accounts</strong>
+              <strong>{providerLabel} accounts</strong>
               <small>{accounts.length} {accounts.length === 1 ? "account" : "accounts"} available</small>
             </div>
             <span className="sai-account-switcher__provider-label">{providerLabel}</span>
