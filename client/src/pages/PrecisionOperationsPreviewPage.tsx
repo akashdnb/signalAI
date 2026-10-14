@@ -11,10 +11,10 @@ import { ConnectedAccountSwitcher } from "../components/ui";
 
 type PreviewScreen = FullPreviewScreen;
 type PreviewInstagramAccount = "sample_fitness" | "studio_owner" | "northside_fit";
-const previewInstagramAccounts: { id: PreviewInstagramAccount; handle: string; label: string }[] = [
+const previewInstagramAccounts: { id: PreviewInstagramAccount; handle: string; label: string; connected?: boolean }[] = [
   { id: "sample_fitness", handle: "@sample_fitness", label: "Sample Fitness" },
   { id: "studio_owner", handle: "@studio_owner", label: "Studio Owner" },
-  { id: "northside_fit", handle: "@northside_fit", label: "Northside Fitness" },
+  { id: "northside_fit", handle: "@northside_fit", label: "Northside Fitness", connected: false },
 ];
 type BuilderNodeKey = "trigger" | "reply" | "goal" | "followup";
 type BuilderSeed = { triggerType: string; keywords: string };
