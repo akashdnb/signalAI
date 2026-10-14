@@ -87,17 +87,29 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
   return (
     <aside className={"po-sidebar" + (collapsed ? " is-collapsed" : "")} aria-label="Preview navigation">
       <div className="po-sidebar-brand-row">
-        <BrandMark />
         <button
           type="button"
-          className="po-sidebar-toggle"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={"po-sidebar-brand-control" + (collapsed ? " is-collapsed" : "")}
+          aria-label={collapsed ? "Expand sidebar" : "SignalAI"}
+          title={collapsed ? "Expand sidebar" : undefined}
           aria-pressed={collapsed}
-          onClick={onToggleCollapsed}
+          onClick={collapsed ? onToggleCollapsed : undefined}
+          tabIndex={collapsed ? 0 : -1}
         >
-          {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+          <span className="po-sidebar-brand-logo"><BrandMark /></span>
+          <span className="po-sidebar-brand-expand-icon" aria-hidden="true"><PanelLeftOpenIcon /></span>
         </button>
+        {!collapsed && (
+          <button
+            type="button"
+            className="po-sidebar-toggle"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            onClick={onToggleCollapsed}
+          >
+            <PanelLeftCloseIcon />
+          </button>
+        )}
       </div>
       <nav className="po-nav" aria-label="Main navigation">
         <div className="po-nav-section">
@@ -893,7 +905,7 @@ export function PrecisionOperationsPreviewPage() {
   const [selectedLeadOwner,setSelectedLeadOwner] = useState("Unassigned");
   const [selectedLeadHandoff,setSelectedLeadHandoff] = useState(true);
   const [theme,setTheme] = useState<"light"|"dark">(() => new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light");
-  const [sidebarCollapsed,setSidebarCollapsed] = useState(() => new URLSearchParams(window.location.search).get("sidebar") === "collapsed");
+  const [sidebarCollapsed,setSidebarCollapsed] = useState(() => new URLSearchParams(window.location.search).get("sidebar") !== "expanded");
   const [palette,setPalette] = useState<PreviewPalette>(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("palette") ?? "navy-cobalt";
@@ -924,8 +936,7 @@ export function PrecisionOperationsPreviewPage() {
     setSidebarCollapsed(next);
     const params = new URLSearchParams(window.location.search);
     params.set("preview", "precision-operations");
-    if (next) params.set("sidebar", "collapsed");
-    else params.delete("sidebar");
+    params.set("sidebar", next ? "collapsed" : "expanded");
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
   };
   const changeTheme = (next: "light"|"dark") => {
