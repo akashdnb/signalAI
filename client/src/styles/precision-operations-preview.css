@@ -1768,25 +1768,25 @@
   border-collapse: collapse;
 }
 .po-preview-app .po-leads-production-table th {
-  height: 48px;
-  padding: 13px 17px;
-  background: #f3e8ff;
-  color: #1f2937;
+  height: 42px;
+  padding: 11px 17px;
+  background: #fafbfc;
+  color: var(--po-muted);
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .045em;
+  font-weight: 700;
+  letter-spacing: .07em;
   line-height: 16px;
   text-align: left;
   white-space: nowrap;
 }
 .po-preview-app .po-leads-production-table td {
-  height: 55px;
-  padding: 11px 17px;
-  border-bottom: 1px solid #e2e8f0;
-  color: #111827;
+  height: 52px;
+  padding: 14px 17px;
+  border-bottom: 1px solid var(--po-line);
+  color: var(--po-ink);
   font-size: 14px;
-  font-weight: 500;
-  line-height: 19px;
+  font-weight: 400;
+  line-height: 20px;
   white-space: nowrap;
 }
 .po-preview-app .po-leads-production-table tbody tr:last-child td { border-bottom: 0; }
@@ -1817,13 +1817,13 @@
 .po-preview-app .po-leads-production-table .po-tag {
   display: inline-flex;
   align-items: center;
-  min-height: 27px;
-  padding: 3px 10px;
-  border: 0;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px solid transparent;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
+  font-weight: 700;
+  line-height: 17px;
   white-space: nowrap;
 }
 .po-preview-app .po-leads-production-table .po-tag--purple { background: #f3e8ff; color: #4c1d95; }

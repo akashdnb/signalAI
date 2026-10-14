@@ -205,6 +205,23 @@ body:has(.po-preview-app) .po-preview-app.is-dark select{
   background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2393a098' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")}
 body:has(.po-preview-app) .po-preview-app.is-dark .po-select-wrap select{background-image:none}
 
+/* ---- Heading and control roles, by element ---------------------------------
+ * The heading rules below used to enumerate the components they applied to, so
+ * any h2 that was not on the list kept its own weight (.po-integration-card-header
+ * h2 stayed at 800 while every listed one was 700). Assigning the role to the
+ * element covers every component, including ones added later.
+ */
+body:has(.po-preview-app) .po-preview-app h1{font-size:32px;font-weight:800;line-height:1.15}
+body:has(.po-preview-app) .po-preview-app h2{font-size:18px;font-weight:700;line-height:1.3}
+body:has(.po-preview-app) .po-preview-app h3{font-size:16px;font-weight:700;line-height:1.4}
+/* The sign-in hero is display copy, not a section heading. */
+body:has(.po-preview-app) .po-preview-app .po-auth-brand h2{font-size:40px;font-weight:800;line-height:1.13}
+/* Form controls had drifted to three weights (400/500/600) across screens. */
+body:has(.po-preview-app) .po-preview-app input,
+body:has(.po-preview-app) .po-preview-app select,
+body:has(.po-preview-app) .po-preview-app textarea,
+body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px;font-weight:500}
+
 /* ---- Pointer targets ------------------------------------------------------
  * AGENTS.md: layouts must work "without ... tiny touch targets". Row checkboxes
  * were 15x15, the row action menu 31x31, global icons 34x34 and pagination
