@@ -1,0 +1,145 @@
+import { useState, type ComponentType } from "react";
+import { Logo } from "../components/Logo";
+import { ConnectedAccountSwitcher } from "../components/ui";
+import {
+  AnalyticsIcon,
+  AutomationIcon,
+  BookIcon,
+  ContentIcon,
+  HomeIcon,
+  InboxIcon,
+  IntegrationsIcon,
+  LeadsIcon,
+  SettingsIcon,
+  TeamIcon,
+  CreditCardIcon,
+} from "../components/icons";
+
+type SettingsSection = "general" | "team" | "connections" | "billing" | "ai" | "personal";
+type IconType = ComponentType<{ className?: string }>;
+
+const navigation: Array<{ label: string; icon: IconType; screen?: string; section: "primary" | "workspace" }> = [
+  { label: "Overview", icon: HomeIcon, screen: "overview", section: "primary" },
+  { label: "Inbox", icon: InboxIcon, screen: "inbox", section: "primary" },
+  { label: "Leads", icon: LeadsIcon, screen: "leads", section: "primary" },
+  { label: "Automation", icon: AutomationIcon, screen: "automations", section: "primary" },
+  { label: "Knowledge", icon: BookIcon, screen: "knowledge", section: "primary" },
+  { label: "Content", icon: ContentIcon, screen: "content", section: "primary" },
+  { label: "Analytics", icon: AnalyticsIcon, screen: "analytics", section: "primary" },
+  { label: "Integrations", icon: IntegrationsIcon, screen: "integrations", section: "workspace" },
+  { label: "Settings", icon: SettingsIcon, screen: "settings", section: "workspace" },
+];
+
+const sections: Array<{ id: SettingsSection; label: string; description: string; group: "workspace" | "automation" | "personal" }> = [
+  { id: "general", label: "General", description: "Workspace identity and defaults", group: "workspace" },
+  { id: "team", label: "Team & access", description: "Members, roles and permissions", group: "workspace" },
+  { id: "connections", label: "Connections", description: "Channels and external accounts", group: "workspace" },
+  { id: "billing", label: "Plan & billing", description: "Plan, usage and invoices", group: "workspace" },
+  { id: "ai", label: "AI & automation", description: "Fields, guardrails and scoring", group: "automation" },
+  { id: "personal", label: "Personal", description: "Your preferences", group: "personal" },
+];
+
+const groupLabels = { workspace: "Workspace", automation: "AI & automation", personal: "Personal" } as const;
+
+function go(screen: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("preview", "precision-operations");
+  params.set("screen", screen);
+  params.delete("settingsSection");
+  window.location.href = window.location.pathname + "?" + params.toString();
+}
+
+function SettingsCard({ icon: Icon, title, description, action, children }: { icon?: IconType; title: string; description?: string; action?: React.ReactNode; children?: React.ReactNode }) {
+  return <section className="psp-card">
+    <div className="psp-card-heading">
+      <div className="psp-card-heading-copy">{Icon && <span className="psp-icon"><Icon /></span>}<div><h3>{title}</h3>{description && <p>{description}</p>}</div></div>
+      {action}
+    </div>
+    {children}
+  </section>;
+}
+
+export function PrecisionSettingsPreviewPage() {
+  const [section, setSection] = useState<SettingsSection>(() => {
+    const requested = new URLSearchParams(window.location.search).get("settingsSection") as SettingsSection | null;
+    return sections.some(item => item.id === requested) ? requested! : "general";
+  });
+  const [workspace, setWorkspace] = useState("My workspace");
+
+  const selectSection = (next: SettingsSection) => {
+    setSection(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("preview", "precision-operations");
+    params.set("screen", "settings");
+    params.set("settingsSection", next);
+    window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+  };
+
+  return <div className="psp-shell">
+    <aside className="psp-sidebar">
+      <div className="psp-brand-row"><Logo size="md" /><button type="button" className="psp-collapse" aria-label="Collapse navigation">‹</button></div>
+      <nav className="psp-main-nav" aria-label="Primary navigation">
+        {navigation.filter(item => item.section === "primary").map(item => <button key={item.label} type="button" onClick={() => item.screen && go(item.screen)}><item.icon /><span>{item.label}</span>{item.label === "Inbox" && <b>5</b>}</button>)}
+      </nav>
+      <div className="psp-nav-divider" />
+      <div className="psp-nav-label">Workspace</div>
+      <nav className="psp-main-nav" aria-label="Workspace navigation">
+        {navigation.filter(item => item.section === "workspace").map(item => <button key={item.label} type="button" className={item.label === "Settings" ? "is-active" : ""} onClick={() => item.screen && go(item.screen)}><item.icon /><span>{item.label}</span></button>)}
+      </nav>
+      <div className="psp-plan"><span>Current Plan</span><strong>Trial</strong><button type="button" onClick={() => selectSection("billing")}>View plan & usage</button></div>
+    </aside>
+
+    <div className="psp-main">
+      <header className="psp-topbar">
+        <ConnectedAccountSwitcher onAccountChange={() => undefined} onWorkspaceChange={setWorkspace} />
+        <div className="psp-topbar-spacer" />
+        <span className="psp-usage">AI usage <strong>145.5K / 200K tokens</strong></span>
+        <span className="psp-top-icon" aria-hidden="true">◐</span><span className="psp-top-icon" aria-hidden="true">♧</span>
+        <div className="psp-user"><span>A</span><div><strong>Alex Morgan</strong><small>Owner · sample user</small></div><b>⌄</b></div>
+      </header>
+
+      <main className="psp-content">
+        <div className="psp-header">
+          <span className="psp-eyebrow">SETTINGS</span>
+          <h1>{workspace}</h1>
+          <p>Manage this workspace and your personal preferences. The workspace selected in the header determines the scope of these settings.</p>
+        </div>
+
+        <div className="psp-layout">
+          <aside className="psp-settings-nav" aria-label="Settings sections">
+            {(["workspace", "automation", "personal"] as const).map(group => <div className="psp-settings-group" key={group}>
+              <div className="psp-group-label">{groupLabels[group]}</div>
+              {sections.filter(item => item.group === group).map(item => <button key={item.id} type="button" className={section === item.id ? "is-active" : ""} aria-current={section === item.id ? "page" : undefined} onClick={() => selectSection(item.id)}><strong>{item.label}</strong><span>{item.description}</span></button>)}
+            </div>)}
+          </aside>
+
+          <section className="psp-settings-content">
+            <div className="psp-section-heading"><div><h2>{sections.find(item => item.id === section)?.label}</h2><p>{sections.find(item => item.id === section)?.description}</p></div><span>{section === "personal" ? "Personal" : "Workspace scoped"}</span></div>
+
+            {section === "general" && <div className="psp-stack">
+              <SettingsCard icon={SettingsIcon} title="Workspace identity" description="This is the business context used by automations, leads, knowledge, connected accounts and team access.">
+                <dl className="psp-detail-grid"><div><dt>Workspace name</dt><dd>{workspace}</dd></div><div><dt>Workspace ID</dt><dd>sample-workspace</dd></div></dl>
+                <p className="psp-note">Workspace name editing can be enabled here once the workspace-management API is exposed. This preview does not pretend a local edit is persisted.</p>
+              </SettingsCard>
+              <div className="psp-link-grid">
+                <button type="button" onClick={() => selectSection("team")}><TeamIcon /><strong>Team & access</strong><span>Manage members and roles.</span></button>
+                <button type="button" onClick={() => selectSection("connections")}><IntegrationsIcon /><strong>Connections</strong><span>Connect and manage Instagram and other channels.</span></button>
+                <button type="button" onClick={() => selectSection("billing")}><CreditCardIcon /><strong>Plan & billing</strong><span>View usage, plan and billing details.</span></button>
+              </div>
+            </div>}
+
+            {section === "team" && <SettingsCard icon={TeamIcon} title="Team & access" description="Workspace members, roles and invitations live on the dedicated team page."><button type="button" className="psp-primary" onClick={() => go("team")}>Open team & access</button></SettingsCard>}
+            {section === "connections" && <SettingsCard icon={IntegrationsIcon} title="Connections" description="Connected Instagram accounts and other channels remain in Integrations so there is one source of truth for OAuth, health and reconnect actions."><button type="button" className="psp-primary" onClick={() => go("integrations")}>Open integrations</button></SettingsCard>}
+            {section === "billing" && <SettingsCard icon={CreditCardIcon} title="Plan & billing" description="Billing is scoped to this workspace, while the full payment and usage workflow stays on the dedicated billing page."><button type="button" className="psp-primary" onClick={() => go("billing")}>Open plan & billing</button></SettingsCard>}
+            {section === "ai" && <div className="psp-stack">
+              <SettingsCard title="Lead fields" description="Use business-friendly labels; keep technical keys secondary."><div className="psp-list-row"><strong>Interest</strong><span>automation_interest · Text</span></div><div className="psp-list-row"><strong>Use case</strong><span>automation_use_case · Text</span></div><div className="psp-list-row"><strong>Preferred contact</strong><span>preferred_contact · Text</span></div></SettingsCard>
+              <SettingsCard title="AI behavior" description="How the assistant responds when context is incomplete or uncertain."><p className="psp-copy">Never invent facts, prices, availability, or guarantees. If approved knowledge does not contain an answer, ask a follow-up or route to a teammate.</p><button type="button" className="psp-secondary">Open AI behavior</button></SettingsCard>
+              <SettingsCard title="Guardrails & scoring" description="Forbidden topics, escalation rules and custom scoring stay together as automation controls."><div className="psp-chip-row"><span>Forbidden topics</span><span>Escalation</span><span>Scoring</span></div></SettingsCard>
+            </div>}
+            {section === "personal" && <SettingsCard title="Personal preferences" description="Personal settings should follow you across workspaces rather than changing the workspace itself."><div className="psp-list-row"><strong>Theme and notifications</strong><span>Use the account menu and notification controls for preferences that belong to you.</span></div></SettingsCard>}
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>;
+}
