@@ -17,7 +17,6 @@ describe("Google OAuth routes", () => {
 
   beforeEach(async () => {
     await resetDb(getPool());
-    await getPool().query("truncate table google_oauth_states, google_login_handoffs");
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
     delete process.env.GOOGLE_REDIRECT_URI;
