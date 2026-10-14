@@ -877,6 +877,14 @@ export function PrecisionOperationsPreviewPage() {
       ? normalized as PreviewPalette
       : "navy-cobalt";
   });
+  useEffect(() => {
+    const targetId = decodeURIComponent(window.location.hash.slice(1));
+    if (!targetId) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: "center", behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [screen]);
   const changeTheme = (next: "light"|"dark") => {
     setTheme(next);
     const params = new URLSearchParams(window.location.search);
