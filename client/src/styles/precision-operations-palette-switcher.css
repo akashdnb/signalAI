@@ -1118,3 +1118,83 @@ body:has(.po-preview-app) .po-preview-app .po-editor-item--form-row > .po-button
     transition: none;
   }
 }
+
+/* Desktop resize rail. The handle overlaps the sidebar/content seam so it does
+   not waste horizontal space, but keeps an 8px hit target for pointer users. */
+.po-preview-app:not(.is-sidebar-collapsed) .po-sidebar {
+  flex: 0 0 var(--po-sidebar-width, 226px) !important;
+  width: var(--po-sidebar-width, 226px) !important;
+  min-width: 180px;
+  max-width: 280px;
+}
+.po-preview-app .po-sidebar-resize-handle {
+  position: relative;
+  z-index: 35;
+  flex: 0 0 8px;
+  width: 8px;
+  min-width: 8px;
+  margin-left: -4px;
+  margin-right: -4px;
+  align-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+  background: var(--po-color-transparent);
+}
+.po-preview-app .po-sidebar-resize-handle[hidden] {
+  display: none !important;
+}
+.po-preview-app .po-sidebar-resize-handle::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--po-color-primary);
+  opacity: 0;
+  content: "";
+  transition: opacity 120ms ease;
+}
+.po-preview-app .po-sidebar-resize-handle:hover::after,
+.po-preview-app .po-sidebar-resize-handle:focus-visible::after,
+.po-preview-app .po-sidebar-resize-handle.is-resizing::after {
+  opacity: .72;
+}
+.po-preview-app .po-sidebar-resize-handle:focus-visible {
+  outline: 2px solid var(--po-color-primary);
+  outline-offset: -2px;
+}
+.po-preview-app.is-sidebar-resizing,
+.po-preview-app.is-sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.po-preview-app.is-sidebar-resizing .po-sidebar,
+.po-preview-app.is-sidebar-resizing .po-main {
+  transition: none !important;
+}
+@media (max-width: 1080px) and (min-width: 761px) {
+  .po-preview-app:not(.is-sidebar-collapsed) .po-sidebar {
+    flex: 0 0 var(--po-sidebar-width, 226px) !important;
+    width: var(--po-sidebar-width, 226px) !important;
+    min-width: 180px;
+    max-width: 280px;
+  }
+}
+@media (max-width: 760px) {
+  .po-preview-app .po-sidebar-resize-handle {
+    display: none !important;
+  }
+  .po-preview-app:not(.is-sidebar-collapsed) .po-sidebar {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0;
+    max-width: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .po-preview-app .po-sidebar-resize-handle::after {
+    transition: none;
+  }
+}
