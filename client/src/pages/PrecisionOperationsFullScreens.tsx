@@ -245,7 +245,7 @@ export function SettingsScreen({ theme, palette, onChangeTheme, onChangePalette 
 }) {
   const [section,setSection]=useState<SettingsSection>(() => {
     const requested = new URLSearchParams(window.location.search).get("settingsSection");
-    return requested && settingsSections.includes(requested as SettingsSection) ? requested as SettingsSection : "Fields";
+    return requested && settingsSections.includes(requested as SettingsSection) ? requested as SettingsSection : "Appearance";
   });
   const [notice,setNotice]=useState("");
   const [newField,setNewField]=useState("");
