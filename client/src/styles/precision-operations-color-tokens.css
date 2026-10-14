@@ -612,3 +612,68 @@ body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(1) { stop-c
 body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(2) { stop-color:var(--po-logo-gradient-middle) !important; }
 body[data-po-palette] .po-preview-app .po-brand svg stop:nth-of-type(3) { stop-color:var(--po-logo-gradient-end) !important; }
 body[data-po-palette] .po-preview-app .po-brand svg > path:last-child { fill:var(--po-logo-sparkle) !important; }
+
+/* Settings appearance-picker tokens: the miniature previews and swatches are
+   independent of the currently selected palette so all options stay scannable. */
+.po-preview-app {
+  --po-color-swatch-border: var(--po-color-border-strong);
+  --po-color-mode-light-canvas: #f1f5fa;
+  --po-color-mode-light-surface: #ffffff;
+  --po-color-mode-light-sidebar: #e2e8f0;
+  --po-color-mode-light-accent: #1e3a8a;
+  --po-color-mode-dark-canvas: #0b1220;
+  --po-color-mode-dark-surface: #111827;
+  --po-color-mode-dark-sidebar: #172033;
+  --po-color-mode-dark-accent: #60a5fa;
+}
+.po-preview-app .po-appearance-mode-option[data-theme="light"] {
+  --po-mode-preview-bg: var(--po-color-mode-light-canvas);
+  --po-mode-preview-surface: var(--po-color-mode-light-surface);
+  --po-mode-preview-sidebar: var(--po-color-mode-light-sidebar);
+  --po-mode-preview-accent: var(--po-color-mode-light-accent);
+  --po-mode-preview-border: var(--po-color-border);
+}
+.po-preview-app .po-appearance-mode-option[data-theme="dark"] {
+  --po-mode-preview-bg: var(--po-color-mode-dark-canvas);
+  --po-mode-preview-surface: var(--po-color-mode-dark-surface);
+  --po-mode-preview-sidebar: var(--po-color-mode-dark-sidebar);
+  --po-mode-preview-accent: var(--po-color-mode-dark-accent);
+  --po-mode-preview-border: var(--po-color-border);
+}
+
+.po-preview-app .po-appearance-palette-option[data-palette="navy-cobalt"] {
+  --po-appearance-swatch-1: #1e3a8a;
+  --po-appearance-swatch-2: #2563eb;
+  --po-appearance-swatch-3: #60a5fa;
+  --po-appearance-swatch-4: #eff6ff;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="teal-emerald"] {
+  --po-appearance-swatch-1: #065f4a;
+  --po-appearance-swatch-2: #10b981;
+  --po-appearance-swatch-3: #34d399;
+  --po-appearance-swatch-4: #ecfdf5;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="slate-cyan"] {
+  --po-appearance-swatch-1: #0f172a;
+  --po-appearance-swatch-2: #06b6d4;
+  --po-appearance-swatch-3: #22d3ee;
+  --po-appearance-swatch-4: #e0f2fe;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="forest-slate"] {
+  --po-appearance-swatch-1: #14532d;
+  --po-appearance-swatch-2: #16a34a;
+  --po-appearance-swatch-3: #86efac;
+  --po-appearance-swatch-4: #f0fdf4;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="orange-amber"] {
+  --po-appearance-swatch-1: #c2410c;
+  --po-appearance-swatch-2: #f97316;
+  --po-appearance-swatch-3: #fdba74;
+  --po-appearance-swatch-4: #fff7ed;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="neutral-slate"] {
+  --po-appearance-swatch-1: #334155;
+  --po-appearance-swatch-2: #475569;
+  --po-appearance-swatch-3: #94a3b8;
+  --po-appearance-swatch-4: #f1f5f9;
+}
