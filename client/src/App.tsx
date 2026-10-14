@@ -9,12 +9,10 @@ import "./styles/precision-operations-design-system.css";
 import "./styles/precision-operations-final-fixes.css";
 import "./styles/precision-operations-color-tokens.css";
 import "./styles/precision-operations-palette-switcher.css";
-import "./styles/precision-settings-preview.css";
-import "./styles/precision-settings-preview-fixes.css";
+import "./styles/precision-settings-sectioned-preview.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() => import("./pages/PrecisionOperationsPreviewPage").then((module) => ({ default: module.PrecisionOperationsPreviewPage })));
-const PrecisionSettingsPreviewPage = lazy(() => import("./pages/PrecisionSettingsPreviewPage").then((module) => ({ default: module.PrecisionSettingsPreviewPage })));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then((module) => ({ default: module.AnalyticsPage })));
 const AutomationPage = lazy(() => import("./pages/AutomationPage").then((module) => ({ default: module.AutomationPage })));
 const JourneyBuilderPage = lazy(() => import("./pages/JourneyBuilderPage").then((module) => ({ default: module.JourneyBuilderPage })));
@@ -38,7 +36,7 @@ const previewPaletteAliases: Record<string, string> = { "indigo-blue": "navy-cob
 function PreviewPaletteBridge() { useEffect(() => { const params = new URLSearchParams(window.location.search); const requested = params.get("palette") ?? "navy-cobalt"; const palette = previewPaletteAliases[requested] ?? requested; const isPreview = params.get("preview") === "precision-operations" || window.location.pathname === "/redesign-preview"; if (isPreview) document.body.dataset.poPalette = previewPalettes.has(palette) ? palette : "navy-cobalt"; else delete document.body.dataset.poPalette; return () => { delete document.body.dataset.poPalette; }; }, []); return null; }
 function PageLoadingFallback() { return <div role="status" className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle">Loading page…</div>; }
 function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) { return <Suspense fallback={<PageLoadingFallback />}><Page /></Suspense>; }
-function PrecisionPreviewEntry() { const params = new URLSearchParams(window.location.search); return params.get("screen") === "settings" ? <LazyPage Page={PrecisionSettingsPreviewPage} /> : <LazyPage Page={PrecisionOperationsPreviewPage} />; }
+function PrecisionPreviewEntry() { return <LazyPage Page={PrecisionOperationsPreviewPage} />; }
 function HomeRedirect() { const isPrecisionPreview = new URLSearchParams(window.location.search).get("preview") === "precision-operations"; if (isPrecisionPreview) return <PrecisionPreviewEntry />; const session = loadSession(); return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />; }
 export default function App() {
   return <><PreviewPaletteBridge /><Routes>
