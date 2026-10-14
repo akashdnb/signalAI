@@ -155,15 +155,16 @@ function BuilderPalette({ onSelect }: { onSelect: (key: BuilderNodeKey) => void 
   </aside>;
 }
 
-function FlowNode({ node, selected, onClick, index, nodeId, onReorder }: {
-  node: (typeof builderNodes)[number]; selected: boolean; onClick: () => void; index: number; nodeId: number; onReorder: (fromId: number, toId: number) => void;
+function FlowNode({ node, selected, onClick, index, nodeId, onReorder, onRemove, isNew, onMove }: {
+  node: (typeof builderNodes)[number]; selected: boolean; onClick: () => void; index: number; nodeId: number; onReorder: (fromId: number, toId: number) => void; onRemove: ((nodeId: number) => void) | null; isNew: boolean; onMove: (nodeId: number, direction: -1|1) => void;
 }) {
   const Icon = node.icon;
   return <div className="po-flow-node-wrap" onDragOver={event=>{event.preventDefault();event.dataTransfer.dropEffect="move";}} onDrop={event=>{event.preventDefault();const raw=event.dataTransfer.getData("text/plain");const fromId=Number(raw);if(raw!==""&&Number.isInteger(fromId)&&fromId!==nodeId)onReorder(fromId,nodeId);}}>
     {index > 0 && <div className="po-flow-connector" aria-hidden="true"><span /></div>}
-    <button type="button" draggable className={"po-flow-node" + (selected ? " is-selected" : "")} onClick={onClick} onDragStart={event=>{event.dataTransfer.setData("text/plain",String(nodeId));event.dataTransfer.effectAllowed="move";}} aria-pressed={selected} title="Click to edit. Drag to reorder this step.">
+    <div className="po-flow-node-shell"><button type="button" draggable className={"po-flow-node" + (selected ? " is-selected" : "") + (isNew ? " is-new" : "")} onClick={onClick} onDragStart={event=>{event.dataTransfer.setData("text/plain",String(nodeId));event.dataTransfer.effectAllowed="move";}} aria-pressed={selected} title="Click to edit. Drag, or press Alt with the up and down arrows, to reorder this step." onKeyDown={event=>{ if(!event.altKey) return; if(event.key==="ArrowUp"){event.preventDefault();onMove(nodeId,-1);} if(event.key==="ArrowDown"){event.preventDefault();onMove(nodeId,1);} }}>
       <span className={"po-flow-node-icon po-flow-node-icon--" + node.key}><Icon /></span><span className="po-flow-node-content"><span className="po-flow-node-kicker">{node.number} / {node.kind}</span><strong>{node.title}</strong><span>{node.summary}</span><small>{node.detail}</small></span><span className="po-flow-node-end" aria-hidden="true">⠿</span>
     </button>
+    {onRemove && <button type="button" className="po-flow-node-remove" aria-label={"Remove step " + node.number + ": " + node.title} title="Remove this step" onClick={()=>onRemove(nodeId)}>×</button>}</div>
   </div>;
 }
 
@@ -471,6 +472,55 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     ...addedNodes.map(item=>({...builderNodes.find(node=>node.key===item.key)!,nodeId:item.id,number:String(item.id+1).padStart(2,"0")})),
   ];
   const visibleNodes = nodeOrder.map(id=>sourceNodes.find(node=>node.nodeId===id)).filter((node): node is (typeof sourceNodes)[number] => node !== undefined);
+  const [flowNotice,setFlowNotice] = useState("");
+  const [justAddedId,setJustAddedId] = useState<number|null>(null);
+  const [undoRemoval,setUndoRemoval] = useState<{id:number;key:BuilderNodeKey;index:number}|null>(null);
+  // The canvas gave no sign a step had landed: the inspector opened over it and the
+  // node count only changed in the footer. Announce what was added, mark the node,
+  // and bring it into view so the change is visible once the inspector closes.
+  const announceFlowChange = (message:string, nodeId:number|null) => {
+    setFlowNotice(message);
+    setJustAddedId(nodeId);
+    if(nodeId!==null) window.setTimeout(()=>{
+      document.querySelector('.po-flow-node.is-new')?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    },60);
+  };
+  useEffect(()=>{
+    if(!flowNotice) return;
+    const timer=window.setTimeout(()=>{setFlowNotice("");setJustAddedId(null);setUndoRemoval(null);},8000);
+    return ()=>window.clearTimeout(timer);
+  },[flowNotice]);
+  const removeFlowNode = (nodeId:number) => {
+    const removed = visibleNodes.find(node=>node.nodeId===nodeId);
+    if(!removed) return;
+    // Deleting a step is destructive and the preview has no history, so the removal
+    // stays recoverable from the notice rather than behind a confirmation dialog.
+    setUndoRemoval({id:nodeId,key:removed.key,index:nodeOrder.indexOf(nodeId)});
+    setNodeOrder(current=>current.filter(id=>id!==nodeId));
+    setFlowStepCount(current=>Math.max(1,current-1));
+    if(selectedNodeId===nodeId){ setInspectorOpen(false); setSelectedNodeId(0); setSelectedNode("trigger"); onSelectNode("trigger"); }
+    announceFlowChange(removed.title+" removed from the flow", null);
+    onDirty();
+  };
+  const undoRemoveFlowNode = () => {
+    if(!undoRemoval) return;
+    const { id, index } = undoRemoval;
+    setNodeOrder(current=>{ const next=[...current]; next.splice(Math.min(index,next.length),0,id); return next; });
+    setFlowStepCount(current=>current+1);
+    announceFlowChange("Step restored to the flow", id);
+    setUndoRemoval(null);
+  };
+  // Drag is the only way to reorder, which leaves keyboard and assistive-tech users
+  // with no route at all (WCAG 2.5.7). Alt+Arrow moves the focused step.
+  const moveFlowNode = (nodeId:number, direction:-1|1) => {
+    setNodeOrder(current=>{
+      const from=current.indexOf(nodeId); const to=from+direction;
+      if(from<0||to<0||to>=current.length) return current;
+      const next=[...current]; const [moved]=next.splice(from,1); next.splice(to,0,moved!);
+      return next;
+    });
+    onDirty();
+  };
   const reorderFlowNodes = (fromId:number,toId:number) => {
     setNodeOrder(current=>{
       const from=current.indexOf(fromId),to=current.indexOf(toId);
@@ -494,6 +544,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
       setNodeOrder(current=>current.concat(id));
       setFlowStepCount(current=>current+1);
       setSelectedNode(key);setSelectedNodeId(id);onSelectNode(key);onDirty();
+      announceFlowChange((builderNodes.find(node=>node.key===key)?.title ?? "Step")+" added to the flow", id);
     }
     setInspectorOpen(true);
   };
@@ -502,12 +553,12 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
     setAddedNodes(current=>current.concat({id,key:"followup"}));
     setNodeOrder(current=>current.concat(id));
     setFlowStepCount(current=>current+1);
-    setSelectedNode("followup");setSelectedNodeId(id);onSelectNode("followup");onDirty();setInspectorOpen(true);
+    setSelectedNode("followup");setSelectedNodeId(id);onSelectNode("followup");onDirty();announceFlowChange("Message step added to the flow", id);setInspectorOpen(true);
   };
   return <section className="po-builder-screen" aria-label="Automation builder concept">
     <div className="po-builder-subnav"><div className="po-builder-subnav-tabs" role="tablist" aria-label="Automation sections">{["Flow", "Setup", "Results", "Leads"].map(tab => <button key={tab} type="button" role="tab" id={"po-builder-tab-"+tab.toLowerCase()} aria-controls="po-builder-panel" aria-selected={subTab===tab} className={subTab===tab?"is-active":""} onClick={()=>switchTab(tab)}>{tab}</button>)}</div><div className="po-builder-subnav-right"><span className="po-flow-summary"><span />{dirty ? "Draft has unsaved changes" : "Preview marked saved"}</span></div></div>
     <div id="po-builder-panel" role="tabpanel" aria-labelledby={"po-builder-tab-"+subTab.toLowerCase()}>
-    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={addPaletteNode} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span><span>Illustrative layout · not connected to runtime</span></div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{visibleNodes.map((node, index) => <FlowNode key={node.nodeId} node={{...node,number:String(index+1).padStart(2,"0")}} nodeId={node.nodeId} index={index} selected={node.nodeId===selectedNodeId} onReorder={reorderFlowNodes} onClick={() => { setSelectedNode(node.key);setSelectedNodeId(node.nodeId);onSelectNode(node.key);setInspectorOpen(true); }} />)}<button type="button" className="po-add-step" onClick={addAnotherMessage}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span role="status" aria-live="polite" data-step-count={flowStepCount}>{flowStepCount} steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" disabled>+</button></div></div></section></div>}
+    {subTab === "Flow" && <div className="po-builder-grid"><BuilderPalette onSelect={addPaletteNode} /><section className="po-canvas" aria-label="Automation flow"><div className="po-canvas-topline"><span>{automationName} flow</span>{flowNotice?<span className="po-flow-notice" role="status">{flowNotice}{undoRemoval&&<button type="button" className="po-flow-notice-undo" onClick={undoRemoveFlowNode}>Undo</button>}</span>:<span>Illustrative layout · not connected to runtime</span>}</div><div className="po-canvas-workspace"><div className="po-canvas-watermark">SAMPLE FLOW</div><div className="po-flow">{visibleNodes.map((node, index) => <FlowNode key={node.nodeId} node={{...node,number:String(index+1).padStart(2,"0")}} nodeId={node.nodeId} index={index} selected={node.nodeId===selectedNodeId} onReorder={reorderFlowNodes} onRemove={node.key==="trigger"?null:removeFlowNode} onMove={moveFlowNode} isNew={node.nodeId===justAddedId} onClick={() => { setSelectedNode(node.key);setSelectedNodeId(node.nodeId);onSelectNode(node.key);setInspectorOpen(true); }} />)}<button type="button" className="po-add-step" onClick={addAnotherMessage}><PlusIcon /> Add another message</button></div></div><div className="po-canvas-footer"><span role="status" aria-live="polite" data-step-count={flowStepCount}>{flowStepCount} steps · Sample flow only</span><div><button type="button" aria-label="Zoom out" title="Zoom is not available in this preview" disabled>−</button><span>100%</span><button type="button" aria-label="Zoom in" title="Zoom is not available in this preview" disabled>+</button></div></div></section></div>}
     </div>
     <div className={"po-modal-backdrop po-inspector-backdrop"+(inspectorOpen?"":" is-hidden")} role="presentation" aria-hidden={!inspectorOpen} onMouseDown={event=>event.target===event.currentTarget&&requestInspectorClose()}><section ref={inspectorRef} tabIndex={-1} className="po-modal po-inspector-dialog" role="dialog" aria-modal={inspectorOpen} aria-label="Edit flow step"><div className="po-inspector-dialog-actions"><span className="po-eyebrow">NODE INSPECTOR · SAMPLE</span><button type="button" className="po-icon-button" aria-label="Close step inspector" onClick={requestInspectorClose}>×</button></div><StepInspector key={inspectorKey} nodeKey={selectedNode} nodeId={selectedNodeId} nodeConfig={nodeConfigs[selectedNodeId]??null} onDirty={onDirty} seed={{triggerType,keywords}} onClose={()=>setInspectorOpen(false)} onEditorDirtyChange={(value)=>{setInspectorDirty(value);onInspectorDirtyChange(value);}} onApplied={(result)=>{setNodeConfigs(current=>({...current,[selectedNodeId]:{...(current[selectedNodeId]??{}),...result}}));if(selectedNode==="trigger"){if(result.triggerType)setTriggerType(result.triggerType);if(result.keywords)setKeywords(result.keywords);}}}/></section></div>
     {confirmInspectorClose&&<div className="po-modal-backdrop po-inspector-discard-backdrop" role="presentation"><section ref={inspectorDiscardRef} tabIndex={-1} className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-inspector-discard-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Keep editing this step" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);onInspectorCloseCancelled();}}>×</button></div><span className="po-eyebrow">UNSAVED STEP CHANGES</span><h2 id="po-inspector-discard-title">Discard inspector changes?</h2><p>You have edited this step but have not applied those changes to the automation draft.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>{setConfirmInspectorClose(false);setPendingInspectorTab(null);onInspectorCloseCancelled();}}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={discardInspectorEdits}>Discard changes</button></div></section></div>}
@@ -520,7 +571,7 @@ function BuilderScreen({ dirty, onSelectNode, automationName, onDirty, onOpenLea
       </div><aside className="po-setup-summary"><span className="po-eyebrow">READINESS CHECK</span><h2>Before publishing</h2><p>Review every requirement before this automation can reply to real customers.</p><div className="po-readiness-checks"><div><CheckCircleIcon/><span><strong>Basic details</strong><small>Name and description present</small></span><Tag tone="green">Ready</Tag></div><div><CheckCircleIcon/><span><strong>Trigger configured</strong><small>{keywords.trim()?"Keywords present":"Add a keyword"}</small></span><Tag tone={keywords.trim()?"green":"warning"}>{keywords.trim()?"Ready":"Blocked"}</Tag></div><div><CheckCircleIcon/><span><strong>Account assigned</strong><small>{account}</small></span><Tag tone={account==="No account assigned"?"warning":"green"}>{account==="No account assigned"?"Blocked":"Ready"}</Tag></div><div><CheckCircleIcon/><span><strong>Draft reviewed</strong><small>Test before publishing</small></span><Tag>Review</Tag></div></div><div className="po-warning-note"><span>!</span><span><strong>Preview-only readiness</strong><small>This checklist doesn't call the real account readiness or validation APIs.</small></span></div></aside>
     </div>}
     {subTab === "Results" && <section className="po-builder-results"><div className="po-screen-toolbar"><div><span className="po-eyebrow">AUTOMATION RESULTS</span><p>Only sample data is shown. Production metrics need a defined reporting window.</p></div><label className="po-select-wrap"><span className="po-visually-hidden">Results period</span><select value={resultPeriod} onChange={e=>setResultPeriod(e.target.value)}><option>Last 7 days</option><option>Last 30 days</option><option>This month</option></select><ChevronDownIcon/></label></div><div className="po-metric-row"><div className="po-metric"><span>Trigger events</span><strong>42</strong><small>sample runs in {resultPeriod.toLowerCase()}</small></div><div className="po-metric"><span>Replies sent</span><strong>35</strong><small>example event count</small></div><div className="po-metric"><span>Lead records created</span><strong>12</strong><small>unique leads · sample</small></div><div className="po-metric"><span>Human reviews</span><strong>4</strong><small>sample handoff count</small></div></div><div className="po-overview-grid"><section className="po-content-panel"><header className="po-panel-title"><div><span className="po-eyebrow">RUN VOLUME</span><h2>Activity over time</h2><p>Sample trigger and reply counts.</p></div></header><div className="po-minibars" role="img" aria-label="Sample automation run volume: Mon 8, Tue 12, Wed 7, Thu 17, Fri 13, Sat 18, Sun 9">{[8,12,7,17,13,18,9].map((n,i)=><div className="po-minibar-col" key={i}><b className="po-minibar-value">{n}</b><div className="po-minibar-track"><span style={{height:n/18*100+"%"}}/></div><small>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]}</small></div>)}</div></section><section className="po-content-panel"><header className="po-panel-title"><div><span className="po-eyebrow">RECENT RUNS</span><h2>Execution activity</h2><p>Sample events, not actual run logs.</p></div></header><div className="po-timeline"><div><b>Trigger matched</b><small>Comment keyword “price” · just now</small></div><div><b>AI reply prepared</b><small>Knowledge context included · 4m ago</small></div><div><b>Goal captured</b><small>Interest field recorded · 10m ago</small></div><div><b>Human review requested</b><small>Uncertain answer · 32m ago</small></div></div></section></div><div className="po-inline-help">This results layout is illustrative. It doesn't read historical journey executions or claim actual performance.</div></section>}
-    {pendingTab&&<div className="po-modal-backdrop" role="presentation"><section ref={pendingTabRef} tabIndex={-1} className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-builder-unsaved-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Close unsaved changes dialog" onClick={()=>setPendingTab(null)}>×</button></div><span className="po-eyebrow">UNSAVED CHANGES</span><h2 id="po-builder-unsaved-title">Leave this builder tab?</h2><p>Your automation has changes that are not marked saved. Save them, discard them, or keep editing before switching to another tab.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>setPendingTab(null)}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={()=>continueTabAfterDecision("discard")}>Discard changes</button><button type="button" className="po-button po-button--primary" onClick={()=>continueTabAfterDecision("save")}>Save changes & continue</button></div></section></div>}
+    {pendingTab&&<div className="po-modal-backdrop" role="presentation"><section ref={pendingTabRef} tabIndex={-1} className="po-modal" role="alertdialog" aria-modal="true" aria-labelledby="po-builder-unsaved-title"><div className="po-modal-top"><span className="po-modal-icon po-modal-icon--warning">!</span><button type="button" className="po-icon-button" aria-label="Close unsaved changes dialog" onClick={()=>setPendingTab(null)}>×</button></div><span className="po-eyebrow">UNSAVED CHANGES</span><h2 id="po-builder-unsaved-title">Leave this builder tab?</h2><p>Your automation has changes that are not marked saved. Save them, discard them, or keep editing before switching to another tab.</p><div className="po-modal-footer"><button type="button" className="po-button po-button--quiet" onClick={()=>setPendingTab(null)}>Keep editing</button><button type="button" className="po-button po-button--secondary" onClick={()=>continueTabAfterDecision("discard")}>Discard changes</button><button type="button" className="po-button po-button--primary" onClick={()=>continueTabAfterDecision("save")}>Save & continue</button></div></section></div>}
     {subTab === "Leads" && <section className="po-builder-results"><div className="po-screen-toolbar"><div><span className="po-eyebrow">LEADS FROM THIS AUTOMATION</span><p>Lead examples attributed to this automation; values are sample data.</p></div><button type="button" className="po-button po-button--secondary" disabled>Export</button></div><div className="po-automation-table-wrap"><table className="po-automation-table"><thead><tr><th>Lead</th><th>Stage</th><th>Handoff</th><th>Last activity</th><th>Owner</th><th>View</th></tr></thead><tbody>{[["Morgan Lee","New","Human review","2m ago","Unassigned"],["Casey Rivera","Contacted","AI handling","12m ago","Alex"],["Taylor Kim","Qualified","AI handling","27m ago","Sam"]].map((row,i)=><tr key={row[0]}><td><button type="button" className="po-table-primary-link" onClick={()=>onOpenLead(row[0])}>{row[0]}</button><small>{["@morgan.sample","@casey.sample","@taylor.sample"][i]}</small></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td><button type="button" className="po-text-action" onClick={()=>onOpenLead(row[0])}>Open →</button></td></tr>)}</tbody></table></div></section>}
   </section>;
 }

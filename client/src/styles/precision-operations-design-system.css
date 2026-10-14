@@ -235,6 +235,51 @@ body:has(.po-preview-app) .po-preview-app select,
 body:has(.po-preview-app) .po-preview-app textarea,
 body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px;font-weight:500}
 
+/* ---- Builder canvas fixes --------------------------------------------------
+ * 5. .po-builder-more-wrap had no rules at all, so the absolutely-positioned
+ *    dropdown had no positioned ancestor and rendered at the foot of the page.
+ * 3. The inspector resized between its tabs because the dialog sized to content.
+ * 4. The separator keeps a destructive action away from the confirming one.
+ */
+body:has(.po-preview-app) .po-preview-app .po-builder-more-wrap{position:relative;display:inline-flex}
+/* 6. The canvas used to grow the page as steps were added, and the palette scrolled
+ *    away with it. Bounding the grid row lets each column scroll on its own. */
+@media (min-width:1024px){
+  body:has(.po-preview-app) .po-preview-app .po-builder-grid{height:clamp(460px,66vh,760px)}
+}
+/* A delete control nobody can see is not an option; it stays visible but quiet. */
+body:has(.po-preview-app) .po-preview-app .po-inspector-dialog{height:min(88vh,760px)}
+/* Pushing the quiet action left with an auto margin made the three buttons wrap in a
+ * narrow dialog. A gap plus extra room before the confirming action keeps the
+ * destructive one from sitting flush against it, on one row. */
+body:has(.po-preview-app) .po-preview-app .po-modal-footer .po-button--primary{margin-left:10px}
+/* A three-action footer needs more room than the 510px default or it wraps. */
+body:has(.po-preview-app) .po-preview-app .po-modal:has(.po-modal-footer .po-button--primary):has(.po-modal-footer .po-button--secondary){width:min(100%,580px)}
+
+/* A step landing on the canvas now says so, and the node it added is marked. */
+body:has(.po-preview-app) .po-preview-app .po-flow-notice{
+  display:inline-flex;align-items:center;gap:7px;margin:0;padding:3px 11px;
+  border:1px solid var(--po-primary);border-radius:999px;
+  background:var(--po-primary-soft);color:var(--po-primary);
+  font-size:12px;font-weight:600}
+body:has(.po-preview-app) .po-preview-app .po-flow-node.is-new{
+  border-color:var(--po-primary);box-shadow:0 0 0 3px var(--po-primary-soft)}
+body:has(.po-preview-app) .po-preview-app .po-flow-notice-undo{margin-left:2px;padding:0 2px;border:0;background:transparent;color:inherit;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell{position:relative;display:flex;width:100%}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell > .po-flow-node{flex:1;min-width:0}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove{
+  position:absolute;top:8px;right:8px;z-index:2;display:inline-flex;align-items:center;
+  justify-content:center;width:26px;height:26px;border:1px solid transparent;border-radius:6px;
+  background:transparent;color:var(--po-text-muted);font-size:16px;line-height:1;
+  opacity:.5;transition:opacity 120ms ease,background-color 120ms ease,color 120ms ease}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell:hover .po-flow-node-remove,
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove:focus-visible{opacity:1}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove:hover{
+  border-color:var(--po-border);background:var(--po-bg);color:var(--po-text)}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove::after{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  min-width:44px;min-height:44px;width:100%;height:100%}
+
 /* ---- Pointer targets ------------------------------------------------------
  * AGENTS.md: layouts must work "without ... tiny touch targets". Row checkboxes
  * were 15x15, the row action menu 31x31, global icons 34x34 and pagination

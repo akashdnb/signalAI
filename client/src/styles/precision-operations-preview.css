@@ -99,8 +99,8 @@
 .po-preview-app .po-builder-subnav-right { display: flex; align-items: center; margin-left: auto; }
 .po-preview-app .po-flow-summary { display: inline-flex; align-items: center; gap: 7px; color: var(--po-muted); font-size: 12px; }
 .po-preview-app .po-flow-summary span { width: 6px; height: 6px; border-radius: 50%; background: #d99a2b; }
-.po-preview-app .po-builder-grid { display: grid; grid-template-columns: 208px minmax(320px, 1fr) 286px; min-width: 0; min-height: 650px; border-bottom: 1px solid var(--po-line); }
-.po-preview-app .po-palette { min-width: 0; padding: 18px 12px 16px; border-right: 1px solid var(--po-line); background: #fafbf8; }
+.po-preview-app .po-builder-grid { display: grid; grid-template-columns: 208px minmax(320px, 1fr) 286px; min-width: 0; min-height: 0; border-bottom: 1px solid var(--po-line); }
+.po-preview-app .po-palette { min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 12px 16px; border-right: 1px solid var(--po-line); background: #fafbf8; }
 .po-preview-app .po-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .po-preview-app .po-panel-heading h2 { margin: 4px 0 0; font-size: 18px; font-weight: 800; letter-spacing: -.025em; }
 .po-preview-app .po-step-count { padding: 3px 5px; border: 1px solid var(--po-line); border-radius: 6px; color: var(--po-muted); font-size: 12px; white-space: nowrap; }
@@ -121,11 +121,11 @@
 .po-preview-app .po-coming-soon strong { font-size: 14px; font-weight: 700; }
 .po-preview-app .po-coming-soon small { font-size: 12px; }
 .po-preview-app .po-soon-icon { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border: 1px solid #e2e5e0; border-radius: 6px; font-size: 14px; }
-.po-preview-app .po-canvas { position: relative; display: flex; min-width: 0; flex-direction: column; background: #f7f8f5; }
+.po-preview-app .po-canvas { position: relative; display: flex; min-width: 0; min-height: 0; flex-direction: column; background: #f7f8f5; }
 .po-preview-app .po-canvas-topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 10px 15px; border-bottom: 1px solid #e5e8e2; background: #f9faf7; }
 .po-preview-app .po-canvas-topline span:first-child { color: var(--po-ink); font-size: 12px; font-weight: 800; }
 .po-preview-app .po-canvas-topline span:last-child { color: var(--po-muted); font-size: 12px; text-align: right; }
-.po-preview-app .po-canvas-workspace { position: relative; display: flex; flex: 1; justify-content: center; min-height: 590px; overflow: hidden; padding: 22px 12px 28px; background-image: radial-gradient(#d7dcd5 .85px, transparent .85px); background-position: 0 0; background-size: 18px 18px; }
+.po-preview-app .po-canvas-workspace { position: relative; display: flex; flex: 1; justify-content: center; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 22px 12px 28px; background-image: radial-gradient(#d7dcd5 .85px, transparent .85px); background-position: 0 0; background-size: 18px 18px; }
 .po-preview-app .po-canvas-watermark { position: absolute; top: 15px; right: 13px; color: #bec5bf; font-size: 11px; font-weight: 800; letter-spacing: .15em; pointer-events: none; }
 .po-preview-app .po-flow { z-index: 1; display: flex; width: min(100%, 430px); flex-direction: column; align-items: center; margin: 10px auto 20px; }
 .po-preview-app .po-flow-node-wrap { display: flex; width: 100%; flex-direction: column; align-items: center; }
@@ -289,7 +289,7 @@
 .po-preview-app .po-readiness-list > span { display: flex; align-items: center; gap: 8px; }
 .po-preview-app .po-readiness-list svg { width: 15px; height: 15px; color: var(--po-green); }
 .po-preview-app .po-readiness-empty { width: 13px; height: 13px; border: 1px solid #b5beb6; border-radius: 50%; }
-.po-preview-app .po-modal-footer { display: flex; justify-content: flex-end; margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--po-line); }
+.po-preview-app .po-modal-footer { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--po-line); }
 @media (max-width: 1400px) {
   .po-preview-app .po-main-content { padding-right: 20px; padding-left: 20px; }
   .po-preview-app .po-sidebar { flex-basis: 210px; width: 210px; }
@@ -325,7 +325,7 @@
   .po-preview-app .po-brand { display: inline-flex; justify-content: flex-start; padding: 0 3px; font-size: 16px; }
   .po-preview-app .po-brand-symbol { font-size: 16px; }
   .po-preview-app .po-workspace-switcher, .po-preview-app .po-sidebar-footer { display: none; }
-  .po-preview-app .po-nav { display: flex; flex-direction: row; gap: 4px; margin-top: 11px; overflow-x: auto; max-width: 100%; min-width: 0; }
+  .po-preview-app .po-nav { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 4px; margin-top: 11px; overflow-x: auto; max-width: 100%; min-width: 0; }
   .po-preview-app .po-nav-section { display: flex; flex-direction: row; gap: 4px; width: max-content; flex: 0 0 auto; }
   .po-preview-app .po-nav-divider, .po-preview-app .po-nav-label { display: none; }
   .po-preview-app .po-nav-item, .po-preview-app .po-nav-item.is-muted { display: inline-flex; width: auto; min-height: 34px; justify-content: flex-start; gap: 6px; padding: 7px 9px; font-size: 14px; }
@@ -1586,8 +1586,8 @@
   .po-preview-app .po-sidebar { display: block; width: 100%; flex-basis: auto; min-height: 0; padding: 13px 12px 8px; }
   .po-preview-app .po-brand { justify-content: flex-start; padding: 0 3px; }
   .po-preview-app .po-brand > span:last-child { display: inline; }
-  .po-preview-app .po-nav { display: block; margin-top: 11px; overflow-x: auto; }
-  .po-preview-app .po-nav-section { display: flex; flex-direction: row; gap: 4px; width: max-content; }
+  .po-preview-app .po-nav { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 4px; margin-top: 11px; overflow-x: auto; max-width: 100%; min-width: 0; }
+  .po-preview-app .po-nav-section { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 4px; width: max-content; flex: 0 0 auto; }
   .po-preview-app .po-preview-notice { min-height: 32px; padding: 6px 12px; }
   .po-preview-app .po-workspace-bar { min-height: 56px; padding: 8px 12px; }
   .po-preview-app .po-main-content { padding: 14px 12px 12px; }
