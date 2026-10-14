@@ -165,3 +165,34 @@ No `transition: all`; no emoji iconography; no generic button labels (`Submit`/`
 ## Verified
 
 0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; 0 remaining invisible weight contrasts; build and `oxlint` clean. One regression introduced and fixed during the pass: the `.po-detail-control` padding change met the nowrap "Pipeline stage" label in a narrow panel and overflowed at 768px — the lead-context rows now wrap.
+
+---
+
+# Round 5 — same role, same type on every page (14 October 2026)
+
+Commit `715eda4`, deploy `dep-db7g8paj9qps73cbm71g` (live).
+
+Round 3 made the **sizes** consistent but not the **weights**, and the differences still tracked which page you were on. Measured role-by-role across 14 screens:
+
+| role | before |
+|---|---|
+| table `th` | leads **800** vs 700 everywhere |
+| table `td` | leads **500** vs 400 |
+| tag/chip | leads **500** vs 700 |
+| input | leads **400** vs 600 |
+| select | **400 / 500 / 600** — three weights |
+| panel heading | integrations **800** vs 700 |
+
+## Two causes
+
+**The leads table is a parallel component.** `.po-leads-production-table` was built with its own treatment: a 48px header and 55px rows against the standard 42/64, weights 800/500 against 700/400, its own borderless 27px chip, and a **purple `#f3e8ff` header** — purple as decoration on a table header, which `AGENTS.md` rules out and which the round-4 audit missed. It now uses the same treatment as the automations table.
+
+**The heading rules enumerated their components.** The design system forced 700 on a *list* of `h2` selectors, so any `h2` not on the list kept its own 800 — `.po-integration-card-header h2` was one. Headings and form controls are now assigned by **element** (`h1`/`h2`/`h3`, `input`/`select`/`textarea`), which covers every component including ones added later. The sign-in hero keeps its display size through an explicit exception.
+
+## Result
+
+Verified on the live deployment: page title, subtitle, eyebrow, panel heading, panel description, table header, table cell, primary and secondary button, chip, caption, input and select are **identical on all 14 pages**. Nav items read 700 active / 600 inactive on every page — a selection state, not a per-page difference (confirmed by measuring both states on three screens).
+
+0 page-level horizontal overflow at 390/768/1024/1440; contrast unchanged at 19 known-exempt items; build and `oxlint` clean.
+
+**Repeat of the CDN trap:** the first live verification reported 600 for inputs on three pages. Direct measurement of the same elements with a fresh cache-buster showed 500 on both local and live — the edge had served a stale `index.html`. Always confirm a suspicious live reading against the specific element before treating it as a real difference.
