@@ -9,9 +9,11 @@ import "./styles/precision-operations-design-system.css";
 import "./styles/precision-operations-final-fixes.css";
 import "./styles/precision-operations-color-tokens.css";
 import "./styles/precision-operations-palette-switcher.css";
+import "./styles/workspace-settings-preview.css";
 import { loadSession } from "./api";
 
 const PrecisionOperationsPreviewPage = lazy(() => import("./pages/PrecisionOperationsPreviewPage").then((module) => ({ default: module.PrecisionOperationsPreviewPage })));
+const WorkspaceSettingsPreviewPage = lazy(() => import("./pages/WorkspaceSettingsPreviewPage").then((module) => ({ default: module.WorkspaceSettingsPreviewPage })));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then((module) => ({ default: module.AnalyticsPage })));
 const AutomationPage = lazy(() => import("./pages/AutomationPage").then((module) => ({ default: module.AutomationPage })));
 const JourneyBuilderPage = lazy(() => import("./pages/JourneyBuilderPage").then((module) => ({ default: module.JourneyBuilderPage })));
@@ -41,9 +43,7 @@ function PreviewPaletteBridge() {
     const isPreview = params.get("preview") === "precision-operations" || window.location.pathname === "/redesign-preview";
     if (isPreview) document.body.dataset.poPalette = previewPalettes.has(palette) ? palette : "navy-cobalt";
     else delete document.body.dataset.poPalette;
-    return () => {
-      delete document.body.dataset.poPalette;
-    };
+    return () => { delete document.body.dataset.poPalette; };
   }, []);
   return null;
 }
@@ -51,7 +51,9 @@ function PreviewPaletteBridge() {
 function PageLoadingFallback() { return <div role="status" className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle">Loading page…</div>; }
 function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) { return <Suspense fallback={<PageLoadingFallback />}><Page /></Suspense>; }
 function HomeRedirect() {
-  const isPrecisionPreview = new URLSearchParams(window.location.search).get("preview") === "precision-operations";
+  const params = new URLSearchParams(window.location.search);
+  const isPrecisionPreview = params.get("preview") === "precision-operations";
+  if (isPrecisionPreview && params.get("screen") === "settings") return <LazyPage Page={WorkspaceSettingsPreviewPage} />;
   if (isPrecisionPreview) return <LazyPage Page={PrecisionOperationsPreviewPage} />;
   const session = loadSession();
   return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
@@ -59,8 +61,8 @@ function HomeRedirect() {
 export default function App() {
   return <><PreviewPaletteBridge /><Routes>
     <Route path="/redesign-preview" element={<LazyPage Page={PrecisionOperationsPreviewPage} />} />
+    <Route path="/workspace-settings-preview" element={<LazyPage Page={WorkspaceSettingsPreviewPage} />} />
     <Route path="/" element={<HomeRedirect />} />
-    {/* Public documentation endpoint: deliberately outside the authenticated dashboard shell. */}
     <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
     <Route path="/docs/*" element={<LazyPage Page={DocsPage} />} />
     <Route path="/login" element={<LazyPage Page={LoginPage} />} />
