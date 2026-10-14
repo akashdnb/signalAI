@@ -1810,7 +1810,7 @@
   padding: 0;
   border: 0;
   background: var(--po-color-transparent);
-  color: var(--po-color-legacy-hex-2563eb);
+  color: var(--po-color-primary);
   font-size: 14px;
   font-weight: 500;
   line-height: 18px;
