@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { OverviewScreen, AutomationsScreen, LeadDetailScreen, KnowledgeScreen, ContentScreen, AnalyticsScreen, IntegrationsScreen, TeamScreen, BillingScreen, SettingsScreen, DocsScreen, LoginPreviewScreen, SystemStateScreen, type FullPreviewScreen, type PreviewPalette } from "./PrecisionOperationsFullScreens";
 import { Logo } from "../components/Logo";
 import {
@@ -77,15 +77,23 @@ function PreviewNotice() {
   return <div className="po-preview-notice" role="note"><span className="po-preview-notice-dot" aria-hidden="true" /><div><strong>Redesign preview</strong><span>Sample workspace · Actions are demonstrational. No Instagram messages are sent and no data is saved.</span></div></div>;
 }
 
-function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
+function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resizing, resizeOffset, onResizeStart, onResizeMove, onResizeEnd, onResizeKeyDown, onResetWidth }: {
   screen: PreviewScreen;
   onNavigate: (next: PreviewScreen) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  width: number;
+  resizing: boolean;
+  resizeOffset: React.MutableRefObject<number>;
+  onResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onResizeMove: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onResizeEnd: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onResizeKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onResetWidth: () => void;
 }) {
   const selectedScreen = screen === "builder" ? "automations" : screen === "lead-detail" ? "leads" : screen;
   return (
-    <aside className={"po-sidebar" + (collapsed ? " is-collapsed" : "")} aria-label="Preview navigation">
+    <aside className={"po-sidebar" + (collapsed ? " is-collapsed" : "")} aria-label="Preview navigation" style={{ width: "var(--po-sidebar-width)", flexBasis: "var(--po-sidebar-width)" }}>
       <div className="po-sidebar-brand-row">
         <button
           type="button"
@@ -135,6 +143,25 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed }: {
         <button type="button" aria-label="View plan and usage" data-tooltip={collapsed ? "View plan & usage" : undefined} onClick={() => onNavigate("billing")}><CreditCardIcon className="po-plan-icon" width={17} height={17} /><span>View plan &amp; usage</span></button>
       </div>
     </aside>
+    <div
+      className={"po-sidebar-resize-handle" + (resizing ? " is-resizing" : "")}
+      role="separator"
+      aria-label="Resize sidebar"
+      aria-orientation="vertical"
+      aria-valuemin={180}
+      aria-valuemax={280}
+      aria-valuenow={width}
+      aria-valuetext={`${width} pixels`}
+      tabIndex={collapsed ? -1 : 0}
+      hidden={collapsed}
+      onPointerDown={onResizeStart}
+      onPointerMove={onResizeMove}
+      onPointerUp={onResizeEnd}
+      onPointerCancel={onResizeEnd}
+      onDoubleClick={onResetWidth}
+      onKeyDown={onResizeKeyDown}
+      title="Drag to resize · Double-click to reset · Use arrow keys"
+    />
   );
 }
 
@@ -906,6 +933,19 @@ export function PrecisionOperationsPreviewPage() {
   const [selectedLeadHandoff,setSelectedLeadHandoff] = useState(true);
   const [theme,setTheme] = useState<"light"|"dark">(() => new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light");
   const [sidebarCollapsed,setSidebarCollapsed] = useState(() => new URLSearchParams(window.location.search).get("sidebar") !== "expanded");
+  const [sidebarWidth,setSidebarWidth] = useState(() => {
+    try {
+      const saved = Number(window.localStorage.getItem("signalai-preview-sidebar-width"));
+      return Number.isFinite(saved) && saved >= 180 && saved <= 280 ? saved : 226;
+    } catch {
+      return 226;
+    }
+  });
+  const [sidebarResizing,setSidebarResizing] = useState(false);
+  const sidebarResizeOffset = useRef(0);
+  useEffect(() => {
+    try { window.localStorage.setItem("signalai-preview-sidebar-width", String(sidebarWidth)); } catch { /* private browsing or storage disabled */ }
+  }, [sidebarWidth]);
   const [palette,setPalette] = useState<PreviewPalette>(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("palette") ?? "navy-cobalt";
@@ -939,6 +979,37 @@ export function PrecisionOperationsPreviewPage() {
     params.set("sidebar", next ? "collapsed" : "expanded");
     window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
   };
+  const resizeSidebarStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (sidebarCollapsed || event.pointerType === "touch" && window.matchMedia("(max-width: 760px)").matches) return;
+    event.preventDefault();
+    sidebarResizeOffset.current = event.clientX - event.currentTarget.getBoundingClientRect().left;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSidebarResizing(true);
+  };
+  const resizeSidebarMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!sidebarResizing || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const root = event.currentTarget.parentElement;
+    if (!root) return;
+    const rootLeft = root.getBoundingClientRect().left;
+    const nextWidth = Math.max(180, Math.min(280, Math.round(event.clientX - rootLeft - sidebarResizeOffset.current)));
+    setSidebarWidth(nextWidth);
+  };
+  const resizeSidebarEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setSidebarResizing(false);
+  };
+  const resizeSidebarByKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    let next: number | null = null;
+    const step = event.shiftKey ? 20 : 10;
+    if (event.key === "ArrowLeft") next = sidebarWidth - step;
+    if (event.key === "ArrowRight") next = sidebarWidth + step;
+    if (event.key === "Home") next = 180;
+    if (event.key === "End") next = 280;
+    if (next === null) return;
+    event.preventDefault();
+    setSidebarWidth(Math.max(180, Math.min(280, next)));
+  };
+  const resetSidebarWidth = () => setSidebarWidth(226);
   const changeTheme = (next: "light"|"dark") => {
     setTheme(next);
     const params = new URLSearchParams(window.location.search);
@@ -1046,5 +1117,5 @@ export function PrecisionOperationsPreviewPage() {
     : screen === "login" ? <LoginPreviewScreen onNavigate={go} />
     : <SystemStateScreen screen={screen as "connect-error"|"invite"} onNavigate={go} />;
   if (standalone) return <div className={"po-preview-app po-standalone-preview"+(theme==="dark"?" is-dark":"")}><div className="po-standalone-header"><BrandMark/><span>Authentication & recovery preview</span><button type="button" className="po-button po-button--secondary" onClick={()=>go("overview")}>Return to dashboard</button></div><PreviewNotice/>{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Preview only · no authentication or invitations are processed</span></footer></div>;
-  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
+  return <div className={"po-preview-app"+(theme==="dark"?" is-dark":"")+(sidebarCollapsed?" is-sidebar-collapsed":"")+(sidebarResizing?" is-sidebar-resizing":"")} style={{ "--po-sidebar-width": `${sidebarWidth}px` } as CSSProperties}><a className="po-skip-link" href="#po-main">Skip to main content</a><Sidebar screen={screen} onNavigate={go} collapsed={sidebarCollapsed} onToggleCollapsed={toggleSidebar} width={sidebarWidth} resizing={sidebarResizing} resizeOffset={sidebarResizeOffset} onResizeStart={resizeSidebarStart} onResizeMove={resizeSidebarMove} onResizeEnd={resizeSidebarEnd} onResizeKeyDown={resizeSidebarByKeyboard} onResetWidth={resetSidebarWidth}/><main id="po-main" className="po-main"><WorkspaceBar onNavigate={go} theme={theme} onToggleTheme={()=>changeTheme(theme==="light"?"dark":"light")}/><div className="po-main-content"><PageHeader screen={screen} dirty={dirty} onSave={savePreviewState} onTest={()=>setShowWalkthrough(true)} onPreview={()=>setShowMessagePreview(true)} onPublish={()=>setShowPublish(true)} onLifecycleAction={requestLifecycleAction} selectedLeadName={selectedLeadName} automationName={automationName} automationStatus={automationStatus} onNavigate={go}/>{savedNotice&&<div className="po-inline-notice" role="status">Preview state marked saved. Nothing was written to the server.</div>}{page}<footer className="po-footer"><span>SignalAI · Precision Operations Studio</span><span>Sample workspace · no production API connected</span></footer></div></main>{showWalkthrough&&<WalkthroughDialog onClose={()=>setShowWalkthrough(false)}/>}{showPublish&&<PublishDialog automationStatus={automationStatus} onClose={()=>setShowPublish(false)} onConfirm={confirmPublishPreview}/>}{showMessagePreview&&<MessagePreviewDialog automationName={automationName} onClose={()=>setShowMessagePreview(false)}/>}{showLifecycle&&<LifecycleDialog action={lifecycleAction} onClose={()=>setShowLifecycle(false)} onConfirm={confirmLifecycleAction}/>}{pendingNavigation&&<UnsavedChangesDialog onKeepEditing={()=>setPendingNavigation(null)} onSaveAndLeave={saveAndLeave} onDiscard={discardAndLeave}/>}</div>;
 }
