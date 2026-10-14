@@ -77,7 +77,7 @@ function PreviewNotice() {
   return <div className="po-preview-notice" role="note"><span className="po-preview-notice-dot" aria-hidden="true" /><div><strong>Redesign preview</strong><span>Sample workspace · Actions are demonstrational. No Instagram messages are sent and no data is saved.</span></div></div>;
 }
 
-function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resizing, resizeOffset, onResizeStart, onResizeMove, onResizeEnd, onResizeKeyDown, onResetWidth }: {
+function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resizing, onResizeStart, onResizeMove, onResizeEnd, onResizeKeyDown, onResetWidth }: {
   screen: PreviewScreen;
   onNavigate: (next: PreviewScreen) => void;
   collapsed: boolean;
@@ -92,6 +92,7 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resi
 }) {
   const selectedScreen = screen === "builder" ? "automations" : screen === "lead-detail" ? "leads" : screen;
   return (
+    <>
     <aside className={"po-sidebar" + (collapsed ? " is-collapsed" : "")} aria-label="Preview navigation" style={{ width: "var(--po-sidebar-width)", flexBasis: "var(--po-sidebar-width)" }}>
       <div className="po-sidebar-brand-row">
         <button
@@ -161,6 +162,7 @@ function Sidebar({ screen, onNavigate, collapsed, onToggleCollapsed, width, resi
       onKeyDown={onResizeKeyDown}
       title="Drag to resize · Double-click to reset · Use arrow keys"
     />
+    </>
   );
 }
 
