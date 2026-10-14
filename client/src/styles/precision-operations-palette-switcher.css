@@ -158,9 +158,13 @@ body:has(.po-preview-app) .po-preview-app .po-search input:focus-visible {
 .po-preview-app .po-appearance-settings {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 .po-preview-app .po-appearance-group {
+  padding-top: 0;
+  border-top: 0;
+}
+.po-preview-app .po-appearance-group + .po-appearance-group {
   padding-top: 18px;
   border-top: 1px solid var(--po-color-border);
 }
