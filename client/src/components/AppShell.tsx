@@ -411,6 +411,22 @@ export function AppShell() {
   useEffect(() => {
     window.localStorage.setItem("signalai.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);
+  // Toggling hides whichever button was just clicked/activated (it belongs
+  // to the other state), which would otherwise drop keyboard focus to
+  // <body>. Only reclaim focus when a toggle actually just happened — never
+  // on mount, so loading a saved "collapsed" preference doesn't steal focus.
+  const expandSidebarButtonRef = useRef<HTMLButtonElement | null>(null);
+  const collapseSidebarButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sidebarToggledByUserRef = useRef(false);
+  useEffect(() => {
+    if (!sidebarToggledByUserRef.current) return;
+    sidebarToggledByUserRef.current = false;
+    (sidebarCollapsed ? expandSidebarButtonRef : collapseSidebarButtonRef).current?.focus();
+  }, [sidebarCollapsed]);
+  function toggleSidebarCollapsed(next: boolean) {
+    sidebarToggledByUserRef.current = true;
+    setSidebarCollapsed(next);
+  }
   const mobileNavRef = useRef<HTMLElement | null>(null);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
@@ -581,20 +597,22 @@ export function AppShell() {
            * drawer itself never reads.
            */}
           <button
+            ref={expandSidebarButtonRef}
             type="button"
             aria-label={sidebarCollapsed && !isMobileViewport ? "Expand sidebar" : "SignalAI"}
             title={sidebarCollapsed && !isMobileViewport ? "Expand sidebar" : undefined}
             tabIndex={sidebarCollapsed && !isMobileViewport ? 0 : -1}
-            onClick={() => setSidebarCollapsed(false)}
+            onClick={() => toggleSidebarCollapsed(false)}
             className="rounded-lg"
           >
             <Logo size="md" wordmarkClassName={sidebarCollapsed ? "md:hidden" : ""} />
           </button>
           <button
+            ref={collapseSidebarButtonRef}
             type="button"
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
-            onClick={() => setSidebarCollapsed(true)}
+            onClick={() => toggleSidebarCollapsed(true)}
             className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink md:flex ${sidebarCollapsed ? "md:hidden" : ""}`}
           >
             <PanelToggleIcon className="h-4.5 w-4.5" />
