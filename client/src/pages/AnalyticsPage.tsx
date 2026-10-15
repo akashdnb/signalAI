@@ -46,8 +46,8 @@ function TopPosts({ posts, keywords }: { posts: TopPost[] | null; keywords: TopK
   return (
     <section className="card analytics-supporting-panel">
       <div className="analytics-section-heading"><div><span className="overview-eyebrow">Content signals</span><h2>Top performing posts</h2><p className="muted">Posts that generated the most inbound comments.</p></div></div>
-      {posts === null ? <p className="muted">Loading…</p> : posts.length === 0 ? <p className="muted">No comments yet.</p> : <div className="analytics-table-scroll"><table className="table"><thead><tr><th>Post</th><th>Comments</th></tr></thead><tbody>{posts.map((post) => <tr key={post.mediaId}><td>{post.permalink ? <a href={post.permalink} target="_blank" rel="noreferrer">{post.caption ?? post.mediaId}</a> : post.caption ?? post.mediaId}</td><td className="tabular-nums">{post.commentCount}</td></tr>)}</tbody></table></div>}
-      {keywords && keywords.length > 0 && <div className="analytics-keywords"><h3>Top trigger keywords</h3><div>{keywords.map((keyword) => <span className="tag-chip" key={keyword.keyword}>{keyword.keyword} ({keyword.matchCount})</span>)}</div></div>}
+      {posts === null ? <p className="muted">Loading…</p> : posts.length === 0 ? <p className="muted">No comments yet.</p> : <div className="analytics-table-scroll"><table className="table"><thead><tr><th>Post</th><th>Comments</th></tr></thead><tbody>{posts.map((post) => { const postId = post.mediaId ?? "post"; const postTitle = post.caption ?? postId; return <tr key={postId}><td>{post.permalink ? <a href={post.permalink} target="_blank" rel="noreferrer">{postTitle}</a> : postTitle}</td><td className="tabular-nums">{post.commentCount}</td></tr>; })}</tbody></table></div>}
+      {keywords && keywords.length > 0 && <div className="analytics-keywords"><h3>Top trigger keywords</h3><div>{keywords.map((keyword) => { const keywordLabel = keyword.keyword ?? "Unnamed keyword"; return <span className="tag-chip" key={keywordLabel}>{keywordLabel} ({keyword.matchCount})</span>; })}</div></div>}
     </section>
   );
 }
