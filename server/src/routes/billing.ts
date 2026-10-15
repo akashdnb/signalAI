@@ -11,7 +11,14 @@ import {
 import { getStripeClient, isBillingConfigured } from "../lib/stripeClient.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 import { isWebhookEventAlreadyProcessed, recordWebhookEventProcessed } from "../db/stripeWebhookEvents.js";
+import {
+  getBillingAccount,
+  getBillingAccountByStripeCustomerId,
+  setBillingAccountStripeCustomer,
+  setBillingAccountStatus,
+} from "../db/billingAccounts.js";
 import { getPlanTier, resolvePriceIdForTier, type PlanTier } from "../lib/planTiers.js";
+import { resolveEffectiveBilling, billingCycleStart } from "../services/billingResolver.js";
 import { estimateOverageCost } from "../lib/overage.js";
 import { getTokenUsageSince } from "../db/tokenUsage.js";
 import { countSendsSince } from "../db/accountSends.js";
@@ -137,10 +144,12 @@ billingRouter.get("/tenants/:tenantId/usage", async (req, res) => {
   if (!tenant) return res.status(404).json({ error: "tenant not found" });
 
   const now = new Date();
-  const cycleStart =
-    tenant.planTier === "trial" && tenant.trialStartedAt
-      ? tenant.trialStartedAt
-      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  // Agency Bulk Billing: effective billing decides the token allowance and
+  // entitlement — a plan-covered workspace draws from the shared pool and the
+  // (optional) per-workspace cap, not its own tier. DMs stay per-workspace:
+  // the plan governs tokens + seats, not Meta's send limit.
+  const effective = await resolveEffectiveBilling(pool, tenant, now);
+  const cycleStart = billingCycleStart(effective, now);
 
   const [usage, dmsSent] = await Promise.all([
     getTokenUsageSince(pool, tenant.id, cycleStart),
@@ -148,25 +157,37 @@ billingRouter.get("/tenants/:tenantId/usage", async (req, res) => {
   ]);
 
   const tierDef = getPlanTier(tenant.planTier);
-  const tokenOverage = Math.max(0, usage.totalTokens - tierDef.tokenAllowance);
+  // This workspace's own effective token ceiling:
+  //  - plan + per-workspace cap  -> the cap (a real per-workspace ceiling)
+  //  - plan, uncapped            -> null: the shared pool is NOT this one
+  //    workspace's personal allowance, so reporting it here (against a single
+  //    workspace's usage) is misleading. Pool-level usage lives on
+  //    GET /me/billing-account instead.
+  //  - own billing               -> the tier allowance
+  const tokenAllowance =
+    effective.source === "plan"
+      ? effective.perWorkspaceTokenCap // number (cap) or null (uncapped pool)
+      : effective.tokenAllowance;
+  const tokenOverage = tokenAllowance === null ? 0 : Math.max(0, usage.totalTokens - tokenAllowance);
   const SOFT_CAP_WARNING_THRESHOLD = 0.8;
 
-  const isTrialExpired = tenant.planTier === "trial" && !!tenant.trialEndsAt && tenant.trialEndsAt < now;
-  const isEntitled = tenant.billingStatus === "active" || (tenant.planTier === "trial" && !isTrialExpired);
+  const isTrialExpired = effective.isTrial && !!effective.trialEndsAt && effective.trialEndsAt < now;
 
   return res.status(200).json({
+    billingSource: effective.source,
     planTier: tenant.planTier,
-    planTierLabel: tierDef.label,
+    planTierLabel: effective.planLabel,
     cycleStart,
-    trialEndsAt: tenant.trialEndsAt,
+    trialEndsAt: effective.trialEndsAt,
     isTrialExpired,
-    isEntitled,
+    isEntitled: effective.isEntitled,
     tokens: {
       used: usage.totalTokens,
-      allowance: tierDef.tokenAllowance,
+      allowance: tokenAllowance,
+      perWorkspaceTokenCap: effective.perWorkspaceTokenCap,
       overage: tokenOverage,
       estimatedOverageCostUsd: estimateOverageCost(tokenOverage),
-      nearingLimit: usage.totalTokens >= tierDef.tokenAllowance * SOFT_CAP_WARNING_THRESHOLD,
+      nearingLimit: tokenAllowance !== null && tokenAllowance > 0 && usage.totalTokens >= tokenAllowance * SOFT_CAP_WARNING_THRESHOLD,
     },
     dms: {
       sent: dmsSent,
@@ -219,10 +240,25 @@ billingRouter.post("/billing/webhook", async (req, res) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-        const tenantId = session.client_reference_id;
+        const reference = session.client_reference_id;
         const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
         const subscriptionId =
           typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+
+        // Agency Bulk Billing: a billing-account checkout namespaces its
+        // reference as `ba:<id>`. Activate the PLAN (not a tenant) — every
+        // workspace it covers becomes entitled through the resolver, with no
+        // per-tenant writes.
+        if (reference?.startsWith("ba:") && customerId) {
+          const billingAccountId = reference.slice("ba:".length);
+          if (await getBillingAccount(pool, billingAccountId)) {
+            await setBillingAccountStripeCustomer(pool, billingAccountId, customerId);
+            await setBillingAccountStatus(pool, billingAccountId, "active", subscriptionId ?? null);
+          }
+          break;
+        }
+
+        const tenantId = reference;
         if (tenantId && customerId) {
           await setStripeCustomerId(pool, tenantId, customerId);
           await setBillingStatus(pool, tenantId, "active", subscriptionId ?? null);
@@ -253,6 +289,35 @@ billingRouter.post("/billing/webhook", async (req, res) => {
           // tenant canceled.
           if (tenant && tenant.stripeSubscriptionId === subscription.id) {
             await setBillingStatus(pool, tenant.id, "canceled");
+          }
+          // Agency Bulk Billing: the same customer could instead be a billing
+          // account. Same stale-event guard applies — only cancel the plan if
+          // the deleted subscription is still its current one.
+          const account = await getBillingAccountByStripeCustomerId(pool, customerId);
+          if (account && account.stripeSubscriptionId === subscription.id) {
+            await setBillingAccountStatus(pool, account.id, "canceled");
+          }
+        }
+        break;
+      }
+      case "customer.subscription.updated": {
+        // Agency Bulk Billing: reflect a plan going past_due / back to active.
+        // (Per-tenant subscriptions have no non-active/canceled states wired
+        // up, so this only maps billing accounts.)
+        const subscription = event.data.object;
+        const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+        if (customerId) {
+          const account = await getBillingAccountByStripeCustomerId(pool, customerId);
+          if (account && account.stripeSubscriptionId === subscription.id) {
+            const mapped =
+              subscription.status === "active" || subscription.status === "trialing"
+                ? "active"
+                : subscription.status === "past_due" || subscription.status === "unpaid"
+                  ? "past_due"
+                  : subscription.status === "canceled"
+                    ? "canceled"
+                    : null;
+            if (mapped) await setBillingAccountStatus(pool, account.id, mapped);
           }
         }
         break;

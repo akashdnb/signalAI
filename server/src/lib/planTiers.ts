@@ -52,6 +52,17 @@ export const PLAN_TIERS: Record<PlanTier, PlanTierDefinition> = {
   },
 };
 
+/**
+ * Agency Bulk Billing: the pooled token allowance a bulk plan grants PER
+ * covered workspace. The plan's shared pool allowance is this times the number
+ * of covered workspaces (see services/billingResolver.ts). Matches the
+ * 'growth' tier's per-workspace generosity — agency clients are real paying
+ * workspaces, not trials. A hardcoded constant for the same reason PLAN_TIERS
+ * is: no tier-admin surface at pilot scale.
+ */
+export const AGENCY_PER_WORKSPACE_TOKEN_ALLOWANCE = 5_000_000;
+export const AGENCY_PLAN_LABEL = "Agency";
+
 /** Trial's tokenAllowance is read from config (trialTokenAllowance), not the static table above, so an operator can tune it via env var without a code change — same reasoning as trialDays. */
 export function getPlanTier(tier: PlanTier): PlanTierDefinition {
   const def = PLAN_TIERS[tier];

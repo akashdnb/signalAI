@@ -27,13 +27,13 @@ import { recalculateLeadIntelligence } from "./leadScoring.js";
 import { getFieldDefinitionValueTypes } from "../db/fieldDefinitions.js";
 import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
-import { getTokenUsageSince, recordTokenUsage } from "../db/tokenUsage.js";
-import { getPlanTier } from "../lib/planTiers.js";
+import { recordTokenUsage } from "../db/tokenUsage.js";
 import { sendInstagramCommentReply, sendInstagramMessage, sendInstagramPrivateReply } from "../lib/instagramSend.js";
 import { Sentry } from "../lib/sentry.js";
 import { generateReply } from "./replyEngine.js";
 import { runMilestoneCheck } from "./milestoneEngine.js";
 import { createAccountSpendGuard, type AiSpendGuard } from "./aiSpendGuard.js";
+import { wrapSpendGuardWithTokenEntitlement } from "./tokenEntitlement.js";
 import { HOURLY_SEND_LIMIT } from "../lib/sendLimits.js";
 
 // Not derived from the limit window (that would mean a ~5s average
@@ -221,28 +221,14 @@ export function createLeadEventReplyHandler(
     // never count against the cap.
     const spendGuard = createAccountSpendGuard(pool, job.tenantId, account.instagramAccountId, aiDailyCallCap);
 
-    // Phase 2B Trial Token Allowance: a cumulative cap for the WHOLE
-    // trial, composed onto the existing per-account daily-call guard
-    // rather than a second independent check — both share the same
-    // reserve-before-call/release-on-failure shape, and generateReply/
-    // runMilestoneCheck already only take one guard. Only trial tenants
-    // pay the extra getTokenUsageSince query; every paid tier skips this
-    // wrapper entirely.
-    const effectiveSpendGuard: AiSpendGuard =
-      tenant.planTier === "trial" && tenant.trialStartedAt
-        ? {
-            async tryConsume() {
-              if (!(await spendGuard.tryConsume())) return false;
-              const usage = await getTokenUsageSince(pool, job.tenantId, tenant.trialStartedAt!);
-              if (usage.totalTokens >= getPlanTier("trial").tokenAllowance) {
-                await spendGuard.release(); // undo the reservation just taken above
-                return false;
-              }
-              return true;
-            },
-            release: () => spendGuard.release(),
-          }
-        : spendGuard;
+    // Phase 2B Trial Token Allowance + Agency Bulk Billing: a token ceiling
+    // composed onto the per-account daily-call guard, chosen from the
+    // workspace's EFFECTIVE billing (its covering agency plan if active, else
+    // its own columns) rather than tenant.plan_tier directly. A trial
+    // workspace gets the cumulative trial allowance; a plan-covered workspace
+    // with a per-workspace cap gets that cap; everything else is the bare
+    // daily-call guard. See services/tokenEntitlement.ts.
+    const effectiveSpendGuard: AiSpendGuard = await wrapSpendGuardWithTokenEntitlement(pool, tenant, spendGuard);
 
     let replyText: string;
     let engine: SentReplyEngine;

@@ -11,6 +11,7 @@ export type TenantIndustry = "real_estate" | "ecommerce" | "education" | "creato
 export interface Tenant {
   id: string;
   name: string;
+  description: string | null;
   ownerUserId: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
@@ -25,6 +26,7 @@ export interface Tenant {
 interface TenantRow {
   id: string;
   name: string;
+  description: string | null;
   owner_user_id: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
@@ -40,6 +42,7 @@ function toTenant(row: TenantRow): Tenant {
   return {
     id: row.id,
     name: row.name,
+    description: row.description,
     ownerUserId: row.owner_user_id,
     stripeCustomerId: row.stripe_customer_id,
     stripeSubscriptionId: row.stripe_subscription_id,
@@ -70,7 +73,12 @@ export async function createTenant(pool: Pool, name: string): Promise<Tenant> {
  * land in one transaction so a crash between them can never produce a
  * tenant with no owner or an owner with no membership row.
  */
-export async function createTenantForUser(pool: Pool, name: string, ownerUserId: string): Promise<Tenant> {
+export async function createTenantForUser(
+  pool: Pool,
+  name: string,
+  ownerUserId: string,
+  description: string | null = null,
+): Promise<Tenant> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -81,9 +89,9 @@ export async function createTenantForUser(pool: Pool, name: string, ownerUserId:
     // a code-level product decision, not a migration.
     const trialEndsAt = new Date(Date.now() + config.trialDays * 24 * 60 * 60 * 1000);
     const result = await client.query<TenantRow>(
-      `insert into tenants (name, owner_user_id, trial_started_at, trial_ends_at)
-       values ($1, $2, now(), $3) returning *`,
-      [name, ownerUserId, trialEndsAt],
+      `insert into tenants (name, description, owner_user_id, trial_started_at, trial_ends_at)
+       values ($1, $2, $3, now(), $4) returning *`,
+      [name, description, ownerUserId, trialEndsAt],
     );
     const tenant = toTenant(result.rows[0]!);
     await addTenantMember(client, tenant.id, ownerUserId, "owner");
@@ -150,5 +158,37 @@ export async function endTrialImmediately(pool: Pool, tenantId: string): Promise
 /** Onboarding wizard (R5): persists the tenant's chosen vertical — 'other' included, since declining a real industry is still a real, recorded choice (see TenantIndustry's doc comment). */
 export async function setTenantIndustry(pool: Pool, tenantId: string, industry: TenantIndustry): Promise<Tenant | null> {
   const result = await pool.query<TenantRow>(`update tenants set industry = $2 where id = $1 returning *`, [tenantId, industry]);
+  return result.rows[0] ? toTenant(result.rows[0]) : null;
+}
+
+/**
+ * Agency Workspaces: edit a workspace's display fields (name, description).
+ * Callers pass only the fields they want to change; an omitted field is left
+ * untouched, while `description: null` explicitly clears it. Values must be
+ * pre-validated (see lib/workspaceValidation.ts) — this only writes them.
+ * Returns null when the tenant does not exist, or when no updatable field was
+ * supplied (nothing to do).
+ */
+export async function updateTenant(
+  pool: Pool,
+  tenantId: string,
+  fields: { name?: string; description?: string | null },
+): Promise<Tenant | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [tenantId];
+  if (fields.name !== undefined) {
+    values.push(fields.name);
+    sets.push(`name = $${values.length}`);
+  }
+  if (fields.description !== undefined) {
+    values.push(fields.description);
+    sets.push(`description = $${values.length}`);
+  }
+  if (sets.length === 0) return null;
+
+  const result = await pool.query<TenantRow>(
+    `update tenants set ${sets.join(", ")} where id = $1 returning *`,
+    values,
+  );
   return result.rows[0] ? toTenant(result.rows[0]) : null;
 }
