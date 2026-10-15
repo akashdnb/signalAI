@@ -22,21 +22,21 @@ function ActivityVolume({ funnel }: { funnel: Funnel }) {
     <div className="analytics-activity">
       <div className="analytics-section-heading"><div><span className="overview-eyebrow">Inbound activity</span><h2>Messages and comments</h2><p className="muted">Total events recorded. Comments and DMs can include repeated activity from the same person, so these are not conversion rates.</p></div></div>
       <div className="analytics-bars" aria-label="Activity volume by event type">
-        {activity.map((stage) => <div className="analytics-bar-item" key={stage.key}><strong>{stage.count.toLocaleString()}</strong><div className="analytics-bar-track"><span style={{ height: `${Math.max(8, (stage.count / maxCount) * 100)}%` }} /></div><span>{stage.label}</span></div>)}
+        {activity.map((stage) => <div className="analytics-bar-item" key={`${stage.label}-${stage.count}`}><strong>{stage.count.toLocaleString()}</strong><div className="analytics-bar-track"><span style={{ height: `${Math.max(8, (stage.count / maxCount) * 100)}%` }} /></div><span>{stage.label}</span></div>)}
       </div>
-      <div className="analytics-table-scroll"><table className="table"><caption className="sr-only">Activity event definitions</caption><thead><tr><th>Event type</th><th>Count</th><th>Definition</th></tr></thead><tbody>{activity.map((stage) => <tr key={stage.key}><td>{stage.label}</td><td className="tabular-nums">{stage.count.toLocaleString()}</td><td>{stage.key === "comments" ? "Inbound comment events" : "Inbound DM events, including repeats"}</td></tr>)}</tbody></table></div>
+      <div className="analytics-table-scroll"><table className="table"><caption className="sr-only">Activity event definitions</caption><thead><tr><th>Event type</th><th>Count</th><th>Definition</th></tr></thead><tbody>{activity.map((stage) => <tr key={`${stage.label}-definition`}><td>{stage.label}</td><td className="tabular-nums">{stage.count.toLocaleString()}</td><td>{stage.key === "comments" ? "Inbound comment events" : "Inbound DM events, including repeats"}</td></tr>)}</tbody></table></div>
     </div>
   );
 }
 
 function PipelineProgression({ funnel }: { funnel: Funnel }) {
-  const stages = funnel.stages.filter((stage) => !["comments", "dms"].includes(stage.key));
+  const stages = funnel.stages.filter((stage) => stage.key !== "comments" && stage.key !== "dms");
   const leadCount = stages.find((stage) => stage.key === "leads")?.count ?? 0;
   return (
     <div>
       <div className="analytics-section-heading"><div><span className="overview-eyebrow">Pipeline</span><h2>Current pipeline progression</h2><p className="muted">Current snapshot, not a historical cohort. Percentages use all leads as the denominator.</p></div></div>
-      <div className="space-y-4">{stages.map((stage) => { const pct = leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0; return <div key={stage.key} className="analytics-pipeline-row"><div className="analytics-pipeline-label"><span>{stage.label}</span><strong>{stage.count.toLocaleString()} <small>({pct}%)</small></strong></div><div className="analytics-pipeline-track"><span style={{ width: `${pct}%` }} /></div></div>; })}</div>
-      <div className="analytics-table-scroll"><table className="table"><caption className="sr-only">Current pipeline counts and share of all leads at or beyond each stage</caption><thead><tr><th>Pipeline stage</th><th>Leads</th><th>Share of leads</th></tr></thead><tbody>{stages.map((stage) => <tr key={stage.key}><td>{stage.label}</td><td className="tabular-nums">{stage.count.toLocaleString()}</td><td className="tabular-nums">{leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0}%</td></tr>)}</tbody></table></div>
+      <div className="space-y-4">{stages.map((stage) => { const pct = leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0; return <div key={`${stage.label}-${stage.count}`} className="analytics-pipeline-row"><div className="analytics-pipeline-label"><span>{stage.label}</span><strong>{stage.count.toLocaleString()} <small>({pct}%)</small></strong></div><div className="analytics-pipeline-track"><span style={{ width: `${pct}%` }} /></div></div>; })}</div>
+      <div className="analytics-table-scroll"><table className="table"><caption className="sr-only">Current pipeline counts and share of all leads at or beyond each stage</caption><thead><tr><th>Pipeline stage</th><th>Leads</th><th>Share of leads</th></tr></thead><tbody>{stages.map((stage) => <tr key={`${stage.label}-table`}><td>{stage.label}</td><td className="tabular-nums">{stage.count.toLocaleString()}</td><td className="tabular-nums">{leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0}%</td></tr>)}</tbody></table></div>
     </div>
   );
 }
