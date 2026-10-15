@@ -116,7 +116,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="m-0 text-[16px] font-semibold text-ink">Leads progressing through this automation</h2>
+        <h2 className="m-0 text-[16px] font-semibold text-ink">Leads from this automation</h2>
         <p className="muted m-0 mt-1 text-xs leading-5">
           This view shows leads currently linked to one of this automation’s goals. Leads that have finished or left the goal sequence may not appear here.
         </p>
@@ -146,7 +146,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
             setPage(0);
           }}
         >
-          <option value="all">All Status</option>
+          <option value="all">All stages</option>
           {PIPELINE_STAGES.map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}
@@ -177,7 +177,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
                 {facts && Object.keys(facts).length > 0 && (
                   <div className="muted small mt-0.5">{Object.values(facts).slice(0, 2).join(" · ")}</div>
                 )}
-                {lead.handoffStatus !== "ai" && <span className={`${handoff.className} mt-2 inline-block`}>{handoff.text}</span>}
+                <span className={`${handoff.className} mt-2 inline-block`}>{handoff.text}</span>
 
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
                   <select
@@ -206,15 +206,16 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
           </div>
 
           <div className="hidden md:block" style={{ overflowX: "auto" }}>
-          <table className="table">
+          <table className="table" aria-label="Leads from this automation">
             <thead>
               <tr>
                 <th>Lead</th>
                 <th>Current goal</th>
-                <th>Status</th>
-                <th>Assignee</th>
-                <th>Last Activity</th>
-                <th>Actions</th>
+                <th>Stage</th>
+                <th>Handoff</th>
+                <th>Owner</th>
+                <th>Last activity</th>
+                <th>View</th>
               </tr>
             </thead>
             <tbody>
@@ -241,8 +242,8 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
                       <span className="pill" style={{ marginLeft: 0 }}>
                         {stage?.label ?? lead.pipelineStage}
                       </span>
-                      {lead.handoffStatus !== "ai" && <span className={`${handoff.className} mt-1 block w-fit`}>{handoff.text}</span>}
                     </td>
+                    <td><span className={handoff.className} style={{ marginLeft: 0 }}>{handoff.text}</span></td>
                     <td>
                       <select
                         value={lead.ownerUserId ?? ""}
@@ -258,7 +259,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
                         ))}
                       </select>
                     </td>
-                    <td className="text-xs">{formatRelativeTime(lead.lastInboundAt)}</td>
+                    <td className="text-xs"><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time></td>
                     <td>
                       <Link to={`/dashboard/${tenantId}/leads/${lead.id}`} className="link-button">
                         View
