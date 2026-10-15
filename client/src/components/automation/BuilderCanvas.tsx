@@ -1386,6 +1386,10 @@ export function BuilderCanvas({
 
           <MiniMap
             nodeStrokeWidth={2}
+            nodeColor="var(--border)"
+            nodeStrokeColor="var(--text-muted)"
+            maskColor="color-mix(in srgb, var(--bg) 60%, transparent)"
+            bgColor="var(--card-bg)"
             pannable
             zoomable
             className="!m-4 !overflow-hidden !rounded-xl !border !border-line !bg-card"

@@ -214,8 +214,8 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
                 <th>Stage</th>
                 <th>Handoff</th>
                 <th>Owner</th>
-                <th>Last activity</th>
-                <th>View</th>
+                <th className="whitespace-nowrap">Last activity</th>
+                <th className="whitespace-nowrap">View</th>
               </tr>
             </thead>
             <tbody>
@@ -260,7 +260,7 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
                       </select>
                     </td>
                     <td className="text-xs"><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time></td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <Link to={`/dashboard/${tenantId}/leads/${lead.id}`} className="link-button">
                         View
                       </Link>
