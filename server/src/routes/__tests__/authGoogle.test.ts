@@ -46,7 +46,9 @@ describe("Google OAuth routes", () => {
     expect(url.searchParams.get("scope")).toContain("openid email profile");
     expect(url.searchParams.get("state")).toBeTruthy();
     expect(url.searchParams.get("nonce")).toBeTruthy();
-    const setCookie = (res.headers["set-cookie"] ?? []).join(";");
+    // `set-cookie` is typed as string but arrives as string[] at runtime;
+    // normalize to an array before joining so this typechecks.
+    const setCookie = ([] as string[]).concat(res.headers["set-cookie"] ?? []).join(";");
     expect(setCookie).toContain("signalai_google_oauth_state=");
     expect(setCookie.toLowerCase()).toContain("httponly");
     expect(setCookie.toLowerCase()).toContain("samesite=lax");
