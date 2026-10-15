@@ -35,11 +35,11 @@ function formatDate(iso: string): string {
 }
 
 const ROLE_PERMISSIONS = [
-  { capability: "Reply to conversations", owner: "Full access", admin: "Full access", member: "Full access" },
-  { capability: "Edit automations", owner: "Full access", admin: "Full access", member: "Limited access" },
-  { capability: "Manage integrations", owner: "Full access", admin: "Full access", member: "No access" },
-  { capability: "Invite teammates", owner: "Full access", admin: "Full access", member: "No access" },
-  { capability: "Manage billing", owner: "Full access", admin: "No access", member: "No access" },
+  { capability: "View team members and connected accounts", owner: "Allowed", admin: "Allowed", member: "Allowed" },
+  { capability: "Create, resend or cancel invitations", owner: "Full access", admin: "Full access", member: "No access" },
+  { capability: "Change member roles or remove members", owner: "Full access", admin: "Full access", member: "No access" },
+  { capability: "Edit workspace name and description", owner: "Full access", admin: "Full access", member: "No access" },
+  { capability: "Disconnect connected accounts or bind them to journeys", owner: "Full access", admin: "Full access", member: "No access" },
 ] as const;
 
 export function TeamPage() {
@@ -271,8 +271,8 @@ export function TeamPage() {
 
       <section className="card" aria-labelledby="team-permissions-title">
         <div className="mb-4 border-b border-line pb-4">
-          <h2 id="team-permissions-title" className="mb-1">Role permissions</h2>
-          <p className="muted small m-0">Review access before inviting someone or changing a teammate’s role.</p>
+          <h2 id="team-permissions-title" className="mb-1">Role permissions in the current API</h2>
+          <p className="muted small m-0">These are the role-specific controls explicitly enforced by the current server.</p>
         </div>
         <div className="overflow-x-auto" role="region" aria-label="Role permissions table" tabIndex={0}>
           <table className="table team-permissions-table min-w-[620px]">
@@ -285,7 +285,7 @@ export function TeamPage() {
             </tr>)}</tbody>
           </table>
         </div>
-        <p className="muted small mt-3 mb-0">This is a guide to workspace roles. Server-side authorization remains the source of truth.</p>
+        <p className="team-permissions-note mt-3 mb-0" role="note"><strong>Important:</strong> several core routes, including automations, billing, knowledge, lead fields and AI guardrails, currently check workspace membership without consistently restricting actions by role. This table does not claim those routes are role-restricted.</p>
       </section>
 
       {resolvedInvitations.length > 0 && (
