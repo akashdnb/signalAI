@@ -344,3 +344,134 @@
     min-height: 40px;
   }
 }
+
+
+/* Billing — current plan and actual usage allowances, not preview sample caps. */
+.page-billing .billing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.page-billing .billing-plan-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.page-billing .billing-section-eyebrow {
+  margin: 0 0 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.page-billing .billing-plan-name {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.page-billing .billing-trial-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+.page-billing .billing-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 1rem;
+}
+.page-billing .billing-usage-meter {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+.page-billing .billing-usage-meter-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.page-billing .billing-usage-meter-heading h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.page-billing .billing-usage-meter-heading p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.page-billing .billing-usage-percent {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.page-billing .billing-usage-track {
+  height: 8px;
+  margin-top: 0.9rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--pill-bg);
+}
+.page-billing .billing-usage-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+.page-billing .billing-usage-meter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.page-billing .billing-overage-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  border-left: 3px solid var(--accent);
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+}
+.page-billing .billing-overage-price {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+.page-billing .billing-payment-notice {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  background: var(--card-bg);
+}
+.page-billing .billing-payment-notice h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.page-billing .billing-entitlement-notice {
+  margin-bottom: 0;
+}
+.page-billing .billing-reset-note {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  font-size: 0.82rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-billing .billing-usage-track span {
+    transition: none;
+  }
+}
