@@ -254,6 +254,7 @@ export function InboxPage() {
                 type="button"
                 className={tab === t.value ? "btn-primary btn-small" : "btn-secondary btn-small"}
                 onClick={() => setTab(t.value)}
+                onFocus={(e) => e.currentTarget.scrollIntoView({ inline: "nearest", block: "nearest" })}
               >
                 {t.label}
               </button>
