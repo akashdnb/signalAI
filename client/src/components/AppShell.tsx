@@ -311,7 +311,11 @@ function AccountHeader({
 
       <div className="flex shrink-0 items-center gap-4">
         {usage && (
-          <div className="w-36">
+          // Hidden between `md` and `lg`: at that width the tenant name/connected-pill
+          // block (which can't shrink past its content) and this widget don't both fit
+          // in the header, and nothing clips the overflow — they visually collide. Token
+          // usage stays reachable via the mobile account sheet below `md`.
+          <div className="hidden w-36 lg:block">
             <div className="flex items-center justify-between text-xs text-subtle">
               <span>AI Tokens</span>
               <span>
