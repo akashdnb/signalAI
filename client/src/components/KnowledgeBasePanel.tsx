@@ -3,6 +3,7 @@ import { api, type KnowledgeBaseDocument } from "../api";
 import { getKnowledgeBaseDocumentsPage, type PaginatedResponse } from "../api/pagination";
 import { EmptyState, ErrorState, LoadingState, Section, StatusBadge } from "./ui";
 import { Pagination } from "./Pagination";
+import { SearchIcon } from "./icons";
 
 const STATUS_LABEL: Record<KnowledgeBaseDocument["status"], string> = {
   processing: "Processing",
@@ -30,6 +31,7 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,6 +89,8 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
 
   const documents = pageData?.items ?? null;
   const total = pageData?.total ?? null;
+  const trimmedSearch = search.trim().toLowerCase();
+  const filteredDocuments = documents?.filter((document) => document.filename.toLowerCase().includes(trimmedSearch)) ?? null;
 
   return (
     <div className="knowledge-base-panel">
@@ -135,10 +139,46 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
             PDF, plain text or Markdown, up to the server's configured upload limit. Processing begins after upload; failed sources are excluded from retrieval until replaced.
           </p>
 
+          {documents.length > 0 && (
+            <div className="mb-4 min-w-0 max-w-sm">
+              <label htmlFor="knowledge-search" className="mb-1.5 block text-xs font-medium text-subtle">
+                Search
+              </label>
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+                <input
+                  id="knowledge-search"
+                  type="search"
+                  aria-label="Search source files"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search source files"
+                  className="!m-0 !h-11 !w-full !rounded-xl !bg-card !pl-10 !pr-14 !text-sm"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-1 text-xs font-semibold text-subtle hover:bg-chip hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    onClick={() => setSearch("")}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {documents.length === 0 ? (
             <EmptyState
               title="No knowledge sources yet"
               description="Upload your FAQ, pricing sheet or product information so AI replies can use your content instead of relying only on the conversation."
+              className="knowledge-empty-state"
+            />
+          ) : filteredDocuments && filteredDocuments.length === 0 ? (
+            <EmptyState
+              title="No sources match your search"
+              description={`No source filenames on this page match "${search.trim()}".${pageData && pageData.totalPages > 1 ? " Try another page or clear the search." : ""}`}
               className="knowledge-empty-state"
             />
           ) : (
@@ -156,7 +196,7 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {documents.map((document) => (
+                    {filteredDocuments!.map((document) => (
                       <tr key={document.id}>
                         <td>
                           <strong className="knowledge-source-name">{document.filename}</strong>
