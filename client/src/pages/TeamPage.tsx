@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
+import { PageHeader, StatusBadge } from "../components/ui";
 import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember } from "../api/workspace";
 
 function formatRole(role: WorkspaceMember["role"]): string {
@@ -32,6 +33,14 @@ function formatExpiry(iso: string): string {
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
+
+const ROLE_PERMISSIONS = [
+  { capability: "Reply to conversations", owner: "Full access", admin: "Full access", member: "Full access" },
+  { capability: "Edit automations", owner: "Full access", admin: "Full access", member: "Limited access" },
+  { capability: "Manage integrations", owner: "Full access", admin: "Full access", member: "No access" },
+  { capability: "Invite teammates", owner: "Full access", admin: "Full access", member: "No access" },
+  { capability: "Manage billing", owner: "Full access", admin: "No access", member: "No access" },
+] as const;
 
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -146,28 +155,27 @@ export function TeamPage() {
   const resolvedInvitations = invitations.filter((invitation) => !isPendingInvitation(invitation));
 
   return (
-    <div className="page page-wide">
-      <h1>Team</h1>
-      <p className="muted">Everyone with access to this workspace.</p>
+    <div className="page page-wide page-team">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Team & access"
+        description="Manage who can access this workspace, what they can do, and outstanding invitations."
+        actions={
+          <button type="button" className="btn-primary btn-small" onClick={() => setInviting((value) => !value)}>
+            <span className="inline-flex items-center gap-1.5">
+              <UserPlusIcon className="h-4 w-4" />
+              {inviting ? "Close invite form" : "Invite teammate"}
+            </span>
+          </button>
+        }
+      />
 
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
-      <section className="card">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 style={{ marginBottom: 0 }}>Members</h2>
-            <p className="muted small mt-1 mb-0">Owners can manage billing and workspace access. Admins can manage members, accounts and automations. Members can work with inbox, leads and automations.</p>
-          </div>
-          <button
-            type="button"
-            className="btn-secondary btn-small"
-            onClick={() => setInviting((value) => !value)}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <UserPlusIcon className="h-4 w-4" />
-              {inviting ? "Cancel" : "Invite teammate"}
-            </span>
-          </button>
+      <section className="card" aria-labelledby="team-members-title">
+        <div className="mb-4 border-b border-line pb-4">
+          <h2 id="team-members-title" className="mb-1">People with access</h2>
+          <p className="muted small m-0">Owners manage billing and workspace access. Admins can manage members, connected accounts and automations. Members work with inbox, leads and automations.</p>
         </div>
 
         {inviting && (
@@ -190,9 +198,9 @@ export function TeamPage() {
         )}
 
         {members === null ? (
-          <p className="muted">Loading team…</p>
+          <p className="muted" role="status">Loading team…</p>
         ) : members.length === 0 ? (
-          <p className="muted">No members found.</p>
+          <p className="muted">No members found. Invite a teammate to start collaborating.</p>
         ) : (
           <ul className="list" style={{ marginTop: inviting ? "1.25rem" : "1rem" }}>
             {members.map((member) => {
@@ -207,7 +215,7 @@ export function TeamPage() {
                     <span className="truncate text-sm font-medium text-ink">{member.email}</span>
                   </span>
                   {isOwner ? (
-                    <span className="pill pill-ok" style={{ marginLeft: 0 }}>Owner</span>
+                    <StatusBadge tone="success" dot>Owner</StatusBadge>
                   ) : (
                     <span className="inline-flex items-center gap-2">
                       <select
@@ -219,12 +227,7 @@ export function TeamPage() {
                         <option value="member">Member</option>
                         <option value="admin">Admin</option>
                       </select>
-                      <button
-                        type="button"
-                        className="btn-secondary btn-small"
-                        disabled={busy}
-                        onClick={() => void handleRemove(member)}
-                      >
+                      <button type="button" className="btn-secondary btn-small" disabled={busy} onClick={() => void handleRemove(member)}>
                         {busy ? "Saving…" : "Remove"}
                       </button>
                     </span>
@@ -237,8 +240,8 @@ export function TeamPage() {
       </section>
 
       {pendingInvitations.length > 0 && (
-        <section className="card">
-          <h2>Pending invitations</h2>
+        <section className="card" aria-labelledby="pending-invitations-title">
+          <h2 id="pending-invitations-title">Pending invitations</h2>
           <p className="muted small">Invitations are single-use and expire automatically. Resend to issue a fresh invitation link.</p>
           <ul className="list">
             {pendingInvitations.map((invitation) => {
@@ -252,20 +255,10 @@ export function TeamPage() {
                     <span className="muted small block mt-1">{formatExpiry(invitation.expiresAt)}</span>
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="btn-secondary btn-small"
-                      disabled={resendBusy || revokeBusy}
-                      onClick={() => void handleInvitationAction(invitation.id, "resend")}
-                    >
+                    <button type="button" className="btn-secondary btn-small" disabled={resendBusy || revokeBusy} onClick={() => void handleInvitationAction(invitation.id, "resend")}>
                       {resendBusy ? "Sending…" : "Resend"}
                     </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn-small"
-                      disabled={resendBusy || revokeBusy}
-                      onClick={() => void handleInvitationAction(invitation.id, "revoke")}
-                    >
+                    <button type="button" className="btn-secondary btn-small" disabled={resendBusy || revokeBusy} onClick={() => void handleInvitationAction(invitation.id, "revoke")}>
                       {revokeBusy ? "Cancelling…" : "Cancel"}
                     </button>
                   </span>
@@ -276,9 +269,28 @@ export function TeamPage() {
         </section>
       )}
 
+      <section className="card" aria-labelledby="team-permissions-title">
+        <div className="mb-4 border-b border-line pb-4">
+          <h2 id="team-permissions-title" className="mb-1">Role permissions</h2>
+          <p className="muted small m-0">Review access before inviting someone or changing a teammate’s role.</p>
+        </div>
+        <div className="overflow-x-auto" role="region" aria-label="Role permissions table" tabIndex={0}>
+          <table className="table team-permissions-table min-w-[620px]">
+            <thead><tr><th scope="col">Capability</th><th scope="col">Owner</th><th scope="col">Admin</th><th scope="col">Member</th></tr></thead>
+            <tbody>{ROLE_PERMISSIONS.map((row) => <tr key={row.capability}>
+              <th scope="row">{row.capability}</th>
+              <td>{row.owner}</td>
+              <td>{row.admin}</td>
+              <td><span className={row.member === "No access" || row.member === "Limited access" ? "team-permission-limited" : ""}>{row.member}</span></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <p className="muted small mt-3 mb-0">This is a guide to workspace roles. Server-side authorization remains the source of truth.</p>
+      </section>
+
       {resolvedInvitations.length > 0 && (
-        <section className="card">
-          <h2>Invitation history</h2>
+        <section className="card" aria-labelledby="invitation-history-title">
+          <h2 id="invitation-history-title">Invitation history</h2>
           <p className="muted small">Resolved invitations stay visible so you can tell whether a teammate accepted, was cancelled, or let the invitation expire.</p>
           <ul className="list">
             {resolvedInvitations.map((invitation) => (
@@ -288,7 +300,7 @@ export function TeamPage() {
                   <span className="muted small" style={{ marginLeft: 8 }}>{formatRole(invitation.role)}</span>
                   <span className="muted small block mt-1">Created {formatDate(invitation.createdAt)}</span>
                 </span>
-                <span className="pill">{invitationState(invitation)}</span>
+                <StatusBadge tone={invitationState(invitation) === "Accepted" ? "success" : invitationState(invitation) === "Expired" || invitationState(invitation) === "Cancelled" ? "neutral" : "warning"} dot>{invitationState(invitation)}</StatusBadge>
               </li>
             ))}
           </ul>
