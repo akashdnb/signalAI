@@ -17,7 +17,7 @@ production. Pairs with the method in
 
 **Legend:** `[ ]` pending · `[x]` done in production · 🟡 = partially ported (note which parts).
 
-**Status:** 12 / 29 screen-features fully verified · 8 partially ported · Phase 0 (foundation, 2 items) done · last updated 2026-10-15.
+**Status:** 13 / 29 screen-features fully verified · 7 partially ported · Phase 0 (foundation, 2 items) done · Phase 2 (core workflows) complete · last updated 2026-10-15.
 
 **Current work:** `feat/preview-to-production-foundation` (PR #57) — Phase 0 foundation is now done; Phase 1 (Trust & correctness) is next. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes), Builder tab routing, the Setup readiness summary, Builder Results scope and mobile KPI strip, Builder Leads table, Integrations, Billing & usage and Team & access have implementation slices using live API data and shared production tokens/components. Automation names are standard route links now, enabling direct deep-link/browser checks of a real campaign. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization. **Gotcha for future shell work:** `client/src/styles/app-shell-phase2.css` governs sidebar width/padding/active-indicator via `aside[aria-label="Primary navigation"]` attribute selectors, which out-specificity plain Tailwind utility classes on that element — override there, not with a utility class, or the change silently loses.
 
@@ -46,7 +46,7 @@ production. Pairs with the method in
 - [x] **Lead detail — Conversation** — existing live ThreadPanel/API preserved. Verified live: real DM/team-reply thread renders, light/dark, responsive, no overflow.
 - [x] **Lead detail — Activities** — existing activity ThreadPanel/API preserved. Verified live: real activity entry renders, light/dark, responsive, no overflow.
 - [x] **Lead detail — Notes** — existing live notes API and add-note form preserved. Verified live: real empty state and add-note form render, light/dark, responsive, no overflow.
-- [ ] **Automations list** (`&screen=automations`) → `…/automation` · `AutomationPage.tsx` / `JourneyTable(Paginated).tsx` — 🟡 production outcome guidance and table treatment aligned to preview; live automation behavior preserved; responsive/theme/keyboard verification still pending.
+- [x] **Automations list** (`&screen=automations`) → `…/automation` · `AutomationPage.tsx` / `JourneyTable(Paginated).tsx` (PR #57; page ported pre-session, DoD pass this session) — outcome-oriented guidance card, My automations/Start from a template tabs, search/status/start-condition/sort filters, responsive table→card collapse. Filter controls (unlike Inbox's tab strip) fit naturally at every width checked — no scroll-affordance issue here. Verified live: light/dark, 1440/1024/768/390 (no overflow), keyboard tab order through all filter controls.
 
 ## Phase 3 — Flagship (own track)
 
