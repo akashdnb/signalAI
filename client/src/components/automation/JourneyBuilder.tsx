@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
@@ -51,6 +51,24 @@ function describeCampaign(campaign: Campaign): string {
   return `Starts when ${kind} mentions one of ${phraseCount}`;
 }
 
+const BUILDER_TAB_QUERY_VALUE: Record<BuilderTab, string> = {
+  builder: "Flow",
+  details: "Setup",
+  analytics: "Results",
+  leads: "Leads",
+};
+
+function parseBuilderTab(search: string, startOnSetup: boolean): BuilderTab {
+  const params = new URLSearchParams(search);
+  const requested = params.get("builderTab")?.trim().toLowerCase();
+  if (requested === "flow") return "builder";
+  if (requested === "setup") return "details";
+  if (requested === "results") return "analytics";
+  if (requested === "leads") return "leads";
+  if (params.get("tab")?.toLowerCase() === "setup") return "details";
+  return startOnSetup ? "details" : "builder";
+}
+
 function automationStatus(campaign: Campaign): { label: string; title: string; className: string } {
   if (!campaign.published) {
     return campaign.enabled
@@ -94,8 +112,15 @@ export function JourneyBuilder({
   onChanged: () => Promise<void> | void;
   onBack: () => void;
 }) {
-  const [subTab, setSubTab] = useState<BuilderTab>(() => startOnSetup ? "details" : "builder");
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [subTab, setSubTab] = useState<BuilderTab>(() => parseBuilderTab(location.search, startOnSetup));
   const subTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    // Keep the builder tab addressable with the same builderTab values as the design preview.
+    setSubTab(parseBuilderTab(location.search, startOnSetup));
+  }, [location.search, startOnSetup]);
   const [milestones, setMilestonesState] = useState<Milestone[]>([]);
   const savedMilestonesRef = useRef<Milestone[]>([]);
   const milestonesLoadRequestRef = useRef(0);
@@ -398,6 +423,14 @@ export function JourneyBuilder({
     [selectedNode],
   );
 
+  function commitSubTabChange(next: BuilderTab) {
+    setSubTab(next);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("builderTab", BUILDER_TAB_QUERY_VALUE[next]);
+    nextParams.delete("tab");
+    setSearchParams(nextParams, { replace: true });
+  }
+
   function requestSubTabChange(next: BuilderTab) {
     if (subTab === "details" && detailsDirty && next !== "details") {
       setPendingTab(next);
@@ -406,7 +439,7 @@ export function JourneyBuilder({
 
     requestNavigation(() => {
       if (subTab === "builder" && next !== "builder") setInspectorOpen(false);
-      setSubTab(next);
+      commitSubTabChange(next);
     });
   }
 
@@ -1169,7 +1202,7 @@ export function JourneyBuilder({
               className="btn-secondary min-h-11"
               onClick={() => {
                 detailsRef.current?.discard();
-                setSubTab(pendingTab);
+                commitSubTabChange(pendingTab);
                 setPendingTab(null);
               }}
             >
@@ -1182,7 +1215,7 @@ export function JourneyBuilder({
               onClick={async () => {
                 const ok = await detailsRef.current?.save();
                 if (ok) {
-                  setSubTab(pendingTab);
+                  commitSubTabChange(pendingTab);
                   setPendingTab(null);
                 }
               }}
