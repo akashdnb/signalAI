@@ -84,7 +84,7 @@ export function AutomationPage() {
   if (!tenantId) return null;
 
   return (
-    <div className="flex flex-col px-4 py-3.5 md:min-h-[calc(100vh-56px)] md:px-6 md:py-3.5">
+    <div className="page page-wide page-automation">
       <AutomationHeader />
       <AutomationTabs active={activeTab} onChange={setActiveTab} />
       {error && <div className="banner banner-error mt-4" role="alert">{error}</div>}
@@ -99,14 +99,12 @@ export function AutomationPage() {
           <AutomationTemplates onUse={handleUseTemplate} />
         ) : (
           <>
-            <div className="mt-5 rounded-2xl border border-accent/15 bg-gradient-to-r from-accent/5 via-card to-card p-4 md:p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
-                  <p className="m-0 text-[15px] font-semibold text-ink">Start with the outcome you want</p>
-                  <p className="muted m-0 mt-1 max-w-2xl text-xs leading-5">Pick a ready-made automation and customize only the parts that matter. Your changes stay in draft until you explicitly publish.</p>
-                </div>
-                <button type="button" className="btn-primary shrink-0" onClick={() => setActiveTab("templates")}>Choose a template</button>
+            <div className="automation-outcome-card">
+              <div className="automation-outcome-copy">
+                <p className="automation-eyebrow">Start with the outcome you want</p>
+                <p>Pick a ready-made automation and customize only the parts that matter. Your changes stay in draft until you explicitly publish.</p>
               </div>
+              <button type="button" className="btn-primary shrink-0" onClick={() => setActiveTab("templates")}>Choose a template</button>
             </div>
             <JourneyTablePaginated tenantId={tenantId} onSelect={(campaignId) => navigate(`/dashboard/${tenantId}/automation/journeys/${campaignId}`)} onNewJourney={() => setShowNewJourney(true)} />
           </>
