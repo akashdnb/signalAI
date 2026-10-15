@@ -25,6 +25,7 @@ import { LeadsPanel } from "./LeadsPanel";
 import { NodeInspectorDialog } from "./NodeInspectorDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { TestJourneyDialog } from "./TestJourneyDialog";
+import { StatusBadge } from "../ui";
 import type { JourneyAccountReadiness } from "../JourneyAccountsPanel";
 
 type BuilderTab = "builder" | "details" | "analytics" | "leads";
@@ -507,6 +508,79 @@ export function JourneyBuilder({
     !publishAffectsLiveAutomation ||
     (accountReadiness.status === "ready" && accountReadiness.healthyAssignedCount > 0);
 
+  const setupReadinessItems = [
+    {
+      title: "Automation details",
+      status: detailsDirty ? "Unsaved changes" : campaign.name.trim() ? "Saved" : "Needs a name",
+      tone: detailsDirty ? "warning" as const : campaign.name.trim() ? "success" as const : "warning" as const,
+      detail: detailsDirty
+        ? "Setup edits need to be saved in the form below."
+        : campaign.description?.trim()
+          ? "Name and purpose are saved."
+          : "The name is saved. A description is optional but helps teammates recognize this automation.",
+    },
+    {
+      title: "Trigger keywords",
+      status: campaign.keywords.length > 0 ? "Configured" : "Needs keywords",
+      tone: campaign.keywords.length > 0 ? "success" as const : "warning" as const,
+      detail: campaign.keywords.length > 0
+        ? `${campaign.keywords.length} keyword phrase${campaign.keywords.length === 1 ? "" : "s"} are configured for this trigger.`
+        : "Add at least one phrase to match incoming comments or messages.",
+    },
+    {
+      title: "Flow draft",
+      status: milestonesLoading
+        ? "Loading"
+        : milestoneLoadError
+          ? "Needs review"
+          : journeyDirty
+            ? "Unsaved changes"
+            : builderVersion !== null
+              ? "Saved"
+              : "Open Flow",
+      tone: milestoneLoadError
+        ? "danger" as const
+        : journeyDirty
+          ? "warning" as const
+          : builderVersion !== null && milestonesReady
+            ? "success" as const
+            : "neutral" as const,
+      detail: milestoneLoadError
+        ? "Goal configuration could not be loaded. Retry before relying on this setup."
+        : milestonesLoading
+          ? "Checking the saved goal configuration."
+          : journeyDirty
+            ? "Flow or qualification changes need an explicit save."
+            : builderVersion !== null
+              ? "The loaded flow version is saved."
+              : "Open Flow to load and verify the current graph version.",
+    },
+    {
+      title: "Instagram account",
+      status: accountReadiness.status === "loading"
+        ? "Checking"
+        : accountReadiness.status === "error"
+          ? "Check connection"
+          : accountReadiness.healthyAssignedCount > 0
+            ? "Healthy account assigned"
+            : "Assign an account",
+      tone: accountReadiness.status === "error"
+        ? "danger" as const
+        : accountReadiness.status !== "ready"
+          ? "neutral" as const
+          : accountReadiness.healthyAssignedCount > 0
+            ? "success" as const
+            : "warning" as const,
+      detail: accountReadiness.status === "loading"
+        ? "Checking connected Instagram accounts and their assignment."
+        : accountReadiness.status === "error"
+          ? "Account readiness could not be confirmed. Retry or inspect Integrations."
+          : accountReadiness.healthyAssignedCount > 0
+            ? `${accountReadiness.healthyAssignedCount} healthy account${accountReadiness.healthyAssignedCount === 1 ? "" : "s"} assigned${accountReadiness.unavailableAssignedCount > 0 ? `; ${accountReadiness.unavailableAssignedCount} unavailable` : ""}.`
+            : "Assign at least one healthy Instagram account before activating a live automation.",
+    },
+  ] as const;
+
   async function handleToggleEnabled() {
     if (!campaign.enabled && !canEnableAutomation) return;
     setTogglingEnabled(true);
@@ -867,6 +941,24 @@ export function JourneyBuilder({
 
           {subTab === "details" && (
             <div className="py-4 md:h-full md:overflow-y-auto md:p-5">
+              <section className="mb-5 rounded-xl border border-line bg-card p-4 md:p-5" aria-labelledby="builder-readiness-title">
+                <div className="border-b border-line pb-3">
+                  <h2 id="builder-readiness-title" className="m-0 text-base font-semibold text-ink">Before publishing</h2>
+                  <p className="muted m-0 mt-1 text-sm">This checklist summarizes saved configuration, your draft state, and live Instagram account readiness.</p>
+                </div>
+                <ul className="m-0 grid list-none grid-cols-1 gap-x-6 p-0 sm:grid-cols-2">
+                  {setupReadinessItems.map((item) => (
+                    <li key={item.title} className="min-w-0 border-b border-line py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <strong className="text-sm font-semibold text-ink">{item.title}</strong>
+                        <StatusBadge tone={item.tone}>{item.status}</StatusBadge>
+                      </div>
+                      <p className="muted m-0 mt-1 text-xs leading-5">{item.detail}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="muted m-0 mt-3 border-t border-line pt-3 text-xs leading-5">A saved draft is not automatically live. Publish and activation still use the server’s validation and account checks.</p>
+              </section>
               <CampaignEditor
                 ref={detailsRef}
                 tenantId={tenantId}
