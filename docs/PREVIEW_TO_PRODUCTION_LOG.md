@@ -41,7 +41,7 @@ production. Pairs with the method in
 
 - [ ] **Overview** (`&screen=overview`) → `/dashboard/:tenantId` · `DashboardPage.tsx` — 🟡 live-data layout ported and smoke-tested on BUI; responsive/theme/keyboard verification still pending.
 - [ ] **Inbox** (`&screen=inbox`) → `…/inbox` · `InboxPage.tsx` — 🟡 preview workspace proportions/tabs/list treatment ported; responsive/theme/keyboard verification still pending.
-- [ ] **Leads list** (`&screen=leads`) → `…/leads` · `LeadsPage.tsx` — 🟡 migrated toolbar and operational columns; BUI data/render smoke-tested through Opera; narrow viewport/theme/keyboard verification pending.
+- [ ] **Leads list** (`&screen=leads`) → `…/leads` · `LeadsPage.tsx` — 🟡 migrated toolbar and operational columns; BUI data/render smoke-tested through Opera; narrow viewport/theme/keyboard verification pending. — 🟡 migrated toolbar and operational columns; BUI data/render smoke-tested through Opera; narrow viewport/theme/keyboard verification pending.
 - [ ] **Lead detail — Overview** (`&screen=lead-detail&leadTab=Overview`) → `…/leads/:leadId` · `LeadDetailPage.tsx`
 - [ ] **Lead detail — Conversation**
 - [ ] **Lead detail — Activities**
@@ -60,7 +60,7 @@ production. Pairs with the method in
 - [ ] **Analytics — Activity** (`&screen=analytics&analyticsTab=Activity`) → `…/analytics` · `AnalyticsPage.tsx` — 🟡 preview-inspired activity tab, metric strip and definitions ported using current workspace-wide API data; preview-only time/account filters were not invented because the current API slice does not expose them; responsive/theme/keyboard verification still pending.
 - [ ] **Analytics — Conversion** · `LeadsByStageDonut.tsx` — 🟡 current pipeline progression/revenue view is ported; full preview parity and responsive/theme/keyboard verification remain.
 - [ ] **Content** (`&screen=content`) → `…/content` · `ContentPage.tsx`
-- [ ] **Team & access** (`&screen=team`) → `…/team` · `TeamPage.tsx` — 🟡 production header, primary invite action, semantic status badges and role permissions reference table aligned to preview; real member/invitation API remains authoritative; verify all themes/viewports and action states before marking complete.
+- [ ] **Team & access** (`&screen=team`) → `…/team` · `TeamPage.tsx` — 🟡 production header, primary invite action, semantic status badges and role permissions reference table aligned to preview; real member/invitation API remains authoritative; verify all themes/viewports and action states before marking complete. — 🟡 production header, primary invite action, semantic status badges and role permissions reference table aligned to preview; real member/invitation API remains authoritative; verify all themes/viewports and action states before marking complete.
 - [ ] **Settings — General** (`&screen=settings&settingsSection=General`) → `…/settings` · `SettingsPage.tsx`
 - [ ] **Settings — Lead fields**
 - [ ] **Settings — AI behavior**
