@@ -5,10 +5,11 @@ import { ApiError, api, type Funnel, type RevenueByCurrency, type TopKeyword, ty
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 type AnalyticsTab = "activity" | "conversion";
 
-function formatMoney(currency: string, total: number): string {
-  const symbol = CURRENCY_SYMBOL[currency];
+function formatMoney(currency: string | undefined, total: number): string {
+  const normalizedCurrency = currency ?? "Unknown currency";
+  const symbol = CURRENCY_SYMBOL[normalizedCurrency];
   const amount = total.toLocaleString();
-  return symbol ? `${symbol}${amount}` : `${currency} ${amount}`;
+  return symbol ? `${symbol}${amount}` : `${normalizedCurrency} ${amount}`;
 }
 
 function getStageCount(funnel: Funnel, key: string | undefined): number {
