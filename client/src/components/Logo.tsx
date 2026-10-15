@@ -13,7 +13,16 @@ const SIZES = {
   lg: { icon: 40, text: "text-2xl" },
 } as const;
 
-export function Logo({ size = "md", className = "" }: { size?: keyof typeof SIZES; className?: string }) {
+export function Logo({
+  size = "md",
+  className = "",
+  wordmarkClassName = "",
+}: {
+  size?: keyof typeof SIZES;
+  className?: string;
+  /** Extra classes on the "signalAI" text span — pass e.g. "md:hidden" to collapse to an icon-only mark above `md`, while the mobile drawer (below `md`) always keeps the full wordmark. */
+  wordmarkClassName?: string;
+}) {
   const { icon, text } = SIZES[size];
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
@@ -31,7 +40,7 @@ export function Logo({ size = "md", className = "" }: { size?: keyof typeof SIZE
         />
         <path fill="#7C3AED" d="M402 57l9 24 24 9-24 9-9 24-9-24-24-9 24-9z" />
       </svg>
-      <span className={`font-bold ${text} text-ink`}>
+      <span className={`font-bold ${text} text-ink ${wordmarkClassName}`}>
         signal<span className="text-accent">AI</span>
       </span>
     </span>

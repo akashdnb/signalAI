@@ -5,9 +5,9 @@ export type StatusTone = "neutral" | "success" | "warning" | "danger" | "info" |
 const TONE_CLASSES: Record<StatusTone, string> = {
   neutral: "border-line bg-chip text-subtle",
   success: "border-ok/25 bg-ok text-ok-ink",
-  warning: "border-amber-500/25 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+  warning: "border-warn-line bg-warn text-warn-ink",
   danger: "border-err/25 bg-err text-err-ink",
-  info: "border-blue-500/20 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200",
+  info: "border-line bg-info text-info-ink",
   accent: "border-accent/20 bg-chip text-accent",
 };
 

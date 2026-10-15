@@ -54,6 +54,21 @@ button {
   --color-err-ink: var(--error-text);
   --color-chip: var(--pill-bg);
   --color-sidebar: var(--sidebar-bg);
+  --color-line-strong: var(--line-strong);
+  --color-warn: var(--warn-bg);
+  --color-warn-ink: var(--warn-text);
+  --color-warn-line: var(--warn-line);
+  --color-info: var(--info-bg);
+  --color-info-ink: var(--info-text);
+  --color-node-trigger: var(--node-trigger);
+  --color-node-trigger-soft: var(--node-trigger-soft);
+  --color-node-trigger-line: var(--node-trigger-line);
+  --color-node-goal: var(--node-goal);
+  --color-node-goal-soft: var(--node-goal-soft);
+  --color-node-goal-line: var(--node-goal-line);
+  --color-node-instagram: var(--node-instagram);
+  --color-node-instagram-soft: var(--node-instagram-soft);
+  --color-node-instagram-line: var(--node-instagram-line);
 }
 
 :root {
@@ -78,6 +93,25 @@ button {
   --error-text: #dc2626;
   --pill-bg: #f3e8ff;
   --sidebar-bg: #ffffff;
+  /* Preview token gaps (docs/PREVIEW_TO_PRODUCTION_IMPLEMENTATION.md §5a): a
+     stronger divider than --border, plus warning/info/builder-node tones
+     that StatusBadge and the Flow canvas previously hard-coded as raw
+     Tailwind amber/blue instead of reading from the shared palette. */
+  --line-strong: #cbd5e1;
+  --warn-bg: #fff3da;
+  --warn-text: #8e5d10;
+  --warn-line: #f0ddb3;
+  --info-bg: #edf4ff;
+  --info-text: #3265a4;
+  --node-trigger: #b83f83;
+  --node-trigger-soft: #fff0f7;
+  --node-trigger-line: #f0d3e4;
+  --node-goal: #2a7851;
+  --node-goal-soft: #ebf7ef;
+  --node-goal-line: #cee7d7;
+  --node-instagram: #8c39ca;
+  --node-instagram-soft: #f5edfc;
+  --node-instagram-line: #e4cdf5;
   --font-sans-stack: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   /* R4 Analytics funnel — ordinal ramp (one hue, monotone lightness), validated via the dataviz skill's six-checks script for this light surface. */
   --funnel-1: #080954;
@@ -116,6 +150,25 @@ button {
     --error-bg: rgba(220, 38, 38, 0.16);
     --error-text: #f87171;
     --pill-bg: #2e2247;
+    /* Dark variants follow the same translucent-overlay pattern as --ok-bg/
+       --error-bg above (saturated ink + a low-alpha rgba of the same hue for
+       the soft background/line), rather than copying the preview's flat
+       dark swatches, which were tuned for its own (non-slate) dark canvas. */
+    --line-strong: #4b5563;
+    --warn-bg: rgba(217, 119, 6, 0.16);
+    --warn-text: #fbbf24;
+    --warn-line: rgba(217, 119, 6, 0.4);
+    --info-bg: rgba(37, 99, 235, 0.16);
+    --info-text: #93c5fd;
+    --node-trigger: #d68ab7;
+    --node-trigger-soft: rgba(184, 63, 131, 0.18);
+    --node-trigger-line: rgba(184, 63, 131, 0.4);
+    --node-goal: #81d0a2;
+    --node-goal-soft: rgba(42, 120, 81, 0.18);
+    --node-goal-line: rgba(42, 120, 81, 0.4);
+    --node-instagram: #c9a0e8;
+    --node-instagram-soft: rgba(140, 57, 202, 0.18);
+    --node-instagram-line: rgba(140, 57, 202, 0.4);
     /* R4 Analytics funnel — dark mode gets its own validated steps, not an automatic flip of the light ones. */
     --funnel-1: #282cec;
     --funnel-2: #4d51ef;
@@ -143,6 +196,21 @@ button {
   --error-bg: rgba(220, 38, 38, 0.16);
   --error-text: #f87171;
   --pill-bg: #2e2247;
+  --line-strong: #4b5563;
+  --warn-bg: rgba(217, 119, 6, 0.16);
+  --warn-text: #fbbf24;
+  --warn-line: rgba(217, 119, 6, 0.4);
+  --info-bg: rgba(37, 99, 235, 0.16);
+  --info-text: #93c5fd;
+  --node-trigger: #d68ab7;
+  --node-trigger-soft: rgba(184, 63, 131, 0.18);
+  --node-trigger-line: rgba(184, 63, 131, 0.4);
+  --node-goal: #81d0a2;
+  --node-goal-soft: rgba(42, 120, 81, 0.18);
+  --node-goal-line: rgba(42, 120, 81, 0.4);
+  --node-instagram: #c9a0e8;
+  --node-instagram-soft: rgba(140, 57, 202, 0.18);
+  --node-instagram-line: rgba(140, 57, 202, 0.4);
   --funnel-1: #282cec;
   --funnel-2: #4d51ef;
   --funnel-3: #7375f2;

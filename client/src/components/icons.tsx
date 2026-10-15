@@ -219,6 +219,17 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+/** Sidebar collapse/expand toggle — a panel outline with a divider and a chevron that flips via CSS rotation at the call site, so one glyph covers both directions. */
+export function PanelToggleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4.5v15" />
+      <path d="m14 9 3 3-3 3" />
+    </Icon>
+  );
+}
+
 export function InstagramMarkIcon(props: IconProps) {
   return (
     <Icon {...props}>

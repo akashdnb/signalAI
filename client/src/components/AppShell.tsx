@@ -34,6 +34,7 @@ import {
   LeadsIcon,
   LogoutIcon,
   MenuIcon,
+  PanelToggleIcon,
   SettingsIcon,
   TeamIcon,
 } from "./icons";
@@ -71,11 +72,14 @@ function NavList({
   tenantId,
   onNavigate,
   badges,
+  collapsed = false,
 }: {
   items: NavItem[];
   tenantId: string;
   onNavigate: () => void;
   badges?: Record<string, number>;
+  /** Icon-only desktop rail: labels move to `title`/`aria-label` instead of disappearing, so the item stays identifiable on hover/focus and to assistive tech. Never applied on the mobile drawer, which always shows labels. */
+  collapsed?: boolean;
 }) {
   return (
     <ul className="list-none space-y-1 p-0">
@@ -83,14 +87,16 @@ function NavList({
         item.disabled ? (
           <li key={item.label}>
             <span
-              className="flex max-md:min-h-11 cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-subtle opacity-60"
+              className={`flex max-md:min-h-11 cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-subtle opacity-60 ${collapsed ? "md:justify-center" : ""}`}
               title="Coming soon"
             >
               <item.icon className="h-5 w-5 shrink-0" />
-              {item.label}
-              <span className="ml-auto rounded-full bg-chip px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-subtle">
-                Soon
-              </span>
+              <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+              {!collapsed && (
+                <span className="ml-auto rounded-full bg-chip px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-subtle">
+                  Soon
+                </span>
+              )}
             </span>
           </li>
         ) : (
@@ -99,16 +105,22 @@ function NavList({
               to={`/dashboard/${tenantId}/${item.to}`}
               end={item.end}
               onClick={onNavigate}
+              title={collapsed ? item.label : undefined}
+              aria-label={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `flex max-md:min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
-                  isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"
-                }`
+                `relative flex max-md:min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
+                  collapsed ? "md:justify-center" : ""
+                } ${isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"}`
               }
             >
               <item.icon className="h-5 w-5 shrink-0" />
-              {item.label}
+              <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
               {Boolean(badges?.[item.to]) && (
-                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-err-ink px-1.5 text-[11px] font-semibold text-white">
+                <span
+                  className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-err-ink px-1.5 text-[11px] font-semibold text-white ${
+                    collapsed ? "md:absolute md:right-1 md:top-1 md:h-2.5 md:min-w-2.5 md:p-0 md:text-[0px]" : "ml-auto"
+                  }`}
+                >
                   {badges![item.to]! > 99 ? "99+" : badges![item.to]}
                 </span>
               )}
@@ -120,13 +132,34 @@ function NavList({
   );
 }
 
-function PlanCard({ tenantId, billing }: { tenantId: string; billing: BillingSummary | null }) {
+function PlanCard({
+  tenantId,
+  billing,
+  collapsed = false,
+}: {
+  tenantId: string;
+  billing: BillingSummary | null;
+  collapsed?: boolean;
+}) {
   const renewalLine =
     billing?.planTier === "trial" && billing.trialEndsAt
       ? `Trial ends ${new Date(billing.trialEndsAt).toLocaleDateString()}`
       : billing?.billingStatus === "active"
         ? "Active plan"
         : null;
+
+  if (collapsed) {
+    return (
+      <Link
+        to={`/dashboard/${tenantId}/billing`}
+        title={`Current plan: ${billing?.planTierLabel ?? "…"} — Upgrade`}
+        aria-label={`Current plan: ${billing?.planTierLabel ?? "…"} — Upgrade`}
+        className="flex h-10 items-center justify-center rounded-lg bg-accent text-white no-underline hover:bg-accent-hover"
+      >
+        <CreditCardIcon className="h-5 w-5" />
+      </Link>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-line bg-card p-3 shadow-sm">
@@ -371,6 +404,13 @@ export function AppShell() {
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
   );
+  // Desktop-only icon rail: persisted per browser, never affects the mobile drawer (which always shows labels).
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem("signalai.sidebarCollapsed") === "1",
+  );
+  useEffect(() => {
+    window.localStorage.setItem("signalai.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
   const mobileNavRef = useRef<HTMLElement | null>(null);
   // Onboarding wizard (R5): latched open once industry flips from null to
   // set (step 2 of the wizard), so the user stays on step 3 (knowledge
@@ -528,12 +568,37 @@ export function AppShell() {
         aria-label="Primary navigation"
         tabIndex={mobileNavOpen && isMobileViewport ? -1 : undefined}
         inert={isMobileViewport && !mobileNavOpen}
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-sidebar transition-transform duration-200 md:static md:z-auto md:w-[212px] md:translate-x-0 ${
+        data-collapsed={sidebarCollapsed ? "true" : undefined}
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-sidebar transition-[transform,width] duration-200 motion-reduce:transition-none md:static md:z-auto md:translate-x-0 ${
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-5 py-5">
-          <Logo size="md" />
+        <div className={`flex items-center px-5 py-5 ${sidebarCollapsed ? "md:justify-center" : "justify-between"}`}>
+          {/*
+           * Below `md` (the mobile drawer) this button is always a no-op —
+           * `sidebarCollapsed` only affects `md:`-prefixed classes, so
+           * clicking the logo there just sets a desktop preference the
+           * drawer itself never reads.
+           */}
+          <button
+            type="button"
+            aria-label={sidebarCollapsed && !isMobileViewport ? "Expand sidebar" : "SignalAI"}
+            title={sidebarCollapsed && !isMobileViewport ? "Expand sidebar" : undefined}
+            tabIndex={sidebarCollapsed && !isMobileViewport ? 0 : -1}
+            onClick={() => setSidebarCollapsed(false)}
+            className="rounded-lg"
+          >
+            <Logo size="md" wordmarkClassName={sidebarCollapsed ? "md:hidden" : ""} />
+          </button>
+          <button
+            type="button"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            onClick={() => setSidebarCollapsed(true)}
+            className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink md:flex ${sidebarCollapsed ? "md:hidden" : ""}`}
+          >
+            <PanelToggleIcon className="h-4.5 w-4.5" />
+          </button>
           <div className="flex items-center gap-1 md:hidden">
             <button
               type="button"
@@ -552,13 +617,27 @@ export function AppShell() {
             tenantId={tenantId}
             onNavigate={() => setMobileNavOpen(false)}
             badges={{ inbox: unreadCount }}
+            collapsed={sidebarCollapsed}
           />
           <div className="my-4 border-t border-line" />
-          <NavList items={SECONDARY_NAV} tenantId={tenantId} onNavigate={() => setMobileNavOpen(false)} />
+          <div className={`mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-subtle ${sidebarCollapsed ? "md:hidden" : ""}`}>
+            Workspace
+          </div>
+          <NavList
+            items={SECONDARY_NAV}
+            tenantId={tenantId}
+            onNavigate={() => setMobileNavOpen(false)}
+            collapsed={sidebarCollapsed}
+          />
         </nav>
 
         <div className="border-t border-line p-3">
-          <PlanCard tenantId={tenantId} billing={billing} />
+          <div className={sidebarCollapsed ? "md:hidden" : ""}>
+            <PlanCard tenantId={tenantId} billing={billing} />
+          </div>
+          <div className={`hidden ${sidebarCollapsed ? "md:block" : ""}`}>
+            <PlanCard tenantId={tenantId} billing={billing} collapsed />
+          </div>
         </div>
       </aside>
 

@@ -73,6 +73,25 @@ aside[aria-label="Primary navigation"] + div > header + header {
   background: var(--card-bg);
   border-color: var(--border);
 }
+/*
+ * Collapsed desktop rail (Phase 0 foundation): `data-collapsed` is set by
+ * AppShell's own `sidebarCollapsed` state. Scoped to `min-width: 768px` so
+ * it can never fight the mobile-drawer width override below, and uses two
+ * attribute selectors (higher specificity than the unguarded base rule
+ * above) rather than relying on source order.
+ */
+@media (min-width: 768px) {
+  aside[aria-label="Primary navigation"][data-collapsed="true"] {
+    width: 80px;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child {
+    padding: 0 8px;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > a[aria-current="page"]::before {
+    display: none;
+  }
+}
+
 @media (max-width: 767px) {
   aside[aria-label="Primary navigation"] { width: min(86vw, 320px); box-shadow: 18px 0 50px rgb(15 23 42 / 14%); }
   aside[aria-label="Primary navigation"] > div:first-child { padding: 0 16px; }
