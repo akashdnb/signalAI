@@ -1663,6 +1663,13 @@
 .po-preview-app .po-automation-table td:nth-child(5) { width: 12%; }
 .po-preview-app .po-automation-table th:nth-child(6),
 .po-preview-app .po-automation-table td:nth-child(6) { width: 54px; }
+/* The builder Leads tab reuses .po-automation-table but has its own column set
+   (Lead / Stage / Handoff / Last activity / Owner / View). Don't inherit the
+   automations-list fixed column widths, which crushed the Lead name into 52px and
+   let the Stage column overlap it. Let this table size to its own content. */
+.po-preview-app .po-builder-results .po-automation-table { table-layout: auto; }
+.po-preview-app .po-builder-results .po-automation-table th:nth-child(n),
+.po-preview-app .po-builder-results .po-automation-table td:nth-child(n) { width: auto; }
 .po-preview-app .po-automation-table td .po-tag {
   display: inline-flex;
   align-items: center;
