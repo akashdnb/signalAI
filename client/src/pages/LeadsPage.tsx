@@ -3,16 +3,22 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
-import { PIPELINE_STAGES, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
-  { value: "", label: "All" },
-  { value: "ai", label: "AI Handling" },
-  { value: "requested", label: "Needs Attention" },
-  { value: "human", label: "Human Handling" },
+  { value: "", label: "All handoffs" },
+  { value: "ai", label: "AI handling" },
+  { value: "requested", label: "Needs attention" },
+  { value: "human", label: "Human handling" },
 ];
 
 const PAGE_SIZE = 20;
+
+function sourceLabel(eventType: LeadListItem["lastEventType"]): string {
+  if (eventType === "comment") return "Comment";
+  if (eventType === "message") return "DM";
+  return "—";
+}
 
 export function LeadsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -65,7 +71,14 @@ export function LeadsPage() {
 
   return (
     <div className="page page-wide page-leads">
-      <h1>Leads</h1>
+      <header className="leads-page-header">
+        <div>
+          <p className="section-eyebrow">PIPELINE</p>
+          <h1>Leads</h1>
+          <p className="page-description">Track people who have shown interest in your business through Instagram.</p>
+        </div>
+        {pageData && <div className="leads-total" aria-label={`${pageData.total} leads in this view`}><strong>{pageData.total}</strong><span>leads</span></div>}
+      </header>
 
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
@@ -76,65 +89,76 @@ export function LeadsPage() {
         </div>
       )}
 
-      <section className="card">
-        <div className="filter-row">
-          <label className="sr-only" htmlFor="leads-stage-filter">Pipeline stage</label>
-          <select id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
-            <option value="">All stages</option>
-            {PIPELINE_STAGES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-          <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
-          <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
-            {HANDOFF_FILTERS.map((h) => (
-              <option key={h.value} value={h.value}>{h.label}</option>
-            ))}
-          </select>
-          <label className="sr-only" htmlFor="leads-search">Search leads by username</label>
-          <input
-            id="leads-search"
-            type="text"
-            aria-label="Search leads by username"
-            placeholder="Search by username…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <section className="card leads-workspace" aria-label="Lead pipeline">
+        <div className="leads-toolbar">
+          <div className="leads-filter-group">
+            <label className="sr-only" htmlFor="leads-stage-filter">Pipeline stage</label>
+            <select id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
+              <option value="">All stages</option>
+              {PIPELINE_STAGES.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+            <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
+            <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
+              {HANDOFF_FILTERS.map((h) => (
+                <option key={h.value} value={h.value}>{h.label}</option>
+              ))}
+            </select>
+          </div>
+          <label className="leads-search">
+            <span className="sr-only">Search leads by username</span>
+            <input
+              id="leads-search"
+              type="text"
+              aria-label="Search leads by username"
+              placeholder="Search leads…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
         </div>
 
         {leads === null ? (
           <p className="muted" role="status">{error ? "Leads could not be loaded. Use Retry above." : "Loading…"}</p>
         ) : leads.length === 0 ? (
-          <p className="muted">No leads match this view yet.</p>
+          <div className="leads-empty">
+            <strong>No leads match this view.</strong>
+            <span>Try clearing a filter or searching for a different username.</span>
+          </div>
         ) : (
           <>
-            <div className="-mx-2 overflow-x-auto sm:mx-0" aria-label="Scrollable leads table">
-              <table className="table leads-data-table min-w-[980px]">
-                <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
+            <div className="leads-table-scroll" aria-label="Scrollable leads table">
+              <table className="table leads-data-table">
+                <thead>
+                  <tr><th>Lead</th><th>Stage</th><th>Source</th><th>Activity</th><th>Owner</th><th>Handoff</th><th>Messaging</th></tr>
+                </thead>
                 <tbody>
                   {leads.map((lead) => {
                     const messagingWindow = formatMessagingWindow(lead.windowOpenUntil);
+                    const handoff = handoffLabel(lead.handoffStatus);
                     return (
                       <tr key={lead.id}>
                         <td>
-                          <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>
-                            {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" style={{ display: "inline-block", marginRight: "0.4rem" }} aria-hidden="true" />}
-                            <span className="inline-flex flex-col align-top">
-                              <span>{leadDisplayName(lead.username)}</span>
-                              {!lead.username && <span className="muted small">Username unavailable</span>}
+                          <Link className="lead-primary-link" to={`/dashboard/${tenantId}/leads/${lead.id}`}>
+                            {lead.unread && <span className="lead-unread-dot" aria-label="Unread" />}
+                            <span className="lead-identity">
+                              <strong>{leadDisplayName(lead.username)}</strong>
+                              <small>{lead.username ? `@${lead.username.replace(/^@/, "")}` : "Instagram username unavailable"}</small>
                             </span>
                           </Link>
                         </td>
                         <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
-                        <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
-                        <td><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "—"}</time></td>
-                        <td>{formatLastContactVia(lead.lastEventType)}</td>
+                        <td>{sourceLabel(lead.lastEventType)}</td>
                         <td>
-                          <span className={messagingWindow.open ? "pill pill-ok" : "pill"} title={messagingWindow.title} style={{ marginLeft: 0 }}>
-                            {messagingWindow.label}
+                          <span className="lead-activity">
+                            <time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time>
+                            {lead.lastMessagePreview && <small title={lead.lastMessagePreview}>{lead.lastMessagePreview}</small>}
                           </span>
                         </td>
-                        <td><time dateTime={lead.createdAt} title={new Date(lead.createdAt).toLocaleString()}>{formatRelativeTime(lead.createdAt)}</time></td>
+                        <td>{lead.ownerUserId ? "Assigned" : "Unassigned"}</td>
+                        <td><span className={handoff.className} style={{ marginLeft: 0 }}>{handoff.text}</span></td>
+                        <td><span className={messagingWindow.open ? "pill pill-ok" : "pill"} title={messagingWindow.title} style={{ marginLeft: 0 }}>{messagingWindow.label}</span></td>
                       </tr>
                     );
                   })}
