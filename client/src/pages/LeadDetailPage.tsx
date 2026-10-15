@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ApiError,
   api,
@@ -37,6 +37,7 @@ function parseLeadDetailTab(value: string | null): LeadDetailTab {
 export function LeadDetailPage() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0);
@@ -81,8 +82,9 @@ export function LeadDetailPage() {
     finally { setRecalculating(false); }
   }
   useEffect(() => {
-    setActiveTab(parseLeadDetailTab(searchParams.get("leadTab")));
-  }, [searchParams]);
+    // Key tab state off the serialized location search, not a mutable URLSearchParams reference.
+    setActiveTab(parseLeadDetailTab(new URLSearchParams(location.search).get("leadTab")));
+  }, [location.search]);
 
   useEffect(() => {
     if (!tenantId || !leadId) return;
