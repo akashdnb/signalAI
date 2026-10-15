@@ -96,7 +96,22 @@
 .page-workspace > h1 { margin: 0 0 1rem; font-size: clamp(1.8rem, 2.4vw, 2.25rem); line-height: 1.1; letter-spacing: -0.03em; }
 .page-workspace > .flex.flex-col { min-height: 640px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); box-shadow: none; }
 .page-workspace > .flex.flex-col > div:first-child { width: 320px; background: var(--card-bg); }
-.page-workspace > .flex.flex-col > div:first-child > div:first-child { display: flex; flex-wrap: nowrap; gap: 0; overflow-x: auto; padding: 0 1rem; border-bottom: 1px solid var(--border); }
+/*
+ * The tab strip (All/Unread/AI Handling/Qualified/Needs Attention) is wider
+ * than the 320px list column at normal sizes, so it scrolls horizontally
+ * rather than wrapping. A hard-clipped last tab with no visible scrollbar
+ * reads as broken, not scrollable — the trailing mask hints there's more.
+ */
+.page-workspace > .flex.flex-col > div:first-child > div:first-child {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+}
 .page-workspace > .flex.flex-col > div:first-child > div:first-child button { flex: 0 0 auto; min-height: 46px; padding: 0 0.65rem; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
 .page-workspace > .flex.flex-col > div:first-child > div:first-child button.btn-primary { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
 .page-workspace > .flex.flex-col > div:first-child > div:first-child button.btn-secondary:hover { background: transparent; color: var(--text); }
