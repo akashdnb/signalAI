@@ -249,3 +249,43 @@
     padding: 1rem;
   }
 }
+
+
+/* Builder Results — define the time/cohort scope before the KPI strip. */
+.builder-results-panel {
+  min-width: 0;
+}
+.builder-results-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0 0.5rem;
+}
+.builder-results-header h2 {
+  overflow-wrap: anywhere;
+}
+.builder-results-header .overview-eyebrow {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+@media (max-width: 640px) {
+  .builder-results-header {
+    padding-top: 0;
+  }
+  .builder-results-panel .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+  .builder-results-panel .stat {
+    min-width: 0;
+    padding: 0.75rem 0.5rem;
+  }
+  .builder-results-panel .stat-value {
+    overflow-wrap: anywhere;
+    font-size: 1.35rem;
+  }
+  .builder-results-panel .stat-label {
+    line-height: 1.35;
+  }
+}
