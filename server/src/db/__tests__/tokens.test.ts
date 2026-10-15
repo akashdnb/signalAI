@@ -36,6 +36,42 @@ describe("token vault repository", () => {
     expect(decrypted).toBe("IGQ...real-token");
   });
 
+  it("persists and preserves an Instagram handle when reconnecting", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-handle");
+
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-handle",
+      instagramUsername: "first_handle",
+      accessToken: "first-token",
+    });
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-handle",
+      instagramUsername: "updated_handle",
+      accessToken: "second-token",
+    });
+
+    const row = await pool.query<{ instagram_username: string | null }>(
+      "select instagram_username from meta_tokens where tenant_id = $1 and instagram_account_id = $2",
+      [tenant.id, "acct-handle"],
+    );
+    expect(row.rows[0]?.instagram_username).toBe("updated_handle");
+
+    // Token refreshes which don't have a fresh provider profile must not erase the handle.
+    await upsertToken(pool, keyring, {
+      tenantId: tenant.id,
+      instagramAccountId: "acct-handle",
+      accessToken: "refreshed-token",
+    });
+    const preserved = await pool.query<{ instagram_username: string | null }>(
+      "select instagram_username from meta_tokens where tenant_id = $1 and instagram_account_id = $2",
+      [tenant.id, "acct-handle"],
+    );
+    expect(preserved.rows[0]?.instagram_username).toBe("updated_handle");
+  });
+
   it("stores the token encrypted at rest, not as plaintext", async () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");

@@ -13,6 +13,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   already_used: "This connection link was already used. Please start a new one from Integrations.",
   connection_failed: "We couldn't complete the connection with Instagram. Return to Integrations and try again. If it keeps failing, check the account's connection status.",
   account_already_connected: "That Instagram account is already connected to a different signalAI workspace.",
+  account_mismatch: "You approved a different Instagram account than the one you're reconnecting. In Instagram, switch to the account you're reconnecting (or log out of the other one), then return to Integrations and reconnect.",
 };
 
 export function ConnectPage() {
