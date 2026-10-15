@@ -238,12 +238,12 @@ export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign:
                         </div>
                       )}
                     </td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <span className="pill" style={{ marginLeft: 0 }}>
                         {stage?.label ?? lead.pipelineStage}
                       </span>
                     </td>
-                    <td><span className={handoff.className} style={{ marginLeft: 0 }}>{handoff.text}</span></td>
+                    <td className="whitespace-nowrap"><span className={handoff.className} style={{ marginLeft: 0 }}>{handoff.text}</span></td>
                     <td>
                       <select
                         value={lead.ownerUserId ?? ""}
