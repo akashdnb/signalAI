@@ -17,7 +17,9 @@ production. Pairs with the method in
 
 **Legend:** `[ ]` pending · `[x]` done in production · 🟡 = partially ported (note which parts).
 
-**Status:** 0 / 29 screen-features ported · last updated 2026-10-15.
+**Status:** 0 / 29 screen-features fully verified · 1 partially ported · last updated 2026-10-15.
+
+**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active. The first live-data slice is deployed and smoke-tested on the BUI: Overview now follows the preview's information architecture while preserving real API data and session behavior. The separate preview service has been restored to `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified.
 
 ---
 
@@ -37,7 +39,7 @@ production. Pairs with the method in
 
 ## Phase 2 — Core workflows
 
-- [ ] **Overview** (`&screen=overview`) → `/dashboard/:tenantId` · `DashboardPage.tsx`
+- [ ] **Overview** (`&screen=overview`) → `/dashboard/:tenantId` · `DashboardPage.tsx` — 🟡 live-data layout ported and smoke-tested on BUI; responsive/theme/keyboard verification still pending.
 - [ ] **Inbox** (`&screen=inbox`) → `…/inbox` · `InboxPage.tsx`
 - [ ] **Leads list** (`&screen=leads`) → `…/leads` · `LeadsPage.tsx`
 - [ ] **Lead detail — Overview** (`&screen=lead-detail&leadTab=Overview`) → `…/leads/:leadId` · `LeadDetailPage.tsx`
