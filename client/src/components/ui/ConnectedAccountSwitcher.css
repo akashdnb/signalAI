@@ -213,6 +213,27 @@
   box-shadow: 0 0 0 3px var(--po-color-primary-soft);
 }
 
+/* Account scope filter portaled into a screen's filter row. It reuses the
+   search-box base, but must match the sibling filter selects (surface fill,
+   strong border, 40px height) and show one custom chevron, not the native
+   select arrow stacked with it. */
+.po-preview-app .sai-account-switcher__filter {
+  min-height: 40px;
+  border-color: var(--po-color-border-strong);
+  background: var(--po-color-surface);
+}
+.po-preview-app .sai-account-switcher__filter select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2px;
+}
+.po-preview-app .sai-account-switcher__filter-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--po-color-muted);
+}
+
 @media (max-width: 760px) {
   .sai-account-switcher { flex: 1 1 100%; width: 100%; max-width: none; }
   .po-preview-app .sai-account-switcher__trigger { min-height: 44px; }

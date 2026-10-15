@@ -32,13 +32,13 @@ function InstagramContextFilter({ accounts, selectedAccountId, onSelect }: Pick<
   if (!ACCOUNT_SCREENS.has(screen) || !target) return null;
   const label = screen === "inbox" ? "Instagram account" : "Account";
   return createPortal(
-    <label className="sai-account-switcher__search" style={{ margin: 0, minWidth: 0, maxWidth: "260px" }}>
+    <label className="sai-account-switcher__search sai-account-switcher__filter" style={{ margin: 0, minWidth: 0, maxWidth: "260px" }}>
       <span style={{ color: "var(--po-color-muted)", fontSize: "11px", fontWeight: 750, whiteSpace: "nowrap" }}>{label}</span>
       <select aria-label={`${label} filter`} value={value} onChange={event => { const next = event.target.value; setValue(next); if (next !== "all") onSelect(next); updatePreviewQuery({ igAccount: next }); window.dispatchEvent(new CustomEvent("signalai:account-filter-change", { detail: { accountId: next, screen } })); }} style={{ flex: 1, minWidth: 110, height: 36, border: 0, outline: 0, background: "transparent", color: "var(--po-color-ink)", fontSize: "12px", fontWeight: 700 }}>
         <option value="all">All accounts</option>
         {accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs reconnect" : ""}</option>)}
       </select>
-      <ChevronDownIcon aria-hidden="true" />
+      <ChevronDownIcon className="sai-account-switcher__filter-chevron" aria-hidden="true" />
     </label>,
     target,
   );
