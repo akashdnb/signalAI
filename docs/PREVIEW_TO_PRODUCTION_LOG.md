@@ -17,9 +17,9 @@ production. Pairs with the method in
 
 **Legend:** `[ ]` pending · `[x]` done in production · 🟡 = partially ported (note which parts).
 
-**Status:** 0 / 29 screen-features fully verified · 15 partially ported · last updated 2026-10-15.
+**Status:** 0 / 29 screen-features fully verified · 16 partially ported · last updated 2026-10-15.
 
-**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active and intentionally remains deployed on `signalai-bui`. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes), Builder tab routing, the Setup readiness summary, Builder Results scope and mobile KPI strip, Builder Leads table and Team & access have implementation slices using live API data and shared production tokens/components. Automation names are standard route links now, enabling direct deep-link/browser checks of a real campaign. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. BUI and preview were inspected using the connected Opera browser this session; full multi-viewport/theme keyboard verification remains pending. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization.
+**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active and intentionally remains deployed on `signalai-bui`. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes), Builder tab routing, the Setup readiness summary, Builder Results scope and mobile KPI strip, Builder Leads table, Integrations and Team & access have implementation slices using live API data and shared production tokens/components. Automation names are standard route links now, enabling direct deep-link/browser checks of a real campaign. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. BUI and preview were inspected using the connected Opera browser this session; full multi-viewport/theme keyboard verification remains pending. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization.
 
 ---
 
@@ -33,7 +33,7 @@ production. Pairs with the method in
 - [ ] **Login** (`&screen=login`) → `/login` · `LoginPage.tsx` — method → email → 6-digit code
 - [ ] **Connection recovery** (`&screen=connect-error`) → `/connect` · `ConnectPage.tsx` — all recovery states
 - [ ] **Invitation recovery** (`&screen=invite`) → `/invite` · `InvitationAcceptPage.tsx` — all recovery states
-- [ ] **Integrations** (`&screen=integrations`) → `…/integrations` · `IntegrationsPage.tsx`
+- [ ] **Integrations** (`&screen=integrations`) → `…/integrations` · `IntegrationsPage.tsx` — 🟡 production PageHeader/StatusBadge, clearer connected-account count/loading/empty states and mobile action wrapping; real connect/reconnect/disconnect handlers and account health remain authoritative; BUI post-deploy smoke test verified one connected healthy account, ID, WhatsApp and CRM placeholder states; responsive/theme/keyboard checks pending.
 - [ ] **Billing & usage** (`&screen=billing`) → `…/billing` · `BillingPage.tsx` / `BillingPanel.tsx`
 - [ ] **Knowledge base** (`&screen=knowledge`) → `…/knowledge` · `KnowledgePage.tsx` / `KnowledgeBasePanel.tsx`
 
