@@ -17,9 +17,9 @@ production. Pairs with the method in
 
 **Legend:** `[ ]` pending · `[x]` done in production · 🟡 = partially ported (note which parts).
 
-**Status:** 0 / 29 screen-features fully verified · 12 partially ported · last updated 2026-10-15.
+**Status:** 0 / 29 screen-features fully verified · 13 partially ported · last updated 2026-10-15.
 
-**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active and intentionally remains deployed on `signalai-bui`. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes), Builder tab routing and Team & access have implementation slices using live API data and shared production tokens/components. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. BUI and preview were inspected using the connected Opera browser this session; full multi-viewport/theme keyboard verification remains pending. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization.
+**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active and intentionally remains deployed on `signalai-bui`. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes), Builder tab routing, the Setup readiness summary and Team & access have implementation slices using live API data and shared production tokens/components. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. BUI and preview were inspected using the connected Opera browser this session; full multi-viewport/theme keyboard verification remains pending. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization.
 
 ---
 
@@ -51,7 +51,7 @@ production. Pairs with the method in
 ## Phase 3 — Flagship (own track)
 
 - [ ] **Builder — Flow** (`&screen=builder&builderTab=Flow`) → `…/automation/journeys/:campaignId` · `JourneyBuilder.tsx` / `BuilderCanvas.tsx` — 🟡 production tab routing accepts preview values `Flow`, `Setup`, `Results`, `Leads` and syncs the query after accepted navigation; existing React Flow canvas, explicit Save, dirty guard and publish flow are preserved; Render build/deploy passed; campaign-specific browser verification, responsive/theme/keyboard checks remain pending.
-- [ ] **Builder — Setup** (readiness, validation) · `Inspector.tsx` / `NodeInspectorDialog.tsx`
+- [ ] **Builder — Setup** (readiness, validation) · `Inspector.tsx` / `NodeInspectorDialog.tsx` — 🟡 added a live-data readiness summary for saved Setup state, trigger keywords, flow/milestone save state and actual assigned-account health; the existing CampaignEditor and server publish validation remain authoritative; Render build/deploy passed; campaign-specific browser and responsive/theme/keyboard checks pending.
 - [ ] **Builder — Results**
 - [ ] **Builder — Leads** · `automation/LeadsPanel.tsx`
 
