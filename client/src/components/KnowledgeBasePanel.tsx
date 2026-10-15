@@ -110,7 +110,7 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
           }
           className="knowledge-sources"
           actions={
-            <>
+            <div className="knowledge-upload-actions">
               <button
                 type="button"
                 className="btn-primary btn-small"
@@ -128,7 +128,7 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
                 onChange={handleFileSelected}
                 disabled={uploading}
               />
-            </>
+            </div>
           }
         >
           <p className="knowledge-upload-help muted small">
