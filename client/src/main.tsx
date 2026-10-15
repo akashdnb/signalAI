@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import "./styles/precision-operations-production.css";
+import "./styles/precision-operations-workflows.css";
 import "@xyflow/react/dist/style.css";
 import App from "./App.tsx";
 
