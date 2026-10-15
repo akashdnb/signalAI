@@ -17,16 +17,22 @@
  * icon-only buttons like ThemeToggle that add no border/background classes
  * of their own) shows through and looks broken, especially with a dark
  * icon on a light native background regardless of theme. `.btn-primary`/
- * `.btn-secondary`/`.link-button` below already set their own border and
- * background explicitly, so this lower-specificity element reset never
- * overrides them — it only fixes the buttons that were relying on nothing.
+ * `.btn-secondary`/`.link-button` below are unlayered too, so they still win
+ * on specificity; wrapped in `@layer base` so a plain `<button className="...
+ * border bg-card ...">` (Tailwind utilities, which live in the `utilities`
+ * layer declared above) can override this reset like any other utility —
+ * an unlayered rule would otherwise beat ALL layered CSS regardless of
+ * specificity, silently stripping Tailwind's border/background from every
+ * such button (found on the login page's SSO/email buttons).
  */
-button {
-  appearance: none;
-  border: none;
-  background: none;
-  font: inherit;
-  color: inherit;
+@layer base {
+  button {
+    appearance: none;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+  }
 }
 
 /*
