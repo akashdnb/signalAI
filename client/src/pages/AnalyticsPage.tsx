@@ -68,7 +68,7 @@ export function AnalyticsPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [f, r, posts, keywords] = await Promise.all([api.getFunnel(tenantId), api.getRevenue(tenantId), api.getTopPosts(tenantId), api.getTopKeywords(tenantId)]);
+        const [f, r, posts, keywords] = await Promise.all([api.getFunnel(tenantId!), api.getRevenue(tenantId!), api.getTopPosts(tenantId!), api.getTopKeywords(tenantId!)]);
         if (cancelled) return;
         setFunnel(f); setRevenue(r); setTopPosts(posts); setTopKeywords(keywords); setError(null);
       } catch (err) {
