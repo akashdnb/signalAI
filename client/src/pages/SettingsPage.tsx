@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { AppearanceSettingsPanel } from "../components/AppearanceSettingsPanel";
 import { FieldDefinitionsPanel } from "../components/FieldDefinitionsPanel";
 import { GuardrailsConfigPanel } from "../components/GuardrailsConfigPanel";
 import { ScoringRulesPanel } from "../components/ScoringRulesPanel";
@@ -18,6 +19,7 @@ export function SettingsPage() {
       <FieldDefinitionsPanel tenantId={tenantId} />
       <GuardrailsConfigPanel tenantId={tenantId} />
       <ScoringRulesPanel tenantId={tenantId} />
+      <AppearanceSettingsPanel />
     </div>
   );
 }
