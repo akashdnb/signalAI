@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
+import { PageHeader, StatusBadge } from "../components/ui";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "Not available";
@@ -87,37 +88,42 @@ export function IntegrationsPage() {
 
   return (
     <div className="page page-wide">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1>Integrations</h1>
-          <p className="muted">Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account.</p>
-        </div>
-        <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
-          <span className="inline-flex items-center gap-1.5">
-            <InstagramMarkIcon className="h-4 w-4" />
-            {connecting ? "Redirecting…" : "Add Instagram account"}
-          </span>
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Workspace connections"
+        title="Integrations"
+        description="Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account."
+        actions={
+          <button type="button" className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
+            <span className="inline-flex items-center gap-1.5">
+              <InstagramMarkIcon className="h-4 w-4" />
+              {connecting ? "Redirecting…" : "Add Instagram account"}
+            </span>
+          </button>
+        }
+      />
 
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
-      <section className="card">
-        <div className="flex items-center justify-between gap-3">
-          <h2 style={{ marginBottom: 0 }}>Instagram accounts</h2>
-          <span className="muted small">{accounts?.length ?? 0} connected</span>
+      <section className="card integration-accounts" aria-labelledby="integration-accounts-title">
+        <div className="integration-section-heading">
+          <div className="min-w-0">
+            <h2 id="integration-accounts-title" className="mb-1">Instagram accounts</h2>
+            <p className="muted small m-0">Connection health and credential expiry are based on the latest server check.</p>
+          </div>
+          <span className="muted small shrink-0" role="status">{accounts === null ? "Checking connections…" : `${accounts.length} connected`}</span>
         </div>
 
         {accounts === null ? (
-          <p className="muted">Checking connections…</p>
+          <p className="muted" role="status">Checking connected Instagram accounts…</p>
         ) : accounts.length === 0 ? (
-          <div className="banner">
-            <p className="m-0">No Instagram accounts are connected yet. Add one to start automating comments and DMs.</p>
+          <div className="integration-empty-state">
+            <strong>No Instagram accounts connected yet</strong>
+            <p className="muted m-0 mt-1 text-sm">Connect an account to start automating Instagram comments and direct messages. You can assign healthy accounts to individual automations after connecting.</p>
           </div>
         ) : (
           <div className="list" style={{ marginTop: "1rem" }}>
             {accounts.map((account) => (
-              <div key={account.id} className="list-item" style={{ alignItems: "flex-start" }}>
+              <div key={account.id} className="list-item integration-account-row">
                 <span className="flex min-w-0 flex-1 items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-chip text-accent">
                     <InstagramMarkIcon className="h-5 w-5" />
@@ -125,9 +131,9 @@ export function IntegrationsPage() {
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-2">
                       <strong>{account.instagramUsername ? `@${account.instagramUsername}` : "Instagram account"}</strong>
-                      <span className={account.status === "healthy" ? "pill pill-ok" : "pill pill-error"}>
+                      <StatusBadge tone={account.status === "healthy" ? "success" : "danger"} dot>
                         {account.status === "healthy" ? "Healthy" : "Needs attention"}
-                      </span>
+                      </StatusBadge>
                     </span>
                     {!account.instagramUsername && (
                       <p className="muted small mt-1 mb-0">The handle will appear after this account is successfully reconnected.</p>
@@ -144,7 +150,7 @@ export function IntegrationsPage() {
                   </span>
                 </span>
 
-                <span className="flex shrink-0 gap-2">
+                <span className="integration-account-actions flex shrink-0 gap-2">
                   {account.status === "error" ? (
                     <button
                       className="btn-primary btn-small"
