@@ -53,27 +53,29 @@ function PreviewPaletteBridge() {
     if (isPreview) document.body.dataset.poPalette = previewPalettes.has(palette) ? palette : "navy-cobalt";
     else delete document.body.dataset.poPalette;
 
-    const syncSettingsUrl = (url: string | URL | null | undefined) => {
-      if (!url) return;
+    // team and billing are settings sections reached via their own screen aliases;
+    // treat them as the settings screen so the shared nav styling always applies.
+    const settingsScreens = new Set(["settings", "team", "billing"]);
+    const isPreviewSettings = (url: URL) =>
+      url.searchParams.get("preview") === "precision-operations" && settingsScreens.has(url.searchParams.get("screen") ?? "");
+    const syncSettingsUrl = (url: string | URL | null | undefined): string | undefined => {
+      if (!url) return undefined;
       const next = new URL(String(url), window.location.href);
-      const isSettings = next.searchParams.get("preview") === "precision-operations" && next.searchParams.get("screen") === "settings";
-      if (isSettings && !next.searchParams.get("settingsSection")) {
+      if (next.searchParams.get("preview") === "precision-operations" && next.searchParams.get("screen") === "settings" && !next.searchParams.get("settingsSection")) {
         next.searchParams.set("settingsSection", "Team & access");
-        return next.toString();
       }
       return next.toString();
     };
-    const originalPushState = window.history.pushState.bind(window.history);
-    const originalReplaceState = window.history.replaceState.bind(window.history);
-    const wrappedPushState: History["pushState"] = (state, title, url) => originalPushState(state, title, syncSettingsUrl(url));
-    const wrappedReplaceState: History["replaceState"] = (state, title, url) => originalReplaceState(state, title, syncSettingsUrl(url));
-    window.history.pushState = wrappedPushState;
-    window.history.replaceState = wrappedReplaceState;
     const syncBody = () => {
-      const current = new URL(window.location.href);
-      if (current.searchParams.get("preview") === "precision-operations" && current.searchParams.get("screen") === "settings") document.body.dataset.poSettingsRedesign = "true";
+      if (isPreviewSettings(new URL(window.location.href))) document.body.dataset.poSettingsRedesign = "true";
       else delete document.body.dataset.poSettingsRedesign;
     };
+    const originalPushState = window.history.pushState.bind(window.history);
+    const originalReplaceState = window.history.replaceState.bind(window.history);
+    const wrappedPushState: History["pushState"] = (state, title, url) => { const result = originalPushState(state, title, syncSettingsUrl(url)); syncBody(); return result; };
+    const wrappedReplaceState: History["replaceState"] = (state, title, url) => { const result = originalReplaceState(state, title, syncSettingsUrl(url)); syncBody(); return result; };
+    window.history.pushState = wrappedPushState;
+    window.history.replaceState = wrappedReplaceState;
     syncBody();
     const onPopState = () => syncBody();
     window.addEventListener("popstate", onPopState);
