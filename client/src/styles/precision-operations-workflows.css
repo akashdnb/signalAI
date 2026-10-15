@@ -150,3 +150,102 @@
 .page-team .team-permissions-note strong {
   color: var(--text);
 }
+
+
+/* Lead detail — keep the live CRM workflow dense and scannable like the preview. */
+.page-lead-detail .lead-detail-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.page-lead-detail .lead-detail-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 1.25rem;
+  margin: 0 0 1.25rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.page-lead-detail .lead-detail-tab {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  margin: 0 0 -1px;
+  padding: 0.8rem 0.25rem 0.75rem;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.page-lead-detail .lead-detail-tab:hover {
+  color: var(--text);
+}
+.page-lead-detail .lead-detail-tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+.page-lead-detail .lead-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(290px, 0.8fr);
+  align-items: start;
+  gap: 1rem;
+}
+.page-lead-detail .lead-detail-main,
+.page-lead-detail .lead-detail-aside {
+  min-width: 0;
+}
+.page-lead-detail .lead-detail-main > .card,
+.page-lead-detail .lead-detail-aside > .card {
+  margin-bottom: 1rem;
+}
+.page-lead-detail .lead-detail-contact .kv {
+  grid-template-columns: minmax(6.5rem, max-content) minmax(0, 1fr);
+  gap: 0.55rem 0.9rem;
+}
+.page-lead-detail .lead-detail-contact .kv dt {
+  padding-top: 0.1rem;
+  font-size: 0.82rem;
+}
+.page-lead-detail .lead-detail-contact .kv dd {
+  min-width: 0;
+  font-size: 0.88rem;
+}
+.page-lead-detail .lead-intelligence-heading {
+  align-items: center;
+  gap: 0.75rem;
+}
+.page-lead-detail .lead-intelligence-heading h2 {
+  margin-bottom: 0;
+}
+.page-lead-detail .lead-detail-tab-panel {
+  min-width: 0;
+}
+.page-lead-detail .lead-detail-timeline {
+  max-width: 100%;
+}
+@media (max-width: 900px) {
+  .page-lead-detail .lead-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .page-lead-detail .lead-detail-heading {
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .page-lead-detail .lead-detail-tabs {
+    gap: 1rem;
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+  }
+  .page-lead-detail .lead-detail-tab-panel > .card {
+    padding: 1rem;
+  }
+}
