@@ -281,7 +281,7 @@ export function TeamPage() {
               <th scope="row">{row.capability}</th>
               <td>{row.owner}</td>
               <td>{row.admin}</td>
-              <td><span className={row.member === "No access" || row.member === "Limited access" ? "team-permission-limited" : ""}>{row.member}</span></td>
+              <td><span className={row.member === "No access" ? "team-permission-limited" : ""}>{row.member}</span></td>
             </tr>)}</tbody>
           </table>
         </div>
