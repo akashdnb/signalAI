@@ -14,11 +14,30 @@ import {
   type TenantMember,
 } from "../api";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, handoffLabel, leadDisplayName, scoreBandLabel } from "../lib/leadFormatting";
+import { PageHeader, StatusBadge } from "../components/ui";
+import { PIPELINE_STAGES, formatBudgetValue, formatDate, formatIntentLabel, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName, scoreBandLabel } from "../lib/leadFormatting";
+
+type LeadDetailTab = "overview" | "conversation" | "activities" | "notes";
+
+const LEAD_TAB_QUERY_VALUE: Record<LeadDetailTab, string> = {
+  overview: "Overview",
+  conversation: "Conversation",
+  activities: "Activities",
+  notes: "Notes",
+};
+
+function parseLeadDetailTab(value: string | null): LeadDetailTab {
+  const normalized = value?.toLowerCase();
+  if (normalized === "conversation") return "conversation";
+  if (normalized === "activities" || normalized === "activity") return "activities";
+  if (normalized === "notes") return "notes";
+  return "overview";
+}
 
 export function LeadDetailPage() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0);
   const [notes, setNotes] = useState<LeadNote[] | null>(null);
@@ -33,7 +52,7 @@ export function LeadDetailPage() {
   const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<"overview" | "conversation" | "activities" | "notes">("overview");
+  const [activeTab, setActiveTab] = useState<LeadDetailTab>(() => parseLeadDetailTab(searchParams.get("leadTab")));
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [noteBody, setNoteBody] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -62,6 +81,10 @@ export function LeadDetailPage() {
     finally { setRecalculating(false); }
   }
   useEffect(() => {
+    setActiveTab(parseLeadDetailTab(searchParams.get("leadTab")));
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!tenantId || !leadId) return;
     let cancelled = false;
     loadAll().catch((err) => { if (cancelled) return; if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { navigate("/login", { replace: true }); return; } setError(err instanceof Error ? err.message : "Failed to load lead"); });
@@ -70,6 +93,12 @@ export function LeadDetailPage() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, leadId, reloadCount]);
+  function handleTabChange(tab: LeadDetailTab) {
+    setActiveTab(tab);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("leadTab", LEAD_TAB_QUERY_VALUE[tab]);
+    setSearchParams(nextParams, { replace: true });
+  }
   async function handleStageChange(stage: PipelineStage) { if (!tenantId || !leadId) return; setBusy(true); setError(null); try { const updated = await api.updateLead(tenantId, leadId, { pipelineStage: stage }); setLead(updated); await loadAll(); setTimelineRefreshToken((t) => t + 1); } catch (err) { setError(err instanceof Error ? err.message : "Failed to update stage"); } finally { setBusy(false); } }
   async function handleOwnerChange(ownerUserId: string) { if (!tenantId || !leadId) return; setBusy(true); setError(null); try { const updated = await api.updateLead(tenantId, leadId, { ownerUserId: ownerUserId || null }); setLead(updated); await loadAll(); setTimelineRefreshToken((t) => t + 1); } catch (err) { setError(err instanceof Error ? err.message : "Failed to assign owner"); } finally { setBusy(false); } }
   async function handleHandoff(action: "request" | "takeover" | "release") { if (!tenantId || !leadId) return; setBusy(true); setError(null); try { const updated = await api.handoffAction(tenantId, leadId, action); setLead(updated); await loadAll(); setTimelineRefreshToken((t) => t + 1); } catch (err) { setError(err instanceof Error ? err.message : "Failed to update handoff status"); } finally { setBusy(false); } }
@@ -83,16 +112,27 @@ export function LeadDetailPage() {
   const TABS: { value: typeof activeTab; label: string }[] = [{ value: "overview", label: "Overview" }, { value: "conversation", label: "Conversation" }, { value: "activities", label: "Activities" }, { value: "notes", label: "Notes" }];
   const ownerName = lead?.ownerUserId ? (members ?? []).find((m) => m.userId === lead.ownerUserId)?.email ?? "assigned teammate" : null;
   return (
-    <div className="page page-wide">
-      <h1>{lead ? leadDisplayName(lead.username) : "Lead"}{lead && <span className={handoffLabel(lead.handoffStatus).className}>{handoffLabel(lead.handoffStatus).text}</span>}</h1>
-      {lead && !lead.username && <p className="muted small -mt-2 mb-4">Instagram hasn't provided a username for this lead yet. You can still review the conversation and captured details here.</p>}
+    <div className="page page-wide page-lead-detail">
+      <PageHeader
+        eyebrow="Lead profile"
+        title={
+          <span className="lead-detail-heading">
+            <span>{lead ? leadDisplayName(lead.username) : "Lead"}</span>
+            {lead && <StatusBadge tone={lead.handoffStatus === "human" ? "info" : lead.handoffStatus === "requested" ? "warning" : "success"} dot>{handoffLabel(lead.handoffStatus).text}</StatusBadge>}
+          </span>
+        }
+        description={lead?.username ? `@${lead.username.replace(/^@/, "")} · Instagram lead` : lead ? "Instagram hasn't provided a username for this lead yet. You can still review the conversation and captured details here." : "Review context, ownership, conversation, activity, notes, and next steps."}
+        actions={<Link className="btn-secondary btn-small" to={`/dashboard/${tenantId}/leads`}>← Back to leads</Link>}
+      />
       {error && <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert"><span>{error}</span>{!lead && <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>Retry loading lead</button>}</div>}
       {!lead ? <p className="muted" role="status">{error ? "Lead details could not be loaded." : "Loading lead…"}</p> : <>
-        <div className="button-row" role="tablist" aria-label="Lead details">
-          {TABS.map((t, index) => <button key={t.value} ref={(element) => { tabRefs.current[index] = element; }} id={`lead-tab-${t.value}`} type="button" role="tab" aria-selected={activeTab === t.value} aria-controls="lead-tabpanel" tabIndex={activeTab === t.value ? 0 : -1} className={activeTab === t.value ? "btn-primary btn-small" : "btn-secondary btn-small"} onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => { let nextIndex: number | null = null; if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length; if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length; if (event.key === "Home") nextIndex = 0; if (event.key === "End") nextIndex = TABS.length - 1; if (nextIndex !== null) { event.preventDefault(); tabRefs.current[nextIndex]?.focus(); } }} onClick={() => setActiveTab(t.value)}>{t.label}</button>)}
+        <div className="lead-detail-tabs" role="tablist" aria-label="Lead details">
+          {TABS.map((t, index) => <button key={t.value} ref={(element) => { tabRefs.current[index] = element; }} id={`lead-tab-${t.value}`} type="button" role="tab" aria-selected={activeTab === t.value} aria-controls="lead-tabpanel" tabIndex={activeTab === t.value ? 0 : -1} className={activeTab === t.value ? "lead-detail-tab is-active" : "lead-detail-tab"} onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => { let nextIndex: number | null = null; if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length; if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length; if (event.key === "Home") nextIndex = 0; if (event.key === "End") nextIndex = TABS.length - 1; if (nextIndex !== null) { event.preventDefault(); tabRefs.current[nextIndex]?.focus(); handleTabChange(TABS[nextIndex].value); } }} onClick={() => handleTabChange(t.value)}>{t.label}</button>)}
         </div>
-        <div id="lead-tabpanel" role="tabpanel" aria-labelledby={`lead-tab-${activeTab}`} tabIndex={0}>
+        <div id="lead-tabpanel" className="lead-detail-tab-panel" role="tabpanel" aria-labelledby={`lead-tab-${activeTab}`} tabIndex={0}>
         {activeTab === "overview" && <>
+          <div className="lead-detail-grid">
+            <div className="lead-detail-main">
           <section className="card">
             <h2>Overview</h2>
             <div className="field-group grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -110,12 +150,26 @@ export function LeadDetailPage() {
             <div className="inline-form"><input type="text" aria-label="Tag name" placeholder="Add a tag…" value={tagName} onChange={(e) => setTagName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddTag()} /><button className="btn-secondary btn-small" disabled={savingTag || !tagName.trim()} onClick={handleAddTag}>Add</button></div>
           </section>
           <section className="card"><h2>Captured Facts</h2>{capturedFacts === null ? <p className="muted">Loading…</p> : Object.keys(capturedFacts).length === 0 ? <p className="muted">Nothing captured yet — the AI hasn't learned any details about this lead so far.</p> : <dl className="kv">{Object.entries(capturedFacts).map(([key, value]) => <Fragment key={key}><dt>{fieldLabel(key)}</dt><dd>{value}</dd></Fragment>)}</dl>}</section>
-          <section className="card"><div className="button-row" style={{ justifyContent: "space-between", alignItems: "center" }}><h2 style={{ margin: 0 }}>Lead Intelligence</h2><button className="btn-secondary btn-small" disabled={recalculating} onClick={handleRecalculateIntelligence}>{recalculating ? "Recalculating…" : "Recalculate"}</button></div>{intelligenceError && <div className="banner banner-error" role="alert">{intelligenceError}</div>}{intelligence === undefined ? <p className="muted">Loading…</p> : intelligence === null ? <p className="muted">No intelligence yet — the AI hasn't learned enough about this lead to score it.</p> : <><div className="field-group"><div><div className="muted" style={{ fontSize: "0.85rem" }}>Lead Score</div><div style={{ fontSize: "1.8rem", fontWeight: 600 }}>{intelligence.score}<span className={scoreBandLabel(intelligence.scoreBand).className}>{scoreBandLabel(intelligence.scoreBand).text}</span></div></div></div><dl className="kv"><dt>Intent</dt><dd>{intelligence.intent ? formatIntentLabel(intelligence.intent) : "—"}</dd><dt>Need</dt><dd>{intelligence.need ?? "—"}</dd><dt>Budget</dt><dd>{intelligence.budgetValue !== null ? formatBudgetValue(intelligence.budgetValue) : (intelligence.budgetText ?? "—")}</dd><dt>Location</dt><dd>{intelligence.location ?? "—"}</dd></dl>{intelligence.scoreReasons.length > 0 && <><div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}>Score Reasons</div><ul className="list">{intelligence.scoreReasons.map((reason, i) => <li className="list-item" key={i} style={{ display: "block" }}>{reason}</li>)}</ul></>}{intelligenceHistory !== null && intelligenceHistory.length > 1 && <><div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}>History</div><ul className="list">{intelligenceHistory.slice(0, 10).map((entry) => <li className="list-item" key={entry.id}><div>{entry.score} · {scoreBandLabel(entry.scoreBand).text}{entry.intent && <span className="muted"> — Intent: {formatIntentLabel(entry.intent)}</span>}</div><div className="timeline-meta">{formatDate(entry.createdAt)}</div></li>)}</ul></>}</> }</section>
+            </div>
+            <aside className="lead-detail-aside">
+              <section className="card lead-detail-contact">
+                <h2>Contact</h2>
+                <dl className="kv">
+                  <dt>Username</dt><dd>{lead.username ? `@${lead.username.replace(/^@/, "")}` : "Unavailable"}</dd>
+                  <dt>Source</dt><dd>{formatLastContactVia(lead.lastEventType)}</dd>
+                  <dt>Last activity</dt><dd><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time></dd>
+                  <dt>First seen</dt><dd><time dateTime={lead.createdAt} title={new Date(lead.createdAt).toLocaleString()}>{formatRelativeTime(lead.createdAt)}</time></dd>
+                  <dt>Messaging window</dt><dd>{(() => { const window = formatMessagingWindow(lead.windowOpenUntil); return <StatusBadge tone={window.open ? "success" : "neutral"}>{window.label}</StatusBadge>; })()}</dd>
+                </dl>
+              </section>
+          <section className="card"><div className="button-row lead-intelligence-heading" style={{ justifyContent: "space-between", alignItems: "center" }}><h2 style={{ margin: 0 }}>Lead Intelligence</h2><button className="btn-secondary btn-small" disabled={recalculating} onClick={handleRecalculateIntelligence}>{recalculating ? "Recalculating…" : "Recalculate"}</button></div>{intelligenceError && <div className="banner banner-error" role="alert">{intelligenceError}</div>}{intelligence === undefined ? <p className="muted">Loading…</p> : intelligence === null ? <p className="muted">No intelligence yet — the AI hasn't learned enough about this lead to score it.</p> : <><div className="field-group"><div><div className="muted" style={{ fontSize: "0.85rem" }}>Lead Score</div><div style={{ fontSize: "1.8rem", fontWeight: 600 }}>{intelligence.score}<span className={scoreBandLabel(intelligence.scoreBand).className}>{scoreBandLabel(intelligence.scoreBand).text}</span></div></div></div><dl className="kv"><dt>Intent</dt><dd>{intelligence.intent ? formatIntentLabel(intelligence.intent) : "—"}</dd><dt>Need</dt><dd>{intelligence.need ?? "—"}</dd><dt>Budget</dt><dd>{intelligence.budgetValue !== null ? formatBudgetValue(intelligence.budgetValue) : (intelligence.budgetText ?? "—")}</dd><dt>Location</dt><dd>{intelligence.location ?? "—"}</dd></dl>{intelligence.scoreReasons.length > 0 && <><div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}>Score Reasons</div><ul className="list">{intelligence.scoreReasons.map((reason, i) => <li className="list-item" key={i} style={{ display: "block" }}>{reason}</li>)}</ul></>}{intelligenceHistory !== null && intelligenceHistory.length > 1 && <><div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.75rem" }}>History</div><ul className="list">{intelligenceHistory.slice(0, 10).map((entry) => <li className="list-item" key={entry.id}><div>{entry.score} · {scoreBandLabel(entry.scoreBand).text}{entry.intent && <span className="muted"> — Intent: {formatIntentLabel(entry.intent)}</span>}</div><div className="timeline-meta">{formatDate(entry.createdAt)}</div></li>)}</ul></>}</> }</section>
           <section className="card"><h2>Deals</h2>{deals === null ? <p className="muted">Loading…</p> : deals.length === 0 ? <p className="muted">No deals yet.</p> : <ul className="list">{deals.map((d) => <li className="list-item" key={d.id}><span>{d.value !== null ? `${d.currency} ${d.value}` : "No value set"}<span className={d.stage === "won" ? "pill pill-ok" : d.stage === "lost" ? "pill pill-error" : "pill"}>{d.stage}</span></span>{d.stage === "open" && <span className="button-row" style={{ marginBottom: 0 }}><button className="btn-secondary btn-small" onClick={() => handleDealStage(d.id, "won")}>Mark won</button><button className="btn-secondary btn-small" onClick={() => handleDealStage(d.id, "lost")}>Mark lost</button></span>}</li>)}</ul>}<div className="inline-form"><input type="text" aria-label="Deal value (optional)" placeholder="Deal value (optional)" value={dealValue} onChange={(e) => setDealValue(e.target.value)} /><button className="btn-secondary btn-small" disabled={savingDeal} onClick={handleCreateDeal}>Add deal</button></div></section>
+            </aside>
+          </div>
         </>}
-        {activeTab === "conversation" && <section className="card"><h2>Conversation</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["event", "reply"]} onError={setError} /></section>}
-        {activeTab === "activities" && <section className="card"><h2>Activities</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["activity"]} onError={setError} /></section>}
-        {activeTab === "notes" && <section className="card"><h2>Notes</h2>{notes === null ? <p className="muted">Loading…</p> : notes.length === 0 ? <p className="muted">No notes yet.</p> : <ul className="list">{notes.map((n) => <li className="list-item" key={n.id} style={{ display: "block" }}><div>{n.body}</div><div className="timeline-meta">{formatDate(n.createdAt)}</div></li>)}</ul>}<div className="inline-form"><textarea aria-label="Internal note" placeholder="Add an internal note…" value={noteBody} onChange={(e) => setNoteBody(e.target.value)} rows={2} /><button className="btn-secondary btn-small" disabled={savingNote || !noteBody.trim()} onClick={handleAddNote}>Add note</button></div></section>}
+        {activeTab === "conversation" && <section className="card lead-detail-timeline"><h2>Conversation</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["event", "reply"]} onError={setError} /></section>}
+        {activeTab === "activities" && <section className="card lead-detail-timeline"><h2>Activities</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["activity"]} onError={setError} /></section>}
+        {activeTab === "notes" && <section className="card lead-detail-timeline"><h2>Notes</h2>{notes === null ? <p className="muted">Loading…</p> : notes.length === 0 ? <p className="muted">No notes yet.</p> : <ul className="list">{notes.map((n) => <li className="list-item" key={n.id} style={{ display: "block" }}><div>{n.body}</div><div className="timeline-meta">{formatDate(n.createdAt)}</div></li>)}</ul>}<div className="inline-form"><textarea aria-label="Internal note" placeholder="Add an internal note…" value={noteBody} onChange={(e) => setNoteBody(e.target.value)} rows={2} /><button className="btn-secondary btn-small" disabled={savingNote || !noteBody.trim()} onClick={handleAddNote}>Add note</button></div></section>}
         </div>
       </>}
     </div>
