@@ -155,7 +155,16 @@ export function AnalyticsPanel({ tenantId, campaign }: { tenantId: string; campa
   const maxDropoff = Math.max(...dropoff.map((d) => d.advancedCount), 1);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 builder-results-panel">
+      <header className="builder-results-header">
+        <div>
+          <p className="overview-eyebrow">Automation performance</p>
+          <h2 className="m-0 text-lg font-semibold text-ink">Results for {campaign.name}</h2>
+          <p className="muted m-0 mt-1 max-w-3xl text-sm leading-5">
+            Matched-event totals come from this automation’s analytics. The activity timeline covers the last 30 days; lead stage counts are a current snapshot of leads still in active goals.
+          </p>
+        </div>
+      </header>
       <div className="stat-grid">
         <StatTile value={analytics.commentsMatched.toLocaleString()} label="Comments matched" />
         <StatTile value={analytics.messagesMatched.toLocaleString()} label="Messages matched" />
