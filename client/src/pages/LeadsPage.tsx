@@ -70,14 +70,14 @@ export function LeadsPage() {
   const leads = pageData?.items ?? null;
 
   return (
-    <div className="page page-wide page-leads">
-      <header className="leads-page-header">
+    <div className="page page-wide">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="section-eyebrow">PIPELINE</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Pipeline</p>
           <h1>Leads</h1>
-          <p className="page-description">Track people who have shown interest in your business through Instagram.</p>
+          <p className="m-0 max-w-2xl text-sm text-subtle">Track people who have shown interest in your business through Instagram.</p>
         </div>
-        {pageData && <div className="leads-total" aria-label={`${pageData.total} leads in this view`}><strong>{pageData.total}</strong><span>leads</span></div>}
+        {pageData && <div className="text-right" aria-label={`${pageData.total} leads in this view`}><strong className="block text-2xl font-semibold leading-none">{pageData.total}</strong><span className="text-xs text-subtle">leads</span></div>}
       </header>
 
       {error && (
@@ -89,24 +89,24 @@ export function LeadsPage() {
         </div>
       )}
 
-      <section className="card leads-workspace" aria-label="Lead pipeline">
-        <div className="leads-toolbar">
-          <div className="leads-filter-group">
+      <section className="card" aria-label="Lead pipeline">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
+          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
             <label className="sr-only" htmlFor="leads-stage-filter">Pipeline stage</label>
-            <select id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
+            <select className="!mt-0 w-auto min-w-[150px]" id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
               <option value="">All stages</option>
               {PIPELINE_STAGES.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
             <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
-            <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
+            <select className="!mt-0 w-auto min-w-[160px]" id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
               {HANDOFF_FILTERS.map((h) => (
                 <option key={h.value} value={h.value}>{h.label}</option>
               ))}
             </select>
           </div>
-          <label className="leads-search">
+          <label className="w-full sm:max-w-xs">
             <span className="sr-only">Search leads by username</span>
             <input
               id="leads-search"
@@ -122,14 +122,14 @@ export function LeadsPage() {
         {leads === null ? (
           <p className="muted" role="status">{error ? "Leads could not be loaded. Use Retry above." : "Loading…"}</p>
         ) : leads.length === 0 ? (
-          <div className="leads-empty">
-            <strong>No leads match this view.</strong>
-            <span>Try clearing a filter or searching for a different username.</span>
+          <div className="py-10 text-center">
+            <strong className="block">No leads match this view.</strong>
+            <span className="text-sm text-subtle">Try clearing a filter or searching for a different username.</span>
           </div>
         ) : (
           <>
-            <div className="leads-table-scroll" aria-label="Scrollable leads table">
-              <table className="table leads-data-table">
+            <div className="-mx-2 overflow-x-auto sm:mx-0" aria-label="Scrollable leads table">
+              <table className="table leads-data-table min-w-[980px]">
                 <thead>
                   <tr><th>Lead</th><th>Stage</th><th>Source</th><th>Activity</th><th>Owner</th><th>Handoff</th><th>Messaging</th></tr>
                 </thead>
@@ -140,20 +140,20 @@ export function LeadsPage() {
                     return (
                       <tr key={lead.id}>
                         <td>
-                          <Link className="lead-primary-link" to={`/dashboard/${tenantId}/leads/${lead.id}`}>
-                            {lead.unread && <span className="lead-unread-dot" aria-label="Unread" />}
-                            <span className="lead-identity">
+                          <Link className="inline-flex items-center gap-2 no-underline" to={`/dashboard/${tenantId}/leads/${lead.id}`}>
+                            {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+                            <span className="inline-flex min-w-0 flex-col">
                               <strong>{leadDisplayName(lead.username)}</strong>
-                              <small>{lead.username ? `@${lead.username.replace(/^@/, "")}` : "Instagram username unavailable"}</small>
+                              <small className="text-subtle">{lead.username ? `@${lead.username.replace(/^@/, "")}` : "Instagram username unavailable"}</small>
                             </span>
                           </Link>
                         </td>
                         <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
                         <td>{sourceLabel(lead.lastEventType)}</td>
                         <td>
-                          <span className="lead-activity">
+                          <span className="inline-flex max-w-[280px] flex-col align-top">
                             <time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time>
-                            {lead.lastMessagePreview && <small title={lead.lastMessagePreview}>{lead.lastMessagePreview}</small>}
+                            {lead.lastMessagePreview && <small className="truncate text-subtle" title={lead.lastMessagePreview}>{lead.lastMessagePreview}</small>}
                           </span>
                         </td>
                         <td>{lead.ownerUserId ? "Assigned" : "Unassigned"}</td>
