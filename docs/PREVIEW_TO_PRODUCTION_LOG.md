@@ -17,7 +17,7 @@ production. Pairs with the method in
 
 **Legend:** `[ ]` pending · `[x]` done in production · 🟡 = partially ported (note which parts).
 
-**Status:** 0 / 29 screen-features fully verified · 17 partially ported · Phase 0 (foundation, 2 items) now done · last updated 2026-10-15.
+**Status:** 1 / 29 screen-features fully verified · 17 partially ported · Phase 0 (foundation, 2 items) done · last updated 2026-10-15.
 
 **Current work:** `feat/preview-to-production-foundation` (PR #57) — Phase 0 foundation is now done; Phase 1 (Trust & correctness) is next. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes), Builder tab routing, the Setup readiness summary, Builder Results scope and mobile KPI strip, Builder Leads table, Integrations, Billing & usage and Team & access have implementation slices using live API data and shared production tokens/components. Automation names are standard route links now, enabling direct deep-link/browser checks of a real campaign. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization. **Gotcha for future shell work:** `client/src/styles/app-shell-phase2.css` governs sidebar width/padding/active-indicator via `aside[aria-label="Primary navigation"]` attribute selectors, which out-specificity plain Tailwind utility classes on that element — override there, not with a utility class, or the change silently loses.
 
@@ -30,7 +30,7 @@ production. Pairs with the method in
 
 ## Phase 1 — Trust & correctness
 
-- [ ] **Login** (`&screen=login`) → `/login` · `LoginPage.tsx` — method → email → 6-digit code
+- [x] **Login** (`&screen=login`) → `/login` · `LoginPage.tsx` — method → email → 6-digit code (PR #57, commit 8fd30c9). Layout/hierarchy/copy already matched the preview closely; the one real gap was a CSS bug — the global `button` reset in `index.css` sat outside any `@layer`, so (per cascade-layers rules) it unconditionally beat the SSO/email buttons' Tailwind `border`/`bg-card` utilities, leaving them borderless and non-hover-responsive app-wide on every plain `<button>` relying on utilities for border/background. Fixed by wrapping the reset in `@layer base`; swept dashboard/billing/automation/integrations/team live afterward with no regressions. Verified live: method/email-step/code-step, light+dark, 1440/390.
 - [ ] **Connection recovery** (`&screen=connect-error`) → `/connect` · `ConnectPage.tsx` — all recovery states
 - [ ] **Invitation recovery** (`&screen=invite`) → `/invite` · `InvitationAcceptPage.tsx` — all recovery states
 - [ ] **Integrations** (`&screen=integrations`) → `…/integrations` · `IntegrationsPage.tsx` — 🟡 production PageHeader/StatusBadge, clearer connected-account count/loading/empty states and mobile action wrapping; real connect/reconnect/disconnect handlers and account health remain authoritative; BUI post-deploy smoke test verified one connected healthy account, ID, WhatsApp and CRM placeholder states; responsive/theme/keyboard checks pending.
