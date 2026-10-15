@@ -17,9 +17,9 @@ production. Pairs with the method in
 
 **Legend:** `[ ]` pending · `[x]` done in production · 🟡 = partially ported (note which parts).
 
-**Status:** 0 / 29 screen-features fully verified · 7 partially ported · last updated 2026-10-15.
+**Status:** 0 / 29 screen-features fully verified · 11 partially ported · last updated 2026-10-15.
 
-**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active and intentionally remains deployed on `signalai-bui`. Overview, Inbox, Automations list, Analytics, Leads list and Team & access have implementation slices using live API data and shared production tokens/components. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. BUI and preview were inspected using the connected Opera browser this session; full multi-viewport/theme keyboard verification remains pending. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization.
+**Current work:** `feat/preview-to-production-foundation` — production Precision Operations implementation is active and intentionally remains deployed on `signalai-bui`. Overview, Inbox, Automations list, Analytics, Leads list, Lead Detail (Overview/Conversation/Activities/Notes) and Team & access have implementation slices using live API data and shared production tokens/components. The separate preview service remains on `feat/precision-operations-product-ui`. Do not tick a screen until its light/dark, 1440/1024/768/390, keyboard/focus, build and browser checks are all verified. BUI and preview were inspected using the connected Opera browser this session; full multi-viewport/theme keyboard verification remains pending. Lead Detail tabs were smoke-tested via `leadTab` URLs. The Team & access page describes explicit role guards from the server and calls out routes that currently use membership-only authorization.
 
 ---
 
@@ -41,11 +41,11 @@ production. Pairs with the method in
 
 - [ ] **Overview** (`&screen=overview`) → `/dashboard/:tenantId` · `DashboardPage.tsx` — 🟡 live-data layout ported and smoke-tested on BUI; responsive/theme/keyboard verification still pending.
 - [ ] **Inbox** (`&screen=inbox`) → `…/inbox` · `InboxPage.tsx` — 🟡 preview workspace proportions/tabs/list treatment ported; responsive/theme/keyboard verification still pending.
-- [ ] **Leads list** (`&screen=leads`) → `…/leads` · `LeadsPage.tsx` — 🟡 migrated toolbar and operational columns; BUI data/render smoke-tested through Opera; narrow viewport/theme/keyboard verification pending. — 🟡 migrated toolbar and operational columns; BUI data/render smoke-tested through Opera; narrow viewport/theme/keyboard verification pending.
-- [ ] **Lead detail — Overview** (`&screen=lead-detail&leadTab=Overview`) → `…/leads/:leadId` · `LeadDetailPage.tsx`
-- [ ] **Lead detail — Conversation**
-- [ ] **Lead detail — Activities**
-- [ ] **Lead detail — Notes**
+- [ ] **Leads list** (`&screen=leads`) → `…/leads` · `LeadsPage.tsx` — 🟡 migrated toolbar and operational columns; BUI data/render smoke-tested through Opera; narrow viewport/theme/keyboard verification pending.
+- [ ] **Lead detail — Overview** (`&screen=lead-detail&leadTab=Overview`) → `…/leads/:leadId` · `LeadDetailPage.tsx` — 🟡 two-column live-data layout, header/back link, status badge and contact summary; stage/owner/handoff, captured facts, intelligence and deals preserved; BUI smoke-tested on a real lead; viewport/theme/keyboard verification pending.
+- [ ] **Lead detail — Conversation** — 🟡 existing live ThreadPanel/API preserved; `leadTab=Conversation` URL state smoke-tested; keyboard interaction verification pending.
+- [ ] **Lead detail — Activities** — 🟡 existing activity ThreadPanel/API preserved; `leadTab=Activities` selects the correct tab and renders its empty state on BUI; keyboard interaction verification pending.
+- [ ] **Lead detail — Notes** — 🟡 existing live notes API and add-note form preserved; `leadTab=Notes` selects the correct tab and renders the real empty state on BUI; keyboard interaction verification pending.
 - [ ] **Automations list** (`&screen=automations`) → `…/automation` · `AutomationPage.tsx` / `JourneyTable(Paginated).tsx` — 🟡 production outcome guidance and table treatment aligned to preview; live automation behavior preserved; responsive/theme/keyboard verification still pending.
 
 ## Phase 3 — Flagship (own track)
@@ -60,7 +60,7 @@ production. Pairs with the method in
 - [ ] **Analytics — Activity** (`&screen=analytics&analyticsTab=Activity`) → `…/analytics` · `AnalyticsPage.tsx` — 🟡 preview-inspired activity tab, metric strip and definitions ported using current workspace-wide API data; preview-only time/account filters were not invented because the current API slice does not expose them; responsive/theme/keyboard verification still pending.
 - [ ] **Analytics — Conversion** · `LeadsByStageDonut.tsx` — 🟡 current pipeline progression/revenue view is ported; full preview parity and responsive/theme/keyboard verification remain.
 - [ ] **Content** (`&screen=content`) → `…/content` · `ContentPage.tsx`
-- [ ] **Team & access** (`&screen=team`) → `…/team` · `TeamPage.tsx` — 🟡 production header, primary invite action, semantic status badges and role table using current server-enforced controls; it explicitly notes where core routes use membership-only authorization instead of role-based restrictions; real member/invitation API remains authoritative; verify all themes/viewports and action states before marking complete. — 🟡 production header, primary invite action, semantic status badges and role permissions reference table aligned to preview; real member/invitation API remains authoritative; verify all themes/viewports and action states before marking complete.
+- [ ] **Team & access** (`&screen=team`) → `…/team` · `TeamPage.tsx` — 🟡 production header, primary invite action, semantic status badges and role table using current server-enforced controls; it explicitly notes where core routes use membership-only authorization instead of role-based restrictions; real member/invitation API remains authoritative; verify all themes/viewports and action states before marking complete.
 - [ ] **Settings — General** (`&screen=settings&settingsSection=General`) → `…/settings` · `SettingsPage.tsx`
 - [ ] **Settings — Lead fields**
 - [ ] **Settings — AI behavior**
