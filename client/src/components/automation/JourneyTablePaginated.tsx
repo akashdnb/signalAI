@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { BottomSheet } from "../BottomSheet";
 import { api, type Campaign, type TriggerSource } from "../../api";
 import { getCampaignsPage, type PaginatedResponse } from "../../api/pagination";
@@ -352,13 +353,12 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
                         onChange={() => toggleSelected(campaign.id)}
                       />
                       <div className="min-w-0 flex-1">
-                        <button
-                          type="button"
+                        <Link
+                          to={`/dashboard/${tenantId}/automation/journeys/${campaign.id}`}
                           className="block max-w-full text-left text-sm font-semibold text-ink underline-offset-2 hover:underline"
-                          onClick={() => onSelect(campaign.id)}
                         >
                           {campaign.name}
-                        </button>
+                        </Link>
                         <p className="muted m-0 mt-1 line-clamp-3 text-xs leading-4">
                           {campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}
                         </p>
@@ -391,7 +391,7 @@ export function JourneyTablePaginated({ tenantId, onSelect, onNewJourney, refres
             </div>
             <div className="hidden lg:block">
               <table className="w-full min-w-[820px] border-collapse"><thead><tr className="border-b border-line bg-canvas/40 text-left"><th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Select visible automations" className="h-4 w-4 shrink-0 cursor-pointer accent-[#7C3AED] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" checked={allVisibleSelected} onChange={toggleAllVisible} /></th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Name</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Starts when</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Status</th><th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Updated</th><th className="w-12 px-2 py-3" /></tr></thead><tbody>
-              {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} className={`border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"}`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><button type="button" className="block max-w-full text-left text-[15px] font-semibold leading-5 text-ink underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" onClick={() => onSelect(campaign.id)}>{campaign.name}</button><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><AutomationStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onDelete={() => { setDeleteCampaign(campaign); setDeleteError(null); }} canDeleteDraft={!campaign.enabled && campaign.published !== true} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
+              {campaigns.map((campaign) => { const selected = selectedIds.has(campaign.id); const updated = relativeUpdatedAt(campaign.updatedAt); return <tr key={campaign.id} className={`border-b border-line last:border-b-0 ${selected ? "bg-chip/55" : "hover:bg-chip/35"}`}><td className="px-4 py-3.5 align-middle"><input type="checkbox" aria-label={`Select ${campaign.name}`} checked={selected} onChange={() => toggleSelected(campaign.id)} onClick={(event) => event.stopPropagation()} /></td><td className="max-w-[460px] px-3 py-3.5 align-middle"><Link to={`/dashboard/${tenantId}/automation/journeys/${campaign.id}`} className="block max-w-full text-left text-[15px] font-semibold leading-5 text-ink underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{campaign.name}</Link><div className="muted mt-0.5 line-clamp-2 text-xs leading-4">{campaign.description?.trim() || `${triggerLabel(campaign.triggerSource)} · ${campaign.keywords.length} phrase${campaign.keywords.length === 1 ? "" : "s"}`}</div></td><td className="px-3 py-3.5 align-middle"><TriggerBadge campaign={campaign} /></td><td className="px-3 py-3.5"><AutomationStatusBadge campaign={campaign} /></td><td className="whitespace-nowrap px-3 py-3.5 text-sm text-subtle" title={updated.title}>{updated.label}</td><td className="px-2 py-3.5 text-right"><ActionMenu campaign={campaign} onOpen={() => onSelect(campaign.id)} onRename={() => setRenameCampaign(campaign)} onDelete={() => { setDeleteCampaign(campaign); setDeleteError(null); }} canDeleteDraft={!campaign.enabled && campaign.published !== true} onToggle={async () => { await api.setCampaignEnabled(campaign.tenantId, campaign.id, !campaign.enabled); setReloadToken((value) => value + 1); }} /></td></tr>; })}
             </tbody></table>
             </div>
             </>
