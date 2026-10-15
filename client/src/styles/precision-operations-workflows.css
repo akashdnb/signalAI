@@ -289,3 +289,58 @@
     line-height: 1.35;
   }
 }
+
+
+/* Integrations — make live connection state and recovery actions easy to scan. */
+.page-integrations .integration-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.page-integrations .integration-section-heading h2 {
+  margin-top: 0;
+}
+.page-integrations .integration-account-row {
+  align-items: flex-start;
+  gap: 1rem;
+  padding-block: 1rem;
+}
+.page-integrations .integration-account-row > span:first-child {
+  min-width: 0;
+}
+.page-integrations .integration-account-row code {
+  overflow-wrap: anywhere;
+}
+.page-integrations .integration-account-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.page-integrations .integration-empty-state {
+  padding: 1.5rem 0.25rem 0.5rem;
+}
+.page-integrations .integration-empty-state strong {
+  color: var(--text);
+}
+.page-integrations .integration-coming-soon-card {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .page-integrations .integration-section-heading {
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .page-integrations .integration-account-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .page-integrations .integration-account-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .page-integrations .integration-account-actions button {
+    min-height: 40px;
+  }
+}
