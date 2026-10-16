@@ -230,7 +230,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
      left join lateral (
        select username from lead_pii
        where lead_id = l.id and deleted_at is null and username is not null
-       order by created_at desc, id desc limit 1
+       order by created_at desc limit 1
      ) p on true
      left join lateral (
        select occurred_at as last_dm_at from lead_events
