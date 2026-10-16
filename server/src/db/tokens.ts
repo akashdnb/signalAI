@@ -145,6 +145,26 @@ export async function getSoleConnectedAccount(
   return { instagramAccountId: result.rows[0]!.instagram_account_id };
 }
 
+/**
+ * Resolve a client-visible connected-account row ID to its provider account ID.
+ * Membership routes are already tenant-authenticated; this extra lookup makes
+ * account filters safe against forged UUIDs belonging to a different workspace.
+ */
+export async function resolveInstagramAccountIdForTenant(
+  pool: Pool,
+  tenantId: string,
+  accountRowId: string,
+): Promise<string | null> {
+  const result = await pool.query<{ instagram_account_id: string }>(
+    `select instagram_account_id
+       from meta_tokens
+      where id = $1 and tenant_id = $2
+      limit 1`,
+    [accountRowId, tenantId],
+  );
+  return result.rows[0]?.instagram_account_id ?? null;
+}
+
 export interface AccountHealth {
   instagramAccountId: string;
   status: "healthy" | "error";
