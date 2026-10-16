@@ -569,6 +569,8 @@ export function AppShell() {
 
   async function reloadConnectedAccounts(): Promise<void> {
     if (!tenantId) return;
+    setConnectedAccounts(null);
+    setAccountError(null);
     try {
       const next = await workspaceApi.listConnectedAccounts(tenantId);
       setConnectedAccounts(next);
