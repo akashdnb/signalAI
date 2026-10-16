@@ -6,6 +6,7 @@ import { getLeadTimelinePage, decodeTimelineCursor } from "../db/leadTimeline.js
 import type { Campaign, CampaignLanguage, CampaignTone, ReplyChannel, ReplyMode, TriggerSource } from "../db/campaigns.js";
 import type { KnowledgeBaseDocument, KnowledgeBaseDocumentStatus } from "../db/knowledgeBase.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
+import { resolveInstagramAccountIdForTenant } from "../db/tokens.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -111,15 +112,23 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   const { stage, ownerUserId, q, tagId, handoffStatus, unread } = query;
   if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
   if (handoffStatus !== undefined && !VALID_HANDOFF_STATUSES.includes(handoffStatus as HandoffStatus)) return res.status(400).json({ error: `handoffStatus must be one of ${VALID_HANDOFF_STATUSES.join(", ")}` });
+  const pool = getPool();
+  const requestedAccountRowId = typeof query.accountId === "string" && query.accountId ? query.accountId : undefined;
+  const providerAccountId = requestedAccountRowId
+    ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
+    : undefined;
+  if (requestedAccountRowId && !providerAccountId) {
+    return res.status(404).json({ error: "Instagram account not found for this workspace" });
+  }
   const conditions = ["l.tenant_id = $1"];
   const params: unknown[] = [tenantId];
+  if (providerAccountId) { params.push(providerAccountId); conditions.push(`l.instagram_account_id = ${params.length}`); }
   if (stage) { params.push(stage); conditions.push(`l.pipeline_stage = $${params.length}`); }
   if (typeof ownerUserId === "string" && ownerUserId) { params.push(ownerUserId); conditions.push(`l.owner_user_id = $${params.length}`); }
   if (typeof tagId === "string" && tagId) { params.push(tagId); conditions.push(`exists (select 1 from lead_tags lt where lt.lead_id = l.id and lt.tag_id = $${params.length})`); }
   if (typeof q === "string" && q.trim()) { params.push(`%${q.trim()}%`); conditions.push(`exists (select 1 from lead_pii p2 where p2.lead_id = l.id and p2.deleted_at is null and p2.username ilike $${params.length})`); }
   if (handoffStatus) { params.push(handoffStatus); conditions.push(`l.handoff_status = $${params.length}`); }
   if (unread === "true") conditions.push(`l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)`);
-  const pool = getPool();
   const where = conditions.join(" and ");
   const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from leads l where ${where}`, params);
   const total = Number(countResult.rows[0]?.count ?? 0);
