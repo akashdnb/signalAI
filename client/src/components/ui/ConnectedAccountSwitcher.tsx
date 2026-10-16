@@ -25,6 +25,7 @@ export type ConnectedAccountSwitcherProps = {
   showAccountSelector?: boolean;
   accountsLoading?: boolean;
   accountError?: string | null;
+  onReloadAccounts?: () => void;
 };
 type Workspace = { id: string; name: string; description: string; initials: string };
 const WORKSPACES: Workspace[] = [
@@ -155,6 +156,7 @@ function ProductWorkspaceSwitcher({
   showAccountSelector = false,
   accountsLoading = false,
   accountError,
+  onReloadAccounts,
 }: ConnectedAccountSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [createMode, setCreateMode] = useState(false);
@@ -345,7 +347,10 @@ function ProductWorkspaceSwitcher({
             </select>
           </label>
           {accountError ? (
-            <span title={accountError} className="text-xs text-err-ink" role="status">Unavailable</span>
+            <span className="flex items-center gap-1.5">
+              <span title={accountError} className="text-xs text-err-ink" role="status">Unavailable</span>
+              {onReloadAccounts && <button type="button" className="whitespace-nowrap text-xs font-semibold text-accent underline" onClick={onReloadAccounts}>Retry</button>}
+            </span>
           ) : accounts.length === 0 && !accountsLoading ? (
             <button type="button" className="whitespace-nowrap text-xs font-semibold text-accent" onClick={onManageAccounts}>Connect account</button>
           ) : null}
