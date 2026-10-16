@@ -60,9 +60,9 @@ export function ConnectedAccountSwitcher({
 
   // The precision-operations preview deliberately uses isolated sample data.
   // Keep it behind an explicit previewOnly prop; production uses server results.
-  const selectedPreviewWorkspace = WORKSPACES.find(workspace => workspace.id === new URLSearchParams(window.location.search).get("workspace")) ?? WORKSPACES[0]!;
+  const selectedPreviewWorkspace = previewOnly ? (WORKSPACES.find(workspace => workspace.id === new URLSearchParams(window.location.search).get("workspace")) ?? WORKSPACES[0]!) : null;
   const selectedRealWorkspace = workspaces.find(workspace => workspace.tenantId === currentWorkspaceId);
-  const selectedName = realMode ? (selectedRealWorkspace?.name ?? workspaceName) : (selectedPreviewWorkspace.name || workspaceName);
+  const selectedName = realMode ? (selectedRealWorkspace?.name ?? workspaceName) : (selectedPreviewWorkspace?.name ?? workspaceName);
   const selectedRole = realMode ? (currentRole ?? selectedRealWorkspace?.role) : undefined;
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export function ConnectedAccountSwitcher({
   }, [open]);
 
   const selectPreviewWorkspace = (workspace: Workspace) => {
-    updatePreviewQuery({ workspace: workspace.id });
+    if (previewOnly) updatePreviewQuery({ workspace: workspace.id });
     setOpen(false);
     window.requestAnimationFrame(() => triggerRef.current?.focus());
   };
@@ -179,12 +179,13 @@ export function ConnectedAccountSwitcher({
             <div className="sai-account-switcher__accounts">
               <div className="sai-account-switcher__accounts-heading"><strong>{providerLabel}</strong><button type="button" onClick={() => { setOpen(false); onManageAccounts?.(); }}>Manage</button></div>
               {accounts.length === 0 ? <p className="sai-account-switcher__message">No Instagram accounts are connected to this workspace.</p> : (
-                <label className="sai-account-switcher__account-select"><span>Current account</span><select aria-label="Current Instagram account" value={selectedAccountId || "all"} onChange={event => onSelect(event.target.value)}><option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs attention" : ""}</option>)}</select></label>
+                <label className="sai-account-switcher__account-select"><span>Current account context</span><select aria-label="Current Instagram account context" value={selectedAccountId || "all"} onChange={event => onSelect(event.target.value)}><option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs attention" : ""}</option>)}</select></label>
               )}
+              <p className="sai-account-switcher__message">This selects the account context in the shell. Account-level filtering is shown only where the page supports it.</p>
               {currentRole === "member" && <p className="sai-account-switcher__message">Your role allows viewing accounts. Workspace admins manage connections.</p>}
             </div>
           )}
-          {!realMode && <div className="sai-account-switcher__preview-account-hint">{providerIcon} {providerLabel} accounts here are example data.</div>}
+          {previewOnly && !realMode && <div className="sai-account-switcher__preview-account-hint">{providerIcon} {providerLabel} accounts here are example data.</div>}
         </div>
       )}
     </div>
