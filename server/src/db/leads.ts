@@ -489,7 +489,7 @@ export async function listLeadsForTenant(
   }
   if (filters.instagramAccountId) {
     params.push(filters.instagramAccountId);
-    conditions.push(`l.instagram_account_id = ${params.length}`);
+    conditions.push(`l.instagram_account_id = $${params.length}`);
   }
 
   params.push(limit);
