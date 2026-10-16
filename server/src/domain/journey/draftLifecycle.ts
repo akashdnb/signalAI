@@ -126,7 +126,25 @@ export async function updateJourneyDraftWithClient(
     updatedAt: Date;
     mcp_metadata: Record<string, unknown>;
     published: boolean;
-  }>(  const row = found.rows[0];
+  >(
+    `select c.id, c.tenant_id as "tenantId", c.name, c.description, c.keywords,
+            c.enabled, c.reply_mode as "replyMode", c.reply_templates as "replyTemplates",
+            c.default_reply_template as "defaultReplyTemplate", c.cta_link as "ctaLink",
+            c.target_media_ids as "targetMediaIds", c.reply_channel as "replyChannel",
+            c.trigger_source as "triggerSource", c.tone, c.language,
+            c.use_knowledge_base as "useKnowledgeBase", c.created_at as "createdAt",
+            c.updated_at as "updatedAt", c.builder_version,
+            c.mcp_metadata,
+            exists (
+              select 1 from campaign_journey_versions v
+               where v.tenant_id = c.tenant_id and v.campaign_id = c.id
+            ) as published
+       from campaigns c
+       where c.id = $1 and c.tenant_id = $2
+       for update`,
+    [automationId, tenantId],
+  );
+  const row = found.rows[0];
   if (!row) throw new DraftLifecycleError("resource_not_found", "Automation not found in this workspace.");
   if (row.enabled || row.published) {
     throw new DraftLifecycleError("invalid_lifecycle_state", "Only inactive, unpublished drafts can be edited.");
