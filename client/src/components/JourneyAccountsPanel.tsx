@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { workspaceApi, type ConnectedInstagramAccount, type JourneyAccountBinding } from "../api/workspace";
+import { useTenant } from "../context/TenantContext";
 
 export type JourneyAccountReadiness = {
   status: "loading" | "ready" | "error";
@@ -88,6 +89,16 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
       </div>
 
       {error && <div className="banner banner-error mt-3" role="alert">{error}</div>}
+      {workspaceRole === null && (
+        <div className="banner banner-error mt-3" role={workspaceError ? "alert" : "status"}>
+          {workspaceError ? "Workspace access could not be verified. Account assignments are read-only until access can be checked." : "Checking workspace permissions…"}
+        </div>
+      )}
+      {workspaceRole !== null && !canManageAccounts && (
+        <div className="banner mt-3" role="status">
+          You can view which accounts use this journey. Only workspace owners and admins can change account assignments.
+        </div>
+      )}
 
       {loading ? (
         <p className="muted small">Loading accounts…</p>
@@ -115,9 +126,9 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
                   type="button"
                   className={bound ? "btn-primary btn-small" : "btn-secondary btn-small"}
                   onClick={() => void toggle(account)}
-                  disabled={!healthy || savingId === account.id}
+                  disabled={!healthy || !canManageAccounts || workspaceRole === null || savingId === account.id}
                   aria-pressed={bound}
-                  title={healthy ? undefined : "Reconnect this Instagram account before assigning it to a journey"}
+                  title={!healthy ? "Reconnect this Instagram account before assigning it to a journey" : !canManageAccounts ? "Only workspace owners and admins can change journey account assignments" : undefined}
                 >
                   {savingId === account.id
                     ? "Saving…"
