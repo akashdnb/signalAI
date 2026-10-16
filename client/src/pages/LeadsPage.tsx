@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStage, type TenantMember } from "../api";
+import { ApiError, type HandoffStatus, type LeadListItem, type PipelineStage } from "../api";
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
 import { PIPELINE_STAGES, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
@@ -19,8 +19,6 @@ export function LeadsPage() {
   const navigate = useNavigate();
 
   const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
-  const [members, setMembers] = useState<TenantMember[] | null>(null);
-  const [membersError, setMembersError] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
   const [handoffFilter, setHandoffFilter] = useState<HandoffStatus | "">("");
   const [search, setSearch] = useState("");
@@ -31,24 +29,6 @@ export function LeadsPage() {
   useEffect(() => {
     setPage(1);
   }, [stageFilter, handoffFilter, search]);
-
-  useEffect(() => {
-    if (!tenantId) return;
-    let cancelled = false;
-    api.listMembers(tenantId).then((result) => {
-      if (cancelled) return;
-      setMembers(result);
-      setMembersError(null);
-    }).catch((err) => {
-      if (cancelled) return;
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        navigate("/login", { replace: true });
-        return;
-      }
-      setMembersError(err instanceof Error ? err.message : "Owner details are unavailable.");
-    });
-    return () => { cancelled = true; };
-  }, [tenantId, navigate]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -130,7 +110,7 @@ export function LeadsPage() {
           <>
             <div className="-mx-2 overflow-x-auto sm:mx-0" aria-label="Scrollable leads table">
               <table className="table leads-data-table min-w-[980px]">
-                <thead><tr><th>Lead</th><th>Stage</th><th>Handoff</th><th>Owner</th><th>Last activity</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
+                <thead><tr><th>Username</th><th>Stage</th><th>Handoff</th><th>Last contact</th><th>Via</th><th>Messaging window</th><th>First seen</th></tr></thead>
                 <tbody>
                   {leads.map((lead) => {
                     const messagingWindow = formatMessagingWindow(lead.windowOpenUntil);
@@ -146,22 +126,7 @@ export function LeadsPage() {
                           </Link>
                         </td>
                         <td>{PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage)?.label ?? lead.pipelineStage}</td>
-                        <td>
-                          <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span>
-                          {lead.handoffStatus === "requested" && !lead.ownerUserId && (
-                            <span className="block muted small mt-1">Unassigned handoff</span>
-                          )}
-                        </td>
-                        <td className="max-w-[14rem]">
-                          {lead.ownerUserId
-                            ? (members?.find((member) => member.userId === lead.ownerUserId)?.email ?? (membersError ? "Owner details unavailable" : "Assigned teammate"))
-                            : "Unassigned"}
-                          {lead.handoffStatus === "requested" && (
-                            <Link className="link-button block mt-1" to={`/dashboard/${tenantId}/leads/${lead.id}`}>
-                              {lead.ownerUserId ? "Review handoff" : "Assign / review"}
-                            </Link>
-                          )}
-                        </td>
+                        <td><span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>{handoffLabel(lead.handoffStatus).text}</span></td>
                         <td><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "—"}</time></td>
                         <td>{formatLastContactVia(lead.lastEventType)}</td>
                         <td>
@@ -176,11 +141,6 @@ export function LeadsPage() {
                 </tbody>
               </table>
             </div>
-            {pageData && (
-              <p className="muted small mt-3" role="status">
-                Showing {pageData.items.length} of {pageData.total.toLocaleString()} leads{stageFilter || handoffFilter || search.trim() ? " matching the current filters" : ""}.
-              </p>
-            )}
             {pageData && (
               <Pagination
                 page={pageData.page}

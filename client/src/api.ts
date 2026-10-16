@@ -506,8 +506,6 @@ export interface FunnelStage {
 
 export interface Funnel {
   stages: FunnelStage[];
-  stageCounts: Record<PipelineStage, number>;
-  unmappedLeadCount: number;
   openWithNoOutcome: number;
 }
 

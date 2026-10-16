@@ -100,12 +100,7 @@ export function IntegrationsPage() {
         </button>
       </div>
 
-      {error && (
-        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
-          <span>{error}</span>
-          {accounts === null && <button type="button" className="link-button" onClick={() => void loadAccounts()}>Retry loading accounts</button>}
-        </div>
-      )}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">
@@ -144,7 +139,7 @@ export function IntegrationsPage() {
                       <span className="banner banner-error small mt-2" style={{ display: "block" }}>{account.lastError}</span>
                     )}
                     {account.status === "error" && (
-                      <p className="muted small mt-2 mb-0">Automatic replies for journeys assigned to this account are paused while the connection is unhealthy. Reconnect to restore the connection, then verify the account status here.</p>
+                      <p className="muted small mt-2 mb-0">Reconnect this Instagram account to refresh its credential and restore its journey assignments.</p>
                     )}
                   </span>
                 </span>

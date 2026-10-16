@@ -182,14 +182,9 @@ export function ContentPage() {
                   </div>
                 )}
                 <div className="p-3">
-                  <p className="m-0 line-clamp-2 min-h-[2.5em] break-words text-sm text-ink" title={m.caption ?? undefined}>
+                  <p className="m-0 line-clamp-2 min-h-[2.5em] text-sm text-ink">
                     {m.caption ? m.caption.split("\n")[0] : <span className="text-subtle">No caption</span>}
                   </p>
-                  {!m.caption && (
-                    <p className="m-0 mt-1 break-all text-xs text-subtle">
-                      {TYPE_LABEL[m.mediaType ?? ""] ?? "Instagram post"} · Media ID: {m.mediaId}
-                    </p>
-                  )}
                   <div className="mt-2 flex items-center justify-between text-xs text-subtle">
                     <span className="pill" style={{ marginLeft: 0 }}>
                       {m.commentCount} comment{m.commentCount === 1 ? "" : "s"}
