@@ -366,7 +366,7 @@ async function validateDraft(client: PoolClient, tenantId: string, input: Record
   assertAllowedKeys(input, ["automation_id", "nodes", "edges", "expected_version"]);
   const automationId = input.automation_id === undefined ? undefined : requireString(input.automation_id, "automation_id");
   let graph: BuilderGraph;
-  let milestones = [];
+  let milestones: Awaited<ReturnType<typeof listMilestonesWithClient>> = [];
   if (automationId) {
     const found = await client.query("select id from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId]);
     if (!found.rowCount) throw new ResourceNotFoundError();
@@ -395,7 +395,6 @@ async function validateDraft(client: PoolClient, tenantId: string, input: Record
     note: "Validation does not publish or activate this draft.",
   };
 }
-
 function normalizeNodes(value: unknown): JourneyNode[] {
   if (!Array.isArray(value) || value.length > 500) throw new CapabilityInputError("nodes must be an array of at most 500 nodes.");
   return value.map((item, i) => {
