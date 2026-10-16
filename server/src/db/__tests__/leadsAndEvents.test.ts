@@ -137,4 +137,18 @@ describe("leads and events", () => {
     );
   });
 
+  it("rejects associating a lead with an Instagram account owned by another workspace", async () => {
+    const pool = getPool();
+    const tenantA = await createTenant(pool, "creator-a");
+    const tenantB = await createTenant(pool, "creator-b");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, { tenantId: tenantB.id, instagramAccountId: "acct-foreign", accessToken: "unused" });
+
+    await expect(
+      findOrCreateLeadByInstagramUserId(pool, tenantA.id, "instagram-user", "acct-foreign"),
+    ).rejects.toThrow("Instagram account does not belong to this workspace");
+    const leads = await pool.query("select id from leads where tenant_id = $1", [tenantA.id]);
+    expect(leads.rows).toHaveLength(0);
+  });
+
 });
