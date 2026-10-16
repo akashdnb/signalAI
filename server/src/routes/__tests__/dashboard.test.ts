@@ -773,6 +773,12 @@ describe("dashboard routes (BUI backend surface)", () => {
       eventType: "comment", occurredAt: new Date("2026-10-10T11:00:00Z"), sequence: 1,
       attributes: { mediaId: "shared-post-id", instagramAccountId: "analytics-acct-b", matchedKeyword: "real-estate" },
     });
+    // A corrupted/mis-attributed event must not leak into either account's analytics when its account conflicts with the owning lead.
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id, leadId: leadA.id, metaEventId: "analytics-misaccounted-comment",
+      eventType: "comment", occurredAt: new Date("2026-10-10T12:00:00Z"), sequence: 2,
+      attributes: { mediaId: "wrong-account-post", instagramAccountId: "analytics-acct-b", matchedKeyword: "misattributed" },
+    });
     await pool.query(
       "insert into account_sends (tenant_id, instagram_account_id) values ($1, $2), ($1, $3)",
       [tenant.id, "analytics-acct-a", "analytics-acct-b"],
