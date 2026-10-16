@@ -4,6 +4,7 @@ import { getPool, closePool } from "../../db/pool.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { sendTelegramAlert } from "../../lib/telegram.js";
 import { sendAlertEmail } from "../../lib/resend.js";
+import { NOTIFICATION_DELIVERY_QUEUE } from "../../notifications/service.js";
 import { createTenantForUser } from "../../db/tenants.js";
 import { findOrCreateUserByEmail } from "../../db/users.js";
 import { ensureAlertsQueue, enqueueNewLeadAlert, startAlertsWorker, ALERTS_QUEUE } from "../alertsQueue.js";
@@ -35,7 +36,7 @@ describe("alertsQueue worker", () => {
     // webhookIngestService.newLead.test.ts (which enqueues but never
     // consumes, by design) would otherwise be the first thing this
     // file's worker picks up, not the job this test itself enqueues.
-    await getPool().query("delete from pgboss.job where name = $1", [ALERTS_QUEUE]);
+    await getPool().query("delete from pgboss.job where name = any($1::text[])", [[ALERTS_QUEUE, NOTIFICATION_DELIVERY_QUEUE]]);
   });
 
   afterEach(async () => {
@@ -62,7 +63,7 @@ describe("alertsQueue worker", () => {
     expect(text).toContain("lead-1");
   }, 15000);
 
-  it("also emails the tenant owner (Phase 2A), no PII beyond the dashboard link", async () => {
+  it("records a tenant-scoped in-app event instead of sending an untracked owner email", async () => {
     const owner = await findOrCreateUserByEmail(getPool(), "owner@example.com");
     const tenant = await createTenantForUser(getPool(), "creator-a", owner.id);
 
@@ -74,13 +75,12 @@ describe("alertsQueue worker", () => {
       await sleep(500);
     }
 
-    expect(sendAlertEmail).toHaveBeenCalledTimes(1);
-    const [to, subject, html] = vi.mocked(sendAlertEmail).mock.calls[0]!;
-    expect(to).toBe("owner@example.com");
-    expect(subject).toContain("lead");
-    expect(html).toContain(tenant.id);
-    expect(html).toContain("lead-1");
-    expect(html).not.toContain("owner@example.com"); // link only, never PII in the alert body
+    expect(sendAlertEmail).not.toHaveBeenCalled();
+    const notification = await getPool().query(
+      "select n.event_type, n.tenant_id, n.user_id, n.entity_id from notifications n join users u on u.id = n.user_id where n.tenant_id = $1 and u.email = $2",
+      [tenant.id, "owner@example.com"],
+    );
+    expect(notification.rows).toMatchObject([{ event_type: "lead.created", tenant_id: tenant.id, entity_id: "lead-1" }]);
   }, 15000);
 
   it("skips the email but still succeeds when the tenant/owner can't be resolved (e.g. a synthetic tenantId in a test)", async () => {

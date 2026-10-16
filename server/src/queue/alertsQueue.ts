@@ -2,9 +2,7 @@ import type { PgBoss } from "pg-boss";
 import type { Pool, PoolClient } from "pg";
 import { config } from "../config.js";
 import { sendTelegramAlert } from "../lib/telegram.js";
-import { sendAlertEmail } from "../lib/resend.js";
-import { getTenant } from "../db/tenants.js";
-import { getUserById } from "../db/users.js";
+import { publishNotificationEvent } from "../notifications/service.js";
 import { asPgBossDb } from "./leadEventsQueue.js";
 import { FAST_POLL, ensureNotifyQueue } from "./boss.js";
 
@@ -57,14 +55,9 @@ export async function enqueueNewLeadAlert(
  * username would still sit in the alert history (and, for the
  * unconfigured path, in stdout).
  *
- * Phase 2A "Email Alerts (Resend)": a second channel alongside Telegram,
- * not a replacement — Phase 1's own note said "one channel only in Phase
- * 1; email alerts follow in Phase 2A alongside the CRM." Sent to the
- * tenant's owner (tenants.owner_user_id), the only real notification
- * target that exists before Phase 6 adds real teams. Both sends are
- * best-effort and independent — a failed email never blocks the Telegram
- * alert or vice versa (see sendAlertEmail/sendTelegramAlert, neither of
- * which throws).
+ * Product notification delivery is handled through the persisted event and
+ * preference system. The global Telegram message remains an operational
+ * alert; user-facing channels follow each member's own workspace preference.
  */
 export function startAlertsWorker(boss: PgBoss, pool: Pool): Promise<string> {
   return boss.work<NewLeadAlertJob>(ALERTS_QUEUE, FAST_POLL, async (jobs) => {
@@ -73,23 +66,29 @@ export function startAlertsWorker(boss: PgBoss, pool: Pool): Promise<string> {
         const link = `${config.appBaseUrl}/tenants/${job.data.tenantId}/leads/${job.data.leadId}`;
         await sendTelegramAlert(`👋 New lead: ${link}`);
 
-        // Best-effort, same as the Telegram send above — a lookup failure
-        // here (or, in tests, a synthetic tenantId that isn't a real row)
-        // must not fail the job or block the Telegram alert that already
-        // succeeded.
+        // Fan out the real product event through persisted preferences and a
+        // durable delivery ledger. The idempotency key is stable for this
+        // lead event, so queue retries cannot create duplicate in-app alerts.
         try {
-          const tenant = await getTenant(pool, job.data.tenantId);
-          const owner = tenant?.ownerUserId ? await getUserById(pool, tenant.ownerUserId) : null;
-          if (owner) {
-            await sendAlertEmail(
-              owner.email,
-              "New lead on signalAI",
-              `<p>You have a new lead.</p><p><a href="${link}">View it in your dashboard</a></p>`,
-            );
-          }
+          await publishNotificationEvent(pool, boss, {
+            tenantId: job.data.tenantId,
+            eventType: "lead.created",
+            idempotencyKey: `lead:${job.data.leadId}:created`,
+            title: "New lead",
+            message: "A new lead was added from an Instagram conversation.",
+            entityType: "lead",
+            entityId: job.data.leadId,
+          });
         } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error("[alerts] email alert lookup/send failed:", err instanceof Error ? err.message : String(err));
+          // Keep provider/database details out of logs while retaining a useful event marker.
+          // The publisher only resolves after its persistence transaction commits.
+          console.error(JSON.stringify({
+            event: "notification.fanout",
+            eventType: "lead.created",
+            workspaceId: job.data.tenantId,
+            result: "failed",
+            errorCode: "notification_persistence_failed",
+          }));
         }
       }
     }
