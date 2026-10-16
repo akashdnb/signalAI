@@ -11,7 +11,7 @@ import {
   type TenantSummary,
   type UsageSummary,
 } from "../api";
-import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole, type WorkspaceSummary } from "../api/workspace";
+import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceSummary } from "../api/workspace";
 import { BottomSheet } from "./BottomSheet";
 import { ConnectedAccountSwitcher, type ConnectedAccountSwitcherOption } from "./ui/ConnectedAccountSwitcher";
 import { NotificationBell } from "./NotificationBell";
