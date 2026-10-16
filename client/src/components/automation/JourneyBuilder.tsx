@@ -204,9 +204,22 @@ export function JourneyBuilder({
   }
 
   async function saveAndContinue() {
+    if (detailsDirty) {
+      if (subTab === "details") {
+        const detailsSaved = await detailsRef.current?.save();
+        if (!detailsSaved) {
+          setUnsavedDialogError("Couldn't save Setup changes. Your edits are still here.");
+          return;
+        }
+      } else {
+        setUnsavedDialogError("Save or discard the unsaved Setup changes on the Setup tab before continuing.");
+        return;
+      }
+    }
+
     const saved = await saveCanvasDraft();
-    if (!saved) {
-      setUnsavedDialogError("Couldn't save this automation. Your changes are still here; please try again.");
+    if (!saved && journeyDirty) {
+      setUnsavedDialogError("Couldn't save this journey. Your graph changes are still here; please try again.");
       return;
     }
 
@@ -218,6 +231,14 @@ export function JourneyBuilder({
   }
 
   async function discardAndContinue() {
+    if (detailsDirty) {
+      if (subTab === "details") {
+        detailsRef.current?.discard();
+      } else {
+        setUnsavedDialogError("Open Setup and discard its unsaved changes before continuing.");
+        return;
+      }
+    }
     canvasActionsRef.current?.discardDraft();
     setMilestonesState(savedMilestonesRef.current);
     setMilestonesDirty(false);
@@ -1109,7 +1130,9 @@ export function JourneyBuilder({
           onClose={keepEditing}
         >
           <p className="m-0 text-sm text-ink">
-            You have unsaved automation changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
+            {detailsDirty
+              ? "You have unsaved automation changes. The graph and Setup settings use separate save controls; finish both before leaving."
+              : "You have unsaved flow or goal changes. Save or discard them before continuing."}
           </p>
           {unsavedDialogError && (
             <div className="banner banner-error mt-3">{unsavedDialogError}</div>
