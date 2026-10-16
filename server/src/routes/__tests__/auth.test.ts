@@ -99,6 +99,18 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     expect(res.status).toBe(401);
   });
 
+  it("connect-link requires instagram:connect — members cannot start account linking", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const member = await findOrCreateUserByEmail(pool, "member@example.com");
+    await pool.query("insert into tenant_members (tenant_id, user_id, role) values ($1, $2, 'member')", [tenant.id, member.id]);
+    const memberAuth = await sessionHeaderFor(pool, SESSION_SECRET_FOR_TESTS, member.id);
+
+    const res = await request(createApp()).post(`/tenants/${tenant.id}/instagram/connect-link`).set(memberAuth);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("insufficient tenant permission");
+  });
   it("connect-link requires the caller to be a member of tenantId — 403 for a real tenant the session isn't a member of", async () => {
     const pool = getPool();
     const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
@@ -108,6 +120,8 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     const res = await request(app).post(`/tenants/${tenant.id}/instagram/connect-link`).set(otherAuthHeader);
     expect(res.status).toBe(403);
   });
+
+
 
 
   it("connect-link denies regular workspace members even when they have a valid session", async () => {
