@@ -356,6 +356,9 @@ function AccountHeader({
  */
 export function AppShell() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const tenantRequestIdRef = useRef(0);
   const navigate = useNavigate();
   const location = useLocation();
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
@@ -481,7 +484,7 @@ export function AppShell() {
   }
 
   async function reloadConnectedAccounts(): Promise<void> {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
     const requestedTenantId = tenantId;
     const requestId = ++connectedAccountsRequestIdRef.current;
     setConnectedAccountsTenantId(requestedTenantId);
@@ -489,11 +492,11 @@ export function AppShell() {
     setAccountError(null);
     try {
       const available = await workspaceApi.listConnectedAccounts(requestedTenantId);
-      if (requestId !== connectedAccountsRequestIdRef.current) return;
+      if (requestId !== connectedAccountsRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
       setConnectedAccounts(available);
       setAccountError(null);
     } catch (err) {
-      if (requestId !== connectedAccountsRequestIdRef.current) return;
+      if (requestId !== connectedAccountsRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
         clearSession();
@@ -505,7 +508,7 @@ export function AppShell() {
   }
 
   function handleSelectAccount(accountId: string | null) {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
     const key = "signalai.account-context:" + tenantId;
     if (!accountId) {
       localStorage.removeItem(key);
@@ -523,12 +526,16 @@ export function AppShell() {
   }
 
   function handleManageAccounts() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
     setMobileAccountOpen(false);
     navigate(`/dashboard/${tenantId}/integrations`);
   }
 
   useEffect(() => {
+    setAccount(null);
+    setUsage(null);
+    setBilling(null);
+    setUnreadCount(0);
     if (sessionValid) {
       void reloadWorkspaces();
       void reloadConnectedAccounts();
@@ -558,17 +565,21 @@ export function AppShell() {
   }, [tenantId, connectedAccounts, connectedAccountsTenantId]);
 
   async function reloadTenant() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++tenantRequestIdRef.current;
     try {
-      const t = await api.getTenant(tenantId);
+      const t = await api.getTenant(requestedTenantId);
+      if (requestId !== tenantRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
       setTenant(t);
       setTenantError(null);
       setAccessDenied(false);
       const activeSession = loadSession();
-      if (activeSession && activeSession.tenantId !== tenantId) {
-        saveSession({ ...activeSession, tenantId });
+      if (activeSession && activeSession.tenantId !== requestedTenantId) {
+        saveSession({ ...activeSession, tenantId: requestedTenantId });
       }
     } catch (err) {
+      if (requestId !== tenantRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
         navigate("/login", { replace: true });
@@ -586,7 +597,17 @@ export function AppShell() {
   }
 
   useEffect(() => {
-    if (sessionValid) reloadTenant();
+    setTenant(null);
+    setTenantError(null);
+    setAccessDenied(false);
+    if (sessionValid) {
+      void reloadTenant();
+    } else {
+      tenantRequestIdRef.current += 1;
+    }
+    return () => {
+      tenantRequestIdRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, sessionValid]);
 
