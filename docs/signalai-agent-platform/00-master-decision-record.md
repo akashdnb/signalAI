@@ -8,6 +8,63 @@ Proposed architecture direction for the next stage of SignalAI.
 
 SignalAI will be developed as a reusable capability platform. MCP and AG-UI are adapters over that platform, not independent business-logic systems.
 
+The backend will use a **modular-core + independently scalable workloads** model rather than immediately splitting every domain into microservices.
+
+The default starting point is:
+
+```text
+signalai-server
+  - core product/API
+  - capabilities
+  - domain rules
+  - persistence
+  - auth/authorization
+  - synchronous request handling
+
+signalai-worker
+  - asynchronous jobs
+  - bulk processing
+  - scheduled work
+  - retries
+  - long-running execution
+```
+
+Additional services are introduced only when their operational characteristics justify a separate deployment:
+
+```text
+signalai-server
+signalai-worker
+signalai-agent        # when agent runtime/orchestration needs independent scaling/security
+signalai-mcp          # when external MCP becomes a meaningful security/versioning boundary
+signalai-connectors   # when provider integrations need independent scaling/security/deployment
+```
+
+The Web SDK is a client package, not a backend service. AG-UI is initially an endpoint/adapter in `signalai-server` and should not become a separate service prematurely.
+
+## Service-boundary decision
+
+Do **not** create separate services for individual business domains such as:
+
+- `lead-service`
+- `conversation-service`
+- `journey-service`
+- `campaign-service`
+- `company-service`
+
+These domains should remain modular boundaries inside `signalai-server` while they share transactions, invariants, authorization context, and the same capability layer.
+
+Extract a service when there is concrete evidence of one or more of the following:
+
+1. materially different scaling requirements
+2. independent deployment cadence
+3. a strong security/trust boundary
+4. failure isolation requirements
+5. a distinct runtime requirement
+6. independent ownership/team boundary
+7. significant infrastructure or dependency isolation needs
+
+Extraction should preserve the capability contract. A service boundary must not become a reason to duplicate domain logic.
+
 ## Why this direction
 
 The planned product surface extends beyond the current automation/builder experience into:
@@ -59,14 +116,17 @@ These are product-quality requirements, not merely visual polish.
 
 1. Capability first.
 2. One business implementation, many adapters.
-3. Stable resource IDs and explicit tenant/account relationships.
-4. Jobs for long-running work.
-5. Connectors for external data/providers.
-6. Strong authorization and tenant isolation.
-7. Explicit approval for consequential actions.
-8. Auditability and idempotency for writes.
-9. Explainable research/scoring with evidence provenance.
-10. UI changes reuse existing SignalAI components and follow anti-AI design guidance.
+3. One modular core before many domain microservices.
+4. Stable resource IDs and explicit tenant/account relationships.
+5. Jobs for long-running work.
+6. Workers for independently scalable asynchronous workloads.
+7. Connectors for external data/providers.
+8. Strong authorization and tenant isolation.
+9. Explicit approval for consequential actions.
+10. Auditability and idempotency for writes.
+11. Explainable research/scoring with evidence provenance.
+12. UI changes reuse existing SignalAI components and follow anti-AI design guidance.
+13. Extract services based on operational evidence, not architectural fashion.
 
 ## Near-term vertical slices
 
@@ -115,4 +175,29 @@ Company discovery
 
 ## Deployment decision
 
-Initially keep these modules in the existing backend deployment. Extract services only after operational evidence shows a separate trust boundary, scaling profile, deployment cadence, or ownership model is needed.
+Initially keep the capability/domain modules in `signalai-server`, with asynchronous execution moved into `signalai-worker` when workload characteristics justify it.
+
+Potential later services are:
+
+| Service | Initial boundary | Extract when |
+|---|---|---|
+| `signalai-server` | Core product, API, capabilities, domain, persistence | Remains the source of truth |
+| `signalai-worker` | Async jobs, bulk processing, scheduled/retry work | First extraction when background load affects API capacity or needs independent scaling |
+| `signalai-agent` | LLM planning/orchestration and agent runtime | Agent workloads require independent scaling, runtime dependencies, or stronger isolation |
+| `signalai-mcp` | External MCP transport/auth/versioning boundary | External MCP usage becomes substantial or requires independent security/release lifecycle |
+| `signalai-connectors` | External provider integration runtime | Connector workload/dependencies/security need independent deployment |
+
+The extraction path should be:
+
+```text
+Modular monolith
+      |
+      v
+server + worker
+      |
+      +----> agent (when justified)
+      +----> MCP (when justified)
+      +----> connectors (when justified)
+```
+
+Do not extract all services at once.
