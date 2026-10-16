@@ -2,6 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  ApiError,
+  type JourneyValidationError,
   type Campaign,
   type FieldDefinition,
   type InstagramMessagePresentation,
@@ -129,6 +131,7 @@ export function JourneyBuilder({
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishValidationErrors, setPublishValidationErrors] = useState<JourneyValidationError[]>([]);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [togglingEnabled, setTogglingEnabled] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
@@ -543,6 +546,8 @@ export function JourneyBuilder({
       }
 
       setMenuOpen(false);
+      setPublishValidationErrors([]);
+      setPublishError(null);
       setShowPublishConfirm(true);
     });
   }
@@ -561,6 +566,28 @@ export function JourneyBuilder({
       setPublishError(
         error instanceof Error ? error.message : "Couldn't publish this journey",
       );
+      if (error instanceof ApiError) {
+        const payload = error.payload;
+        if (
+          typeof payload === "object" &&
+          payload !== null &&
+          "details" in payload &&
+          Array.isArray((payload as { details?: unknown }).details)
+        ) {
+          setPublishValidationErrors(
+            (payload as { details: JourneyValidationError[] }).details.filter(
+              (item) =>
+                typeof item === "object" &&
+                item !== null &&
+                typeof item.message === "string",
+            ),
+          );
+        } else {
+          setPublishValidationErrors([]);
+        }
+      } else {
+        setPublishValidationErrors([]);
+      }
     } finally {
       setPublishing(false);
     }
@@ -809,8 +836,30 @@ export function JourneyBuilder({
           </div>
         </div>
 
-        {publishError && (
-          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{publishError}</div>
+        {publishError && !showPublishConfirm && (
+          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">
+            <p className="m-0">{publishError}</p>
+            {publishValidationErrors.length > 0 && (
+              <ul className="mb-0 mt-2 list-disc pl-5">
+                {publishValidationErrors.map((item, index) => (
+                  <li key={item.code + (item.nodeId ?? "") + (item.edgeId ?? "") + index}>{item.message}</li>
+                ))}
+              </ul>
+            )}
+            {publishValidationErrors.length > 0 && (
+              <button
+                type="button"
+                className="mt-2 font-semibold underline"
+                onClick={() => {
+                  setPublishError(null);
+                  setPublishValidationErrors([]);
+                  setSubTab("builder");
+                }}
+              >
+                Return to journey flow
+              </button>
+            )}
+          </div>
         )}        {toggleError && !showActivateConfirm && (
           <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{toggleError}</div>
         )}
@@ -963,6 +1012,21 @@ export function JourneyBuilder({
             if (!publishing) setShowPublishConfirm(false);
           }}
         >
+          {publishError && (
+            <div className="banner banner-error mb-4" role="alert">
+              <p className="m-0">{publishError}</p>
+              {publishValidationErrors.length > 0 && (
+                <ul className="mb-0 mt-2 list-disc pl-5">
+                  {publishValidationErrors.map((item, index) => (
+                    <li key={item.code + (item.nodeId ?? "") + (item.edgeId ?? "") + index}>{item.message}</li>
+                  ))}
+                </ul>
+              )}
+              {publishValidationErrors.length > 0 && (
+                <p className="m-0 mt-2 text-xs">Return to the Flow tab to correct these items, save the journey, and publish again.</p>
+              )}
+            </div>
+          )}
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
             <p className="m-0 text-sm font-semibold">
               {campaign.enabled
