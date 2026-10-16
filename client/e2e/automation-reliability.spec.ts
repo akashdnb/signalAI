@@ -133,7 +133,9 @@ async function mockAutomationApi(page: Page) {
       };
     } else if (path === `${campaignPath}/reply-config` && method === "PUT") {
       data = campaign;
-    } else if (path === `${campaignPath}/enabled` && method === "PUT") {
+    } else if (path === `${campaignPath}/reply-config` && method === "PATCH") {
+      data = campaign;
+    } else if (path === `${campaignPath}/enabled` && method === "PATCH") {
       data = campaign;
     } else {
       data = [];
