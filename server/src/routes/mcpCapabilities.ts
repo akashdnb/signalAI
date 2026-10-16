@@ -162,7 +162,7 @@ async function invokeWriteCapability(
 
     let result: Record<string, unknown>;
     if (capability === "automation.create_draft") {
-      result = await createDraft(client, tenantId, principalId, input);
+      result = await createDraft(client, tenantId, input);
     } else if (capability === "automation.update_draft") {
       result = await updateDraft(client, tenantId, input);
     } else {
@@ -200,7 +200,7 @@ async function invokeWriteCapability(
   }
 }
 
-async function createDraft(client: PoolClient, tenantId: string, principalId: string, input: Record<string, unknown>) {
+async function createDraft(client: PoolClient, tenantId: string, input: Record<string, unknown>) {
   assertAllowedKeys(input, ["name", "trigger", "nodes", "edges", "metadata"]);
   const name = requireString(input.name, "name");
   const trigger = requireString(input.trigger, "trigger");
@@ -334,7 +334,7 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
   }
   scalarSet.push("updated_at = now()");
   if (scalarSet.length > 1 || !graphChanges) {
-    const versionGuard = graphChanges ? "" : ` and builder_version = ${values.length}`;
+    const versionGuard = graphChanges ? "" : ` and builder_version = ${values.length + 1}`;
     const update = await client.query(
       `update campaigns set ${scalarSet.join(", ")}
         where id = $1 and tenant_id = $2${versionGuard}`,
