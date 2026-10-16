@@ -28,12 +28,11 @@ No checks or builds have run for this entry.
 
 ## NEEDS DECISION
 
-**BLOCKED — product/architecture decision required:**
+**BLOCKED — Step 1 requires a product/architecture decision.**
 
-Should the `?preview=precision-operations` demo route and `precision-operations-preview.css` remain bundled in the production app for ongoing comparison, or should they be retired from the production route/bundle once final QA is complete and kept only in the separate preview service/branch? The implementation guide says the preview sandbox and `--po-*` namespace must not ship, while the task's no-output-change requirement asks to preserve its palette. These cannot both be satisfied by a direct replacement with production tokens.
+Should the sandbox route `?preview=precision-operations` and `precision-operations-preview.css` remain bundled in production for ongoing comparison, or be retired from the production bundle after QA and kept only in the separate preview service/branch? The implementation guide says the sandbox and `--po-*` namespace must not ship, but the task also requires preserving the sandbox's rendered output while mapping its private palette. Those requirements cannot both be satisfied by a direct shared-token replacement without visual changes.
 
-**Recommendation:** keep the live standalone preview service as the reference and remove the sandbox route/CSS from the production bundle only after production visual QA is complete. Until that decision and QA gate are complete, preserve the current preview code/styles. Keep `precision-operations-production.css` and `precision-operations-workflows.css` separate unless a proven cascade-preserving merge is available.
-
+**Recommendation:** preserve the separate live preview service as the reference and retire its production-bundle route/CSS reference only after final production visual QA is complete. Do not perform that removal or guess the user's decision in this PR. Until then, preserve all existing preview code and styles. Keep `precision-operations-production.css` and `precision-operations-workflows.css` separate unless computed-style tests prove a merge is safe.
 
 ## 2026-10-17 — CSS consolidation review
 
@@ -55,7 +54,7 @@ Should the `?preview=precision-operations` demo route and `precision-operations-
 - **Stylesheet consolidation is NOT complete.** The preview, production, and workflow stylesheets remain in their current locations and import boundaries.
 - No component markup, API behavior, sample/real-data boundary, selectors, declarations, or imports changed.
 - The prior entry incorrectly characterized the blocker as not requiring a product decision. This follow-up corrects that record: the preview-bundle disposition is a product/architecture decision and is now explicitly recorded under `NEEDS DECISION` above.
- 
+
 ### Regression checklist (must be executed before merge)
 
 - [ ] Preview route (`?preview=precision-operations`) still loads and remains isolated from production routes.
@@ -70,3 +69,12 @@ Should the `?preview=precision-operations` demo route and `precision-operations-
 - Source inspection and git-history/open-PR reconciliation completed with GitHub tools.
 - Automated build, lint, and rendered-browser checks were not run in this task environment; do not treat the checklist as passed. CI/live browser validation remains outstanding.
 - Follow-up review confirmed that this branch preserves all existing CSS/code and only updates this orchestrator log; no destructive removal or token replacement was performed.
+
+## 2026-10-17 — Step 1 decision follow-up
+
+**Timestamp:** 2026-10-17 02:xx Asia/Kolkata (IST)
+
+- **BLOCKED:** Step 1 remains incomplete. Token remapping is NOT complete and stylesheet/file consolidation is NOT complete.
+- The current PR intentionally preserves all code and styles. No sandbox route/CSS removal, palette replacement, or production/workflow stylesheet merge was performed.
+- The user decision requested above is still outstanding. The recommendation remains to preserve the separate preview service and retire its production bundle reference only after final visual QA, but this PR does not make that decision or perform the removal.
+- `precision-operations-production.css` and `precision-operations-workflows.css` remain separate pending computed-style evidence that a merge preserves cascade behavior.
