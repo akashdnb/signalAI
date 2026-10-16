@@ -72,6 +72,9 @@ export function TeamPage() {
 
   async function load() {
     if (!tenantId) return;
+    setMembers(null);
+    setInvitations([]);
+    setError(null);
     try {
       const nextMembers = await workspaceApi.listMembers(tenantId);
       setMembers(nextMembers);
