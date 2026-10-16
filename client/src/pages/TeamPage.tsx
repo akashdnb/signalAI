@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
 import { Field, TextInput, TextareaInput } from "../components/ui";
@@ -37,6 +37,9 @@ function formatDate(iso: string): string {
 
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const loadRequestIdRef = useRef(0);
   const navigate = useNavigate();
   const { tenant, reload, reloadWorkspaces } = useTenant();
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
@@ -62,17 +65,23 @@ export function TeamPage() {
   }, [tenant?.id, tenant?.name, tenant?.description]);
 
   async function load() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++loadRequestIdRef.current;
+    const isCurrentRequest = () =>
+      requestId === loadRequestIdRef.current && activeTenantIdRef.current === requestedTenantId;
     setMembers(null);
+    setCurrentRole(null);
     setInvitations([]);
     setError(null);
     setPermissionError(null);
     try {
       const [nextMembers, workspaces] = await Promise.all([
-        workspaceApi.listMembers(tenantId),
+        workspaceApi.listMembers(requestedTenantId),
         workspaceApi.listWorkspaces(),
       ]);
-      const workspace = workspaces.find((item) => item.tenantId === tenantId);
+      if (!isCurrentRequest()) return;
+      const workspace = workspaces.find((item) => item.tenantId === requestedTenantId);
       if (!workspace) {
         setMembers(null);
         setCurrentRole(null);
@@ -84,8 +93,11 @@ export function TeamPage() {
       setError(null);
       if (workspace.role === "owner" || workspace.role === "admin") {
         try {
-          setInvitations(await workspaceApi.listInvitations(tenantId));
+          const nextInvitations = await workspaceApi.listInvitations(requestedTenantId);
+          if (!isCurrentRequest()) return;
+          setInvitations(nextInvitations);
         } catch (err) {
+          if (!isCurrentRequest()) return;
           const status = (err as Error & { status?: number }).status;
           if (status === 403) {
             setPermissionError("Your current role can view teammates but cannot manage invitations.");
@@ -99,6 +111,7 @@ export function TeamPage() {
         setPermissionError("Your Member role is read-only for workspace access. Owners and admins can invite, remove, or change roles.");
       }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
         navigate("/login", { replace: true });
@@ -115,7 +128,12 @@ export function TeamPage() {
   }
 
   useEffect(() => {
+    loadRequestIdRef.current += 1;
     void load();
+    return () => {
+      loadRequestIdRef.current += 1;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   async function handleSaveWorkspace(event: FormEvent<HTMLFormElement>) {
