@@ -153,6 +153,7 @@ function MobileAccountSheet({
   firstName,
   lastName,
   picture,
+  role,
   onClose,
   onLogout,
 }: {
@@ -163,6 +164,7 @@ function MobileAccountSheet({
   firstName?: string;
   lastName?: string;
   picture?: string;
+  role: "owner" | "admin" | "member" | null;
   onClose: () => void;
   onLogout: () => void;
 }) {
@@ -244,6 +246,7 @@ function AccountHeader({
   firstName,
   lastName,
   picture,
+  role,
   onLogout,
 }: {
   tenant: TenantSummary | null;
@@ -253,6 +256,7 @@ function AccountHeader({
   firstName?: string;
   lastName?: string;
   picture?: string;
+  role: "owner" | "admin" | "member" | null;
   onLogout: () => void;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -672,6 +676,7 @@ export function AppShell() {
           firstName={session?.firstName}
           lastName={session?.lastName}
           picture={session?.picture}
+          role={role}
           onLogout={handleLogout}
         />
 
@@ -684,6 +689,7 @@ export function AppShell() {
             firstName={session?.firstName}
             lastName={session?.lastName}
             picture={session?.picture}
+            role={role}
             onClose={() => setMobileAccountOpen(false)}
             onLogout={handleLogout}
           />
