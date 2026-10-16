@@ -168,7 +168,7 @@ export function ConnectedAccountSwitcher({
             </>
           ) : (
             <div className="sai-account-switcher__options">
-              {WORKSPACES.map(workspace => <button key={workspace.id} type="button" role="menuitemradio" aria-checked={workspace.id === selectedPreviewWorkspace.id} className={"sai-account-switcher__option" + (workspace.id === selectedPreviewWorkspace.id ? " is-selected" : "")} onClick={() => selectPreviewWorkspace(workspace)}>
+              {previewOnly && WORKSPACES.map(workspace => <button key={workspace.id} type="button" role="menuitemradio" aria-checked={workspace.id === selectedPreviewWorkspace.id} className={"sai-account-switcher__option" + (workspace.id === selectedPreviewWorkspace.id ? " is-selected" : "")} onClick={() => selectPreviewWorkspace(workspace)}>
                 <span className="sai-account-switcher__option-icon" aria-hidden="true">{workspace.initials}</span>
                 <span className="sai-account-switcher__option-copy"><strong>{workspace.name}</strong><small>{workspace.description}</small></span>
                 {workspace.id === selectedPreviewWorkspace.id && <CheckCircleIcon className="sai-account-switcher__selected-icon" aria-hidden="true" />}
