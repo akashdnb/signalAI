@@ -16,6 +16,21 @@
         } catch (e) {}
       })();
     </script>
+    <script>
+      // Same FOUC-prevention pattern as the theme script above, for the
+      // accent palette (see src/lib/palette.ts). Unlike theme, there's no
+      // "unset means follow something else" case — index.css's :root
+      // already carries the default (navy-cobalt) palette's values, so
+      // this only needs to act when an explicit non-default choice exists.
+      (function () {
+        try {
+          var palette = localStorage.getItem("signalai.palette");
+          if (palette && palette !== "navy-cobalt") {
+            document.documentElement.setAttribute("data-palette", palette);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>signalAI</title>

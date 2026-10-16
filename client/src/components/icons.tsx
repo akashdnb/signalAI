@@ -148,6 +148,15 @@ export function MoonIcon(props: IconProps) {
   );
 }
 
+export function MonitorIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4.5" width="18" height="12" rx="1.5" />
+      <path d="M8.5 20h7M12 16.5V20" />
+    </Icon>
+  );
+}
+
 export function ShoppingBagIcon(props: IconProps) {
   return (
     <Icon {...props}>

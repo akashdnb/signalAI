@@ -21,6 +21,7 @@ import {
   AutomationIcon,
   BellIcon,
   BookIcon,
+  CheckCircleIcon,
   ChevronDownIcon,
   CloseIcon,
   ContentIcon,
@@ -173,6 +174,7 @@ function PlanCard({
 }
 
 function MobileAccountSheet({
+  tenantId,
   tenant,
   account,
   usage,
@@ -183,6 +185,7 @@ function MobileAccountSheet({
   onClose,
   onLogout,
 }: {
+  tenantId?: string;
   tenant: TenantSummary | null;
   account: AccountHealth | null;
   usage: UsageSummary | null;
@@ -251,19 +254,50 @@ function MobileAccountSheet({
         <ThemeToggle />
       </div>
 
-      <button
-        type="button"
-        onClick={onLogout}
-        className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-left text-sm font-medium text-ink hover:bg-chip"
-      >
-        <LogoutIcon className="h-4.5 w-4.5" />
-        Log out
-      </button>
+      <div className="mt-3 flex flex-col gap-1">
+        {tenantId && (
+          <>
+            <Link
+              to={`/dashboard/${tenantId}/settings`}
+              onClick={onClose}
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-left text-sm font-medium text-ink no-underline hover:bg-chip"
+            >
+              <SettingsIcon className="h-4.5 w-4.5" />
+              Workspace settings
+            </Link>
+            <Link
+              to={`/dashboard/${tenantId}/settings/billing`}
+              onClick={onClose}
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-left text-sm font-medium text-ink no-underline hover:bg-chip"
+            >
+              <CreditCardIcon className="h-4.5 w-4.5" />
+              Plan &amp; usage
+            </Link>
+          </>
+        )}
+        <Link
+          to="/docs"
+          onClick={onClose}
+          className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-left text-sm font-medium text-ink no-underline hover:bg-chip"
+        >
+          <BookIcon className="h-4.5 w-4.5" />
+          Help &amp; documentation
+        </Link>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-left text-sm font-medium text-ink hover:bg-chip"
+        >
+          <LogoutIcon className="h-4.5 w-4.5" />
+          Sign out
+        </button>
+      </div>
     </BottomSheet>
   );
 }
 
 function AccountHeader({
+  tenantId,
   tenant,
   usage,
   email,
@@ -272,6 +306,7 @@ function AccountHeader({
   picture,
   onLogout,
 }: {
+  tenantId?: string;
   tenant: TenantSummary | null;
   usage: UsageSummary | null;
   email?: string;
@@ -280,6 +315,8 @@ function AccountHeader({
   picture?: string;
   onLogout: () => void;
 }) {
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
   const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
@@ -294,16 +331,55 @@ function AccountHeader({
 
   return (
     <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
-      <button type="button" className="flex min-w-0 items-center gap-2.5 rounded-lg py-1 pr-2 hover:bg-chip" title={tenant?.name ?? undefined}>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-sm font-semibold text-accent">
-          {workspaceInitials}
-        </span>
-        <span className="min-w-0 text-left">
-          <span className="block truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</span>
-          <span className="block text-xs text-subtle">Workspace</span>
-        </span>
-        <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
-      </button>
+      <div className="relative min-w-0">
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={workspaceMenuOpen}
+          onClick={() => setWorkspaceMenuOpen((v) => !v)}
+          className="flex min-w-0 items-center gap-2.5 rounded-lg py-1 pr-2 hover:bg-chip"
+          title={tenant?.name ?? undefined}
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-sm font-semibold text-accent">
+            {workspaceInitials}
+          </span>
+          <span className="min-w-0 text-left">
+            <span className="block truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</span>
+            <span className="block text-xs text-subtle">Workspace</span>
+          </span>
+          <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
+        </button>
+        {workspaceMenuOpen && (
+          <>
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="fixed inset-0 z-10 cursor-default"
+              onClick={() => setWorkspaceMenuOpen(false)}
+            />
+            <div className="absolute left-0 top-11 z-20 w-72 rounded-xl border border-line bg-card p-1.5 shadow-lg" role="menu" aria-label="Switch workspace">
+              <div className="px-2.5 py-2">
+                <div className="text-sm font-semibold text-ink">Switch workspace</div>
+                <div className="text-xs text-subtle">Select the business context you want to work in.</div>
+              </div>
+              <div
+                role="menuitemradio"
+                aria-checked="true"
+                className="flex items-center gap-2.5 rounded-lg bg-chip px-2.5 py-2"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-card text-xs font-semibold text-accent">
+                  {workspaceInitials}
+                </span>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-sm font-medium text-ink">{tenant?.name ?? "…"}</span>
+                  <span className="block text-xs text-subtle">Current workspace</span>
+                </span>
+                <CheckCircleIcon className="h-4.5 w-4.5 shrink-0 text-accent" />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="flex shrink-0 items-center gap-4">
         {usage && (
@@ -331,19 +407,41 @@ function AccountHeader({
 
         <ThemeToggle />
 
-        <button
-          type="button"
-          aria-label="Notifications (coming soon)"
-          title="Notifications are not available yet"
-          disabled
-          className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-subtle opacity-50"
-        >
-          <BellIcon className="h-4.5 w-4.5" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Notifications"
+            aria-haspopup="dialog"
+            aria-expanded={notificationsOpen}
+            title="Notifications"
+            onClick={() => setNotificationsOpen((v) => !v)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-subtle hover:bg-chip hover:text-ink"
+          >
+            <BellIcon className="h-4.5 w-4.5" />
+          </button>
+          {notificationsOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="fixed inset-0 z-10 cursor-default"
+                onClick={() => setNotificationsOpen(false)}
+              />
+              <div className="absolute right-0 top-11 z-20 w-80 rounded-xl border border-line bg-card p-3 shadow-lg" role="dialog" aria-label="Notifications">
+                <div className="mb-2 text-sm font-semibold text-ink">Notifications</div>
+                <p className="muted small m-0">
+                  This workspace doesn&rsquo;t have a live notification system yet — you&rsquo;ll see real alerts here once one exists.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="relative">
           <button
             type="button"
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-chip"
           >
@@ -366,14 +464,59 @@ function AccountHeader({
                 className="fixed inset-0 z-10 cursor-default"
                 onClick={() => setProfileOpen(false)}
               />
-              <div className="absolute right-0 top-11 z-20 w-44 rounded-xl border border-line bg-card p-1.5 shadow-lg">
+              <div className="absolute right-0 top-11 z-20 w-56 rounded-xl border border-line bg-card p-1.5 shadow-lg" role="menu" aria-label={`${profileName} account menu`}>
+                <div className="flex items-center gap-2.5 px-2.5 py-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-sm font-semibold text-white">
+                    {picture ? (
+                      <img src={picture} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                    ) : profileInitial}
+                  </span>
+                  <span className="min-w-0 text-left">
+                    <span className="block truncate text-sm font-medium text-ink">{profileName}</span>
+                    <span className="block text-xs text-subtle">Owner</span>
+                  </span>
+                </div>
+                <div className="my-1 border-t border-line" />
+                {tenantId && (
+                  <>
+                    <Link
+                      to={`/dashboard/${tenantId}/settings`}
+                      onClick={() => setProfileOpen(false)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink no-underline hover:bg-chip"
+                      role="menuitem"
+                    >
+                      <SettingsIcon className="h-4 w-4" />
+                      Workspace settings
+                    </Link>
+                    <Link
+                      to={`/dashboard/${tenantId}/settings/billing`}
+                      onClick={() => setProfileOpen(false)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink no-underline hover:bg-chip"
+                      role="menuitem"
+                    >
+                      <CreditCardIcon className="h-4 w-4" />
+                      Plan &amp; usage
+                    </Link>
+                  </>
+                )}
+                <Link
+                  to="/docs"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink no-underline hover:bg-chip"
+                  role="menuitem"
+                >
+                  <BookIcon className="h-4 w-4" />
+                  Help &amp; documentation
+                </Link>
+                <div className="my-1 border-t border-line" />
                 <button
                   type="button"
                   onClick={onLogout}
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink hover:bg-chip"
+                  role="menuitem"
                 >
                   <LogoutIcon className="h-4 w-4" />
-                  Log out
+                  Sign out
                 </button>
               </div>
             </>
@@ -692,6 +835,7 @@ export function AppShell() {
         </header>
 
         <AccountHeader
+          tenantId={tenantId}
           tenant={tenant}
           usage={usage}
           email={session?.email}
@@ -703,6 +847,7 @@ export function AppShell() {
 
         {mobileAccountOpen && (
           <MobileAccountSheet
+            tenantId={tenantId}
             tenant={tenant}
             account={account}
             usage={usage}

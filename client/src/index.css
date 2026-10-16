@@ -236,6 +236,222 @@
   color-scheme: dark;
 }
 
+/*
+ * Accent palette picker (Settings -> Appearance): the preview's 10-option
+ * data-po-palette switcher, ported as a real, persisted data-palette
+ * attribute on <html> (see lib/palette.ts) rather than a decorative mock.
+ * "navy-cobalt" is the default and needs no override -- its values already
+ * live in the three blocks above. Every other option only overrides the
+ * same four accent tokens (--accent/-hover/-soft, --pill-bg); everything
+ * else (surfaces, text, charts via bg-accent) follows automatically.
+ */
+[data-palette="teal-emerald"] {
+  --accent: #065f4a;
+  --accent-hover: #10b981;
+  --accent-soft: #a7f3d0;
+  --pill-bg: #ecfdf5;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="teal-emerald"]:not([data-theme="light"]) {
+    --accent: #34d399;
+    --accent-hover: #6ee7b7;
+    --accent-soft: #047857;
+    --pill-bg: #063b2f;
+  }
+}
+
+[data-palette="teal-emerald"][data-theme="dark"] {
+  --accent: #34d399;
+  --accent-hover: #6ee7b7;
+  --accent-soft: #047857;
+  --pill-bg: #063b2f;
+}
+
+[data-palette="slate-cyan"] {
+  --accent: #0f172a;
+  --accent-hover: #06b6d4;
+  --accent-soft: #bae6fd;
+  --pill-bg: #e0f2fe;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="slate-cyan"]:not([data-theme="light"]) {
+    --accent: #22d3ee;
+    --accent-hover: #67e8f9;
+    --accent-soft: #0e7490;
+    --pill-bg: #0c3340;
+  }
+}
+
+[data-palette="slate-cyan"][data-theme="dark"] {
+  --accent: #22d3ee;
+  --accent-hover: #67e8f9;
+  --accent-soft: #0e7490;
+  --pill-bg: #0c3340;
+}
+
+[data-palette="forest-slate"] {
+  --accent: #14532d;
+  --accent-hover: #16a34a;
+  --accent-soft: #bbf7d0;
+  --pill-bg: #f0fdf4;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="forest-slate"]:not([data-theme="light"]) {
+    --accent: #4ade80;
+    --accent-hover: #86efac;
+    --accent-soft: #166534;
+    --pill-bg: #12351f;
+  }
+}
+
+[data-palette="forest-slate"][data-theme="dark"] {
+  --accent: #4ade80;
+  --accent-hover: #86efac;
+  --accent-soft: #166534;
+  --pill-bg: #12351f;
+}
+
+[data-palette="orange-amber"] {
+  --accent: #c2410c;
+  --accent-hover: #f97316;
+  --accent-soft: #fed7aa;
+  --pill-bg: #fff7ed;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="orange-amber"]:not([data-theme="light"]) {
+    --accent: #fb923c;
+    --accent-hover: #fdba74;
+    --accent-soft: #9a3412;
+    --pill-bg: #3b2417;
+  }
+}
+
+[data-palette="orange-amber"][data-theme="dark"] {
+  --accent: #fb923c;
+  --accent-hover: #fdba74;
+  --accent-soft: #9a3412;
+  --pill-bg: #3b2417;
+}
+
+[data-palette="neutral-slate"] {
+  --accent: #334155;
+  --accent-hover: #475569;
+  --accent-soft: #cbd5e1;
+  --pill-bg: #f1f5f9;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="neutral-slate"]:not([data-theme="light"]) {
+    --accent: #cbd5e1;
+    --accent-hover: #e2e8f0;
+    --accent-soft: #475569;
+    --pill-bg: #1e293b;
+  }
+}
+
+[data-palette="neutral-slate"][data-theme="dark"] {
+  --accent: #cbd5e1;
+  --accent-hover: #e2e8f0;
+  --accent-soft: #475569;
+  --pill-bg: #1e293b;
+}
+
+[data-palette="ocean-sky"] {
+  --accent: #075985;
+  --accent-hover: #0284c7;
+  --accent-soft: #bae6fd;
+  --pill-bg: #e0f2fe;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="ocean-sky"]:not([data-theme="light"]) {
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-soft: #39728f;
+    --pill-bg: #14364d;
+  }
+}
+
+[data-palette="ocean-sky"][data-theme="dark"] {
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --accent-soft: #39728f;
+  --pill-bg: #14364d;
+}
+
+[data-palette="jade-mint"] {
+  --accent: #065f46;
+  --accent-hover: #059669;
+  --accent-soft: #a7f3d0;
+  --pill-bg: #d1fae5;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="jade-mint"]:not([data-theme="light"]) {
+    --accent: #34d399;
+    --accent-hover: #6ee7b7;
+    --accent-soft: #347361;
+    --pill-bg: #12372e;
+  }
+}
+
+[data-palette="jade-mint"][data-theme="dark"] {
+  --accent: #34d399;
+  --accent-hover: #6ee7b7;
+  --accent-soft: #347361;
+  --pill-bg: #12372e;
+}
+
+[data-palette="rose-slate"] {
+  --accent: #9f1239;
+  --accent-hover: #e11d48;
+  --accent-soft: #fecdd3;
+  --pill-bg: #fff1f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="rose-slate"]:not([data-theme="light"]) {
+    --accent: #fb7185;
+    --accent-hover: #fda4af;
+    --accent-soft: #586b80;
+    --pill-bg: #27313f;
+  }
+}
+
+[data-palette="rose-slate"][data-theme="dark"] {
+  --accent: #fb7185;
+  --accent-hover: #fda4af;
+  --accent-soft: #586b80;
+  --pill-bg: #27313f;
+}
+
+[data-palette="amber-graphite"] {
+  --accent: #78350f;
+  --accent-hover: #d97706;
+  --accent-soft: #fde68a;
+  --pill-bg: #fffbeb;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="amber-graphite"]:not([data-theme="light"]) {
+    --accent: #fbbf24;
+    --accent-hover: #fde68a;
+    --accent-soft: #675e50;
+    --pill-bg: #302d28;
+  }
+}
+
+[data-palette="amber-graphite"][data-theme="dark"] {
+  --accent: #fbbf24;
+  --accent-hover: #fde68a;
+  --accent-soft: #675e50;
+  --pill-bg: #302d28;
+}
+
 * {
   box-sizing: border-box;
 }
