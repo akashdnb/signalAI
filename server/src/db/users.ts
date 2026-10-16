@@ -63,9 +63,6 @@ export async function findOrCreateUserByGoogle(
   profile: { sub: string; email: string; givenName?: string | null; familyName?: string | null; picture?: string | null },
 ): Promise<User> {
   const normalized = normalizeEmail(profile.email);
-  // A verified Google email can attach to a legacy email-OTP user exactly
-  // once. The immutable Google subject is globally unique via migration.
-  // coalesce preserves profile fields if Google omits them in a later login.
   const result = await pool.query<UserRow>(
     `insert into users (email, first_name, last_name, profile_picture_url, google_subject)
      values ($1, $2, $3, $4, $5)
@@ -89,13 +86,23 @@ export async function updateUserProfile(
   userId: string,
   profile: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null },
 ): Promise<void> {
+  // undefined means "leave unchanged"; explicit null means "clear". Separate
+  // booleans preserve this distinction because SQL COALESCE cannot express it.
   await pool.query(
     `update users set
-       first_name = coalesce($2, first_name),
-       last_name = coalesce($3, last_name),
-       profile_picture_url = coalesce($4, profile_picture_url)
+       first_name = case when $2 then $3 else first_name end,
+       last_name = case when $4 then $5 else last_name end,
+       profile_picture_url = case when $6 then $7 else profile_picture_url end
      where id = $1`,
-    [userId, profile.firstName?.trim() || null, profile.lastName?.trim() || null, profile.profilePictureUrl || null],
+    [
+      userId,
+      profile.firstName !== undefined,
+      profile.firstName === undefined ? null : (profile.firstName?.trim() || null),
+      profile.lastName !== undefined,
+      profile.lastName === undefined ? null : (profile.lastName?.trim() || null),
+      profile.profilePictureUrl !== undefined,
+      profile.profilePictureUrl ?? null,
+    ],
   );
 }
 
