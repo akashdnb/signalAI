@@ -78,3 +78,25 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - The current PR intentionally preserves all code and styles. No sandbox route/CSS removal, palette replacement, or production/workflow stylesheet merge was performed.
 - The user decision requested above is still outstanding. The recommendation remains to preserve the separate preview service and retire its production bundle reference only after final visual QA, but this PR does not make that decision or perform the removal.
 - `precision-operations-production.css` and `precision-operations-workflows.css` remain separate pending computed-style evidence that a merge preserves cascade behavior.
+
+
+## 2026-10-17 — Auth and typography migration pass
+
+**Timestamp:** 2026-10-17 02:30 Asia/Kolkata (IST)
+
+### Merged work
+
+- PR #90 (`chore(css): document safe Precision Operations stylesheet consolidation`) was squash-merged to `feat/preview-to-production-foundation` as `115ec7ff92d3b84ceedd7389e4c34acb00d01fce`. This was intentionally a log/comment safety update only. Step 1 token remapping and stylesheet consolidation are NOT done. The preview-bundle route/palette decision remains under `## NEEDS DECISION`. Preview CSS declarations and imports were preserved; production and workflow CSS remain separate pending actual cascade proof.
+- PR #91 (`fix(ui): flatten login background and align page typography`) was squash-merged as `31b675fc28ac019e9c06a20b23b971edc6b9bd21`. It replaces the decorative login gradient with shared `var(--bg)`, removes unused `--auth-gradient` definitions, caps the Overview title at 32px, adjusts the eyebrow to 12px, and aligns Analytics title/labels. Auth/data/API behavior remains unchanged.
+
+### CI and smoke status
+
+- CI run `client-ci` #506 passed lint/typecheck/build for head `0fec0c5dd2e9d686a976265b28ad946ca254623a`.
+- Chromium smoke run #412 failed 6 assertions: Team mobile fit, automation list keyboard dismissal, Inbox fixture text, username fallback, AI reply preferences initial state, and draft label.
+- A read-only source comparison found that PR #91 does not touch those implementations or the e2e test file. Classify these failures as likely unrelated, not confirmed pre-existing, because no base-branch smoke run was found. These failures did NOT pass.
+
+### Outstanding QA and next work
+
+- Rendered before/after visual checks across light/dark themes and widths 390/768/1024/1440 remain outstanding.
+- Production has not been deployed or modified by this migration.
+- Next: do a focused Leads visual parity PR while preserving the richer real production filters, account scope, pagination, and data; separately inspect and polish the actual production JourneyBuilder editor against preview BuilderScreen (do not reshape AutomationPage catalog into a canvas); then stage all changes for full rendered QA and deploy only once steps 1–4 and the visual check are complete.
