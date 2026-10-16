@@ -28,7 +28,11 @@ No checks or builds have run for this entry.
 
 ## NEEDS DECISION
 
-None currently.
+**BLOCKED — product/architecture decision required:**
+
+Should the `?preview=precision-operations` demo route and `precision-operations-preview.css` remain bundled in the production app for ongoing comparison, or should they be retired from the production route/bundle once final QA is complete and kept only in the separate preview service/branch? The implementation guide says the preview sandbox and `--po-*` namespace must not ship, while the task's no-output-change requirement asks to preserve its palette. These cannot both be satisfied by a direct replacement with production tokens.
+
+**Recommendation:** keep the live standalone preview service as the reference and remove the sandbox route/CSS from the production bundle only after production visual QA is complete. Until that decision and QA gate are complete, preserve the current preview code/styles. Keep `precision-operations-production.css` and `precision-operations-workflows.css` separate unless a proven cascade-preserving merge is available.
 
 
 ## 2026-10-17 — CSS consolidation review
@@ -46,9 +50,11 @@ None currently.
 ### Changes and safety boundary
 
 - Clarified preview CSS comments documenting why the scoped palette is intentionally retained pending an exact semantic mapping.
-- Clarified production/workflow stylesheet comments about the distinct roles and import-order contract.
+- Clarified production/workflow CSS comments about the distinct roles and import-order contract.
+- **Step 1 is NOT complete.** No `--po-*` token remapping was implemented.
+- **Stylesheet consolidation is NOT complete.** The preview, production, and workflow stylesheets remain in their current locations and import boundaries.
 - No component markup, API behavior, sample/real-data boundary, selectors, declarations, or imports changed.
-- No genuine design decision is needed from Akash for this no-output-change task; the blocker is an implementation constraint (the 15 current preview values do not all have exact shared-token equivalents). No `NEEDS DECISION` entry is added.
+- The prior entry incorrectly characterized the blocker as not requiring a product decision. This follow-up corrects that record: the preview-bundle disposition is a product/architecture decision and is now explicitly recorded under `NEEDS DECISION` above.
  
 ### Regression checklist (must be executed before merge)
 
@@ -63,3 +69,4 @@ None currently.
 
 - Source inspection and git-history/open-PR reconciliation completed with GitHub tools.
 - Automated build, lint, and rendered-browser checks were not run in this task environment; do not treat the checklist as passed. CI/live browser validation remains outstanding.
+- Follow-up review confirmed that this branch preserves all existing CSS/code and only updates this orchestrator log; no destructive removal or token replacement was performed.
