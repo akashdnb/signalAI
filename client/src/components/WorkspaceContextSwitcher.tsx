@@ -205,6 +205,7 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
                     ))}
                   </ul>
                 )}
+                {currentWorkspace && currentWorkspace.role === "member" && <p className="mb-0 mt-3 border-t border-line pt-3 text-xs leading-5 text-subtle">Your role allows workspace use, while workspace settings and membership management are restricted.</p>}
               </>
             )}
           </div>
