@@ -76,7 +76,25 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
     setOpen(false);
     const currentBase = `/dashboard/${tenantId}`;
     const suffix = location.pathname.startsWith(currentBase) ? location.pathname.slice(currentBase.length) : "";
-    navigate(`/dashboard/${next.tenantId}${suffix}`);
+    // Keep only workspace-level destinations. Resource detail routes contain IDs
+    // that belong to the previous workspace and would otherwise navigate into a
+    // nonexistent (or unrelated) record in the newly selected workspace.
+    const workspaceLevelRoutes = new Set([
+      "",
+      "/",
+      "/inbox",
+      "/leads",
+      "/automation",
+      "/knowledge",
+      "/content",
+      "/analytics",
+      "/team",
+      "/integrations",
+      "/billing",
+      "/settings",
+    ]);
+    const destination = workspaceLevelRoutes.has(suffix) ? suffix : "";
+    navigate(`/dashboard/${next.tenantId}${destination}`);
   }
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
