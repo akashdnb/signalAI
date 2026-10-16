@@ -651,8 +651,11 @@ export function AppShell() {
     connected: connected.status === "healthy",
   }));
   const accountsLoading = connectedAccounts === null && accountError === null;
+  // Scope the visible context control to list/report screens. A nested
+  // lead-detail route is tied to its selected lead and doesn't change when
+  // the list filter changes, so showing the selector there would be misleading.
   const showAccountSelector = ["/inbox", "/leads", "/content", "/analytics"].some((suffix) =>
-    location.pathname.endsWith(suffix) || location.pathname.includes(suffix + "/"),
+    location.pathname.endsWith(suffix),
   );
   const headerAccount: AccountHealth | null = connectedAccountsTenantId === tenantId && connectedAccounts !== null
     ? (() => {
