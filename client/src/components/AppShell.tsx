@@ -365,6 +365,7 @@ export function AppShell() {
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
