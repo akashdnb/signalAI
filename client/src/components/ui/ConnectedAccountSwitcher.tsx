@@ -4,7 +4,7 @@ import { CheckCircleIcon, ChevronDownIcon } from "../icons";
 import "./ConnectedAccountSwitcher.css";
 
 export type ConnectedAccountSwitcherOption = { id: string; handle: string; label: string; connected?: boolean };
-export type ConnectedAccountSwitcherProps = { workspaceName: string; providerLabel: string; providerIcon: ReactNode; accounts: ConnectedAccountSwitcherOption[]; selectedAccountId: string; onSelect: (accountId: string) => void; onManageAccounts?: () => void; previewOnly?: boolean };
+export type ConnectedAccountSwitcherProps = { workspaceName: string; providerLabel: string; providerIcon: ReactNode; accounts: ConnectedAccountSwitcherOption[]; selectedAccountId: string; onSelect: (accountId: string) => void; onManageAccounts?: () => void; previewOnly?: boolean; showAccountSelector?: boolean; accountsLoading?: boolean; accountError?: string | null; onRetryAccounts?: () => void };
 type Workspace = { id: string; name: string; description: string; initials: string };
 const WORKSPACES: Workspace[] = [
   { id: "my-workspace", name: "My workspace", description: "Current workspace", initials: "MW" },
@@ -43,7 +43,7 @@ function InstagramContextFilter({ accounts, selectedAccountId, onSelect }: Pick<
     target,
   );
 }
-export function ConnectedAccountSwitcher({ workspaceName, accounts, selectedAccountId, onSelect, providerLabel, providerIcon, onManageAccounts, previewOnly }: ConnectedAccountSwitcherProps) {
+function PreviewConnectedAccountSwitcher({ workspaceName, accounts, selectedAccountId, onSelect, providerLabel, providerIcon, onManageAccounts, previewOnly }: ConnectedAccountSwitcherProps) {
   void providerLabel;
   void providerIcon;
   void onManageAccounts;
@@ -103,4 +103,82 @@ export function ConnectedAccountSwitcher({ workspaceName, accounts, selectedAcco
     </div>
     {ACCOUNT_SCREENS.has(screen) && <InstagramContextFilter accounts={accounts} selectedAccountId={selectedAccountId} onSelect={onSelect} />}
   </>;
+}
+type ProductAccountContextProps = ConnectedAccountSwitcherProps;
+
+function ProductAccountContextSelector({
+  providerLabel,
+  providerIcon,
+  accounts,
+  selectedAccountId,
+  onSelect,
+  onManageAccounts,
+  showAccountSelector = true,
+  accountsLoading = false,
+  accountError,
+  onRetryAccounts,
+}: ProductAccountContextProps) {
+  const [value, setValue] = useState(selectedAccountId || "");
+  useEffect(() => {
+    setValue(selectedAccountId || "");
+  }, [selectedAccountId, accounts]);
+
+  if (!showAccountSelector) return null;
+
+  return (
+    <div className="flex min-w-0 max-w-full items-center gap-2 rounded-xl border border-line bg-card px-3 py-2">
+      <span className="shrink-0 text-accent" aria-hidden="true">{providerIcon}</span>
+      <label className="flex min-w-0 flex-1 flex-col">
+        <span className="text-xs font-medium text-subtle">{providerLabel || "Instagram"} account</span>
+        <select
+          aria-label={`${providerLabel || "Instagram"} account context`}
+          value={value}
+          disabled={accountsLoading || Boolean(accountError) || accounts.length === 0}
+          onChange={(event) => {
+            setValue(event.target.value);
+            onSelect(event.target.value);
+          }}
+          className="min-h-8 max-w-[240px] bg-transparent text-sm font-medium text-ink outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-subtle"
+        >
+          {accountsLoading ? (
+            <option value="">Loading accounts…</option>
+          ) : (
+            <option value="">All Instagram accounts</option>
+          )}
+          {!accountsLoading && accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.handle}{account.connected === false ? " · Needs reconnect" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {accountError ? (
+        <span className="flex shrink-0 items-center gap-2" role="status">
+          <span className="max-w-36 text-xs text-err-ink" title={accountError}>Unavailable</span>
+          <button
+            type="button"
+            className="text-xs font-semibold text-accent underline-offset-2 hover:underline"
+            onClick={onRetryAccounts}
+          >
+            Retry
+          </button>
+        </span>
+      ) : accounts.length === 0 && !accountsLoading ? (
+        <button
+          type="button"
+          className="shrink-0 text-xs font-semibold text-accent underline-offset-2 hover:underline"
+          onClick={onManageAccounts}
+        >
+          Connect account
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** The existing preview sample selector is available only when explicitly requested. Product mode renders the server-backed account context control. */
+export function ConnectedAccountSwitcher(props: ConnectedAccountSwitcherProps) {
+  return props.previewOnly
+    ? <PreviewConnectedAccountSwitcher {...props} />
+    : <ProductAccountContextSelector {...props} />;
 }

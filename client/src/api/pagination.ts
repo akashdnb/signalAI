@@ -22,6 +22,7 @@ export interface LeadListFilters {
   qualification?: "qualified" | "unqualified";
   sort?: "activity_desc" | "activity_asc" | "created_desc" | "created_asc" | "stage_asc" | "stage_desc" | "username_asc" | "username_desc";
   sourceMediaId?: string;
+  accountId?: string;
 }
 
 export interface CampaignListFilters {
@@ -64,7 +65,7 @@ function queryString(values: Record<string, string | number | boolean | undefine
 }
 
 export function getLeadsPage(tenantId: string, page: number, pageSize = 20, filters: LeadListFilters = {}): Promise<PaginatedResponse<LeadListItem>> {
-  return getPage<PaginatedResponse<LeadListItem>>(`/tenants/${tenantId}/leads${queryString({ page, pageSize, stage: filters.stage, ownerUserId: filters.ownerUserId, q: filters.q, tagId: filters.tagId, handoffStatus: filters.handoffStatus, unread: filters.unreadOnly, from: filters.from, to: filters.to, qualification: filters.qualification, sort: filters.sort, sourceMediaId: filters.sourceMediaId })}`);
+  return getPage<PaginatedResponse<LeadListItem>>(`/tenants/${tenantId}/leads${queryString({ page, pageSize, stage: filters.stage, ownerUserId: filters.ownerUserId, q: filters.q, tagId: filters.tagId, handoffStatus: filters.handoffStatus, unread: filters.unreadOnly, from: filters.from, to: filters.to, qualification: filters.qualification, sort: filters.sort, sourceMediaId: filters.sourceMediaId, accountId: filters.accountId })}`);
 }
 
 const CAMPAIGN_FETCH_PAGE_SIZE = 50;

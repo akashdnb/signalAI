@@ -24,20 +24,37 @@ export interface TenantAnalytics {
  *    failure; a transient one that succeeded on retry was never really a
  *    failure from the creator's point of view.
  */
-export async function getTenantAnalytics(pool: Pool, tenantId: string): Promise<TenantAnalytics> {
+export async function getTenantAnalytics(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId?: string,
+): Promise<TenantAnalytics> {
+  const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
+    : "";
+  const directAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
+  const jobAccountFilter = instagramAccountId ? "and job_data->>'instagramAccountId' = $2" : "";
   const [comments, uniqueLeads, dmsSent, dmFailures] = await Promise.all([
     pool.query<{ count: string }>(
-      `select count(*)::int as count from lead_events where tenant_id = $1 and event_type = 'comment'`,
-      [tenantId],
+      `select count(*)::int as count
+         from lead_events e
+         left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+        where e.tenant_id = $1 and e.event_type = 'comment' ${eventAccountFilter}`,
+      params,
     ),
-    pool.query<{ count: string }>(`select count(*)::int as count from leads where tenant_id = $1`, [tenantId]),
-    pool.query<{ count: string }>(`select count(*)::int as count from account_sends where tenant_id = $1`, [
-      tenantId,
-    ]),
+    pool.query<{ count: string }>(
+      `select count(*)::int as count from leads where tenant_id = $1 ${directAccountFilter}`,
+      params,
+    ),
+    pool.query<{ count: string }>(
+      `select count(*)::int as count from account_sends where tenant_id = $1 ${directAccountFilter}`,
+      params,
+    ),
     pool.query<{ count: string }>(
       `select count(*)::int as count from dead_letter_events
-       where queue_name = 'lead-events' and job_data->>'tenantId' = $1`,
-      [tenantId],
+        where queue_name = 'lead-events' and job_data->>'tenantId' = $1 ${jobAccountFilter}`,
+      params,
     ),
   ]);
 
@@ -66,10 +83,22 @@ export interface TopPost {
  * just without those two fields, same graceful-degradation the picker
  * itself already accepts.
  */
-export async function getTopPosts(pool: Pool, tenantId: string, limit = 10): Promise<TopPost[]> {
-  // Aggregate events first, then enrich with exactly one latest metadata row.
-  // media_metadata can contain one legacy row and multiple account-scoped rows for the same media ID;
-  // joining raw events to all of them would multiply comment counts.
+export async function getTopPosts(
+  pool: Pool,
+  tenantId: string,
+  limit = 10,
+  instagramAccountId?: string,
+): Promise<TopPost[]> {
+  // Filter the events, metadata and comments together. The same provider
+  // media ID can occur on multiple business accounts, so client-only
+  // filtering of the final rows would return the wrong captions/counts.
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $3 and (l.instagram_account_id is null or l.instagram_account_id = $3)"
+    : "";
+  const mediaAccountFilter = instagramAccountId
+    ? "and instagram_account_id = $3"
+    : "";
+  const params = instagramAccountId ? [tenantId, limit, instagramAccountId] : [tenantId, limit];
   const result = await pool.query<{
     media_id: string;
     caption: string | null;
@@ -77,23 +106,27 @@ export async function getTopPosts(pool: Pool, tenantId: string, limit = 10): Pro
     comment_count: string;
   }>(
     `with comment_counts as (
-       select attributes->>'mediaId' as media_id, count(*)::int as comment_count
-       from lead_events
-       where tenant_id = $1 and event_type = 'comment' and attributes->>'mediaId' is not null
-       group by attributes->>'mediaId'
+       select e.attributes->>'mediaId' as media_id, count(*)::int as comment_count
+         from lead_events e
+         left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+        where e.tenant_id = $1
+          and e.event_type = 'comment'
+          and e.attributes->>'mediaId' is not null
+          ${eventAccountFilter}
+        group by e.attributes->>'mediaId'
      )
      select c.media_id, m.caption, m.permalink, c.comment_count
-     from comment_counts c
-     left join lateral (
-       select caption, permalink
-       from media_metadata
-       where tenant_id = $1 and media_id = c.media_id
-       order by fetched_at desc nulls last, instagram_account_id asc nulls last, id desc
-       limit 1
-     ) m on true
-     order by c.comment_count desc, c.media_id
-     limit $2`,
-    [tenantId, limit],
+       from comment_counts c
+       left join lateral (
+         select caption, permalink
+           from media_metadata
+          where tenant_id = $1 and media_id = c.media_id ${mediaAccountFilter}
+          order by fetched_at desc nulls last, instagram_account_id asc nulls last, id desc
+          limit 1
+       ) m on true
+      order by c.comment_count desc, c.media_id
+      limit $2`,
+    params,
   );
   return result.rows.map((row) => ({
     mediaId: row.media_id,
@@ -109,15 +142,27 @@ export interface TopKeyword {
 }
 
 /** Phase 2A "Top Trigger Keywords" (carried from Phase 1's deferred list) — counts matched (not just received) events by the keyword that actually triggered a campaign. */
-export async function getTopKeywords(pool: Pool, tenantId: string, limit = 10): Promise<TopKeyword[]> {
+export async function getTopKeywords(
+  pool: Pool,
+  tenantId: string,
+  limit = 10,
+  instagramAccountId?: string,
+): Promise<TopKeyword[]> {
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $3 and (l.instagram_account_id is null or l.instagram_account_id = $3)"
+    : "";
+  const params = instagramAccountId ? [tenantId, limit, instagramAccountId] : [tenantId, limit];
   const result = await pool.query<{ keyword: string; match_count: string }>(
-    `select attributes->>'matchedKeyword' as keyword, count(*)::int as match_count
-     from lead_events
-     where tenant_id = $1 and attributes->>'matchedKeyword' is not null
-     group by attributes->>'matchedKeyword'
-     order by match_count desc
-     limit $2`,
-    [tenantId, limit],
+    `select e.attributes->>'matchedKeyword' as keyword, count(*)::int as match_count
+       from lead_events e
+       left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+      where e.tenant_id = $1
+        and e.attributes->>'matchedKeyword' is not null
+        ${eventAccountFilter}
+      group by e.attributes->>'matchedKeyword'
+      order by match_count desc
+      limit $2`,
+    params,
   );
   return result.rows.map((row) => ({ keyword: row.keyword, matchCount: Number(row.match_count) }));
 }
@@ -147,19 +192,34 @@ export interface Funnel {
  * distribution and cumulative progression counts. 'Reach' isn't included
  * because impression/reach data does not exist in the data model.
  */
-export async function getPipelineFunnel(pool: Pool, tenantId: string): Promise<Funnel> {
+export async function getPipelineFunnel(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId?: string,
+): Promise<Funnel> {
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
+    : "";
+  const accountSendFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
+  const leadAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
+  const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
   const [comments, dmsSent, stageRows] = await Promise.all([
     pool.query<{ count: string }>(
-      `select count(*)::int as count from lead_events where tenant_id = $1 and event_type = 'comment'`,
-      [tenantId],
+      `select count(*)::int as count
+         from lead_events e
+         left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+        where e.tenant_id = $1 and e.event_type = 'comment' ${eventAccountFilter}`,
+      params,
     ),
     pool.query<{ count: string }>(
-      `select count(*)::int as count from account_sends where tenant_id = $1`,
-      [tenantId],
+      `select count(*)::int as count from account_sends where tenant_id = $1 ${accountSendFilter}`,
+      params,
     ),
     pool.query<{ pipeline_stage: string; count: string }>(
-      `select pipeline_stage, count(*)::int as count from leads where tenant_id = $1 group by pipeline_stage`,
-      [tenantId],
+      `select pipeline_stage, count(*)::int as count
+         from leads where tenant_id = $1 ${leadAccountFilter}
+        group by pipeline_stage`,
+      params,
     ),
   ]);
 
@@ -192,14 +252,27 @@ export interface RevenueByCurrency {
 }
 
 /** Grouped by currency rather than a flat sum — deals.currency is per-deal, not tenant-fixed, so a flat SUM would silently mix currencies. */
-export async function getRevenueSummary(pool: Pool, tenantId: string): Promise<RevenueByCurrency[]> {
+export async function getRevenueSummary(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId?: string,
+): Promise<RevenueByCurrency[]> {
+  // Preserve workspace-wide totals for every deal. When an account is
+  // selected, only deals attached to leads attributed to that account can
+  // be included; an unlinked deal has no safe account attribution.
+  const accountJoin = instagramAccountId
+    ? "join leads l on l.tenant_id = d.tenant_id and l.id = d.lead_id"
+    : "";
+  const accountFilter = instagramAccountId ? "and l.instagram_account_id = $2" : "";
+  const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
   const result = await pool.query<{ currency: string; total: string }>(
-    `select currency, sum(value)::numeric as total
-     from deals
-     where tenant_id = $1 and stage = 'won' and value is not null
-     group by currency
-     order by total desc`,
-    [tenantId],
+    `select d.currency, sum(d.value)::numeric as total
+       from deals d
+       ${accountJoin}
+      where d.tenant_id = $1 and d.stage = 'won' and d.value is not null ${accountFilter}
+      group by d.currency
+      order by total desc`,
+    params,
   );
   return result.rows.map((row) => ({ currency: row.currency, total: Number(row.total) }));
 }
@@ -217,7 +290,16 @@ export interface ConversationsTimeseriesPoint {
  * activity via generate_series rather than only returning days that have
  * rows.
  */
-export async function getConversationsTimeseries(pool: Pool, tenantId: string): Promise<ConversationsTimeseriesPoint[]> {
+export async function getConversationsTimeseries(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId?: string,
+): Promise<ConversationsTimeseriesPoint[]> {
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
+    : "";
+  const sendAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
+  const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
   const result = await pool.query<{ date: string; comments: string; dms: string }>(
     `select
        to_char(d::date, 'YYYY-MM-DD') as date,
@@ -225,19 +307,21 @@ export async function getConversationsTimeseries(pool: Pool, tenantId: string): 
        coalesce(m.count, 0) as dms
      from generate_series(current_date - interval '29 days', current_date, interval '1 day') as d
      left join (
-       select date_trunc('day', occurred_at) as day, count(*)::int as count
-       from lead_events
-       where tenant_id = $1 and event_type = 'comment' and occurred_at >= current_date - interval '29 days'
-       group by 1
+       select date_trunc('day', e.occurred_at) as day, count(*)::int as count
+         from lead_events e
+         left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+        where e.tenant_id = $1 and e.event_type = 'comment'
+          and e.occurred_at >= current_date - interval '29 days' ${eventAccountFilter}
+        group by 1
      ) c on c.day = d
      left join (
        select date_trunc('day', sent_at) as day, count(*)::int as count
-       from account_sends
-       where tenant_id = $1 and sent_at >= current_date - interval '29 days'
-       group by 1
+         from account_sends
+        where tenant_id = $1 and sent_at >= current_date - interval '29 days' ${sendAccountFilter}
+        group by 1
      ) m on m.day = d
      order by d`,
-    [tenantId],
+    params,
   );
   return result.rows.map((row) => ({ date: row.date, comments: Number(row.comments), dms: Number(row.dms) }));
 }

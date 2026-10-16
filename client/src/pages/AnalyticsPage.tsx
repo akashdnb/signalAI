@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Funnel, type RevenueByCurrency, type TopKeyword, type TopPost } from "../api";
+import { useTenant } from "../context/TenantContext";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
@@ -41,6 +42,7 @@ function PipelineProgression({ funnel }: { funnel: Funnel }) {
 export function AnalyticsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [revenue, setRevenue] = useState<RevenueByCurrency[] | null>(null);
   const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
@@ -51,9 +53,9 @@ export function AnalyticsPage() {
     if (!tenantId) return;
     let cancelled = false;
     async function load() {
-      const results = await Promise.allSettled([api.getFunnel(tenantId!), api.getRevenue(tenantId!), api.getTopPosts(tenantId!), api.getTopKeywords(tenantId!)]);
+      const results = await Promise.allSettled([api.getFunnel(tenantId!, selectedAccountId), api.getRevenue(tenantId!, selectedAccountId), api.getTopPosts(tenantId!, selectedAccountId), api.getTopKeywords(tenantId!, selectedAccountId)]);
       if (cancelled) return;
-      const authFailure = results.find((result) => result.status === "rejected" && result.reason instanceof ApiError && (result.reason.status === 401 || result.reason.status === 403));
+      const authFailure = results.find((result) => result.status === "rejected" && result.reason instanceof ApiError && result.reason.status === 401);
       if (authFailure) { navigate("/login", { replace: true }); return; }
       const nextErrors: string[] = [];
       const [funnelResult, revenueResult, postsResult, keywordsResult] = results;
@@ -65,7 +67,7 @@ export function AnalyticsPage() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [tenantId, navigate, reloadCount]);
+  }, [tenantId, navigate, reloadCount, selectedAccountId]);
   if (!tenantId) return null;
   return (
     <div className="page page-wide page-analytics">

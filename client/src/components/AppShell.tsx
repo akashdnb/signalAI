@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
   api,
@@ -11,7 +11,9 @@ import {
   type TenantSummary,
   type UsageSummary,
 } from "../api";
+import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceSummary } from "../api/workspace";
 import { BottomSheet } from "./BottomSheet";
+import { ConnectedAccountSwitcher, type ConnectedAccountSwitcherOption } from "./ui/ConnectedAccountSwitcher";
 import { NotificationBell } from "./NotificationBell";
 import { TenantContext } from "../context/TenantContext";
 import { WorkspaceContextSwitcher } from "./WorkspaceContextSwitcher";
@@ -182,6 +184,8 @@ function MobileAccountSheet({
             <span className="pill pill-ok m-0 inline-block">
               <span className="mr-1">●</span>Connected
             </span>
+          ) : account?.status === "error" ? (
+            <span className="pill pill-error m-0 inline-block">Needs attention</span>
           ) : (
             <span className="text-sm text-subtle">Instagram not connected</span>
           )}
@@ -272,6 +276,8 @@ function AccountHeader({
             <span className="pill pill-ok m-0 inline-block">
               <span className="mr-1">●</span>Connected
             </span>
+          ) : account?.status === "error" ? (
+            <span className="pill pill-error m-0 inline-block">Needs attention</span>
           ) : (
             <span className="text-xs text-subtle">Instagram not connected</span>
           )}
@@ -354,11 +360,23 @@ function AccountHeader({
  */
 export function AppShell() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const tenantRequestIdRef = useRef(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [account, setAccount] = useState<AccountHealth | null>(null);
+  const [accountTenantId, setAccountTenantId] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
+  const [connectedAccountsTenantId, setConnectedAccountsTenantId] = useState<string | null>(null);
+  const connectedAccountsRequestIdRef = useRef(0);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -452,18 +470,122 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionValid]);
 
-  async function reloadTenant() {
-    if (!tenantId) return;
+  async function reloadWorkspaces(): Promise<WorkspaceSummary[] | null> {
     try {
-      const t = await api.getTenant(tenantId);
+      const available = await workspaceApi.listWorkspaces();
+      setWorkspaces(available);
+      setWorkspaceError(null);
+      return available;
+    } catch (err) {
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401) {
+        clearSession();
+        navigate("/login", { replace: true });
+      }
+      setWorkspaces(null);
+      setWorkspaceError(err instanceof Error ? err.message : "Could not load your workspaces.");
+      return null;
+    }
+  }
+
+  async function reloadConnectedAccounts(): Promise<void> {
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++connectedAccountsRequestIdRef.current;
+    setConnectedAccountsTenantId(requestedTenantId);
+    setConnectedAccounts(null);
+    setAccountError(null);
+    try {
+      const available = await workspaceApi.listConnectedAccounts(requestedTenantId);
+      if (requestId !== connectedAccountsRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
+      setConnectedAccounts(available);
+      setAccountError(null);
+    } catch (err) {
+      if (requestId !== connectedAccountsRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401) {
+        clearSession();
+        navigate("/login", { replace: true });
+      }
+      setConnectedAccounts(null);
+      setAccountError(err instanceof Error ? err.message : "Could not load Instagram accounts.");
+    }
+  }
+
+  function handleSelectAccount(accountId: string | null) {
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const key = "signalai.account-context:" + tenantId;
+    if (!accountId) {
+      localStorage.removeItem(key);
+      setSelectedAccountIdState(null);
+      setAccountError(null);
+      return;
+    }
+    if (connectedAccountsTenantId !== tenantId || !connectedAccounts?.some((connected) => connected.id === accountId)) {
+      setAccountError("Choose an Instagram account from the server-provided list.");
+      return;
+    }
+    localStorage.setItem(key, accountId);
+    setSelectedAccountIdState(accountId);
+    setAccountError(null);
+  }
+
+  function handleManageAccounts() {
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    setMobileAccountOpen(false);
+    navigate(`/dashboard/${tenantId}/integrations`);
+  }
+
+  useEffect(() => {
+    setAccount(null);
+    setAccountTenantId(null);
+    setUsage(null);
+    setBilling(null);
+    setUnreadCount(0);
+    if (sessionValid) {
+      void reloadWorkspaces();
+      void reloadConnectedAccounts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, sessionValid]);
+
+  useEffect(() => {
+    if (!tenantId) {
+      setSelectedAccountIdState(null);
+      return;
+    }
+    const stored = localStorage.getItem("signalai.account-context:" + tenantId);
+    setSelectedAccountIdState(stored || null);
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!tenantId || connectedAccountsTenantId !== tenantId || connectedAccounts === null) return;
+    const key = "signalai.account-context:" + tenantId;
+    const stored = localStorage.getItem(key);
+    if (stored && connectedAccounts.some((connected) => connected.id === stored)) {
+      setSelectedAccountIdState(stored);
+    } else {
+      if (stored) localStorage.removeItem(key);
+      setSelectedAccountIdState(null);
+    }
+  }, [tenantId, connectedAccounts, connectedAccountsTenantId]);
+
+  async function reloadTenant() {
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++tenantRequestIdRef.current;
+    try {
+      const t = await api.getTenant(requestedTenantId);
+      if (requestId !== tenantRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
       setTenant(t);
       setTenantError(null);
       setAccessDenied(false);
       const activeSession = loadSession();
-      if (activeSession && activeSession.tenantId !== tenantId) {
-        saveSession({ ...activeSession, tenantId });
+      if (activeSession && activeSession.tenantId !== requestedTenantId) {
+        saveSession({ ...activeSession, tenantId: requestedTenantId });
       }
     } catch (err) {
+      if (requestId !== tenantRequestIdRef.current || activeTenantIdRef.current !== requestedTenantId) return;
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
         navigate("/login", { replace: true });
@@ -481,7 +603,17 @@ export function AppShell() {
   }
 
   useEffect(() => {
-    if (sessionValid) reloadTenant();
+    setTenant(null);
+    setTenantError(null);
+    setAccessDenied(false);
+    if (sessionValid) {
+      void reloadTenant();
+    } else {
+      tenantRequestIdRef.current += 1;
+    }
+    return () => {
+      tenantRequestIdRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, sessionValid]);
 
@@ -497,6 +629,7 @@ export function AppShell() {
       .then(([a, u, b, unread]) => {
         if (cancelled) return;
         setAccount(a);
+        setAccountTenantId(tenantId);
         setUsage(u);
         setBilling(b);
         setUnreadCount(unread.length);
@@ -517,6 +650,42 @@ export function AppShell() {
   if (!tenantId || !sessionValid) return null;
 
   const showWizard = Boolean(tenant) && (tenant!.industry === null || wizardLatchedOpen);
+  const workspaceRole = workspaces?.find((workspace) => workspace.tenantId === tenantId)?.role ?? null;
+  // Do not render a previous workspace's account names for even one frame
+  // after the route context changes; only use inventory fetched for this tenant.
+  const currentConnectedAccounts = connectedAccountsTenantId === tenantId ? connectedAccounts : null;
+  const accountOptions: ConnectedAccountSwitcherOption[] = (currentConnectedAccounts ?? []).map((connected) => ({
+    id: connected.id,
+    handle: connected.instagramUsername ? "@" + connected.instagramUsername : "Instagram account",
+    label: connected.instagramUsername ? "@" + connected.instagramUsername : "Instagram account",
+    connected: connected.status === "healthy",
+  }));
+  const accountsLoading = currentConnectedAccounts === null && accountError === null;
+  // Scope the visible context control to list/report screens. A nested
+  // lead-detail route is tied to its selected lead and doesn't change when
+  // the list filter changes, so showing the selector there would be misleading.
+  const showAccountSelector = ["/inbox", "/leads", "/content", "/analytics"].some((suffix) =>
+    location.pathname.endsWith(suffix),
+  );
+  const headerAccount: AccountHealth | null = connectedAccountsTenantId === tenantId && connectedAccounts !== null
+    ? (() => {
+        const selected = selectedAccountId
+          ? connectedAccounts.find((connected) => connected.id === selectedAccountId)
+          : connectedAccounts.find((connected) => connected.status === "healthy") ?? connectedAccounts[0];
+        if (!selected) return { connected: false };
+        if (selectedAccountId && selected.id !== selectedAccountId) return { connected: false };
+        return {
+          connected: selectedAccountId
+            ? selected.status === "healthy"
+            : connectedAccounts.some((connected) => connected.status === "healthy"),
+          instagramAccountId: selected.instagramAccountId,
+          status: selected.status,
+          lastError: selected.lastError,
+          lastCheckedAt: selected.lastCheckedAt,
+          expiresAt: selected.expiresAt,
+        };
+      })()
+    : accountTenantId === tenantId && !selectedAccountId ? account : null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
@@ -601,7 +770,7 @@ export function AppShell() {
 
         <AccountHeader
           tenant={tenant}
-          account={account}
+          account={headerAccount}
           usage={usage}
           email={session?.email}
           firstName={session?.firstName}
@@ -610,12 +779,28 @@ export function AppShell() {
           onLogout={handleLogout}
         />
 
-        <WorkspaceContextSwitcher />
+        <WorkspaceContextSwitcher
+          accountContext={
+            <ConnectedAccountSwitcher
+              workspaceName={tenant?.name ?? "Workspace"}
+              providerLabel="Instagram"
+              providerIcon={<InstagramMarkIcon className="h-4 w-4" />}
+              accounts={accountOptions}
+              selectedAccountId={selectedAccountId ?? ""}
+              onSelect={(id) => handleSelectAccount(id || null)}
+              onManageAccounts={handleManageAccounts}
+              onRetryAccounts={() => { void reloadConnectedAccounts(); }}
+              showAccountSelector={showAccountSelector}
+              accountsLoading={accountsLoading}
+              accountError={accountError}
+            />
+          }
+        />
 
         {mobileAccountOpen && (
           <MobileAccountSheet
             tenant={tenant}
-            account={account}
+            account={headerAccount}
             usage={usage}
             email={session?.email}
             firstName={session?.firstName}
@@ -640,7 +825,20 @@ export function AppShell() {
               </div>
             </div>
           ) : (
-          <TenantContext.Provider value={{ tenant, error: tenantError, reload: reloadTenant }}>
+          <TenantContext.Provider value={{
+            tenant,
+            error: tenantError,
+            reload: () => { void reloadTenant(); },
+            workspaces,
+            workspaceError,
+            reloadWorkspaces: () => { void reloadWorkspaces(); },
+            workspaceRole,
+            connectedAccounts,
+            accountError,
+            reloadConnectedAccounts: () => { void reloadConnectedAccounts(); },
+            selectedAccountId,
+            setSelectedAccountId: handleSelectAccount,
+          }}>
             {showWizard ? (
               <OnboardingWizard
                 tenantId={tenantId}

@@ -1,8 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getPool, closePool } from "../pool.js";
 import { createTenant } from "../tenants.js";
 import { advanceSequence, findOrCreateLeadByInstagramUserId, isSequenceStale } from "../leads.js";
 import { insertEventIdempotent } from "../events.js";
+import { upsertToken } from "../tokens.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 
 describe("leads and events", () => {
@@ -115,4 +117,38 @@ describe("leads and events", () => {
     expect(await isSequenceStale(pool, tenant.id, lead.id, 2)).toBe(false);
     expect(await isSequenceStale(pool, tenant.id, lead.id, 1)).toBe(true);
   });
+  it("keeps one Instagram visitor in separate leads for each connected account", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "multi-account-creator");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-a", accessToken: "unused-a" });
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-b", accessToken: "unused-b" });
+
+    const fromA = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-shared", "acct-a");
+    const fromAAgain = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-shared", "acct-a");
+    const fromB = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-shared", "acct-b");
+
+    expect(fromAAgain.id).toBe(fromA.id);
+    expect(fromA.instagramAccountId).toBe("acct-a");
+    expect(fromB.instagramAccountId).toBe("acct-b");
+    expect(fromB.id).not.toBe(fromA.id);
+    await expect(findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-user-shared")).rejects.toThrow(
+      "instagramAccountId is required to resolve a lead in a multi-account workspace",
+    );
+  });
+
+  it("rejects associating a lead with an Instagram account owned by another workspace", async () => {
+    const pool = getPool();
+    const tenantA = await createTenant(pool, "creator-a");
+    const tenantB = await createTenant(pool, "creator-b");
+    const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
+    await upsertToken(pool, keyring, { tenantId: tenantB.id, instagramAccountId: "acct-foreign", accessToken: "unused" });
+
+    await expect(
+      findOrCreateLeadByInstagramUserId(pool, tenantA.id, "instagram-user", "acct-foreign"),
+    ).rejects.toThrow("Instagram account does not belong to this workspace");
+    const leads = await pool.query("select id from leads where tenant_id = $1", [tenantA.id]);
+    expect(leads.rows).toHaveLength(0);
+  });
+
 });

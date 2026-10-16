@@ -6,6 +6,7 @@ import { getLeadTimelinePage, decodeTimelineCursor } from "../db/leadTimeline.js
 import type { Campaign, CampaignLanguage, CampaignTone, ReplyChannel, ReplyMode, TriggerSource } from "../db/campaigns.js";
 import type { KnowledgeBaseDocument, KnowledgeBaseDocumentStatus } from "../db/knowledgeBase.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
+import { resolveInstagramAccountIdForTenant } from "../db/tokens.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -84,8 +85,24 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   if (validDate(from) && validDate(to) && from > to) return res.status(400).json({ error: "from must be on or before to" });
   if (unread !== undefined && unread !== "true" && unread !== "false") return res.status(400).json({ error: "unread must be true or false" });
   const pool = getPool();
+  if (query.accountId !== undefined && (typeof query.accountId !== "string" || !query.accountId.trim())) {
+    return res.status(400).json({ error: "accountId must be a single connected account ID" });
+  }
+  const requestedAccountRowId = typeof query.accountId === "string" && query.accountId.trim()
+    ? query.accountId.trim()
+    : undefined;
+  const providerAccountId = requestedAccountRowId
+    ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
+    : undefined;
+  if (requestedAccountRowId && !providerAccountId) {
+    return res.status(404).json({ error: "Instagram account not found for this workspace" });
+  }
   const conditions = ["l.tenant_id = $1"];
   const params: unknown[] = [tenantId];
+  if (providerAccountId) {
+    params.push(providerAccountId);
+    conditions.push(`l.instagram_account_id = $${params.length}`);
+  }
   if (stage) { params.push(stage); conditions.push(`l.pipeline_stage = $${params.length}`); }
   if (typeof ownerUserId === "string" && ownerUserId) { params.push(ownerUserId); conditions.push(`l.owner_user_id = $${params.length}`); }
   if (typeof tagId === "string" && tagId) { params.push(tagId); conditions.push(`exists (select 1 from lead_tags lt join tags t on t.id = lt.tag_id and t.tenant_id = lt.tenant_id where lt.tenant_id = l.tenant_id and lt.lead_id = l.id and lt.tag_id = $${params.length})`); }

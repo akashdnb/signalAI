@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
+import { Field, TextInput, TextareaInput } from "../components/ui";
+import { useTenant } from "../context/TenantContext";
 import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember, type WorkspaceRole } from "../api/workspace";
 
 function formatRole(role: WorkspaceMember["role"]): string {
@@ -35,7 +37,11 @@ function formatDate(iso: string): string {
 
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const loadRequestIdRef = useRef(0);
   const navigate = useNavigate();
+  const { tenant, reload, reloadWorkspaces } = useTenant();
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
   const [currentRole, setCurrentRole] = useState<WorkspaceRole | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -47,16 +53,35 @@ export function TeamPage() {
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [saving, setSaving] = useState(false);
   const [actionKey, setActionKey] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceDescription, setWorkspaceDescription] = useState("");
+  const [savingWorkspace, setSavingWorkspace] = useState(false);
+  const [workspaceSaved, setWorkspaceSaved] = useState(false);
+
+  useEffect(() => {
+    setWorkspaceName(tenant?.name ?? "");
+    setWorkspaceDescription(tenant?.description ?? "");
+    setWorkspaceSaved(false);
+  }, [tenant?.id, tenant?.name, tenant?.description]);
 
   async function load() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++loadRequestIdRef.current;
+    const isCurrentRequest = () =>
+      requestId === loadRequestIdRef.current && activeTenantIdRef.current === requestedTenantId;
+    setMembers(null);
+    setCurrentRole(null);
+    setInvitations([]);
+    setError(null);
     setPermissionError(null);
     try {
       const [nextMembers, workspaces] = await Promise.all([
-        workspaceApi.listMembers(tenantId),
+        workspaceApi.listMembers(requestedTenantId),
         workspaceApi.listWorkspaces(),
       ]);
-      const workspace = workspaces.find((item) => item.tenantId === tenantId);
+      if (!isCurrentRequest()) return;
+      const workspace = workspaces.find((item) => item.tenantId === requestedTenantId);
       if (!workspace) {
         setMembers(null);
         setCurrentRole(null);
@@ -68,8 +93,11 @@ export function TeamPage() {
       setError(null);
       if (workspace.role === "owner" || workspace.role === "admin") {
         try {
-          setInvitations(await workspaceApi.listInvitations(tenantId));
+          const nextInvitations = await workspaceApi.listInvitations(requestedTenantId);
+          if (!isCurrentRequest()) return;
+          setInvitations(nextInvitations);
         } catch (err) {
+          if (!isCurrentRequest()) return;
           const status = (err as Error & { status?: number }).status;
           if (status === 403) {
             setPermissionError("Your current role can view teammates but cannot manage invitations.");
@@ -83,6 +111,7 @@ export function TeamPage() {
         setPermissionError("Your Member role is read-only for workspace access. Owners and admins can invite, remove, or change roles.");
       }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
         navigate("/login", { replace: true });
@@ -99,8 +128,42 @@ export function TeamPage() {
   }
 
   useEffect(() => {
+    loadRequestIdRef.current += 1;
     void load();
+    return () => {
+      loadRequestIdRef.current += 1;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
+
+  async function handleSaveWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!tenantId || (currentRole !== "owner" && currentRole !== "admin") || savingWorkspace) return;
+    if (!workspaceName.trim()) {
+      setError("Workspace name is required.");
+      return;
+    }
+    setSavingWorkspace(true);
+    setWorkspaceSaved(false);
+    setError(null);
+    try {
+      await workspaceApi.updateWorkspace(tenantId, {
+        name: workspaceName.trim(),
+        description: workspaceDescription.trim() || null,
+      });
+      reload();
+      reloadWorkspaces();
+      window.dispatchEvent(new Event("signalai:workspaces-updated"));
+      setWorkspaceSaved(true);
+    } catch (err) {
+      const status = (err as Error & { status?: number }).status;
+      setError(status === 403
+        ? "Only workspace owners and admins can change workspace details."
+        : err instanceof Error ? err.message : "Could not save workspace settings.");
+    } finally {
+      setSavingWorkspace(false);
+    }
+  }
 
   async function handleInvite(event: React.FormEvent) {
     event.preventDefault();
@@ -188,6 +251,54 @@ export function TeamPage() {
       {error && <div className="banner banner-error" role="alert">{error}<button type="button" className="link-button" onClick={() => void load()}>Retry</button></div>}
       {permissionError && <div className="banner" role="status">{permissionError}</div>}
       {notice && <div className="banner" role="status">{notice}</div>}
+
+      <section className="card">
+        <h2>Workspace settings</h2>
+        <p className="muted small">These details identify this workspace in the switcher. Members and connected Instagram accounts stay scoped to this workspace.</p>
+        <form onSubmit={(event) => void handleSaveWorkspace(event)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Workspace name">
+            <TextInput
+              value={workspaceName}
+              onChange={(event) => { setWorkspaceName(event.target.value); setWorkspaceSaved(false); }}
+              required
+              maxLength={120}
+              disabled={(currentRole !== "owner" && currentRole !== "admin") || savingWorkspace}
+              placeholder="Workspace name"
+            />
+          </Field>
+          <Field label="Description (optional)">
+            <TextareaInput
+              value={workspaceDescription}
+              onChange={(event) => { setWorkspaceDescription(event.target.value); setWorkspaceSaved(false); }}
+              maxLength={500}
+              rows={2}
+              disabled={(currentRole !== "owner" && currentRole !== "admin") || savingWorkspace}
+              placeholder="What is this workspace for?"
+            />
+          </Field>
+          <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+            {(currentRole === "owner" || currentRole === "admin") ? (
+              <button
+                type="submit"
+                className="btn-primary btn-small"
+                disabled={savingWorkspace || !workspaceName.trim() || (
+                  workspaceName.trim() === (tenant?.name ?? "") &&
+                  (workspaceDescription.trim() || "") === (tenant?.description ?? "")
+                )}
+              >
+                {savingWorkspace ? "Saving…" : "Save workspace"}
+              </button>
+            ) : (
+              <p className="muted small m-0">
+                {currentRole === null
+                  ? "Workspace permissions are still being checked. Editing is disabled until access is verified."
+                  : "Only workspace owners and admins can change these details."}
+              </p>
+            )}
+            {workspaceSaved && <span className="text-sm text-subtle" role="status">Workspace settings saved.</span>}
+          </div>
+        </form>
+      </section>
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">

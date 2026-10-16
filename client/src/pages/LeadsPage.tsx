@@ -4,11 +4,13 @@ import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStag
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
 import { PIPELINE_STAGES, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { useTenant } from "../context/TenantContext";
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [{ value: "", label: "All" }, { value: "ai", label: "AI Handling" }, { value: "requested", label: "Needs Attention" }, { value: "human", label: "Human Handling" }];
 const PAGE_SIZE = 20;
 export function LeadsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
   const sourceFilter = searchParams.get("sourceMediaId")?.trim() || undefined;
   const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
@@ -25,8 +27,9 @@ export function LeadsPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
   useEffect(() => { setPage(1); }, [stageFilter, handoffFilter, qualificationFilter, activityFrom, activityTo, sort, search, sourceFilter]);
-  useEffect(() => { if (!tenantId) return; let cancelled = false; api.listMembers(tenantId).then((result) => { if (cancelled) return; setMembers(result); setMembersError(null); }).catch((err) => { if (cancelled) return; if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { navigate("/login", { replace: true }); return; } setMembersError(err instanceof Error ? err.message : "Owner details are unavailable."); }); return () => { cancelled = true; }; }, [tenantId, navigate]);
-  useEffect(() => { if (!tenantId) return; let cancelled = false; async function load() { try { const result = await getLeadsPage(tenantId!, page, PAGE_SIZE, { stage: stageFilter || undefined, handoffStatus: handoffFilter || undefined, qualification: qualificationFilter || undefined, from: activityFrom || undefined, to: activityTo || undefined, sort, q: search.trim() || undefined, sourceMediaId: sourceFilter }); if (cancelled) return; setPageData(result); if (result.page !== page) setPage(result.page); setError(null); } catch (err) { if (cancelled) return; if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { navigate("/login", { replace: true }); return; } setError(err instanceof Error ? err.message : "Failed to load leads"); } } load(); return () => { cancelled = true; }; }, [tenantId, stageFilter, handoffFilter, qualificationFilter, activityFrom, activityTo, sort, search, sourceFilter, page, reloadCount, navigate]);
+  useEffect(() => { setPageData(null); setError(null); }, [tenantId, selectedAccountId]);
+  useEffect(() => { if (!tenantId) return; let cancelled = false; api.listMembers(tenantId).then((result) => { if (cancelled) return; setMembers(result); setMembersError(null); }).catch((err) => { if (cancelled) return; if (err instanceof ApiError && (err.status === 401)) { navigate("/login", { replace: true }); return; } setMembersError(err instanceof Error ? err.message : "Owner details are unavailable."); }); return () => { cancelled = true; }; }, [tenantId, navigate]);
+  useEffect(() => { if (!tenantId) return; let cancelled = false; async function load() { try { const result = await getLeadsPage(tenantId!, page, PAGE_SIZE, { stage: stageFilter || undefined, handoffStatus: handoffFilter || undefined, qualification: qualificationFilter || undefined, from: activityFrom || undefined, to: activityTo || undefined, sort, q: search.trim() || undefined, sourceMediaId: sourceFilter, accountId: selectedAccountId || undefined }); if (cancelled) return; setPageData(result); if (result.page !== page) setPage(result.page); setError(null); } catch (err) { if (cancelled) return; if (err instanceof ApiError && (err.status === 401)) { navigate("/login", { replace: true }); return; } setError(err instanceof Error ? err.message : "Failed to load leads"); } } load(); return () => { cancelled = true; }; }, [tenantId, stageFilter, handoffFilter, qualificationFilter, activityFrom, activityTo, sort, search, sourceFilter, selectedAccountId, page, reloadCount, navigate]);
   if (!tenantId) return null;
   const leads = pageData?.items ?? null;
   function clearSourceFilter() { const next = new URLSearchParams(searchParams); next.delete("sourceMediaId"); setSearchParams(next, { replace: true }); }

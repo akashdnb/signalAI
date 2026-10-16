@@ -121,6 +121,28 @@ describe("auth routes (Instagram connect — Identity Refactor U4/U5)", () => {
     expect(res.status).toBe(403);
   });
 
+
+
+
+  it("connect-link denies regular workspace members even when they have a valid session", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET_FOR_TESTS, "creator-a");
+    const member = await findOrCreateUserByEmail(pool, "read-only-member@example.com");
+    await pool.query(
+      "insert into tenant_members (tenant_id, user_id, role) values ($1, $2, 'member')",
+      [tenant.id, member.id],
+    );
+    const memberAuth = await sessionHeaderFor(pool, SESSION_SECRET_FOR_TESTS, member.id);
+    const app = createApp();
+
+    const res = await request(app)
+      .post(`/tenants/${tenant.id}/instagram/connect-link`)
+      .set(memberAuth);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ error: expect.any(String) });
+  });
+
   it("start rejects a request with no tenantId or connectToken", async () => {
     const app = createApp();
     const noTenant = await request(app).get("/auth/instagram/start").query({ connectToken: "x" });

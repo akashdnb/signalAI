@@ -91,19 +91,22 @@ export async function listLeadsMissingInstagramUsername(
   leadId: string;
   leadEventId: string;
   instagramUserId: string;
+  instagramAccountId: string | null;
 }>> {
   const result = await pool.query<{
     tenant_id: string;
     lead_id: string;
     lead_event_id: string;
     instagram_user_id: string;
+    instagram_account_id: string | null;
   }>(
     `
       select
         l.tenant_id,
         l.id as lead_id,
         e.id as lead_event_id,
-        l.instagram_user_id
+        l.instagram_user_id,
+        l.instagram_account_id
       from leads l
       join lateral (
         select e.id
@@ -139,6 +142,7 @@ export async function listLeadsMissingInstagramUsername(
     leadId: row.lead_id,
     leadEventId: row.lead_event_id,
     instagramUserId: row.instagram_user_id,
+    instagramAccountId: row.instagram_account_id,
   }));
 }
 

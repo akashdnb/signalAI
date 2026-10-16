@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "./ui/Button";
 import { EmptyState } from "./ui/EmptyState";
@@ -17,7 +17,7 @@ function roleLabel(role: WorkspaceRole): string {
   }
 }
 
-export function WorkspaceContextSwitcher() {
+export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: ReactNode }) {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +29,7 @@ export function WorkspaceContextSwitcher() {
   const [workspaceDescription, setWorkspaceDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function loadWorkspaces() {
+  const loadWorkspaces = useCallback(async () => {
     try {
       const result = await workspaceApi.listWorkspaces();
       setWorkspaces(result);
@@ -39,7 +39,7 @@ export function WorkspaceContextSwitcher() {
       setError(err instanceof Error ? err.message : "Could not load your workspaces.");
       throw err;
     }
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +56,14 @@ export function WorkspaceContextSwitcher() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const refresh = () => {
+      void loadWorkspaces().catch(() => undefined);
+    };
+    window.addEventListener("signalai:workspaces-updated", refresh);
+    return () => window.removeEventListener("signalai:workspaces-updated", refresh);
+  }, [loadWorkspaces]);
+
   const currentWorkspace = workspaces?.find((workspace) => workspace.tenantId === tenantId) ?? null;
 
   function switchWorkspace(next: WorkspaceSummary) {
@@ -68,7 +76,25 @@ export function WorkspaceContextSwitcher() {
     setOpen(false);
     const currentBase = `/dashboard/${tenantId}`;
     const suffix = location.pathname.startsWith(currentBase) ? location.pathname.slice(currentBase.length) : "";
-    navigate(`/dashboard/${next.tenantId}${suffix}`);
+    // Keep only workspace-level destinations. Resource detail routes contain IDs
+    // that belong to the previous workspace and would otherwise navigate into a
+    // nonexistent (or unrelated) record in the newly selected workspace.
+    const workspaceLevelRoutes = new Set([
+      "",
+      "/",
+      "/inbox",
+      "/leads",
+      "/automation",
+      "/knowledge",
+      "/content",
+      "/analytics",
+      "/team",
+      "/integrations",
+      "/billing",
+      "/settings",
+    ]);
+    const destination = workspaceLevelRoutes.has(suffix) ? suffix : "";
+    navigate(`/dashboard/${next.tenantId}${destination}`);
   }
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -97,12 +123,12 @@ export function WorkspaceContextSwitcher() {
     }
   }
 
-  if (workspaces === null) {
+  if (workspaces === null && !error) {
     return <div className="border-b border-line bg-card px-4 py-2 md:px-5"><LoadingState label="Loading workspaces…" className="min-h-12 py-2" /></div>;
   }
 
-  if (error && workspaces.length === 0) {
-    return <div className="border-b border-line bg-card px-4 py-2 md:px-5"><ErrorState title="Workspace context unavailable" description={error} action={<Button size="sm" variant="secondary" onClick={() => void loadWorkspaces()}>Retry</Button>} className="min-h-12 py-2" /></div>;
+  if (error && (workspaces === null || workspaces.length === 0)) {
+    return <div className="border-b border-line bg-card px-4 py-2 md:px-5"><ErrorState title="Workspace context unavailable" description={error} action={<Button size="sm" variant="secondary" onClick={() => void loadWorkspaces().catch(() => undefined)}>Retry</Button>} className="min-h-12 py-2" /></div>;
   }
 
   return (
@@ -121,7 +147,10 @@ export function WorkspaceContextSwitcher() {
           </span>
           <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
         </button>
-        {currentWorkspace && <span className="text-xs text-subtle">{workspaces.length > 1 ? `${workspaces.length} workspaces` : "Workspace"}</span>}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {accountContext}
+          {currentWorkspace && <span className="shrink-0 text-xs text-subtle">{workspaces.length > 1 ? `${workspaces.length} workspaces` : "Workspace"}</span>}
+        </div>
       </div>
 
       {error && workspaces.length > 0 && <p role="alert" className="mb-0 mt-2 text-sm text-err-ink">{error}</p>}
