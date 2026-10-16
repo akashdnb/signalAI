@@ -137,6 +137,32 @@ describe("billing routes (B11)", () => {
   // R10-01 regression: the checkout/status routes are exactly what starts
   // and reports on a paid subscription — must not be reachable without a
   // session for the tenant in the URL.
+  it("does not allow a member to start workspace billing checkout", async () => {
+    const pool = getPool();
+    const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET, "billing-owner");
+    const member = await import("../../db/users.js").then(({ findOrCreateUserByEmail }) =>
+      findOrCreateUserByEmail(pool, "billing-member@example.com"),
+    );
+    await pool.query(
+      "insert into tenant_members (tenant_id, user_id, role) values ($1, $2, 'member')",
+      [tenant.id, member.id],
+    );
+    const { createSessionToken } = await import("../../lib/session.js");
+    const { getUserSessionVersion } = await import("../../db/users.js");
+    const version = await getUserSessionVersion(pool, member.id);
+    const memberHeader = {
+      Authorization: `Bearer ${createSessionToken(SESSION_SECRET, member.id, version!)}`,
+    };
+
+    const response = await request(createApp())
+      .post(`/tenants/${tenant.id}/billing/checkout`)
+      .set(memberHeader)
+      .send({ tier: "starter" });
+
+    expect(response.status).toBe(403);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("rejects checkout and status requests with no session, or a session for a different tenant", async () => {
     const pool = getPool();
     const { tenant } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
