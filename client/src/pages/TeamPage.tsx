@@ -135,6 +135,7 @@ export function TeamPage() {
       });
       reload();
       reloadWorkspaces();
+      window.dispatchEvent(new Event("signalai:workspaces-updated"));
       setWorkspaceSaved(true);
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
