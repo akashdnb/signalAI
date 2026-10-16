@@ -365,6 +365,7 @@ export function AppShell() {
   const [tenantError, setTenantError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [account, setAccount] = useState<AccountHealth | null>(null);
+  const [accountTenantId, setAccountTenantId] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
@@ -533,6 +534,7 @@ export function AppShell() {
 
   useEffect(() => {
     setAccount(null);
+    setAccountTenantId(null);
     setUsage(null);
     setBilling(null);
     setUnreadCount(0);
@@ -623,6 +625,7 @@ export function AppShell() {
       .then(([a, u, b, unread]) => {
         if (cancelled) return;
         setAccount(a);
+        setAccountTenantId(tenantId);
         setUsage(u);
         setBilling(b);
         setUnreadCount(unread.length);
@@ -678,7 +681,7 @@ export function AppShell() {
           expiresAt: selected.expiresAt,
         };
       })()
-    : account;
+    : accountTenantId === tenantId ? account : null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
