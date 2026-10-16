@@ -2,7 +2,7 @@
 
 Roadmap item: **Complete Missing Backend APIs for Precision Operations**
 
-**Status:** Feature implementation is merged. This document records the current endpoint contracts, the post-merge profile registration regression found during stabilization, the fix proposed by PR #73, and the limits of verification performed so far.
+**Status:** Feature implementation is merged. This document records the current endpoint contracts, the profile registration regression found during post-merge stabilization, and the verification status of PR #73.
 
 ## Implementation map
 
@@ -23,9 +23,9 @@ Roadmap item: **Complete Missing Backend APIs for Precision Operations**
 
 ### Profile route mounting
 
-The profile handlers in `server/src/routes/profile.ts` exist, and the Settings page calls `GET/PATCH /me/profile`. The inspected `main` revision of `server/src/app.ts` did not import or mount `profileRouter`. Thus router implementation and route-level coverage alone did not guarantee the endpoint was reachable through the production `createApp()`.
+The profile handlers in `server/src/routes/profile.ts` exist, and the Settings page calls `GET/PATCH /me/profile`. The audited `main` revision of `server/src/app.ts` did not import or mount `profileRouter`. Thus router implementation and route-level coverage alone did not guarantee the endpoint was reachable through the production `createApp()`.
 
-**Fix proposed in PR #73:** import and mount `profileRouter` in `createApp()`, with a dedicated application-wiring test covering authenticated GET/PATCH and rejection of an unauthenticated read. This correction is pending PR review and CI; it should not be described as shipped until merged.
+**Fix in PR #73:** imports and mounts `profileRouter` in `createApp()`, with a dedicated application-wiring test covering authenticated GET/PATCH and rejection of an unauthenticated read. The code is committed on the stabilization branch but remains unmerged pending review and CI.
 
 ### API security and behavior
 
