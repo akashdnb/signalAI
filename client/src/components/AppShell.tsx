@@ -16,6 +16,8 @@ import { deriveDisplayName } from "../lib/leadFormatting";
 import { Logo } from "./Logo";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { ThemeToggle } from "./ThemeToggle";
+import { ConnectedAccountSwitcher, type ConnectedAccountSwitcherWorkspace } from "./ui/ConnectedAccountSwitcher";
+import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
 import {
   AnalyticsIcon,
   AutomationIcon,
@@ -213,7 +215,7 @@ function MobileAccountSheet({
         </span>
         <div>
           <div className="text-base font-medium text-ink">{profileName}</div>
-          <div className="text-sm text-subtle">Owner</div>
+          <div className="text-sm text-subtle">{role ? role[0]!.toUpperCase() + role.slice(1) : "Workspace member"}</div>
         </div>
       </div>
 
@@ -321,7 +323,7 @@ function AccountHeader({
             </span>
             <span className="text-left leading-tight">
               <span className="block text-sm font-medium text-ink">{profileName}</span>
-              <span className="block text-xs text-subtle">Owner</span>
+              <span className="block text-xs text-subtle">{role ? role[0]!.toUpperCase() + role.slice(1) : "Workspace member"}</span>
             </span>
             <ChevronDownIcon className="h-4 w-4 text-subtle" />
           </button>
@@ -362,6 +364,12 @@ export function AppShell() {
   const navigate = useNavigate();
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<ConnectedAccountSwitcherWorkspace[]>([]);
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [role, setRole] = useState<"owner" | "admin" | "member" | null>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("all");
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
@@ -472,6 +480,49 @@ export function AppShell() {
   }
 
   useEffect(() => {
+    if (!session || !tenantId) return;
+    let cancelled = false;
+    setWorkspaceLoading(true);
+    setWorkspaceError(null);
+    workspaceApi.listWorkspaces()
+      .then((items) => {
+        if (cancelled) return;
+        setWorkspaces(items);
+        const current = items.find((workspace) => workspace.tenantId === tenantId);
+        if (current) setRole(current.role);
+        else setRole(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setWorkspaceError(err instanceof Error ? err.message : "Could not load your workspaces.");
+      })
+      .finally(() => { if (!cancelled) setWorkspaceLoading(false); });
+    return () => { cancelled = true; };
+  }, [tenantId, session?.token]);
+
+  useEffect(() => {
+    if (!sessionValid || !tenantId) return;
+    let cancelled = false;
+    setConnectedAccounts([]);
+    setSelectedAccountId("all");
+    workspaceApi.listConnectedAccounts(tenantId)
+      .then((items) => { if (!cancelled) setConnectedAccounts(items); })
+      .catch(() => { if (!cancelled) setConnectedAccounts([]); });
+    return () => { cancelled = true; };
+  }, [tenantId, sessionValid]);
+
+  async function createWorkspace(name: string, description: string) {
+    const created = await workspaceApi.createWorkspace(name, description);
+    setWorkspaces((current) => [...current, created]);
+    navigate(`/dashboard/${created.tenantId}`, { replace: true });
+  }
+
+  function selectWorkspace(workspace: ConnectedAccountSwitcherWorkspace) {
+    if (!workspaces.some((item) => item.tenantId === workspace.tenantId)) return;
+    navigate(`/dashboard/${workspace.tenantId}`, { replace: true });
+  }
+
+  useEffect(() => {
     if (sessionValid) reloadTenant();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, sessionValid]);
@@ -508,6 +559,7 @@ export function AppShell() {
   if (!tenantId || !sessionValid) return null;
 
   const showWizard = Boolean(tenant) && (tenant!.industry === null || wizardLatchedOpen);
+  const accountOptions = connectedAccounts.map((item) => ({ id: item.id, handle: item.instagramUsername ? `@${item.instagramUsername}` : "Instagram account", label: item.instagramUsername ? `@${item.instagramUsername}` : item.instagramAccountId, connected: item.status === "healthy" }));
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
@@ -532,20 +584,6 @@ export function AppShell() {
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-5 py-5">
-          <Logo size="md" />
-          <div className="flex items-center gap-1 md:hidden">
-            <button
-              type="button"
-              aria-label="Close menu"
-              className="flex h-11 w-11 items-center justify-center text-subtle"
-              onClick={() => setMobileNavOpen(false)}
-            >
-              <CloseIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
         <nav className="flex-1 overflow-y-auto px-3">
           <NavList
             items={PRIMARY_NAV}
