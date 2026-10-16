@@ -63,7 +63,11 @@ export async function enqueueExecutionJob(input: {
   }
 
   const existing = await pool.query(
-    `select * from execution_jobs where tenant_id = $1 and idempotency_key = $2`,
+    `
+      select *
+      from execution_jobs
+      where tenant_id = $1 and idempotency_key = $2
+    `,
     [input.tenantId, input.idempotencyKey],
   );
   const row = existing.rows[0];
@@ -71,8 +75,11 @@ export async function enqueueExecutionJob(input: {
     throw new Error("execution_job_insert_race_lost");
   }
 
-  const samePayload = JSON.stringify(row.payload ?? {}) === JSON.stringify(input.payload);
-  if (String(row.type) !== input.type || !samePayload) {
+  const samePayload = await pool.query(
+    `select ($1::jsonb = $2::jsonb) as same`,
+    [JSON.stringify(row.payload ?? {}), JSON.stringify(input.payload)],
+  );
+  if (String(row.type) !== input.type || !samePayload.rows[0]?.same) {
     throw new ExecutionJobIdempotencyConflictError();
   }
 
