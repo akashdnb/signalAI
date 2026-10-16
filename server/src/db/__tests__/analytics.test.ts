@@ -32,12 +32,22 @@ describe("Phase 2A analytics: Top Performing Posts / Top Trigger Keywords", () =
 
     await upsertMediaMetadata(pool, tenant.id, {
       mediaId: "reel-popular",
-      caption: "Our giveaway reel",
+      caption: "Our giveaway reel (legacy metadata)",
       mediaType: "REEL",
       thumbnailUrl: null,
       permalink: "https://instagram.com/reel/popular",
       postedAt: null,
     });
+    // A second account-scoped metadata row must enrich the post, not
+    // multiply every matching event in the top-posts aggregation.
+    await upsertMediaMetadata(pool, tenant.id, {
+      mediaId: "reel-popular",
+      caption: "Our giveaway reel",
+      mediaType: "REEL",
+      thumbnailUrl: null,
+      permalink: "https://instagram.com/reel/popular",
+      postedAt: null,
+    }, "acct-2");
 
     for (let i = 0; i < 3; i++) {
       await insertEventIdempotent(pool, {
@@ -135,6 +145,15 @@ describe("R4 Analytics: pipeline funnel and revenue", () => {
 
     const funnel = await getPipelineFunnel(pool, tenant.id);
     expect(funnel.stages.find((s) => s.key === "leads")?.count).toBe(6);
+    expect(funnel.stageCounts).toEqual({
+      new: 1,
+      contacted: 1,
+      qualified: 1,
+      meeting_scheduled: 1,
+      won: 1,
+      lost: 1,
+    });
+    expect(funnel.unmappedLeadCount).toBe(0);
     // qualified-or-later: qualified, meeting_scheduled, won = 3 (lost excluded)
     expect(funnel.stages.find((s) => s.key === "qualified")?.count).toBe(3);
     // meeting-or-later: meeting_scheduled, won = 2
