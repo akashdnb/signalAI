@@ -370,6 +370,7 @@ export function AppShell() {
   const [role, setRole] = useState<"owner" | "admin" | "member" | null>(null);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState("all");
+  const [accountContextLoading, setAccountContextLoading] = useState(true);
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
@@ -505,9 +506,11 @@ export function AppShell() {
     let cancelled = false;
     setConnectedAccounts([]);
     setSelectedAccountId("all");
+    setAccountContextLoading(true);
     workspaceApi.listConnectedAccounts(tenantId)
       .then((items) => { if (!cancelled) setConnectedAccounts(items); })
-      .catch(() => { if (!cancelled) setConnectedAccounts([]); });
+      .catch(() => { if (!cancelled) setConnectedAccounts([]); })
+      .finally(() => { if (!cancelled) setAccountContextLoading(false); });
     return () => { cancelled = true; };
   }, [tenantId, sessionValid]);
 
@@ -611,6 +614,7 @@ export function AppShell() {
             onWorkspaceSelect={selectWorkspace}
             onCreateWorkspace={createWorkspace}
             accounts={accountOptions}
+            accountsLoading={accountContextLoading}
             selectedAccountId={selectedAccountId}
             onSelect={setSelectedAccountId}
             onManageAccounts={() => navigate(`/dashboard/${tenantId}/integrations`)}
