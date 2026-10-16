@@ -39,6 +39,7 @@ export function TeamPage() {
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
   const [currentRole, setCurrentRole] = useState<WorkspaceRole | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -109,11 +110,12 @@ export function TeamPage() {
     try {
       const result = await workspaceApi.inviteMember(tenantId, inviteEmail.trim(), inviteRole);
       setInviting(false);
+      setNotice(null);
       setInviteEmail("");
       setInviteRole("member");
-      if (result.delivery === "failed") {
-        setError("Invitation was created, but the email could not be delivered. You can resend it after fixing delivery.");
-      }
+      setNotice(result.delivery === "failed"
+        ? "Invitation was created, but email delivery failed. Check email delivery configuration before resending."
+        : "Invitation sent.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send invitation");
@@ -130,11 +132,12 @@ export function TeamPage() {
     try {
       if (action === "resend") {
         const result = await workspaceApi.resendInvitation(tenantId, invitationId);
-        if (result.delivery === "failed") {
-          setError("Invitation was regenerated, but the email could not be delivered.");
-        }
+        setNotice(result.delivery === "failed"
+          ? "A fresh invitation was created, but email delivery failed."
+          : "A fresh invitation was sent.");
       } else {
         await workspaceApi.revokeInvitation(tenantId, invitationId);
+        setNotice("Invitation cancelled.");
       }
       await load();
     } catch (err) {
@@ -184,12 +187,13 @@ export function TeamPage() {
 
       {error && <div className="banner banner-error" role="alert">{error}<button type="button" className="link-button" onClick={() => void load()}>Retry</button></div>}
       {permissionError && <div className="banner" role="status">{permissionError}</div>}
+      {notice && <div className="banner" role="status">{notice}</div>}
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 style={{ marginBottom: 0 }}>Members</h2>
-            <p className="muted small mt-1 mb-0">Owners can manage billing and workspace access. Admins can manage members, accounts and automations. Members can work with inbox, leads and automations.</p>
+            <p className="muted small mt-1 mb-0">Owners manage workspace access and billing. Admins manage teammates and connected accounts. Members can view the team and work with inbox, leads and automations.</p>
           </div>
           <button
             type="button"
