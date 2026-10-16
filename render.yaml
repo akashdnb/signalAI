@@ -37,6 +37,10 @@ services:
       # MCP OAuth protected-resource URL. The MCP service uses this as the RFC 8707 resource indicator.
       - key: MCP_PUBLIC_URL
         value: https://signalai-mcp-client.onrender.com
+      # Internal credential used by the MCP service for capability calls and token introspection.
+      # Never expose this to MCP clients.
+      - key: SIGNALAI_SERVICE_TOKEN
+        sync: false
       # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
       - key: TOKEN_ENCRYPTION_KEYS
         sync: false
