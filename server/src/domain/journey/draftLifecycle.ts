@@ -105,35 +105,26 @@ export async function updateJourneyDraftWithClient(
   },
 ): Promise<JourneyDraft & { previousVersion: number }> {
   const found = await client.query<{
-    id: string;
-    name: string;
-    description: string | null;
-    enabled: boolean;
+    campaign: Campaign;
     builder_version: number;
-    keywords: string[];
-    reply_mode: Campaign["replyMode"];
-    reply_templates: string[];
-    default_reply_template: string;
-    cta_link: string | null;
-    target_media_ids: string[];
-    reply_channel: Campaign["replyChannel"];
-    trigger_source: Campaign["triggerSource"];
-    tone: Campaign["tone"];
-    language: Campaign["language"];
-    use_knowledge_base: boolean;
-    created_at: Date;
-    updated_at: Date;
     mcp_metadata: Record<string, unknown>;
     published: boolean;
   }>(
-    `select c.*,
-       exists (
-         select 1 from campaign_journey_versions v
-          where v.tenant_id = c.tenant_id and v.campaign_id = c.id
-       ) as published
-     from campaigns c
-     where c.id = $1 and c.tenant_id = $2
-     for update`,
+    `select c.id, c.tenant_id as "tenantId", c.name, c.description, c.keywords,
+            c.enabled, c.reply_mode as "replyMode", c.reply_templates as "replyTemplates",
+            c.default_reply_template as "defaultReplyTemplate", c.cta_link as "ctaLink",
+            c.target_media_ids as "targetMediaIds", c.reply_channel as "replyChannel",
+            c.trigger_source as "triggerSource", c.tone, c.language,
+            c.use_knowledge_base as "useKnowledgeBase", c.created_at as "createdAt",
+            c.updated_at as "updatedAt", c.builder_version,
+            c.mcp_metadata,
+            exists (
+              select 1 from campaign_journey_versions v
+               where v.tenant_id = c.tenant_id and v.campaign_id = c.id
+            ) as published
+       from campaigns c
+       where c.id = $1 and c.tenant_id = $2
+       for update`,
     [automationId, tenantId],
   );
   const row = found.rows[0];
@@ -215,11 +206,26 @@ export async function updateJourneyDraftWithClient(
   const current = campaign.rows[0];
   return {
     campaign: {
-      ...row,
+      id: row.id,
+      tenantId: row.tenant_id,
       name: current?.name ?? row.name,
+      description: row.description,
       keywords: current?.keywords ?? row.keywords,
       enabled: false,
-    } as Campaign,
+      published: false,
+      replyMode: row.reply_mode,
+      replyTemplates: row.reply_templates,
+      defaultReplyTemplate: row.default_reply_template,
+      ctaLink: row.cta_link,
+      targetMediaIds: row.target_media_ids,
+      replyChannel: row.reply_channel,
+      triggerSource: row.trigger_source,
+      tone: row.tone,
+      language: row.language,
+      useKnowledgeBase: row.use_knowledge_base,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    },
     graph: graphNow ?? { nodes: [], edges: [], version },
     metadata: current?.mcp_metadata ?? row.mcp_metadata ?? {},
     previousVersion: row.builder_version,
