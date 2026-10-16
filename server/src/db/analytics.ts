@@ -121,7 +121,7 @@ export async function getTopPosts(
          select caption, permalink
            from media_metadata
           where tenant_id = $1 and media_id = c.media_id ${mediaAccountFilter}
-          order by fetched_at desc nulls last, id desc
+          order by fetched_at desc nulls last, instagram_account_id asc nulls last, id desc
           limit 1
        ) m on true
       order by c.comment_count desc, c.media_id
@@ -257,12 +257,18 @@ export async function getRevenueSummary(
   tenantId: string,
   instagramAccountId?: string,
 ): Promise<RevenueByCurrency[]> {
+  // Preserve workspace-wide totals for every deal. When an account is
+  // selected, only deals attached to leads attributed to that account can
+  // be included; an unlinked deal has no safe account attribution.
+  const accountJoin = instagramAccountId
+    ? "join leads l on l.tenant_id = d.tenant_id and l.id = d.lead_id"
+    : "";
   const accountFilter = instagramAccountId ? "and l.instagram_account_id = $2" : "";
   const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
   const result = await pool.query<{ currency: string; total: string }>(
     `select d.currency, sum(d.value)::numeric as total
        from deals d
-       join leads l on l.tenant_id = d.tenant_id and l.id = d.lead_id
+       ${accountJoin}
       where d.tenant_id = $1 and d.stage = 'won' and d.value is not null ${accountFilter}
       group by d.currency
       order by total desc`,
