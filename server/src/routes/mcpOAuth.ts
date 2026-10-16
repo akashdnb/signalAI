@@ -5,7 +5,10 @@ import { getPool } from "../db/pool.js";
 import { getUserSessionVersion } from "../db/users.js";
 import { verifySessionToken } from "../lib/session.js";
 
-const MCP_SCOPE = "signalai:read";
+const MCP_READ_SCOPE = "signalai:read";
+const MCP_WRITE_SCOPE = "signalai:write";
+const MCP_SUPPORTED_SCOPES = [MCP_READ_SCOPE, MCP_WRITE_SCOPE] as const;
+const MCP_SUPPORTED_SCOPE_SET = new Set<string>(MCP_SUPPORTED_SCOPES);
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 const CODE_TTL_SECONDS = 5 * 60;
@@ -53,7 +56,7 @@ function oauthMetadata() {
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
-    scopes_supported: [MCP_SCOPE],
+    scopes_supported: [...MCP_SUPPORTED_SCOPES],
     token_endpoint_auth_methods_supported: ["none"],
   };
 }
@@ -173,7 +176,11 @@ mcpOAuthRouter.get("/oauth/authorize", async (req, res) => {
   if (responseType !== "code") return errorRedirect(res, redirectUri, "unsupported_response_type", state);
   if (codeChallengeMethod !== "S256" || codeChallenge.length < 43) return errorRedirect(res, redirectUri, "invalid_request", state);
   const scopes = scopeText.split(/\s+/).filter(Boolean);
-  if (!scopes.includes(MCP_SCOPE)) return errorRedirect(res, redirectUri, "invalid_scope", state);
+  if (
+    scopes.length === 0 ||
+    scopes.some((scope) => !MCP_SUPPORTED_SCOPE_SET.has(scope)) ||
+    new Set(scopes).size !== scopes.length
+  ) return errorRedirect(res, redirectUri, "invalid_scope", state);
   if (!configuredMcpPublicUrl()) return res.status(503).json({ error: "mcp_oauth_not_configured" });
   if (resource !== resourceUrl()) return errorRedirect(res, redirectUri, "invalid_target", state);
 
@@ -311,6 +318,7 @@ mcpOAuthRouter.post("/oauth/introspect", async (req, res) => {
 
   return res.json({
     active: true,
+    iss: issuerUrl(),
     client_id: row.clientId,
     scope: row.scopes.join(" "),
     exp: Math.floor(row.expiresAt.getTime() / 1000),
