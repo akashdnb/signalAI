@@ -746,13 +746,13 @@ export const api = {
   updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
     request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
 
-  getTopPosts: (tenantId: string) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts`),
-  getTopKeywords: (tenantId: string) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords`),
-  getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
-  getFunnel: (tenantId: string) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel`),
-  getRevenue: (tenantId: string) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue`),
-  getConversationsTimeseries: (tenantId: string) =>
-    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
+  getTopPosts: (tenantId: string, accountId?: string | null) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getTopKeywords: (tenantId: string, accountId?: string | null) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getAnalytics: (tenantId: string, accountId?: string | null) => request<Analytics>(`/tenants/${tenantId}/analytics${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getFunnel: (tenantId: string, accountId?: string | null) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getRevenue: (tenantId: string, accountId?: string | null) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getConversationsTimeseries: (tenantId: string, accountId?: string | null) =>
+    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
   getCampaignAnalytics: (tenantId: string, campaignId: string) =>
