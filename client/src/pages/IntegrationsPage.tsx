@@ -175,19 +175,21 @@ export function IntegrationsPage() {
                     >
                       {reconnectingId === account.id ? "Redirecting…" : "Reconnect"}
                     </button>
-                  ) : (currentRole === "owner" || currentRole === "admin") && confirmingId === account.id ? (
-                    <>
-                      <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
-                        {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
-                      </button>
-                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
-                        Cancel
-                      </button>
-                    </>
                   ) : currentRole === "owner" || currentRole === "admin" ? (
-                    <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
-                      Disconnect
-                    </button>
+                    confirmingId === account.id ? (
+                      <>
+                        <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
+                          {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                        </button>
+                        <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
+                        Disconnect
+                      </button>
+                    )
                   ) : null}
                 </span>
               </div>
