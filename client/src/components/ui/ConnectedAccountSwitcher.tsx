@@ -9,6 +9,7 @@ export type ConnectedAccountSwitcherProps = {
   providerLabel: string;
   providerIcon: ReactNode;
   accounts: ConnectedAccountSwitcherOption[];
+  accountsLoading?: boolean;
   selectedAccountId: string;
   onSelect: (accountId: string) => void;
   onManageAccounts?: () => void;
@@ -34,6 +35,7 @@ function updatePreviewQuery(values: Record<string, string>) { const params = new
 export function ConnectedAccountSwitcher({
   workspaceName,
   accounts,
+  accountsLoading = false,
   selectedAccountId,
   onSelect,
   providerLabel,
@@ -178,10 +180,10 @@ export function ConnectedAccountSwitcher({
           {realMode && (
             <div className="sai-account-switcher__accounts">
               <div className="sai-account-switcher__accounts-heading"><strong>{providerLabel}</strong><button type="button" onClick={() => { setOpen(false); onManageAccounts?.(); }}>Manage</button></div>
-              {accounts.length === 0 ? <p className="sai-account-switcher__message">No Instagram accounts are connected to this workspace.</p> : (
+              {accountsLoading ? <p className="sai-account-switcher__message" role="status">Loading Instagram accounts…</p> : accounts.length === 0 ? <p className="sai-account-switcher__message">No Instagram accounts are connected to this workspace.</p> : (
                 <label className="sai-account-switcher__account-select"><span>Current account context</span><select aria-label="Current Instagram account context" value={selectedAccountId || "all"} onChange={event => onSelect(event.target.value)}><option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs attention" : ""}</option>)}</select></label>
               )}
-              <p className="sai-account-switcher__message">This selects the account context in the shell. Account-level filtering is shown only where the page supports it.</p>
+              <p className="sai-account-switcher__message">This selects the account context in the shell. It does not filter records on pages that do not yet support account-scoped queries.</p>
               {currentRole === "member" && <p className="sai-account-switcher__message">Your role allows viewing accounts. Workspace admins manage connections.</p>}
             </div>
           )}
