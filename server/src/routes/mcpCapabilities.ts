@@ -2,7 +2,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Pool, PoolClient } from "pg";
 import { getPool } from "../db/pool.js";
-import { getCampaign } from "../db/campaigns.js";
+import { getCampaign as getCampaignFromDomain } from "../db/campaigns.js";
 import {
   listMilestonesWithClient,
 } from "../db/milestones.js";
@@ -499,7 +499,7 @@ async function recordFailureAudit(pool: Pool, event: Record<string, unknown>) {
 }
 
 async function getCampaignCapability(pool: Pool, tenantId: string, id: string) {
-  const campaign = await getCampaign(pool, tenantId, id);
+  const campaign = await getCampaignFromDomain(pool, tenantId, id);
   if (!campaign) throw new ResourceNotFoundError();
   return { capability: "campaign.get", campaign };
 }
@@ -709,9 +709,9 @@ async function listCampaigns(pool: ReturnType<typeof getPool>, tenantId: string,
 }
 
 async function getCampaign(pool: ReturnType<typeof getPool>, tenantId: string, campaignId: string) {
-  const result = await pool.query(`select * from campaigns where id = $1 and tenant_id = $2`, [campaignId, tenantId]);
-  if (!result.rows[0]) throw new CapabilityInputError("campaign_not_found");
-  return { capability: "campaign.get", campaign: result.rows[0] };
+  const campaign = await getCampaignFromDomain(pool, tenantId, campaignId);
+  if (!campaign) throw new ResourceNotFoundError();
+  return { capability: "campaign.get", campaign };
 }
 
 async function analyticsOverview(pool: ReturnType<typeof getPool>, tenantId: string) {
