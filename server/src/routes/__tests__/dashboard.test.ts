@@ -684,4 +684,45 @@ describe("dashboard routes (BUI backend surface)", () => {
     const withFreshSession = await request(app).get(`/tenants/${tenant.id}/leads`).set(freshHeader);
     expect(withFreshSession.status).toBe(200);
   });
+  it("validates account filters against the active tenant before returning leads", async () => {
+    const pool = getPool();
+    const { tenant: tenantA, authHeader: authA } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { tenant: tenantB } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
+    const keyring = new Map([["v1", randomBytes(32)]]);
+    const app = createApp();
+
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-a", accessToken: "unused-a" });
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-b", accessToken: "unused-b" });
+    await upsertToken(pool, keyring, { tenantId: tenantB.id, instagramAccountId: "acct-other-tenant", accessToken: "unused-c" });
+
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "shared-user", "acct-a");
+    await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "shared-user", "acct-b");
+    const leadOtherTenant = await findOrCreateLeadByInstagramUserId(pool, tenantB.id, "other-user", "acct-other-tenant");
+
+    const accountRows = await pool.query<{ id: string; instagram_account_id: string }>(
+      `select id, instagram_account_id from meta_tokens where tenant_id = $1 order by instagram_account_id`,
+      [tenantA.id],
+    );
+    const rowA = accountRows.rows.find((row) => row.instagram_account_id === "acct-a")!;
+    const rowB = accountRows.rows.find((row) => row.instagram_account_id === "acct-b")!;
+    const ownAccount = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${rowA.id}`).set(authA);
+    expect(ownAccount.status).toBe(200);
+    expect(ownAccount.body).toHaveLength(1);
+    expect(ownAccount.body[0].id).toBe(leadA.id);
+
+    const otherAccount = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${rowB.id}`).set(authA);
+    expect(otherAccount.status).toBe(200);
+    expect(otherAccount.body).toHaveLength(1);
+    expect(otherAccount.body[0].id).not.toBe(leadA.id);
+
+    const foreignAccountRow = await pool.query<{ id: string }>(
+      `select id from meta_tokens where tenant_id = $1 and instagram_account_id = $2`,
+      [tenantB.id, "acct-other-tenant"],
+    );
+    const forged = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${foreignAccountRow.rows[0]!.id}`).set(authA);
+    expect(forged.status).toBe(404);
+    expect(forged.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+    expect(leadOtherTenant.tenantId).toBe(tenantB.id);
+  });
+
 });
