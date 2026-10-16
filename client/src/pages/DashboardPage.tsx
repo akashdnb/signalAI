@@ -5,6 +5,7 @@ import {
   api,
   type AccountHealth,
   type Analytics,
+  type Campaign,
   type ConversationsTimeseriesPoint,
   type Funnel,
   type LeadListItem,
@@ -12,6 +13,8 @@ import {
   type RevenueByCurrency,
 } from "../api";
 import { ConversationsChart } from "../components/ConversationsChart";
+import { CheckCircleIcon } from "../components/icons";
+import { StatusBadge } from "../components/ui";
 import { PIPELINE_STAGES, formatRelativeTime, leadDisplayName } from "../lib/leadFormatting";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
@@ -46,6 +49,7 @@ export function DashboardPage() {
   const [revenue, setRevenue] = useState<RevenueByCurrency[] | null>(null);
   const [timeseries, setTimeseries] = useState<ConversationsTimeseriesPoint[] | null>(null);
   const [leads, setLeads] = useState<LeadListItem[] | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
@@ -60,13 +64,14 @@ export function DashboardPage() {
     async function load() {
       setDataLoadError(null);
       try {
-        const [a, f, r, ts, l, acc] = await Promise.all([
+        const [a, f, r, ts, l, acc, c] = await Promise.all([
           api.getAnalytics(tenantId!),
           api.getFunnel(tenantId!),
           api.getRevenue(tenantId!),
           api.getConversationsTimeseries(tenantId!),
           api.getLeads(tenantId!),
           api.getAccountHealth(tenantId!),
+          api.listCampaigns(tenantId!),
         ]);
         if (cancelled) return;
         setAnalytics(a);
@@ -75,6 +80,7 @@ export function DashboardPage() {
         setTimeseries(ts);
         setLeads(l);
         setAccount(acc);
+        setCampaigns(c);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
@@ -131,6 +137,57 @@ export function DashboardPage() {
     : [];
   const maxStageCount = Math.max(1, ...stageRows.map((stage) => stage.count));
 
+  // "Needs your attention" — each count is real, drawn from data this page
+  // already fetches (plus a dedicated campaigns fetch for the draft count),
+  // not the preview's fixed sample copy.
+  const needsReviewCount = leads?.filter((lead) => lead.handoffStatus === "requested").length ?? 0;
+  const unassignedLeadCount = leads?.filter((lead) => lead.ownerUserId === null).length ?? 0;
+  const draftCampaignCount = campaigns?.filter((c) => !c.published).length ?? 0;
+  const accountHealthNote =
+    account === null
+      ? "Loading…"
+      : !account.connected
+        ? "Instagram isn't connected yet"
+        : account.status === "error"
+          ? (account.lastError ?? "This account needs attention")
+          : "Review permissions and last event";
+
+  const nextActions = [
+    {
+      to: `/dashboard/${tenantId}/inbox`,
+      title: "Review conversations",
+      description:
+        leads === null
+          ? "Loading…"
+          : `${needsReviewCount} conversation${needsReviewCount === 1 ? "" : "s"} need${needsReviewCount === 1 ? "s" : ""} a human review`,
+    },
+    {
+      to: `/dashboard/${tenantId}/leads`,
+      title: "Assign lead owners",
+      description:
+        leads === null
+          ? "Loading…"
+          : `${unassignedLeadCount} lead${unassignedLeadCount === 1 ? "" : "s"} ${unassignedLeadCount === 1 ? "is" : "are"} unassigned`,
+    },
+    {
+      to: `/dashboard/${tenantId}/automation`,
+      title: "Finish an automation draft",
+      description:
+        campaigns === null
+          ? "Loading…"
+          : campaigns.length === 0
+            ? "No automations yet"
+            : draftCampaignCount > 0
+              ? `${draftCampaignCount} draft${draftCampaignCount === 1 ? "" : "s"} not live`
+              : "All automations are live",
+    },
+    {
+      to: `/dashboard/${tenantId}/integrations`,
+      title: "Check account health",
+      description: accountHealthNote,
+    },
+  ];
+
   return (
     <div className="page page-wide page-overview">
       <header className="overview-header">
@@ -179,7 +236,7 @@ export function DashboardPage() {
             <div>
               <span className="overview-eyebrow">Conversation volume</span>
               <h2>Activity over time</h2>
-              <p className="muted">Comments and DMs are activity events, not conversion rates.</p>
+              <p className="muted">Count of inbound comments and DMs. Not a conversion rate.</p>
             </div>
             <Link to={`/dashboard/${tenantId}/analytics`}>Open analytics →</Link>
           </header>
@@ -195,7 +252,7 @@ export function DashboardPage() {
             <div>
               <span className="overview-eyebrow">Lead pipeline</span>
               <h2>{totalLeadCount.toLocaleString()} leads by stage</h2>
-              <p className="muted">Unique lead records; totals reconcile with the Leads page.</p>
+              <p className="muted">Unique lead records; totals reconcile.</p>
             </div>
             <Link to={`/dashboard/${tenantId}/leads`}>View leads →</Link>
           </header>
@@ -224,7 +281,14 @@ export function DashboardPage() {
                   </div>
                 )}
               </div>
-              {uncategorizedLeadCount > 0 && <p className="overview-reconcile">{uncategorizedLeadCount} lead{uncategorizedLeadCount === 1 ? " is" : "s are"} not mapped to a known pipeline stage.</p>}
+              {uncategorizedLeadCount > 0 ? (
+                <p className="overview-reconcile">{uncategorizedLeadCount} lead{uncategorizedLeadCount === 1 ? " is" : "s are"} not mapped to a known pipeline stage.</p>
+              ) : totalLeadCount > 0 ? (
+                <p className="overview-reconcile flex items-center gap-1.5 text-ok-ink">
+                  <CheckCircleIcon className="h-4 w-4 shrink-0" />
+                  {stageRows.map((stage) => stage.count).join(" + ")} = {totalLeadCount} leads; no unclassified leads.
+                </p>
+              ) : null}
             </>
           )}
         </section>
@@ -234,13 +298,18 @@ export function DashboardPage() {
             <div>
               <span className="overview-eyebrow">Next actions</span>
               <h2>Needs your attention</h2>
-              <p className="muted">A short list of useful places to continue.</p>
+              <p className="muted">Tasks that need an operator.</p>
             </div>
+            <StatusBadge tone="warning">{nextActions.length} Items</StatusBadge>
           </header>
           <div className="overview-actions">
-            <Link to={`/dashboard/${tenantId}/inbox`}><span><strong>Review conversations</strong><small>Open the latest inbound conversations and handoffs.</small></span><span>→</span></Link>
-            <Link to={`/dashboard/${tenantId}/leads`}><span><strong>Review lead ownership</strong><small>Check unassigned or recently active leads.</small></span><span>→</span></Link>
-            <Link to={`/dashboard/${tenantId}/analytics`}><span><strong>Review performance</strong><small>Separate activity volume from pipeline progression.</small></span><span>→</span></Link>
+            {nextActions.map((action, index) => (
+              <Link key={action.title} to={action.to}>
+                <span className="overview-action-number">{String(index + 1).padStart(2, "0")}</span>
+                <span><strong>{action.title}</strong><small>{action.description}</small></span>
+                <span>→</span>
+              </Link>
+            ))}
           </div>
         </section>
 

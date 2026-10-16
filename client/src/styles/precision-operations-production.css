@@ -77,11 +77,12 @@
 .page-overview .overview-stage-row-muted .overview-stage-track span { background: var(--text-muted); opacity: 0.45; }
 .page-overview .overview-reconcile { margin: 1rem 0 0; padding-top: 0.85rem; border-top: 1px solid var(--surface-divider); color: var(--text-muted); font-size: 0.82rem; }
 .page-overview .overview-actions { display: grid; }
-.page-overview .overview-actions > a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 0.85rem 0; border-bottom: 1px solid var(--surface-divider); color: var(--text); text-decoration: none; }
+.page-overview .overview-actions > a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 0.85rem 0; border-bottom: 1px solid var(--surface-divider); color: var(--text); text-decoration: none; }
 .page-overview .overview-actions > a:last-child { border-bottom: 0; }
 .page-overview .overview-actions > a:hover { color: var(--accent); }
 .page-overview .overview-actions strong, .page-overview .overview-actions small { display: block; }
 .page-overview .overview-actions small { margin-top: 0.15rem; color: var(--text-muted); font-size: 0.8rem; }
+.page-overview .overview-action-number { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.85rem; color: var(--text-muted); }
 .page-overview .overview-recent-list { margin: 0; }
 .page-overview .overview-recent-list .list-item { padding-inline: 0; }
 .page-overview .overview-definitions-link { margin-top: 0.9rem; color: var(--text-muted); font-size: 0.82rem; text-decoration: underline; text-underline-offset: 3px; }
