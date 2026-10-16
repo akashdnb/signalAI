@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
+import type { Pool } from "pg";
 import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
 import { deleteTokensForTenant, getAccountHealth, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
@@ -25,6 +26,29 @@ import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
 import type { LLMProvider } from "../llm/provider.js";
 import type { EmbeddingProvider } from "../llm/embeddingProvider.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
+
+type RequestedAccountScope =
+  | { ok: true; instagramAccountId?: string }
+  | { ok: false };
+
+async function resolveRequestedAccountScope(
+  pool: Pool,
+  tenantId: string,
+  rawAccountRowId: unknown,
+  res: Response,
+): Promise<RequestedAccountScope> {
+  if (rawAccountRowId === undefined) return { ok: true };
+  if (typeof rawAccountRowId !== "string" || rawAccountRowId.length === 0) {
+    res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+    return { ok: false };
+  }
+  const instagramAccountId = await resolveInstagramAccountIdForTenant(pool, tenantId, rawAccountRowId);
+  if (!instagramAccountId) {
+    res.status(404).json({ error: "Instagram account not found for this workspace" });
+    return { ok: false };
+  }
+  return { ok: true, instagramAccountId };
+}
 
 const UNCONFIGURED_PREVIEW_PROVIDER: LLMProvider = {
   name: "unconfigured",
@@ -106,7 +130,10 @@ export function dashboardRouter(
   });
 
   router.get("/tenants/:tenantId/analytics", async (req, res) => {
-    const analytics = await getTenantAnalytics(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const analytics = await getTenantAnalytics(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(analytics);
   });
 
@@ -114,19 +141,28 @@ export function dashboardRouter(
   // lead's current pipeline_stage, not a transition history) and a
   // won-deals revenue rollup, grouped by currency.
   router.get("/tenants/:tenantId/analytics/funnel", async (req, res) => {
-    const funnel = await getPipelineFunnel(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const funnel = await getPipelineFunnel(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(funnel);
   });
 
   router.get("/tenants/:tenantId/analytics/revenue", async (req, res) => {
-    const revenue = await getRevenueSummary(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const revenue = await getRevenueSummary(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(revenue);
   });
 
   // Dashboard R6: trailing-30-day comment/DM counts for the "Conversations
   // over time" chart.
   router.get("/tenants/:tenantId/analytics/timeseries", async (req, res) => {
-    const timeseries = await getConversationsTimeseries(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const timeseries = await getConversationsTimeseries(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(timeseries);
   });
 
