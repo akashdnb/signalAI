@@ -334,7 +334,7 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
   }
   scalarSet.push("updated_at = now()");
   if (scalarSet.length > 1 || !graphChanges) {
-    const versionGuard = graphChanges ? "" : ` and builder_version = ${values.length + 1}`;
+    const versionGuard = graphChanges ? "" : ` and builder_version = ${values.length}`;
     const update = await client.query(
       `update campaigns set ${scalarSet.join(", ")}
         where id = $1 and tenant_id = $2${versionGuard}`,
@@ -777,7 +777,7 @@ async function getContact(pool: ReturnType<typeof getPool>, tenantId: string, co
      where c.id = $2`,
     [tenantId, contactId],
   );
-  if (!result.rows[0]) throw new CapabilityInputError("contact_not_found");
+  if (!result.rows[0]) throw new ResourceNotFoundError();
   return { capability: "contact.get", contact: result.rows[0] };
 }
 
@@ -808,6 +808,6 @@ async function getIntegration(pool: ReturnType<typeof getPool>, tenantId: string
      where id = $1 and tenant_id = $2`,
     [integrationId, tenantId],
   );
-  if (!result.rows[0]) throw new CapabilityInputError("integration_not_found");
+  if (!result.rows[0]) throw new ResourceNotFoundError();
   return { capability: "integration.get", integration: result.rows[0] };
 }
