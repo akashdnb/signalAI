@@ -81,7 +81,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // body wasn't JSON — keep statusText
     }
-    // A 403 is an authenticated permission denial, not an invalid session. Keep the session so the user can switch to a workspace they can access.
     if (res.status === 401) {
       clearSession();
     }
@@ -117,7 +116,7 @@ async function requestMultipart<T>(path: string, formData: FormData): Promise<T>
     } catch {
       // body wasn't JSON — keep statusText
     }
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       clearSession();
     }
     throw new ApiError(res.status, message);
@@ -196,6 +195,44 @@ export interface UserProfile {
   createdAt: string;
 }
 
+
+export type NotificationSeverity = "info" | "success" | "warning" | "critical";
+export type NotificationChannel = "email" | "in_app";
+export interface NotificationPreferenceChannel {
+  type: NotificationChannel;
+  label: string;
+  description: string;
+  available: boolean;
+  reason: string | null;
+  enabled: boolean;
+}
+export interface NotificationPreferenceEvent {
+  type: string;
+  label: string;
+  description: string;
+  severity: NotificationSeverity;
+  channels: NotificationPreferenceChannel[];
+}
+export interface NotificationPreferences {
+  events: NotificationPreferenceEvent[];
+  recipient: { email: string };
+}
+export interface InAppNotification {
+  id: string;
+  eventType: string;
+  title: string;
+  message: string;
+  severity: NotificationSeverity;
+  entityType: string | null;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+export interface NotificationInbox {
+  notifications: InAppNotification[];
+  unreadCount: number;
+}
+
 export interface KnowledgeBaseDocumentPreview {
   documentId: string;
   filename: string;
@@ -272,7 +309,7 @@ export interface Campaign {
 
 export interface ObservedMedia {
   mediaId: string;
-  /** Provider Instagram account ID attached to the observed post; null for legacy metadata that cannot be attributed safely. */
+  /** Provider Instagram account ID; null on legacy metadata that cannot be attributed. */
   instagramAccountId?: string | null;
   commentCount: number;
   lastSeenAt: string | null;
@@ -746,13 +783,13 @@ export const api = {
   updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
     request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
 
-  getTopPosts: (tenantId: string, accountId?: string | null) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getTopKeywords: (tenantId: string, accountId?: string | null) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getAnalytics: (tenantId: string, accountId?: string | null) => request<Analytics>(`/tenants/${tenantId}/analytics${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getFunnel: (tenantId: string, accountId?: string | null) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getRevenue: (tenantId: string, accountId?: string | null) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getConversationsTimeseries: (tenantId: string, accountId?: string | null) =>
-    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getTopPosts: (tenantId: string) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts`),
+  getTopKeywords: (tenantId: string) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords`),
+  getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
+  getFunnel: (tenantId: string) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel`),
+  getRevenue: (tenantId: string) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue`),
+  getConversationsTimeseries: (tenantId: string) =>
+    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
   getCampaignAnalytics: (tenantId: string, campaignId: string) =>
@@ -880,6 +917,21 @@ export const api = {
       body: JSON.stringify({ tier }),
     }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
+
+
+  getNotificationPreferences: (tenantId: string) =>
+    request<NotificationPreferences>(`/tenants/${tenantId}/notifications/preferences`),
+  updateNotificationPreferences: (tenantId: string, preferences: Array<{ eventType: string; channel: NotificationChannel; enabled: boolean }>) =>
+    request<{ saved: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/preferences`, {
+      method: "PUT",
+      body: JSON.stringify({ preferences }),
+    }),
+  getNotifications: (tenantId: string, limit = 10) =>
+    request<NotificationInbox>(`/tenants/${tenantId}/notifications?limit=${limit}`),
+  markNotificationRead: (tenantId: string, notificationId: string) =>
+    request<{ read: boolean }>(`/tenants/${tenantId}/notifications/${notificationId}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: (tenantId: string) =>
+    request<{ read: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/read-all`, { method: "POST" }),
 
   getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
   updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
