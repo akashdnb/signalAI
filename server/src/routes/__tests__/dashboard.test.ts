@@ -258,7 +258,7 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(res.body).toEqual({ commentsReceived: 1, dmsSent: 1, dmFailures: 1, uniqueLeads: 1 });
   });
 
-  it("GET /tenants/:id/analytics/funnel reports stage-cumulative counts and open-with-no-outcome", async () => {
+  it("GET /tenants/:id/analytics/funnel reports exact current stage counts alongside cumulative progression counts", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     const app = createApp();
@@ -273,6 +273,17 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(res.body.stages.find((s: { key: string }) => s.key === "leads")).toMatchObject({ count: 2 });
     expect(res.body.stages.find((s: { key: string }) => s.key === "qualified")).toMatchObject({ count: 2 });
     expect(res.body.stages.find((s: { key: string }) => s.key === "won")).toMatchObject({ count: 1 });
+    expect(res.body.stageCounts).toEqual({
+      new: 0,
+      contacted: 0,
+      qualified: 1,
+      meeting_scheduled: 0,
+      won: 1,
+      lost: 0,
+    });
+    expect(res.body.unmappedLeadCount).toBe(0);
+    expect(res.body.stages.find((s: { key: string }) => s.key === "comments")?.label).toBe("Comments received");
+    expect(res.body.stages.find((s: { key: string }) => s.key === "dms")?.label).toBe("DMs reserved");
     expect(res.body.openWithNoOutcome).toBe(1); // leadB (qualified) — leadA is won
   });
 
