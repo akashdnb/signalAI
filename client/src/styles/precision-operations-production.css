@@ -55,11 +55,11 @@
 
 /* Overview */
 .page-overview .overview-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.page-overview .overview-header h1 { margin: 0; font-size: clamp(1.8rem, 2.4vw, 2.3rem); line-height: 1.12; letter-spacing: -0.03em; }
+.page-overview .overview-header h1 { margin: 0; font-size: clamp(1.8rem, 2.4vw, 2rem); line-height: 1.12; letter-spacing: -0.03em; }
 .page-overview .overview-header .muted { margin-top: 0.45rem; }
 .page-overview .overview-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; margin-bottom: 1.5rem; }
 .page-overview .overview-period-select select { min-height: 40px; }
-.overview-eyebrow { display: block; margin-bottom: 0.3rem; color: var(--text-muted); font-size: 0.72rem; font-weight: 750; letter-spacing: 0.08em; line-height: 1.2; text-transform: uppercase; }
+.overview-eyebrow { display: block; margin-bottom: 0.3rem; color: var(--text-muted); font-size: 0.75rem; font-weight: 750; letter-spacing: 0.08em; line-height: 1.2; text-transform: uppercase; }
 .page-overview .overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); }
 .page-overview .overview-metric { min-width: 0; min-height: 112px; padding: 1.2rem 1.25rem; border-right: 1px solid var(--border); }
 .page-overview .overview-metric:last-child { border-right: 0; }
