@@ -880,6 +880,10 @@ export function AppShell() {
               <Outlet />
             )}
           </TenantContext.Provider>
+          <footer className="app-footer">
+            <span>SignalAI</span>
+            <span>{tenant?.name ?? "…"} · {account?.connected ? "Instagram connected" : "Instagram not connected"}</span>
+          </footer>
         </main>
       </div>
     </div>
