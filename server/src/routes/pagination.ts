@@ -85,7 +85,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   if (validDate(from) && validDate(to) && from > to) return res.status(400).json({ error: "from must be on or before to" });
   if (unread !== undefined && unread !== "true" && unread !== "false") return res.status(400).json({ error: "unread must be true or false" });
   const pool = getPool();
-  if (query.accountId !== undefined && typeof query.accountId !== "string") {
+  if (query.accountId !== undefined && (typeof query.accountId !== "string" || !query.accountId.trim())) {
     return res.status(400).json({ error: "accountId must be a single connected account ID" });
   }
   const requestedAccountRowId = typeof query.accountId === "string" && query.accountId.trim()
