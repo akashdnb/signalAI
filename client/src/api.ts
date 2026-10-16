@@ -81,7 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // body wasn't JSON — keep statusText
     }
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       clearSession();
     }
     throw new ApiError(res.status, message);
@@ -116,7 +116,7 @@ async function requestMultipart<T>(path: string, formData: FormData): Promise<T>
     } catch {
       // body wasn't JSON — keep statusText
     }
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       clearSession();
     }
     throw new ApiError(res.status, message);
