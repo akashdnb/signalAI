@@ -99,7 +99,11 @@ export async function findOrCreateLeadByInstagramUserId(
   const result = instagramAccountId
     ? await pool.query<LeadRow>(
         `insert into leads (tenant_id, instagram_user_id, instagram_account_id)
-         values ($1, $2, $3)
+         select $1, $2, $3
+          where exists (
+            select 1 from meta_tokens
+             where tenant_id = $1 and instagram_account_id = $3
+          )
          on conflict (tenant_id, instagram_account_id, instagram_user_id)
            where instagram_account_id is not null and instagram_user_id is not null
          do update set tenant_id = excluded.tenant_id
@@ -115,7 +119,11 @@ export async function findOrCreateLeadByInstagramUserId(
          returning *, (xmax = 0) as is_new`,
         [tenantId, instagramUserId],
       );
-  const row = result.rows[0]!;
+  const row = result.rows[0];
+  if (!row && instagramAccountId) {
+    throw new Error("Instagram account does not belong to this workspace");
+  }
+  if (!row) throw new Error("Unable to create or resolve lead");
 
   if (row.is_new) {
     // Customer/Lead split (roadmap Phase 1 Platform Foundations): mint one
