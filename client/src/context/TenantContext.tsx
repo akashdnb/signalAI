@@ -10,20 +10,20 @@ export interface TenantContextValue {
   tenant: TenantSummary | null;
   error: string | null;
   reload: () => void;
-  reloadWorkspaces: () => void;
-  reloadConnectedAccounts: () => void;
   workspaces: WorkspaceSummary[] | null;
   workspaceError: string | null;
+  reloadWorkspaces: () => void;
   workspaceRole: WorkspaceRole | null;
   connectedAccounts: ConnectedInstagramAccount[] | null;
   accountError: string | null;
+  reloadConnectedAccounts: () => void;
   selectedAccountId: string | null;
   setSelectedAccountId: (accountId: string | null) => void;
 }
 
 export const TenantContext = createContext<TenantContextValue | null>(null);
 
-/** AppShell owns the signed-in workspace and account context. Nested pages use the server-backed lists rather than inventing local workspace or account records. */
+/** AppShell owns the signed-in workspace and account context. Nested pages consume server-backed lists, never local demo records. */
 export function useTenant(): TenantContextValue {
   const ctx = useContext(TenantContext);
   if (!ctx) throw new Error("useTenant must be used within AppShell");
