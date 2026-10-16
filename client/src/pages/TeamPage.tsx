@@ -275,7 +275,11 @@ export function TeamPage() {
         )}
       </section>
 
-      {invitationsForbidden && <section className="card"><h2>Invitations</h2><p className="muted mb-0">Only workspace owners and admins can view or manage invitations.</p></section>}\n\n      {canManageMembers && invitationsLoading && <section className="card"><h2>Invitations</h2><p className="muted" role="status">Loading invitations…</p></section>}\n\n      {canManageMembers && !invitationsLoading && pendingInvitations.length > 0 && (
+      {invitationsForbidden && <section className="card"><h2>Invitations</h2><p className="muted mb-0">Only workspace owners and admins can view or manage invitations.</p></section>}
+
+      {canManageMembers && invitationsLoading && <section className="card"><h2>Invitations</h2><p className="muted" role="status">Loading invitations…</p></section>}
+
+      {canManageMembers && !invitationsLoading && pendingInvitations.length > 0 && (
         <section className="card">
           <h2>Pending invitations</h2>
           <p className="muted small">Invitations are single-use and expire automatically. Resend to issue a fresh invitation link.</p>
