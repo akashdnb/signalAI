@@ -81,7 +81,7 @@ async function ingestOneEchoEvent(pool: Pool, tenantId: string, event: ParsedWeb
   const alreadyRecorded = await sentReplyExistsForMetaMessageId(pool, tenantId, event.metaMessageId);
   if (alreadyRecorded) return;
 
-  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, event.instagramUserId);
+  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, event.instagramUserId, event.instagramAccountId);
   await recordSentReply(pool, {
     tenantId,
     leadId: lead.id,
@@ -116,7 +116,7 @@ async function ingestOneEvent(
   try {
     await client.query("BEGIN");
 
-    const lead = await findOrCreateLeadByInstagramUserId(client, tenantId, event.instagramUserId);
+    const lead = await findOrCreateLeadByInstagramUserId(client, tenantId, event.instagramUserId, event.instagramAccountId);
     const sequence = await nextSequence(client, tenantId, lead.id);
 
     // Compare this DM with the prior genuine inbound DM, not the leads-table
@@ -155,7 +155,7 @@ async function ingestOneEvent(
     // a comment on" as a picker (listKnownMediaForTenant) without a
     // separate Graph API media-listing call for THIS media, and commentId
     // is what the worker needs to post a public reply to this exact comment.
-    let attributes: Record<string, unknown> = {};
+    let attributes: Record<string, unknown> = { instagramAccountId: event.instagramAccountId };
     if (event.eventType === "comment" && event.mediaId) attributes.mediaId = event.mediaId;
     if (event.eventType === "comment" && event.commentId) attributes.commentId = event.commentId;
 
