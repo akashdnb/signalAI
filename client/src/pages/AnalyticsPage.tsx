@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Funnel, type RevenueByCurrency, type TopKeyword, type TopPost } from "../api";
+import { useTenant } from "../context/TenantContext";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
@@ -73,6 +74,7 @@ function PipelineProgression({ funnel }: { funnel: Funnel }) {
 export function AnalyticsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [revenue, setRevenue] = useState<RevenueByCurrency[] | null>(null);
   const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
@@ -81,14 +83,19 @@ export function AnalyticsPage() {
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
+    setFunnel(null);
+    setRevenue(null);
+    setTopPosts(null);
+    setTopKeywords(null);
+    setErrors([]);
     if (!tenantId) return;
     let cancelled = false;
     async function load() {
       const results = await Promise.allSettled([
-        api.getFunnel(tenantId!),
-        api.getRevenue(tenantId!),
-        api.getTopPosts(tenantId!),
-        api.getTopKeywords(tenantId!),
+        api.getFunnel(tenantId!, selectedAccountId),
+        api.getRevenue(tenantId!, selectedAccountId),
+        api.getTopPosts(tenantId!, selectedAccountId),
+        api.getTopKeywords(tenantId!, selectedAccountId),
       ]);
       if (cancelled) return;
 
@@ -112,7 +119,7 @@ export function AnalyticsPage() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [tenantId, navigate, reloadCount]);
+  }, [tenantId, navigate, reloadCount, selectedAccountId]);
 
   if (!tenantId) return null;
 
