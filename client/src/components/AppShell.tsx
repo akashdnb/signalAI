@@ -269,7 +269,6 @@ function MobileAccountSheet({
 
 function AccountHeader({
   tenant,
-  account,
   usage,
   email,
   firstName,
@@ -278,7 +277,6 @@ function AccountHeader({
   onLogout,
 }: {
   tenant: TenantSummary | null;
-  account: AccountHealth | null;
   usage: UsageSummary | null;
   email?: string;
   firstName?: string;
@@ -291,23 +289,25 @@ function AccountHeader({
   const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
   const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
+  const workspaceInitials = (tenant?.name ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("") || "…";
+
   return (
     <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
-          <InstagramMarkIcon className="h-4 w-4" />
+      <button type="button" className="flex min-w-0 items-center gap-2.5 rounded-lg py-1 pr-2 hover:bg-chip" title={tenant?.name ?? undefined}>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-sm font-semibold text-accent">
+          {workspaceInitials}
         </span>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</div>
-          {account?.connected ? (
-            <span className="pill pill-ok m-0 inline-block">
-              <span className="mr-1">●</span>Connected
-            </span>
-          ) : (
-            <span className="text-xs text-subtle">Instagram not connected</span>
-          )}
-        </div>
-      </div>
+        <span className="min-w-0 text-left">
+          <span className="block truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</span>
+          <span className="block text-xs text-subtle">Workspace</span>
+        </span>
+        <ChevronDownIcon className="h-4 w-4 shrink-0 text-subtle" />
+      </button>
 
       <div className="flex shrink-0 items-center gap-4">
         {usage && (
@@ -693,7 +693,6 @@ export function AppShell() {
 
         <AccountHeader
           tenant={tenant}
-          account={account}
           usage={usage}
           email={session?.email}
           firstName={session?.firstName}
