@@ -66,32 +66,21 @@ export function startAlertsWorker(boss: PgBoss, pool: Pool): Promise<string> {
   return boss.work<NewLeadAlertJob>(ALERTS_QUEUE, FAST_POLL, async (jobs) => {
     for (const job of jobs) {
       if (job.data.type === "new_lead") {
+        // Persist the product event before external side effects. If the durable
+        // notification ledger cannot be written, fail the queue job so pg-boss
+        // can retry instead of silently losing the product notification.
+        await publishNotificationEvent(pool, boss, {
+          tenantId: job.data.tenantId,
+          eventType: "lead.created",
+          idempotencyKey: `lead:${job.data.leadId}:created`,
+          title: "New lead",
+          message: "A new lead was added from an Instagram conversation.",
+          entityType: "lead",
+          entityId: job.data.leadId,
+        });
+
         const link = `${config.appBaseUrl}/tenants/${job.data.tenantId}/leads/${job.data.leadId}`;
         await sendTelegramAlert(`👋 New lead: ${link}`);
-
-        // Fan out the real product event through persisted preferences and a
-        // durable delivery ledger. The idempotency key is stable for this
-        // lead event, so queue retries cannot create duplicate in-app alerts.
-        try {
-          await publishNotificationEvent(pool, boss, {
-            tenantId: job.data.tenantId,
-            eventType: "lead.created",
-            idempotencyKey: `lead:${job.data.leadId}:created`,
-            title: "New lead",
-            message: "A new lead was added from an Instagram conversation.",
-            entityType: "lead",
-            entityId: job.data.leadId,
-          });
-        } catch (err) {
-          // New notification history is independent from the legacy operational alert.
-          console.error(JSON.stringify({
-            event: "notification.fanout",
-            eventType: "lead.created",
-            workspaceId: job.data.tenantId,
-            result: "failed",
-            errorCode: "notification_persistence_failed",
-          }));
-        }
 
         // Preserve the existing independent owner email until consumers migrate.
         // The new delivery ledger remains the source of truth for preference-managed email.
