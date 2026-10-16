@@ -28,12 +28,12 @@ export function IntegrationsPage() {
       setAccounts(await workspaceApi.listConnectedAccounts(tenantId));
       setError(null);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && err.status === 401) {
         navigate("/login", { replace: true });
         return;
       }
       const status = (err as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         navigate("/login", { replace: true });
         return;
       }
@@ -164,9 +164,12 @@ export function IntegrationsPage() {
                     {!account.instagramUsername && (
                       <p className="muted small mt-1 mb-0">The handle will appear after this account is successfully reconnected.</p>
                     )}
-                    <p className="muted small mt-1 mb-0">Instagram account ID: <code>{account.instagramAccountId}</code></p>
                     <p className="muted small mt-1 mb-0">Last checked: {formatDate(account.lastCheckedAt)}</p>
                     {account.expiresAt && <p className="muted small mt-1 mb-0">Connection credential expires: {formatDate(account.expiresAt)}</p>}
+                    <details className="mt-2 text-xs text-subtle">
+                      <summary className="cursor-pointer">Technical details</summary>
+                      <p className="muted small mt-1 mb-0">Instagram account ID: <code>{account.instagramAccountId}</code></p>
+                    </details>
                     {account.status === "error" && account.lastError && (
                       <span className="banner banner-error small mt-2" style={{ display: "block" }}>{account.lastError}</span>
                     )}
