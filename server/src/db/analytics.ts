@@ -24,20 +24,37 @@ export interface TenantAnalytics {
  *    failure; a transient one that succeeded on retry was never really a
  *    failure from the creator's point of view.
  */
-export async function getTenantAnalytics(pool: Pool, tenantId: string): Promise<TenantAnalytics> {
+export async function getTenantAnalytics(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId?: string,
+): Promise<TenantAnalytics> {
+  const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2"
+    : "";
+  const directAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
+  const jobAccountFilter = instagramAccountId ? "and job_data->>'instagramAccountId' = $2" : "";
   const [comments, uniqueLeads, dmsSent, dmFailures] = await Promise.all([
     pool.query<{ count: string }>(
-      `select count(*)::int as count from lead_events where tenant_id = $1 and event_type = 'comment'`,
-      [tenantId],
+      `select count(*)::int as count
+         from lead_events e
+         left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+        where e.tenant_id = $1 and e.event_type = 'comment' ${eventAccountFilter}`,
+      params,
     ),
-    pool.query<{ count: string }>(`select count(*)::int as count from leads where tenant_id = $1`, [tenantId]),
-    pool.query<{ count: string }>(`select count(*)::int as count from account_sends where tenant_id = $1`, [
-      tenantId,
-    ]),
+    pool.query<{ count: string }>(
+      `select count(*)::int as count from leads where tenant_id = $1 ${directAccountFilter}`,
+      params,
+    ),
+    pool.query<{ count: string }>(
+      `select count(*)::int as count from account_sends where tenant_id = $1 ${directAccountFilter}`,
+      params,
+    ),
     pool.query<{ count: string }>(
       `select count(*)::int as count from dead_letter_events
-       where queue_name = 'lead-events' and job_data->>'tenantId' = $1`,
-      [tenantId],
+        where queue_name = 'lead-events' and job_data->>'tenantId' = $1 ${jobAccountFilter}`,
+      params,
     ),
   ]);
 
@@ -267,7 +284,16 @@ export interface ConversationsTimeseriesPoint {
  * activity via generate_series rather than only returning days that have
  * rows.
  */
-export async function getConversationsTimeseries(pool: Pool, tenantId: string): Promise<ConversationsTimeseriesPoint[]> {
+export async function getConversationsTimeseries(
+  pool: Pool,
+  tenantId: string,
+  instagramAccountId?: string,
+): Promise<ConversationsTimeseriesPoint[]> {
+  const eventAccountFilter = instagramAccountId
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2"
+    : "";
+  const sendAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
+  const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
   const result = await pool.query<{ date: string; comments: string; dms: string }>(
     `select
        to_char(d::date, 'YYYY-MM-DD') as date,
@@ -275,19 +301,21 @@ export async function getConversationsTimeseries(pool: Pool, tenantId: string): 
        coalesce(m.count, 0) as dms
      from generate_series(current_date - interval '29 days', current_date, interval '1 day') as d
      left join (
-       select date_trunc('day', occurred_at) as day, count(*)::int as count
-       from lead_events
-       where tenant_id = $1 and event_type = 'comment' and occurred_at >= current_date - interval '29 days'
-       group by 1
+       select date_trunc('day', e.occurred_at) as day, count(*)::int as count
+         from lead_events e
+         left join leads l on l.tenant_id = e.tenant_id and l.id = e.lead_id
+        where e.tenant_id = $1 and e.event_type = 'comment'
+          and e.occurred_at >= current_date - interval '29 days' ${eventAccountFilter}
+        group by 1
      ) c on c.day = d
      left join (
        select date_trunc('day', sent_at) as day, count(*)::int as count
-       from account_sends
-       where tenant_id = $1 and sent_at >= current_date - interval '29 days'
-       group by 1
+         from account_sends
+        where tenant_id = $1 and sent_at >= current_date - interval '29 days' ${sendAccountFilter}
+        group by 1
      ) m on m.day = d
      order by d`,
-    [tenantId],
+    params,
   );
   return result.rows.map((row) => ({ date: row.date, comments: Number(row.comments), dms: Number(row.dms) }));
 }
