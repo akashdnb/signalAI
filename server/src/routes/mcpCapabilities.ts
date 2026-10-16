@@ -13,7 +13,7 @@ import {
   type JourneyNode,
   type JourneyEdge,
 } from "../db/journeyGraph.js";
-import { validateJourneyGraph } from "../domain/journey/validateJourney.js";
+import { DraftLifecycleError, createJourneyDraftWithClient, updateJourneyDraftWithClient, validateJourneyDraftWithClient } from "../domain/journey/draftLifecycle.js";
 
 const READ_CAPABILITIES = new Set([
   "lead.list", "lead.get", "conversation.list", "conversation.get",
@@ -76,6 +76,14 @@ mcpCapabilitiesRouter.post("/v1/capabilities/:capability", requireMcpServiceAuth
     const result = await invokeReadCapability(capability, tenantId, req.body ?? {});
     return res.status(200).json({ ...result, correlationId });
   } catch (error) {
+    if (error instanceof DraftLifecycleError) {
+      const statusCode = error.code === "resource_not_found" ? 404
+        : error.code === "version_conflict" || error.code === "invalid_lifecycle_state" ? 409 : 422;
+      return res.status(statusCode).json({
+        error: error.code, code: error.code, message: error.message,
+        ...(error.details ?? {}), correlationId,
+      });
+    }
     if (error instanceof CapabilityError) {
       const retryAfter = error.statusCode === 429 && typeof error.details?.retryAfterSeconds === "number"
         ? error.details.retryAfterSeconds : undefined;
@@ -205,44 +213,27 @@ async function createDraft(client: PoolClient, tenantId: string, input: Record<s
   const name = requireString(input.name, "name");
   const trigger = requireString(input.trigger, "trigger");
   if (name.length > 120) throw new CapabilityInputError("name must be 120 characters or fewer.");
-  const nodes = input.nodes === undefined ? null : normalizeNodes(input.nodes);
-  const edges = input.edges === undefined ? null : normalizeEdges(input.edges);
-  if ((nodes === null) !== (edges === null)) {
+  const nodes = input.nodes === undefined ? undefined : normalizeNodes(input.nodes);
+  const edges = input.edges === undefined ? undefined : normalizeEdges(input.edges);
+  if ((nodes === undefined) !== (edges === undefined)) {
     throw new CapabilityInputError("nodes and edges must be supplied together.");
   }
   const metadata = input.metadata === undefined ? {} : requireObject(input.metadata, "metadata");
   if (Object.keys(metadata).length > 50) throw new CapabilityInputError("metadata must contain at most 50 keys.");
-
-  const campaign = await createCampaignWithClient(client, tenantId, name, [trigger]);
-  const graph = await getBuilderGraphWithClient(client, tenantId, campaign.id);
-  if (!graph) throw new Error("draft_graph_unavailable");
-  let nodesToPersist = graph.nodes;
-  let edgesToPersist = graph.edges;
-  if (nodes !== null && edges !== null) {
-    nodesToPersist = nodes;
-    edgesToPersist = edges;
-  }
-  const save = await saveBuilderGraphWithClient(
-    client, tenantId, campaign.id, graph.version, nodesToPersist, edgesToPersist,
-  );
-  if (save.status === "not_found") throw new ResourceNotFoundError();
-  if (save.status === "conflict") {
-    throw new CapabilityError("The draft changed while it was being created.", 409, "version_conflict", { currentVersion: save.currentVersion });
-  }
-  if (save.status === "invalid") {
-    throw new CapabilityInputError("The draft graph is structurally invalid.", 422, "validation_error", {
-      validationErrors: save.errors,
-    });
-  }
-  await client.query(
-    "update campaigns set mcp_metadata = $3::jsonb where id = $1 and tenant_id = $2",
-    [campaign.id, tenantId, JSON.stringify(metadata)],
-  );
+  const draft = await createJourneyDraftWithClient(client, tenantId, name, trigger, nodes, edges, metadata);
   return {
-    capability: "automation.create_draft", automationId: campaign.id, name: campaign.name,
-    status: "draft", enabled: false, version: save.graph.version, trigger,
-    metadata, nodes: save.graph.nodes, edges: save.graph.edges,
-    readyForReview: false, lifecycle: "draft_not_published",
+    capability: "automation.create_draft",
+    automationId: draft.campaign.id,
+    name: draft.campaign.name,
+    status: "draft",
+    enabled: false,
+    version: draft.graph.version,
+    trigger,
+    metadata: draft.metadata,
+    nodes: draft.graph.nodes,
+    edges: draft.graph.edges,
+    readyForReview: false,
+    lifecycle: "draft_not_published",
   };
 }
 
@@ -253,143 +244,55 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
   const changes = requireObject(input.changes, "changes");
   assertAllowedKeys(changes, ["name", "trigger", "nodes", "edges", "metadata"]);
   if (!Object.keys(changes).length) throw new CapabilityInputError("changes must include at least one supported field.");
-
-  const found = await client.query<{
-    id: string; name: string; enabled: boolean; builder_version: number;
-    keywords: string[]; mcp_metadata: Record<string, unknown>;
-  }>(
-    `select id, name, enabled, builder_version, keywords, mcp_metadata
-       from campaigns where id = $1 and tenant_id = $2 for update`,
-    [automationId, tenantId],
-  );
-  const campaign = found.rows[0];
-  if (!campaign) throw new ResourceNotFoundError();
-
-  const published = await client.query(
-    "select 1 from campaign_journey_versions where tenant_id = $1 and campaign_id = $2 limit 1",
-    [tenantId, automationId],
-  );
-  if (campaign.enabled || published.rowCount) {
-    throw new CapabilityError("Only inactive, unpublished drafts can be edited.", 409, "invalid_lifecycle_state");
-  }
-  if (campaign.builder_version !== expectedVersion) {
-    throw new CapabilityError(
-      "The automation changed since it was read. Re-read it before retrying.", 409, "version_conflict",
-      { currentVersion: campaign.builder_version, recovery: "reread_automation" },
-    );
-  }
-
-  const graphChanges = changes.nodes !== undefined || changes.edges !== undefined;
-  let version: number;
-  if (graphChanges) {
-    const graph = await getBuilderGraphWithClient(client, tenantId, automationId);
-    if (!graph) throw new ResourceNotFoundError();
-    const nodes = changes.nodes === undefined ? graph.nodes : normalizeNodes(changes.nodes);
-    const edges = changes.edges === undefined ? graph.edges : normalizeEdges(changes.edges);
-    const save = await saveBuilderGraphWithClient(
-      client, tenantId, automationId, expectedVersion, nodes, edges,
-    );
-    if (save.status === "not_found") throw new ResourceNotFoundError();
-    if (save.status === "conflict") {
-      throw new CapabilityError("The automation changed since it was read. Re-read it before retrying.", 409, "version_conflict", {
-        currentVersion: save.currentVersion, recovery: "reread_automation",
-      });
-    }
-    if (save.status === "invalid") {
-      throw new CapabilityInputError("The draft graph is structurally invalid.", 422, "validation_error", {
-        validationErrors: save.errors,
-      });
-    }
-    version = save.graph.version;
-  } else {
-    version = expectedVersion + 1;
-  }
-
-  const scalarSet: string[] = [];
-  const values: unknown[] = [automationId, tenantId];
-  const addSet = (column: string, value: unknown) => {
-    values.push(value);
-    scalarSet.push(`${column} = $${values.length}`);
-  };
   if (changes.name !== undefined) {
     const name = requireString(changes.name, "changes.name");
     if (name.length > 120) throw new CapabilityInputError("changes.name must be 120 characters or fewer.");
-    addSet("name", name);
   }
-  if (changes.trigger !== undefined) addSet("keywords", [requireString(changes.trigger, "changes.trigger")]);
-  if (changes.metadata !== undefined) {
-    addSet("mcp_metadata", JSON.stringify(requireObject(changes.metadata, "changes.metadata")));
-    scalarSet[scalarSet.length - 1] = scalarSet[scalarSet.length - 1]!.replace(/(mcp_metadata = \$\d+)/, "$1::jsonb");
-  }
-  if (!graphChanges) {
-    values.push(version);
-    scalarSet.push(`builder_version = ${values.length}`);
-  }
-  scalarSet.push("updated_at = now()");
-  if (scalarSet.length > 1 || !graphChanges) {
-    const versionGuard = graphChanges ? "" : ` and builder_version = ${values.length + 1}`;
-    const update = await client.query(
-      `update campaigns set ${scalarSet.join(", ")}
-        where id = $1 and tenant_id = $2${versionGuard}`,
-      graphChanges ? values : [...values, expectedVersion],
-    );
-    if (update.rowCount !== 1) {
-      const current = await client.query<{ builder_version: number }>(
-        "select builder_version from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId],
-      );
-      throw new CapabilityError("The automation changed elsewhere.", 409, "version_conflict", {
-        currentVersion: current.rows[0]?.builder_version ?? null, recovery: "reread_automation",
-      });
-    }
-  }
-
-  const currentGraph = await getBuilderGraphWithClient(client, tenantId, automationId);
-  const current = await client.query<{ name: string; keywords: string[]; mcp_metadata: Record<string, unknown> }>(
-    "select name, keywords, mcp_metadata from campaigns where id = $1 and tenant_id = $2",
-    [automationId, tenantId],
-  );
+  const domainChanges = {
+    ...(changes.name !== undefined ? { name: requireString(changes.name, "changes.name") } : {}),
+    ...(changes.trigger !== undefined ? { trigger: requireString(changes.trigger, "changes.trigger") } : {}),
+    ...(changes.nodes !== undefined ? { nodes: normalizeNodes(changes.nodes) } : {}),
+    ...(changes.edges !== undefined ? { edges: normalizeEdges(changes.edges) } : {}),
+    ...(changes.metadata !== undefined ? { metadata: requireObject(changes.metadata, "changes.metadata") } : {}),
+  };
+  const draft = await updateJourneyDraftWithClient(client, tenantId, automationId, expectedVersion, domainChanges);
   return {
-    capability: "automation.update_draft", automationId, name: current.rows[0]?.name ?? campaign.name,
-    status: "draft", enabled: false, previousVersion: campaign.builder_version,
-    version: currentGraph?.version ?? version, trigger: current.rows[0]?.keywords?.[0] ?? null,
-    metadata: current.rows[0]?.mcp_metadata ?? {}, nodes: currentGraph?.nodes ?? [], edges: currentGraph?.edges ?? [],
-    readyForReview: false, lifecycle: "draft_not_published",
+    capability: "automation.update_draft",
+    automationId,
+    name: draft.campaign.name,
+    status: "draft",
+    enabled: false,
+    previousVersion: draft.previousVersion,
+    version: draft.graph.version,
+    trigger: draft.campaign.keywords[0] ?? null,
+    metadata: draft.metadata,
+    nodes: draft.graph.nodes,
+    edges: draft.graph.edges,
+    readyForReview: false,
+    lifecycle: "draft_not_published",
   };
 }
 
 async function validateDraft(client: PoolClient, tenantId: string, input: Record<string, unknown>) {
   assertAllowedKeys(input, ["automation_id", "nodes", "edges", "expected_version"]);
   const automationId = input.automation_id === undefined ? undefined : requireString(input.automation_id, "automation_id");
-  let graph: BuilderGraph;
-  let milestones: Awaited<ReturnType<typeof listMilestonesWithClient>> = [];
-  if (automationId) {
-    const found = await client.query("select id from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId]);
-    if (!found.rowCount) throw new ResourceNotFoundError();
-    const loaded = await getBuilderGraphWithClient(client, tenantId, automationId);
-    if (!loaded) throw new ResourceNotFoundError();
-    graph = loaded;
-    milestones = await listMilestonesWithClient(client, tenantId, automationId);
-  } else {
-    if (input.nodes === undefined || input.edges === undefined) {
-      throw new CapabilityInputError("Provide automation_id or both nodes and edges.");
-    }
-    graph = {
-      nodes: normalizeNodes(input.nodes), edges: normalizeEdges(input.edges),
-      version: requireInteger(input.expected_version, "expected_version"),
-    };
-  }
-  const result = validateJourneyGraph(graph, milestones);
+  const nodes = input.nodes === undefined ? undefined : normalizeNodes(input.nodes);
+  const edges = input.edges === undefined ? undefined : normalizeEdges(input.edges);
+  const expectedVersion = input.expected_version === undefined ? undefined : requireInteger(input.expected_version, "expected_version");
+  const result = await validateJourneyDraftWithClient(client, tenantId, {
+    ...(automationId ? { automationId } : {}),
+    ...(nodes ? { nodes } : {}),
+    ...(edges ? { edges } : {}),
+    ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+  });
   return {
-    capability: "automation.validate", ...(automationId ? { automationId } : {}),
-    version: graph.version, valid: result.valid,
-    errors: result.errors.map((item) => ({
-      path: item.nodeId ? `nodes[id=${item.nodeId}]` : item.edgeId ? `edges[id=${item.edgeId}]` : "graph",
-      code: item.code.toLowerCase(), message: item.message, severity: "error",
-    })),
-    warnings: [], readyForReview: result.valid,
+    capability: "automation.validate",
+    ...(automationId ? { automationId } : {}),
+    ...result,
     note: "Validation does not publish or activate this draft.",
   };
 }
+
 function normalizeNodes(value: unknown): JourneyNode[] {
   if (!Array.isArray(value) || value.length > 500) throw new CapabilityInputError("nodes must be an array of at most 500 nodes.");
   return value.map((item, i) => {
