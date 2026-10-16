@@ -128,7 +128,10 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 ### Reconciliation attempt
 
 - Branch `task/reconcile-main-into-foundation` exists, but its first pass made no code/merge commit and opened no PR. GitHub compare currently confirms that branch is identical to foundation (`0d398f44665ec2e72b96d32cb33ac02e6e1553cd`).
-- A follow-up investigation is checking whether GitHub Git Data APIs can support a safe true merge commit. No reconciliation has been completed and no production deployment occurred.
+- A temporary integration-only PR #95 was created from `main` into `task/reconcile-main-into-foundation` to test GitHub's real three-way merge without changing `main`. GitHub reported `mergeable=false`; PR #95 is **closed without merge**.
+- PR #95 previewed 136 changed files across 33 main-only commits (+18,625/-1,611). Conflicts span client/App.tsx, AppShell, TenantContext, index.css, Leads/Inbox/Content/Analytics/JourneyBuilder, and backend runtime/migration files. The audit also found a same-timestamp migration identity issue; no migration was renumbered or deleted.
+- No integration commit was created. `task/reconcile-main-into-foundation` remains identical to foundation at `0d398f44665ec2e72b96d32cb33ac02e6e1553cd`. No outer task→foundation reconciliation PR exists. `main`, foundation, PR #93/#94, and production deployment state were not changed by that attempt.
+- The worker stopped rather than manufacturing a merge tree with unvalidated conflicts. A genuine local Git checkout plus semantic three-way resolution and client/server/build/migration/security tests is required. The local runtime in this chat could not reach github.com, so no local checkout/test is available here.
 
 ### Step 1 status
 
@@ -137,14 +140,25 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 
 ### Next steps / release gates
 
-1. Finish a safe main-to-foundation reconciliation PR. Do not merge or deploy until it is reviewed; never write to `main`.
-2. Bring PRs #93/#94 onto the reconciled base if needed.
-3. Rerun relevant builds/smoke and visually inspect light/dark themes at 390/768/1024/1440 CSS px.
-4. Resolve or accurately document the smoke failures and the outstanding preview-route decision.
-5. Deploy only after all release gates pass.
+1. Hand off `main` → foundation reconciliation to a real local Git checkout for semantic three-way conflict resolution and client/server/workflow/migration/security validation; do not manufacture a merge tree from Git Data APIs.
+2. Create the final reviewed child→foundation reconciliation PR only after that local resolution and test evidence is complete; do not merge or deploy until reviewed, and never write to `main`.
+3. Bring PRs #93/#94 onto the reconciled base if needed.
+4. Rerun relevant builds/smoke and visually inspect light/dark themes at 390/768/1024/1440 CSS px.
+5. Resolve or accurately document the smoke failures and the outstanding preview-route decision.
+6. Deploy only after all release gates pass.
 
 ### Verification
 
-- Read `AGENTS.md`, the existing orchestrator log, current foundation/main branch metadata, the main/foundation compare, the reconciliation branch compare, and PR #93/#94 metadata before this docs-only update.
-- Verified the exact CI/smoke run mapping above through GitHub Actions metadata and Chromium job logs; no new build or smoke run was started by this task.
-- This PR changes only `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md`. No application files were modified. No merge, deploy, or `main` change was performed.
+- Read `AGENTS.md`, the existing orchestrator log, current foundation/main branch metadata, the main/foundation compare, the reconciliation branch compare, and PR #93/#94 metadata before the original docs-only update.
+- Verified PR #95 is closed and unmerged, with `mergeable=false`, and recorded its integration scope and conflict/test handoff above.
+- This branch changes only `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md`. No application files were modified. No merge, deploy, or `main` change was performed.
+
+## 2026-10-17 — Reconciliation worker outcome follow-up
+
+**Timestamp:** 2026-10-17 02:49 Asia/Kolkata (IST)
+
+- Definitive reconciliation-worker outcome: temporary integration-only PR #95 was closed **without merge** after GitHub reported `mergeable=false` for the real three-way `main` → `task/reconcile-main-into-foundation` preview.
+- PR #95 covered 136 changed files across 33 main-only commits (+18,625/-1,611), with conflicts across client runtime/layout, major production screens, and backend runtime/migration files. The audit also identified a same-timestamp migration identity issue; no migration was renumbered or deleted.
+- No integration commit was created. `task/reconcile-main-into-foundation` remains identical to foundation at `0d398f44665ec2e72b96d32cb33ac02e6e1553cd`; no outer reconciliation PR exists. `main`, foundation, PR #93/#94, and production deployment state were unchanged.
+- The worker intentionally stopped rather than manufacturing an unvalidated merge tree. Safe handoff is a genuine local Git checkout with semantic three-way conflict resolution, followed by client/server/build/migration/security validation. The local runtime in this chat could not reach github.com, so no local checkout or tests are available here.
+- **Deployment remains blocked.** Continue to use BrowserMCP only; NEVER use Browser Use.
