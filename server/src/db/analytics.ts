@@ -68,7 +68,7 @@ export interface TopPost {
  */
 export async function getTopPosts(pool: Pool, tenantId: string, limit = 10): Promise<TopPost[]> {
   // Aggregate events first, then enrich with exactly one latest metadata row.
-  // media_metadata can contain account-scoped rows for the same media ID;
+  // media_metadata can contain one legacy row and multiple account-scoped rows for the same media ID;
   // joining raw events to all of them would multiply comment counts.
   const result = await pool.query<{
     media_id: string;
@@ -88,7 +88,7 @@ export async function getTopPosts(pool: Pool, tenantId: string, limit = 10): Pro
        select caption, permalink
        from media_metadata
        where tenant_id = $1 and media_id = c.media_id
-       order by fetched_at desc nulls last, id desc
+       order by fetched_at desc nulls last, instagram_account_id asc nulls last, id desc
        limit 1
      ) m on true
      order by c.comment_count desc, c.media_id
