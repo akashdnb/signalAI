@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTenant } from "../context/TenantContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
@@ -12,6 +12,9 @@ function formatDate(iso: string | null): string {
 
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const loadRequestIdRef = useRef(0);
   const navigate = useNavigate();
   const { reloadConnectedAccounts } = useTenant();
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
@@ -23,16 +26,22 @@ export function IntegrationsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   async function loadAccounts() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++loadRequestIdRef.current;
+    const isCurrentRequest = () =>
+      requestId === loadRequestIdRef.current && activeTenantIdRef.current === requestedTenantId;
     setAccounts(null);
+    setCurrentRole(null);
     setError(null);
     setConfirmingId(null);
     try {
       const [nextAccounts, workspaces] = await Promise.all([
-        workspaceApi.listConnectedAccounts(tenantId),
+        workspaceApi.listConnectedAccounts(requestedTenantId),
         workspaceApi.listWorkspaces(),
       ]);
-      const workspace = workspaces.find((item) => item.tenantId === tenantId);
+      if (!isCurrentRequest()) return;
+      const workspace = workspaces.find((item) => item.tenantId === requestedTenantId);
       if (!workspace) {
         setAccounts(null);
         setCurrentRole(null);
@@ -44,6 +53,7 @@ export function IntegrationsPage() {
       setError(null);
       reloadConnectedAccounts();
     } catch (err) {
+      if (!isCurrentRequest()) return;
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
         navigate("/login", { replace: true });
@@ -60,7 +70,12 @@ export function IntegrationsPage() {
   }
 
   useEffect(() => {
+    loadRequestIdRef.current += 1;
     void loadAccounts();
+    return () => {
+      loadRequestIdRef.current += 1;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   async function handleConnect() {
