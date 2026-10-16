@@ -506,16 +506,26 @@ async function getCampaignCapability(pool: Pool, tenantId: string, id: string) {
   return { capability: "campaign.get", campaign };
 }
 
-function requireMcpServiceAuth(req: Request, res: Response, next: NextFunction) {
+async function requireMcpServiceAuth(req: Request, res: Response, next: NextFunction) {
   const expected = process.env.SIGNALAI_SERVICE_TOKEN ?? "";
   const provided = req.header("x-signalai-service-token") ?? "";
   if (!expected || provided !== expected) {
     return res.status(401).json({ error: "invalid_token", code: "invalid_token" });
   }
   const tenantId = req.header("x-signalai-tenant-id")?.trim();
-  if (!tenantId) return res.status(400).json({ error: "tenant_not_found", code: "tenant_not_found" });
-  req.mcpTenantId = tenantId;
-  return next();
+  if (!tenantId) return res.status(403).json({ error: "tenant_not_found", code: "tenant_not_found" });
+  try {
+    const tenant = await getPool().query("select 1 from tenants where id = $1", [tenantId]);
+    if (!tenant.rowCount) return res.status(403).json({ error: "tenant_not_found", code: "tenant_not_found" });
+    req.mcpTenantId = tenantId;
+    return next();
+  } catch {
+    return res.status(500).json({
+      error: "upstream_error",
+      code: "upstream_error",
+      message: "Authentication could not be completed.",
+    });
+  }
 }
 
 declare global { namespace Express { interface Request { mcpTenantId?: string } } }
