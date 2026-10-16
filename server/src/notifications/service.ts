@@ -189,7 +189,6 @@ export async function startNotificationDeliveryWorker(boss: PgBoss, pool: Pool):
           }
         }
         continue;
-        continue;
       }
       const deliveryId = job.data.deliveryId;
       const claim = await pool.query<{
