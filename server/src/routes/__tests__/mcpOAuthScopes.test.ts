@@ -2,16 +2,14 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
-import { closePool } from "../../db/pool.js";
 
 describe("MCP OAuth scope metadata", () => {
   beforeAll(() => {
     process.env.MCP_PUBLIC_URL = "https://signalai-mcp.example";
   });
 
-  afterAll(async () => {
+  afterAll(() => {
     delete process.env.MCP_PUBLIC_URL;
-    await closePool();
   });
 
   it("advertises read and write scopes in OAuth and protected-resource metadata", async () => {
