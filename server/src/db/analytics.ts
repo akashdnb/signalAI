@@ -31,7 +31,7 @@ export async function getTenantAnalytics(
 ): Promise<TenantAnalytics> {
   const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
   const eventAccountFilter = instagramAccountId
-    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2"
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
     : "";
   const directAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
   const jobAccountFilter = instagramAccountId ? "and job_data->>'instagramAccountId' = $2" : "";
@@ -93,7 +93,7 @@ export async function getTopPosts(
   // media ID can occur on multiple business accounts, so client-only
   // filtering of the final rows would return the wrong captions/counts.
   const eventAccountFilter = instagramAccountId
-    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $3"
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $3 and (l.instagram_account_id is null or l.instagram_account_id = $3)"
     : "";
   const mediaAccountFilter = instagramAccountId
     ? "and instagram_account_id = $3"
@@ -149,7 +149,7 @@ export async function getTopKeywords(
   instagramAccountId?: string,
 ): Promise<TopKeyword[]> {
   const eventAccountFilter = instagramAccountId
-    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $3"
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $3 and (l.instagram_account_id is null or l.instagram_account_id = $3)"
     : "";
   const params = instagramAccountId ? [tenantId, limit, instagramAccountId] : [tenantId, limit];
   const result = await pool.query<{ keyword: string; match_count: string }>(
@@ -198,7 +198,7 @@ export async function getPipelineFunnel(
   instagramAccountId?: string,
 ): Promise<Funnel> {
   const eventAccountFilter = instagramAccountId
-    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2"
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
     : "";
   const accountSendFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
   const leadAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
@@ -290,7 +290,7 @@ export async function getConversationsTimeseries(
   instagramAccountId?: string,
 ): Promise<ConversationsTimeseriesPoint[]> {
   const eventAccountFilter = instagramAccountId
-    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2"
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
     : "";
   const sendAccountFilter = instagramAccountId ? "and instagram_account_id = $2" : "";
   const params = instagramAccountId ? [tenantId, instagramAccountId] : [tenantId];
