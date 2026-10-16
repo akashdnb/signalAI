@@ -458,8 +458,8 @@ function boundedLimit(value: unknown): number { const parsed = typeof value === 
 function sha256(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 
 function enforceWriteRateLimit(req: Request, tenantId: string, res: Response) {
-  const principal = req.header("x-signalai-principal-id") ?? "unknown";
-  const client = req.header("x-signalai-client-id") ?? "unknown";
+  const principal = requireHeader(req, "x-signalai-principal-id");
+  const client = requireHeader(req, "x-signalai-client-id");
   const key = [tenantId, principal, client].join(":");
   const now = Date.now();
   for (const [bucketKey, bucket] of writeBuckets) {
