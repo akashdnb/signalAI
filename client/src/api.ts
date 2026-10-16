@@ -178,6 +178,7 @@ export const INDUSTRY_LABEL: Record<TenantIndustry, string> = {
 export interface TenantSummary {
   id: string;
   name: string;
+  description?: string | null;
   billingStatus: "none" | "active" | "canceled";
   industry: TenantIndustry | null;
 }
