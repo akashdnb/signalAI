@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type ObservedMedia } from "../api";
 import { PlayIcon } from "../components/icons";
+import { useTenant } from "../context/TenantContext";
 
 const TYPE_LABEL: Record<string, string> = {
   IMAGE: "Image",
@@ -27,6 +28,8 @@ function mediaPreviewLabel(mediaType: string | null): string {
 export function ContentPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId, connectedAccounts } = useTenant();
+  const selectedProviderAccountId = selectedAccountId ? connectedAccounts?.find((account) => account.id === selectedAccountId)?.instagramAccountId ?? null : null;
 
   const [media, setMedia] = useState<ObservedMedia[] | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -76,9 +79,17 @@ export function ContentPage() {
 
   const sorted = useMemo(() => {
     if (!media) return null;
-    const filtered = typeFilter === "all" ? media : media.filter((m) => m.mediaType === typeFilter);
+    // The selected account ID is a server-provided credential-row ID; map it to
+    // the provider ID and filter only records attributed to that account. Legacy
+    // media without an account identity remains visible in "All accounts" only.
+    const accountScoped = selectedAccountId
+      ? selectedProviderAccountId
+        ? media.filter((entry) => entry.instagramAccountId === selectedProviderAccountId)
+        : []
+      : media;
+    const filtered = typeFilter === "all" ? accountScoped : accountScoped.filter((m) => m.mediaType === typeFilter);
     return filtered.slice().sort((a, b) => new Date(b.lastSeenAt ?? 0).getTime() - new Date(a.lastSeenAt ?? 0).getTime());
-  }, [media, typeFilter]);
+  }, [media, selectedAccountId, selectedProviderAccountId, typeFilter]);
 
   const markPreviewFailed = (mediaId: string) => {
     setFailedPreviews((current) => {
