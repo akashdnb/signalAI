@@ -16,7 +16,7 @@ function ActivityVolume({ funnel }: { funnel: Funnel }) {
 
   return (
     <div className="space-y-5">
-      <p className="muted small">Total events recorded. Comments and DMs can include repeated activity from the same person, so these are not conversion rates.</p>
+      <p className="muted small">All-time activity totals. Comments are inbound comment events; DMs are send reservations, recorded before delivery is attempted. A send can later fail, and one person can generate multiple events. These are not conversion rates.</p>
       {activity.map((stage) => (
         <div key={stage.key} className="space-y-2">
           <div className="flex items-baseline justify-between gap-3">
@@ -38,7 +38,7 @@ function PipelineProgression({ funnel }: { funnel: Funnel }) {
 
   return (
     <div>
-      <p className="muted small mb-4">Current pipeline snapshot, not a historical cohort. Percentages use all leads as the denominator and show the share currently at or beyond each pipeline stage.</p>
+      <p className="muted small mb-4">Current status of all lead records, not a historical conversion cohort. Percentages use all leads as the denominator and show the share currently at or beyond each stage; lost leads are excluded from earlier-stage totals. Activity totals above use a different population.</p>
       <div className="space-y-4">
         {stages.map((stage) => {
           const pct = leadCount > 0 ? Math.round((stage.count / leadCount) * 100) : 0;
