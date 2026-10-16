@@ -181,9 +181,15 @@ export function ConnectedAccountSwitcher({
             <div className="sai-account-switcher__accounts">
               <div className="sai-account-switcher__accounts-heading"><strong>{providerLabel}</strong><button type="button" onClick={() => { setOpen(false); onManageAccounts?.(); }}>Manage</button></div>
               {accountsLoading ? <p className="sai-account-switcher__message" role="status">Loading Instagram accounts…</p> : accounts.length === 0 ? <p className="sai-account-switcher__message">No Instagram accounts are connected to this workspace.</p> : (
-                <label className="sai-account-switcher__account-select"><span>Current account context</span><select aria-label="Current Instagram account context" value={selectedAccountId || "all"} onChange={event => onSelect(event.target.value)}><option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.handle}{account.connected === false ? " · Needs attention" : ""}</option>)}</select></label>
+                <div className="sai-account-switcher__account-list">
+                  {accounts.map(account => (
+                    <div key={account.id} className="sai-account-switcher__account-row">
+                      <span><strong>{account.handle}</strong><small>{account.connected === false ? "Needs attention" : "Connected"}</small></span>
+                      <span className={account.connected === false ? "sai-account-switcher__account-status is-warning" : "sai-account-switcher__account-status"}>{account.connected === false ? "Action needed" : "Available"}</span>
+                    </div>
+                  ))}
+                </div>
               )}
-              <p className="sai-account-switcher__message">This selects the account context in the shell. It does not filter records on pages that do not yet support account-scoped queries.</p>
               {currentRole === "member" && <p className="sai-account-switcher__message">Your role allows viewing accounts. Workspace admins manage connections.</p>}
             </div>
           )}
