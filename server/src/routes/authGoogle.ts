@@ -88,13 +88,11 @@ function redirectAuthError(res: Response, reason: string) {
 }
 function allowedMcpReturnTo(value: string | undefined): string | null {
   if (!value) return null;
-  const configured = (process.env.MCP_PUBLIC_URL ?? "").replace(/\/+$/, "");
-  if (!configured) return null;
   try {
     const candidate = new URL(value);
-    const allowed = new URL(configured);
+    const allowed = new URL(config.apiBaseUrl);
     if (candidate.origin !== allowed.origin) return null;
-    if (!candidate.pathname.startsWith("/oauth/authorize")) return null;
+    if (candidate.pathname !== "/oauth/authorize") return null;
     return candidate.toString();
   } catch {
     return null;
