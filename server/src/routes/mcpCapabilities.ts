@@ -393,7 +393,13 @@ async function recordFailureAudit(pool: Pool, event: Record<string, unknown>) {
   let client: PoolClient | null = null;
   try {
     client = await pool.connect();
-    await recordAudit(client, { ...event, automationId: null, previousVersion: null, newVersion: null, succeeded: false });
+    await recordAudit(client, {
+      ...event,
+      automationId: null,
+      previousVersion: null,
+      newVersion: null,
+      succeeded: false,
+    });
   } catch {
     // Preserve the original capability error if audit storage is unavailable.
   } finally {
