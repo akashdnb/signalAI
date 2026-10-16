@@ -101,7 +101,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   const params: unknown[] = [tenantId];
   if (providerAccountId) {
     params.push(providerAccountId);
-    conditions.push(`l.instagram_account_id = ${params.length}`);
+    conditions.push(`l.instagram_account_id = $${params.length}`);
   }
   if (stage) { params.push(stage); conditions.push(`l.pipeline_stage = $${params.length}`); }
   if (typeof ownerUserId === "string" && ownerUserId) { params.push(ownerUserId); conditions.push(`l.owner_user_id = $${params.length}`); }
