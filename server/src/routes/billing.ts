@@ -9,7 +9,7 @@ import {
   setPlanTier,
 } from "../db/tenants.js";
 import { getStripeClient, isBillingConfigured } from "../lib/stripeClient.js";
-import { requireTenantSession } from "../lib/tenantAuth.js";
+import { requireTenantRole, requireTenantSession } from "../lib/tenantAuth.js";
 import { isWebhookEventAlreadyProcessed, recordWebhookEventProcessed } from "../db/stripeWebhookEvents.js";
 import {
   getBillingAccount,
@@ -45,7 +45,7 @@ billingRouter.use("/tenants/:tenantId", requireTenantSession);
  * configured (dev/test, or before the user has a real Stripe account) —
  * same shape as the LLM provider's graceful degradation.
  */
-billingRouter.post("/tenants/:tenantId/billing/checkout", async (req, res) => {
+billingRouter.post("/tenants/:tenantId/billing/checkout", requireTenantRole("owner", "admin"), async (req, res) => {
   if (!isBillingConfigured()) {
     return res.status(503).json({ error: "billing is not configured on this server" });
   }
