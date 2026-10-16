@@ -87,6 +87,8 @@ describe("knowledge base routes (Phase 2C)", () => {
     expect(uploadRes.status).toBe(201);
     expect(uploadRes.body.document.status).toBe("ready");
     expect(uploadRes.body.document.filename).toBe("faq.txt");
+    expect(uploadRes.body.document).not.toHaveProperty("storageKey");
+    expect(uploadRes.body.document).not.toHaveProperty("storage_key");
 
     const listRes = await request(app)
       .get(`/tenants/${tenant.id}/knowledge-base?page=1&pageSize=20`)
