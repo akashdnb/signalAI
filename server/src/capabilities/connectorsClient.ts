@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+import { capabilityConfig } from "./capabilityConfig.js";
 import type {
   CompanyEvidence,
   CompanyGetInput,
@@ -9,10 +9,7 @@ import type {
 } from "./types.js";
 
 export class ConnectorError extends Error {
-  constructor(
-    public readonly statusCode: number,
-    message: string,
-  ) {
+  constructor(public readonly statusCode: number, message: string) {
     super(message);
   }
 }
@@ -27,7 +24,6 @@ interface ConnectorCompanyCandidate {
   employee_count?: number | null;
   location?: string | null;
 }
-
 interface ConnectorCompanyEvidence extends ConnectorCompanyCandidate {
   description?: string | null;
   source_url?: string | null;
@@ -35,97 +31,53 @@ interface ConnectorCompanyEvidence extends ConnectorCompanyCandidate {
 }
 
 export class ConnectorsClient {
-  constructor(
-    private readonly baseUrl = config.connectorsBaseUrl,
-    private readonly serviceToken = config.serviceToken,
-  ) {}
-
-  async searchCompanies(
-    input: CompanySearchInput,
-    correlationId: string,
-    tenantId: string,
-  ): Promise<CompanySearchResult> {
+  async searchCompanies(input: CompanySearchInput, correlationId: string, tenantId: string): Promise<CompanySearchResult> {
     const payload = await this.request<{ operation: "company.search"; companies: ConnectorCompanyCandidate[]; correlation_id: string }>(
-      "/v1/company/search",
-      input,
-      correlationId,
-      tenantId,
+      "/v1/company/search", input, correlationId, tenantId,
     );
-
-    return {
-      operation: "company.search",
-      correlationId: payload.correlation_id,
-      companies: payload.companies.map(mapCandidate),
-    };
+    return { operation: "company.search", correlationId: payload.correlation_id, companies: payload.companies.map(mapCandidate) };
   }
 
-  async getCompany(
-    input: CompanyGetInput,
-    correlationId: string,
-    tenantId: string,
-  ): Promise<CompanyGetResult> {
+  async getCompany(input: CompanyGetInput, correlationId: string, tenantId: string): Promise<CompanyGetResult> {
     const payload = await this.request<{ operation: "company.get"; company: ConnectorCompanyEvidence; correlation_id: string }>(
-      "/v1/company/get",
-      input,
-      correlationId,
-      tenantId,
+      "/v1/company/get", input, correlationId, tenantId,
     );
-
-    return {
-      operation: "company.get",
-      correlationId: payload.correlation_id,
-      company: mapEvidence(payload.company),
-    };
+    return { operation: "company.get", correlationId: payload.correlation_id, company: mapEvidence(payload.company) };
   }
 
-  private async request<T>(
-    path: string,
-    body: unknown,
-    correlationId: string,
-    tenantId: string,
-  ): Promise<T> {
-    if (!this.baseUrl || !this.serviceToken) {
-      throw new ConnectorError(503, "connectors_not_configured");
-    }
+  private async request<T>(path: string, body: unknown, correlationId: string, tenantId: string): Promise<T> {
+    const baseUrl = capabilityConfig.connectorsBaseUrl;
+    if (!baseUrl) throw new ConnectorError(503, "connectors_not_configured");
+
+    let serviceToken: string;
+    try { serviceToken = capabilityConfig.serviceToken; } catch { throw new ConnectorError(503, "service_auth_not_configured"); }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), config.connectorsRequestTimeoutMs);
-
+    const timeout = setTimeout(() => controller.abort(), capabilityConfig.connectorsRequestTimeoutMs);
     try {
-      const response = await fetch(`${this.baseUrl.replace(/\/+$/, "")}${path}`, {
+      const response = await fetch(`${baseUrl}${path}`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-signalai-service-token": this.serviceToken,
+          "x-signalai-service-token": serviceToken,
           "x-signalai-tenant-id": tenantId,
           "x-correlation-id": correlationId,
         },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
-
       const text = await response.text();
       let parsed: unknown = {};
-      try {
-        parsed = text ? JSON.parse(text) : {};
-      } catch {
-        parsed = { error: "invalid_connector_response" };
-      }
-
+      try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = { error: "invalid_connector_response" }; }
       if (!response.ok) {
-        const message =
-          typeof parsed === "object" && parsed !== null && "detail" in parsed
-            ? String((parsed as { detail: unknown }).detail)
-            : "connector_request_failed";
+        const message = typeof parsed === "object" && parsed !== null && "detail" in parsed
+          ? String((parsed as { detail: unknown }).detail) : "connector_request_failed";
         throw new ConnectorError(response.status, message);
       }
-
       return parsed as T;
     } catch (error) {
       if (error instanceof ConnectorError) throw error;
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new ConnectorError(504, "connector_request_timeout");
-      }
+      if (error instanceof DOMException && error.name === "AbortError") throw new ConnectorError(504, "connector_request_timeout");
       throw new ConnectorError(503, "connector_unavailable");
     } finally {
       clearTimeout(timeout);
@@ -145,12 +97,6 @@ function mapCandidate(value: ConnectorCompanyCandidate): CompanyCandidate {
     location: value.location ?? null,
   };
 }
-
 function mapEvidence(value: ConnectorCompanyEvidence): CompanyEvidence {
-  return {
-    ...mapCandidate(value),
-    description: value.description ?? null,
-    sourceUrl: value.source_url ?? null,
-    rawMetadata: value.raw_metadata ?? {},
-  };
+  return { ...mapCandidate(value), description: value.description ?? null, sourceUrl: value.source_url ?? null, rawMetadata: value.raw_metadata ?? {} };
 }
