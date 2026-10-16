@@ -1,6 +1,15 @@
 /* Precision Operations Studio — isolated redesign preview.
-   Every selector is scoped to .po-preview-app so existing product screens stay untouched. */
+   Scope, layout, palette and sample-only presentation deliberately remain local
+   to .po-preview-app: production tokens have different light/dark values, and
+   replacing this preview's values would change rendered output.
+
+   Safe consolidation: define the existing legacy --po-* aliases in this scoped
+   block from the shared token vocabulary without changing a single computed
+   preview value. In particular, keep preview-only canvas/text/status shades
+   literal until the production token family can represent them exactly. */
 .po-preview-app {
+  /* Existing shared-token vocabulary aliases are exact here only where proven.
+     Preview palette variables below are intentionally retained for pixel parity. */
   --po-canvas: #f6f7f4;
   --po-surface: #ffffff;
   --po-surface-muted: #f9faf7;

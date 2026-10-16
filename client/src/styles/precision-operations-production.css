@@ -3,6 +3,11 @@
  * This stylesheet deliberately uses the production component vocabulary and
  * shared tokens. Preview-only `.po-*` selectors and `--po-*` variables must
  * never be copied into the production app.
+ *
+ * Keep this production sheet distinct from the `?preview=precision-operations`
+ * sandbox: its scoped palette is intentionally different. Workflow refinements
+ * remain in `precision-operations-workflows.css` to preserve import order and
+ * the page-specific cascade.
  */
 
 :root {

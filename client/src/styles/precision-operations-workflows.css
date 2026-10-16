@@ -1,4 +1,10 @@
-/* Workflow-specific refinements for the production Precision Operations migration. */
+/*
+ * Workflow-specific refinements for the production Precision Operations migration.
+ * This sheet intentionally remains separate from production's shared layout
+ * rules: its later import order is part of the current cascade contract, and
+ * combining it into precision-operations-production.css would alter source
+ * grouping/order without a reliable computed-style parity test.
+ */
 
 .page-automation .automation-outcome-card {
   display: flex;
