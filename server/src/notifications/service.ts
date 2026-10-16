@@ -26,6 +26,18 @@ function safeDisplayText(value: string, max: number): string {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim().slice(0, max);
 }
 
+const ALLOWED_PAYLOAD_KEYS = new Set(["reasonCode", "source", "runId", "accountId"]);
+function sanitizeNotificationPayload(value: Record<string, unknown> | undefined): Record<string, string | number | boolean> {
+  if (!value) return {};
+  const result: Record<string, string | number | boolean> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (!ALLOWED_PAYLOAD_KEYS.has(key)) continue;
+    if (typeof item === "string" && item.length <= 200) result[key] = safeDisplayText(item, 200);
+    else if (typeof item === "number" && Number.isFinite(item)) result[key] = item;
+    else if (typeof item === "boolean") result[key] = item;
+  }
+  return result;
+}
 export function notificationRetryDelayMs(attempt: number): number {
   // 30s, 60s, 120s, 240s, then terminal after the fifth attempt.
   return Math.min(30_000 * (2 ** Math.max(0, attempt - 1)), 4 * 60_000);
@@ -59,10 +71,12 @@ export async function publishNotificationEvent(pool: Pool, boss: PgBoss, input: 
   try {
     await client.query("begin");
     const severity = input.severity ?? definition.defaultSeverity;
+    const safePayload = sanitizeNotificationPayload(input.payload);
     const inserted = await client.query<{ id: string }>(
       `insert into notification_events
         (tenant_id, event_type, idempotency_key, severity, title, message, entity_type, entity_id, payload)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+       select $1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb
+        where exists (select 1 from tenants where id = $1)
        on conflict (tenant_id, event_type, idempotency_key) do nothing
        returning id`,
       [
@@ -70,11 +84,13 @@ export async function publishNotificationEvent(pool: Pool, boss: PgBoss, input: 
         safeDisplayText(input.title, 160), safeDisplayText(input.message, 500),
         input.entityType ? safeDisplayText(input.entityType, 60) : null,
         input.entityId ? safeDisplayText(input.entityId, 200) : null,
-        JSON.stringify(input.payload ?? {}),
+        JSON.stringify(safePayload),
       ],
     );
 
     if (!inserted.rows[0]) {
+      const tenantExists = await client.query("select 1 from tenants where id = $1", [input.tenantId]);
+      if (!tenantExists.rowCount) throw new Error("notification_tenant_not_found");
       const existing = await client.query<{ id: string }>(
         "select id from notification_events where tenant_id = $1 and event_type = $2 and idempotency_key = $3",
         [input.tenantId, input.eventType, idempotencyKey],

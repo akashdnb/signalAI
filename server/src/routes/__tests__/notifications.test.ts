@@ -5,7 +5,7 @@ import { getPool, closePool } from "../../db/pool.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 import { findOrCreateUserByEmail } from "../../db/users.js";
-import { publishNotificationEvent, startNotificationDeliveryWorker } from "../../notifications/service.js";
+import { notificationRetryDelayMs, publishNotificationEvent, startNotificationDeliveryWorker } from "../../notifications/service.js";
 import { getBoss, stopBoss } from "../../queue/boss.js";
 import { ensureNotificationQueue } from "../../notifications/service.js";
 
@@ -134,6 +134,13 @@ describe("notification routes and durable event delivery", () => {
     }
   });
 
+  it("uses a bounded exponential retry schedule", () => {
+    expect(notificationRetryDelayMs(1)).toBe(30_000);
+    expect(notificationRetryDelayMs(2)).toBe(60_000);
+    expect(notificationRetryDelayMs(3)).toBe(120_000);
+    expect(notificationRetryDelayMs(4)).toBe(240_000);
+    expect(notificationRetryDelayMs(5)).toBe(240_000);
+  });
   it("requires authentication for preference/history operations", async () => {
     const { tenant } = await createLoggedInTenant(getPool(), SESSION_SECRET, "notice-auth");
     const app = createApp();
