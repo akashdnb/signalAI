@@ -40,8 +40,12 @@ contentRouter.use("/tenants/:tenantId", requireTenantSession);
 contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const pool = getPool();
   const tenantId = req.params.tenantId;
-  const requestedAccountRowId = typeof req.query.accountId === "string" && req.query.accountId
-    ? req.query.accountId
+  const rawAccountRowId = req.query.accountId;
+  if (rawAccountRowId !== undefined && (typeof rawAccountRowId !== "string" || !rawAccountRowId.trim())) {
+    return res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+  }
+  const requestedAccountRowId = typeof rawAccountRowId === "string"
+    ? rawAccountRowId.trim()
     : undefined;
   const instagramAccountId = requestedAccountRowId
     ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
