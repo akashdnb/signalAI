@@ -35,21 +35,17 @@ export const mcpAutomationOperationalCapabilitiesRouter = Router();
 mcpAutomationOperationalCapabilitiesRouter.post(
   "/v1/capabilities/:capability",
   requireMcpServiceAuth,
-  async (req, res) => {
+  async (req, res, next) => {
     const capability = req.params.capability.endsWith(":invoke")
       ? req.params.capability.slice(0, -":invoke".length)
       : "";
     const correlationId = req.header("x-correlation-id") ?? randomUUID();
     const tenantId = req.mcpTenantId!;
 
-    if (!OPERATIONAL_CAPABILITIES.has(capability)) {
-      return res.status(404).json({
-        error: "capability_unavailable",
-        code: "capability_unavailable",
-        message: "This capability is not available.",
-        correlationId,
-      });
-    }
+    // This router is mounted before the general capability dispatcher. Let
+    // non-lifecycle capabilities reach that dispatcher instead of turning a
+    // valid read/draft operation into a false capability_unavailable 404.
+    if (!OPERATIONAL_CAPABILITIES.has(capability)) return next();
 
     try {
       const principalId = requireHeader(req, "x-signalai-principal-id");
