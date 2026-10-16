@@ -272,6 +272,8 @@ export interface Campaign {
 
 export interface ObservedMedia {
   mediaId: string;
+  /** Provider Instagram account ID attached to the observed post; null for legacy metadata that cannot be attributed safely. */
+  instagramAccountId?: string | null;
   commentCount: number;
   lastSeenAt: string | null;
   /** Cached Graph API metadata — null until enriched (see server's routes/campaigns.ts), which happens lazily whenever the picker loads an entry it doesn't have this for yet. */
