@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { Router, type Request, type Response } from "express";
+import { Router, type Response } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import { getUserSessionVersion } from "../db/users.js";
@@ -34,8 +34,12 @@ function issuerUrl(): string {
   return config.apiBaseUrl;
 }
 
+function configuredMcpPublicUrl(): string {
+  return (process.env.MCP_PUBLIC_URL ?? "").replace(/\/+$/, "");
+}
+
 function resourceUrl(): string {
-  return `${config.mcpPublicUrl}/mcp`;
+  return `${configuredMcpPublicUrl()}/mcp`;
 }
 
 function oauthMetadata() {
@@ -170,11 +174,11 @@ mcpOAuthRouter.get("/oauth/authorize", async (req, res) => {
   if (codeChallengeMethod !== "S256" || codeChallenge.length < 43) return errorRedirect(res, redirectUri, "invalid_request", state);
   const scopes = scopeText.split(/\s+/).filter(Boolean);
   if (!scopes.includes(MCP_SCOPE)) return errorRedirect(res, redirectUri, "invalid_scope", state);
+  if (!configuredMcpPublicUrl()) return res.status(503).json({ error: "mcp_oauth_not_configured" });
   if (resource !== resourceUrl()) return errorRedirect(res, redirectUri, "invalid_target", state);
 
   const handoff = typeof req.query.mcp_handoff === "string" ? req.query.mcp_handoff : "";
   if (!handoff) {
-    if (!config.mcpPublicUrl) return res.status(503).json({ error: "mcp_oauth_not_configured" });
     const loginReturn = new URL(req.originalUrl, issuerUrl());
     loginReturn.searchParams.delete("mcp_handoff");
     const loginUrl = new URL("/auth/google/start", issuerUrl());
