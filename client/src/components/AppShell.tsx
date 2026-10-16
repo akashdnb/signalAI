@@ -841,6 +841,7 @@ export function AppShell() {
           accountOptions={accountOptions}
           selectedAccountId={selectedAccountId}
           accountError={accountError}
+          onReloadAccounts={() => { void reloadConnectedAccounts(); }}
           accountsLoading={accountsLoading}
           onSelectAccount={handleSelectAccount}
           onManageAccounts={handleManageAccounts}
