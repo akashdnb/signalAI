@@ -1,9 +1,13 @@
 /*
  * Production journey-editor parity refinements.
  *
- * The preview is reference-only: this sheet uses production tokens and the
- * existing JourneyBuilder structure. Keep selectors rooted at the page so the
- * automation catalog and other workflow screens are unaffected.
+ * The live preview is reference-only: this sheet uses production tokens and
+ * the existing JourneyBuilder structure. Keep selectors rooted at the page so
+ * the automation catalog and other workflow screens are unaffected.
+ *
+ * Branch-gap note: this PR targets feat/preview-to-production-foundation,
+ * which predates newer main workspace/account/API wiring. Keep this sheet
+ * presentation-only and avoid coupling it to preview-only structure.
  */
 
 .page-journey-builder {
@@ -21,7 +25,7 @@
 
 .page-journey-builder > .automation-builder > .relative.border-b {
   padding: 0.65rem 1.25rem 0;
-  border-color: var(--surface-divider);
+  border-color: var(--border);
 }
 
 .page-journey-builder .builder-toolbar-button {
@@ -31,8 +35,8 @@
 
 .page-journey-builder .toolbar-version {
   min-height: 40px;
-  border: 1px solid var(--surface-divider);
-  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  background: var(--pill-bg);
 }
 
 .page-journey-builder .automation-builder > .relative.border-b > .flex.items-start.justify-between {
@@ -48,7 +52,7 @@
   min-height: 46px;
   align-items: stretch;
   gap: 1.5rem;
-  border-bottom: 1px solid var(--surface-divider);
+  border-bottom: 1px solid var(--border);
 }
 
 .page-journey-builder .automation-builder [role="tab"] {
@@ -81,7 +85,7 @@
 
 .page-journey-builder .automation-builder .react-flow__node [role="button"][aria-pressed="true"] {
   border-color: var(--accent);
-  background: var(--surface-selected);
+  background: var(--pill-bg);
   box-shadow: 0 0 0 1px var(--accent), 0 4px 14px rgb(15 23 42 / 7%);
 }
 
@@ -105,7 +109,7 @@
 
 .page-journey-builder .automation-builder .builder-palette-toggle {
   min-height: 48px;
-  border-color: var(--surface-divider);
+  border-color: var(--border);
 }
 
 .page-journey-builder .automation-builder .absolute.left-4.top-4.z-20 {
@@ -128,13 +132,13 @@
 .page-journey-builder .automation-builder .react-flow__controls-button {
   width: 32px;
   height: 32px;
-  border-color: var(--surface-divider);
+  border-color: var(--border);
   background: var(--card-bg);
   color: var(--text);
 }
 
 .page-journey-builder .automation-builder .react-flow__controls-button:hover {
-  background: var(--surface-hover);
+  background: var(--pill-bg);
 }
 
 .page-journey-builder .automation-builder .react-flow__minimap-mask {
