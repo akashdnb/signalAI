@@ -1,7 +1,14 @@
 name: client-ci
 
 on:
-  workflow_dispatch:
+  push:
+    paths:
+      - "client/**"
+      - ".github/workflows/client-ci.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - ".github/workflows/client-ci.yml"
 
 permissions:
   contents: read
