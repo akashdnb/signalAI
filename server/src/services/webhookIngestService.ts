@@ -230,7 +230,7 @@ async function ingestOneEvent(
     if (!event.username) {
       await enqueueUsernameResolution(
         boss,
-        { tenantId, leadId: lead.id, leadEventId: inserted.id, instagramUserId: event.instagramUserId },
+        { tenantId, leadId: lead.id, leadEventId: inserted.id, instagramUserId: event.instagramUserId, instagramAccountId: event.instagramAccountId },
         { client },
       );
     }
