@@ -35,6 +35,11 @@ export function LeadsPage() {
   }, [stageFilter, handoffFilter, search, selectedAccountId]);
 
   useEffect(() => {
+    setPageData(null);
+    setError(null);
+  }, [tenantId, selectedAccountId]);
+
+  useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
     api.listMembers(tenantId).then((result) => {
