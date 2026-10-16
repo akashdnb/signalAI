@@ -12,6 +12,7 @@ import { insertEventIdempotent } from "../../db/events.js";
 import { insertPii } from "../../db/pii.js";
 import { tryReserveSend } from "../../db/accountSends.js";
 import { recordDeadLetterEvent } from "../../db/deadLetterEvents.js";
+import { createDeal, updateDealStage } from "../../db/deals.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant, sessionHeaderFor } from "../../__tests__/helpers/auth.js";
 import { upsertGuardrailsConfig } from "../../db/guardrailsConfig.js";
@@ -784,6 +785,11 @@ describe("dashboard routes (BUI backend surface)", () => {
       [tenant.id, "analytics-acct-a", "analytics-acct-b"],
     );
 
+    const dealA = await createDeal(pool, { tenantId: tenant.id, customerId: leadA.customerId!, leadId: leadA.id, value: 180, currency: "INR" });
+    await updateDealStage(pool, { tenantId: tenant.id, dealId: dealA.id, stage: "won" });
+    const dealB = await createDeal(pool, { tenantId: tenant.id, customerId: leadB.customerId!, leadId: leadB.id, value: 25, currency: "USD" });
+    await updateDealStage(pool, { tenantId: tenant.id, dealId: dealB.id, stage: "won" });
+
     await recordDeadLetterEvent(pool, {
       queueName: "lead-events",
       sourceJobId: "analytics-dlq-a",
@@ -832,6 +838,13 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(summaryB.status).toBe(200);
     expect(summaryA.body.dmFailures).toBe(1);
     expect(summaryB.body.dmFailures).toBe(1);
+
+    const revenueA = await request(app).get(`/tenants/${tenant.id}/analytics/revenue?accountId=${rowA.id}`).set(authHeader);
+    const revenueB = await request(app).get(`/tenants/${tenant.id}/analytics/revenue?accountId=${rowB.id}`).set(authHeader);
+    expect(revenueA.status).toBe(200);
+    expect(revenueA.body).toEqual([{ currency: "INR", total: 180 }]);
+    expect(revenueB.status).toBe(200);
+    expect(revenueB.body).toEqual([{ currency: "USD", total: 25 }]);
 
     const foreignRow = await pool.query<{ id: string }>(
       "select id from meta_tokens where tenant_id = $1 and instagram_account_id = $2",
