@@ -87,17 +87,23 @@
   --text: #0f172a;
   --text-muted: #596273;
   --border: #e2e8f0;
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-soft: #a78bfa;
+  /* The preview's actual default palette (confirmed by reading its runtime
+     `data-po-palette` attribute on a fresh load, not just its base/unprefixed
+     CSS rule — which is a different, non-default palette) is "navy-cobalt",
+     not purple. Matches docs/signalai-brand-assets/BRAND-GUIDE.txt's "Primary
+     Blue #2563EB" rather than its "Primary Purple" — production now follows
+     the preview exactly per explicit instruction. */
+  --accent: #1e3a8a;
+  --accent-hover: #2563eb;
+  --accent-soft: #93c5fd;
   --accent-blue: #2563eb;
   --accent-cyan: #0e7490;
-  --brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb, #7c3aed);
+  --brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb, #1e3a8a);
   --ok-bg: #ecfdf5;
   --ok-text: #047857;
   --error-bg: #fef2f2;
   --error-text: #dc2626;
-  --pill-bg: #f3e8ff;
+  --pill-bg: #eff6ff;
   --sidebar-bg: #ffffff;
   /* Preview token gaps (docs/PREVIEW_TO_PRODUCTION_IMPLEMENTATION.md §5a): a
      stronger divider than --border, plus warning/info/builder-node tones
@@ -149,13 +155,14 @@
     --text: #f8fafc;
     --text-muted: #94a3b8;
     --border: #374151;
-    --accent-hover: #8b5cf6;
-    --accent-soft: #c4b5fd;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-soft: #bfdbfe;
     --ok-bg: rgba(5, 150, 105, 0.16);
     --ok-text: #34d399;
     --error-bg: rgba(220, 38, 38, 0.16);
     --error-text: #f87171;
-    --pill-bg: #2e2247;
+    --pill-bg: #172554;
     /* Dark variants follow the same translucent-overlay pattern as --ok-bg/
        --error-bg above (saturated ink + a low-alpha rgba of the same hue for
        the soft background/line), rather than copying the preview's flat
@@ -195,13 +202,14 @@
   --text: #f8fafc;
   --text-muted: #94a3b8;
   --border: #374151;
-  --accent-hover: #8b5cf6;
-  --accent-soft: #c4b5fd;
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-soft: #bfdbfe;
   --ok-bg: rgba(5, 150, 105, 0.16);
   --ok-text: #34d399;
   --error-bg: rgba(220, 38, 38, 0.16);
   --error-text: #f87171;
-  --pill-bg: #2e2247;
+  --pill-bg: #172554;
   --line-strong: #4b5563;
   --warn-bg: rgba(217, 119, 6, 0.16);
   --warn-text: #fbbf24;

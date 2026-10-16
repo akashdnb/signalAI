@@ -222,7 +222,7 @@ function MobileAccountSheet({
       {usage && (
         <div className="mt-5">
           <div className="flex items-center justify-between text-sm text-subtle">
-            <span>AI Tokens</span>
+            <span>AI usage</span>
             <span>
               {usage.tokens.used >= 1000 ? `${(usage.tokens.used / 1000).toFixed(1)}K` : usage.tokens.used}
               {" / "}
@@ -317,7 +317,7 @@ function AccountHeader({
           // usage stays reachable via the mobile account sheet below `md`.
           <div className="hidden w-36 lg:block">
             <div className="flex items-center justify-between text-xs text-subtle">
-              <span>AI Tokens</span>
+              <span>AI usage</span>
               <span>
                 {usage.tokens.used >= 1000 ? `${(usage.tokens.used / 1000).toFixed(1)}K` : usage.tokens.used}
                 {" / "}
