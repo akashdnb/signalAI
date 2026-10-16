@@ -38,7 +38,7 @@ async function resolveRequestedAccountScope(
   res: Response,
 ): Promise<RequestedAccountScope> {
   if (rawAccountRowId === undefined) return { ok: true };
-  if (typeof rawAccountRowId !== "string" || rawAccountRowId.length === 0) {
+  if (typeof rawAccountRowId !== "string" || rawAccountRowId.trim().length === 0) {
     res.status(400).json({ error: "accountId must be a single connected-account identifier" });
     return { ok: false };
   }
