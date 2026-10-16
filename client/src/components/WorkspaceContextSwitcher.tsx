@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "./ui/Button";
 import { EmptyState } from "./ui/EmptyState";
@@ -29,7 +29,7 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
   const [workspaceDescription, setWorkspaceDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function loadWorkspaces() {
+  const loadWorkspaces = useCallback(async () => {
     try {
       const result = await workspaceApi.listWorkspaces();
       setWorkspaces(result);
@@ -39,7 +39,7 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
       setError(err instanceof Error ? err.message : "Could not load your workspaces.");
       throw err;
     }
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +62,7 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
     };
     window.addEventListener("signalai:workspaces-updated", refresh);
     return () => window.removeEventListener("signalai:workspaces-updated", refresh);
-  }, []);
+  }, [loadWorkspaces]);
 
   const currentWorkspace = workspaces?.find((workspace) => workspace.tenantId === tenantId) ?? null;
 
