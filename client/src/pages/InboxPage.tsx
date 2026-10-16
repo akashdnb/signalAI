@@ -358,11 +358,11 @@ export function InboxPage() {
               <div className="min-h-0 flex-1 overflow-hidden p-3">
                 <div className="inbox-post-context">
                   <InstagramMarkIcon className="h-[17px] w-[17px] shrink-0 text-accent" />
-                  <span>
+                  <span className="inbox-post-context-text">
                     <strong>Last contact via {formatLastContactVia(selectedLead.lastEventType)}</strong>
                     <small>{selectedLead.lastMessagePreview ?? "No message preview available"}</small>
                   </span>
-                  <StatusBadge tone="neutral">{formatLastContactVia(selectedLead.lastEventType)}</StatusBadge>
+                  <StatusBadge tone="neutral" className="shrink-0">{formatLastContactVia(selectedLead.lastEventType)}</StatusBadge>
                 </div>
                 <ThreadPanel
                   tenantId={tenantId}

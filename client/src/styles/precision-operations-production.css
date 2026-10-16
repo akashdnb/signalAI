@@ -154,7 +154,7 @@
 .inbox-thread-header-identity strong { font-size: 0.875rem; }
 .inbox-thread-header-identity span { color: var(--text-muted); font-size: 0.85rem; }
 .inbox-post-context { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; padding: 0.65rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
-.inbox-post-context > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0.15rem; }
+.inbox-post-context-text { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0.15rem; }
 .inbox-post-context strong { font-size: 0.85rem; }
 .inbox-post-context small { overflow: hidden; color: var(--text-muted); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
 
