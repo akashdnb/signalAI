@@ -105,11 +105,11 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
     }
   }
 
-  if (workspaces === null) {
+  if (workspaces === null && !error) {
     return <div className="border-b border-line bg-card px-4 py-2 md:px-5"><LoadingState label="Loading workspaces…" className="min-h-12 py-2" /></div>;
   }
 
-  if (error && workspaces.length === 0) {
+  if (error && (workspaces === null || workspaces.length === 0)) {
     return <div className="border-b border-line bg-card px-4 py-2 md:px-5"><ErrorState title="Workspace context unavailable" description={error} action={<Button size="sm" variant="secondary" onClick={() => void loadWorkspaces()}>Retry</Button>} className="min-h-12 py-2" /></div>;
   }
 
