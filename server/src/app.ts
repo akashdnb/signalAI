@@ -19,6 +19,7 @@ import { authRouter } from "./routes/auth.js";
 import { authEmailRouter } from "./routes/authEmail.js";
 import { googleAuthRouter } from "./routes/authGoogle.js";
 import { mcpOAuthRouter } from "./routes/mcpOAuth.js";
+import { profileRouter } from "./routes/profile.js";
 import { paginationRouter } from "./routes/pagination.js";
 import { campaignsRouter } from "./routes/campaigns.js";
 import { contentRouter } from "./routes/content.js";
@@ -87,6 +88,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(authEmailRouter);
   app.use(googleAuthRouter);
   app.use(mcpOAuthRouter);
+  app.use(profileRouter);
   app.use(workspacesRouter);
   app.use(billingAccountsRouter);
   app.use(workspaceManagementRouter);
