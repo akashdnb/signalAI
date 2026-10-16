@@ -30,7 +30,7 @@ export function knowledgeBaseRouter(embeddingProvider: EmbeddingProvider | null)
 
   router.get("/tenants/:tenantId/knowledge-base", async (req, res) => {
     const documents = await listDocumentsForTenant(getPool(), req.params.tenantId!);
-    return res.status(200).json({ documents });
+    return res.status(200).json({ documents: documents.map(({ storageKey: _storageKey, ...document }) => document) });
   });
 
   router.get("/tenants/:tenantId/knowledge-base/:documentId", async (req, res) => {
@@ -147,7 +147,8 @@ export function knowledgeBaseRouter(embeddingProvider: EmbeddingProvider | null)
         contentType: req.file.mimetype,
         buffer: req.file.buffer,
       });
-      return res.status(201).json({ document });
+      const { storageKey: _storageKey, ...safeDocument } = document;
+      return res.status(201).json({ document: safeDocument });
     } catch (err) {
       console.error("Knowledge base ingestion failed to start:", err);
       Sentry.captureException(err);
