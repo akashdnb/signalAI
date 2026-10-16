@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
   api,
   clearSession,
   loadSession,
-  type AccountHealth,
   type BillingSummary,
   type TenantSummary,
   type UsageSummary,
 } from "../api";
+import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole, type WorkspaceSummary } from "../api/workspace";
 import { BottomSheet } from "./BottomSheet";
 import { TenantContext } from "../context/TenantContext";
 import { deriveDisplayName } from "../lib/leadFormatting";
 import { Logo } from "./Logo";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { ThemeToggle } from "./ThemeToggle";
+import { ConnectedAccountSwitcher, type ConnectedAccountSwitcherOption, type WorkspaceSwitcherOption } from "./ui/ConnectedAccountSwitcher";
 import {
   AnalyticsIcon,
   AutomationIcon,
@@ -143,19 +144,59 @@ function PlanCard({ tenantId, billing }: { tenantId: string; billing: BillingSum
   );
 }
 
+type WorkspaceContextControls = {
+  workspaceOptions: WorkspaceSwitcherOption[] | null;
+  currentWorkspaceId: string;
+  currentWorkspaceRole: WorkspaceRole | null;
+  workspaceError: string | null;
+  onReloadWorkspaces: () => void;
+  onSelectWorkspace: (workspaceId: string) => void;
+  onCreateWorkspace: (name: string, description: string) => Promise<WorkspaceSwitcherOption>;
+  connectedAccounts: ConnectedInstagramAccount[] | null;
+  accountOptions: ConnectedAccountSwitcherOption[];
+  selectedAccountId: string | null;
+  accountError: string | null;
+  accountsLoading: boolean;
+  onSelectAccount: (accountId: string) => void;
+  onManageAccounts: () => void;
+  showAccountSelector: boolean;
+};
+
+function accountHealthSummary(accounts: ConnectedInstagramAccount[] | null, error: string | null): string {
+  if (accounts === null) return error ? "Connection status unavailable" : "Checking Instagram accounts…";
+  if (accounts.length === 0) return "No Instagram accounts connected";
+  const attention = accounts.filter((account) => account.status !== "healthy").length;
+  return accounts.length + " Instagram account" + (accounts.length === 1 ? "" : "s")
+    + (attention > 0 ? " · " + attention + " need attention" : " · All healthy");
+}
+
 function MobileAccountSheet({
   tenant,
-  account,
+  connectedAccounts,
   usage,
   email,
   firstName,
   lastName,
   picture,
+  workspaceOptions,
+  currentWorkspaceId,
+  currentWorkspaceRole,
+  workspaceError,
+  onReloadWorkspaces,
+  onSelectWorkspace,
+  onCreateWorkspace,
+  accountOptions,
+  selectedAccountId,
+  accountError,
+  accountsLoading,
+  onSelectAccount,
+  onManageAccounts,
+  showAccountSelector,
   onClose,
   onLogout,
 }: {
   tenant: TenantSummary | null;
-  account: AccountHealth | null;
+  connectedAccounts: ConnectedInstagramAccount[] | null;
   usage: UsageSummary | null;
   email?: string;
   firstName?: string;
@@ -163,7 +204,7 @@ function MobileAccountSheet({
   picture?: string;
   onClose: () => void;
   onLogout: () => void;
-}) {
+} & WorkspaceContextControls) {
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
   const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
   const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
@@ -175,15 +216,31 @@ function MobileAccountSheet({
           <InstagramMarkIcon className="h-5.5 w-5.5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-base font-semibold text-ink">{tenant?.name ?? "…"}</div>
-          {account?.connected ? (
-            <span className="pill pill-ok m-0 inline-block">
-              <span className="mr-1">●</span>Connected
-            </span>
-          ) : (
-            <span className="text-sm text-subtle">Instagram not connected</span>
-          )}
+          <div className="truncate text-base font-semibold text-ink">{tenant?.name ?? "Workspace"}</div>
+          <span className="text-sm text-subtle">{accountHealthSummary(connectedAccounts, accountError)}</span>
         </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border border-line p-2">
+        <ConnectedAccountSwitcher
+          workspaceName={tenant?.name ?? "Workspace"}
+          providerLabel="Instagram"
+          providerIcon={<InstagramMarkIcon />}
+          accounts={accountOptions}
+          selectedAccountId={selectedAccountId ?? ""}
+          onSelect={onSelectAccount}
+          onManageAccounts={onManageAccounts}
+          workspaces={workspaceOptions}
+          currentWorkspaceId={currentWorkspaceId}
+          currentWorkspaceRole={currentWorkspaceRole}
+          workspaceError={workspaceError}
+          onReloadWorkspaces={onReloadWorkspaces}
+          onSelectWorkspace={onSelectWorkspace}
+          onCreateWorkspace={onCreateWorkspace}
+          showAccountSelector={showAccountSelector}
+          accountsLoading={accountsLoading}
+          accountError={accountError}
+        />
       </div>
 
       {usage && (
@@ -213,7 +270,7 @@ function MobileAccountSheet({
         </span>
         <div>
           <div className="text-base font-medium text-ink">{profileName}</div>
-          <div className="text-sm text-subtle">Owner</div>
+          <div className="text-sm text-subtle">{currentWorkspaceRole ? currentWorkspaceRole.charAt(0).toUpperCase() + currentWorkspaceRole.slice(1) : "Workspace access loading"}</div>
         </div>
       </div>
 
@@ -236,23 +293,37 @@ function MobileAccountSheet({
 
 function AccountHeader({
   tenant,
-  account,
+  connectedAccounts,
   usage,
   email,
   firstName,
   lastName,
   picture,
+  workspaceOptions,
+  currentWorkspaceId,
+  currentWorkspaceRole,
+  workspaceError,
+  onReloadWorkspaces,
+  onSelectWorkspace,
+  onCreateWorkspace,
+  accountOptions,
+  selectedAccountId,
+  accountError,
+  accountsLoading,
+  onSelectAccount,
+  onManageAccounts,
+  showAccountSelector,
   onLogout,
 }: {
   tenant: TenantSummary | null;
-  account: AccountHealth | null;
+  connectedAccounts: ConnectedInstagramAccount[] | null;
   usage: UsageSummary | null;
   email?: string;
   firstName?: string;
   lastName?: string;
   picture?: string;
   onLogout: () => void;
-}) {
+} & WorkspaceContextControls) {
   const [profileOpen, setProfileOpen] = useState(false);
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
   const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
@@ -260,20 +331,29 @@ function AccountHeader({
 
   return (
     <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
-          <InstagramMarkIcon className="h-4 w-4" />
+      <div className="flex min-w-0 items-center gap-3">
+        <ConnectedAccountSwitcher
+          workspaceName={tenant?.name ?? "Workspace"}
+          providerLabel="Instagram"
+          providerIcon={<InstagramMarkIcon />}
+          accounts={accountOptions}
+          selectedAccountId={selectedAccountId ?? ""}
+          onSelect={onSelectAccount}
+          onManageAccounts={onManageAccounts}
+          workspaces={workspaceOptions}
+          currentWorkspaceId={currentWorkspaceId}
+          currentWorkspaceRole={currentWorkspaceRole}
+          workspaceError={workspaceError}
+          onReloadWorkspaces={onReloadWorkspaces}
+          onSelectWorkspace={onSelectWorkspace}
+          onCreateWorkspace={onCreateWorkspace}
+          showAccountSelector={showAccountSelector}
+          accountsLoading={accountsLoading}
+          accountError={accountError}
+        />
+        <span className="hidden xl:block truncate text-xs text-subtle" title={accountHealthSummary(connectedAccounts, accountError)}>
+          {accountHealthSummary(connectedAccounts, accountError)}
         </span>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</div>
-          {account?.connected ? (
-            <span className="pill pill-ok m-0 inline-block">
-              <span className="mr-1">●</span>Connected
-            </span>
-          ) : (
-            <span className="text-xs text-subtle">Instagram not connected</span>
-          )}
-        </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
@@ -313,6 +393,8 @@ function AccountHeader({
             type="button"
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-chip"
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-sm font-semibold text-white">
               {picture ? (
@@ -321,7 +403,7 @@ function AccountHeader({
             </span>
             <span className="text-left leading-tight">
               <span className="block text-sm font-medium text-ink">{profileName}</span>
-              <span className="block text-xs text-subtle">Owner</span>
+              <span className="block text-xs text-subtle">{currentWorkspaceRole ? currentWorkspaceRole.charAt(0).toUpperCase() + currentWorkspaceRole.slice(1) : "Workspace access loading"}</span>
             </span>
             <ChevronDownIcon className="h-4 w-4 text-subtle" />
           </button>
