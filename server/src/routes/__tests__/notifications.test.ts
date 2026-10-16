@@ -115,14 +115,20 @@ describe("notification routes and durable event delivery", () => {
         title: "New lead", message: "A lead arrived.",
       });
       const delivery = await getPool().query("select id,status,attempts from notification_deliveries where event_id = $1 and channel = 'email'", [result.eventId]);
-      expect(delivery.rows[0].status).toBe("pending"); // the provider has not been run yet, so no success is invented
-      // Start the real delivery worker so the row is claimed, the provider is
-      // called, and a permanent provider rejection is persisted as failed.
+      expect(delivery.rows[0].status).toBe("pending"); // no provider success is recorded before a send
       await startNotificationDeliveryWorker(boss, getPool());
-      const { deliverNotificationEmail } = await import("../../notifications/providers.js");
-      const providerResult = await deliverNotificationEmail({ to: user.email, subject: "Test", html: "<p>Test</p>" });
-      expect(providerResult).toMatchObject({ ok: false, failureClass: "permanent", errorCode: "provider_rejected_request" });
+      const deadline = Date.now() + 5000;
+      let persisted = { status: "pending", attempts: 0 };
+      while (Date.now() < deadline) {
+        const current = await getPool().query<{ status: string; attempts: number }>(
+          "select status,attempts from notification_deliveries where id = $1", [delivery.rows[0].id],
+        );
+        persisted = current.rows[0] ?? persisted;
+        if (persisted.status === "failed") break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
       expect(fetchSpy).toHaveBeenCalled();
+      expect(persisted).toMatchObject({ status: "failed", attempts: 1 });
     } finally {
       fetchSpy.mockRestore();
     }
