@@ -26,6 +26,7 @@ export function capabilitiesRouter(companyCapability = new CompanyCapability(new
   const router = Router();
 
   router.use("/internal/capabilities", requireServiceAuth);
+  router.use("/v1/capabilities", requireServiceAuth);
 
   router.post("/internal/capabilities/company/search", async (req, res) => {
     const correlationId = req.header("x-correlation-id") ?? randomUUID();
