@@ -63,7 +63,7 @@ describe("alertsQueue worker", () => {
     expect(text).toContain("lead-1");
   }, 15000);
 
-  it("records a tenant-scoped in-app event instead of sending an untracked owner email", async () => {
+  it("keeps legacy owner email and also records a tenant-scoped in-app event", async () => {
     const owner = await findOrCreateUserByEmail(getPool(), "owner@example.com");
     const tenant = await createTenantForUser(getPool(), "creator-a", owner.id);
 
@@ -75,7 +75,12 @@ describe("alertsQueue worker", () => {
       await sleep(500);
     }
 
-    expect(sendAlertEmail).not.toHaveBeenCalled();
+    expect(sendAlertEmail).toHaveBeenCalledTimes(1);
+    const [to, subject, html] = vi.mocked(sendAlertEmail).mock.calls[0]!;
+    expect(to).toBe("owner@example.com");
+    expect(subject).toContain("lead");
+    expect(html).toContain(tenant.id);
+    expect(html).toContain("lead-1");
     const notification = await getPool().query(
       "select n.event_type, n.tenant_id, n.user_id, n.entity_id from notifications n join users u on u.id = n.user_id where n.tenant_id = $1 and u.email = $2",
       [tenant.id, "owner@example.com"],

@@ -2,6 +2,9 @@ import type { PgBoss } from "pg-boss";
 import type { Pool, PoolClient } from "pg";
 import { config } from "../config.js";
 import { sendTelegramAlert } from "../lib/telegram.js";
+import { sendAlertEmail } from "../lib/resend.js";
+import { getTenant } from "../db/tenants.js";
+import { getUserById } from "../db/users.js";
 import { publishNotificationEvent } from "../notifications/service.js";
 import { asPgBossDb } from "./leadEventsQueue.js";
 import { FAST_POLL, ensureNotifyQueue } from "./boss.js";
@@ -80,8 +83,7 @@ export function startAlertsWorker(boss: PgBoss, pool: Pool): Promise<string> {
             entityId: job.data.leadId,
           });
         } catch (err) {
-          // Keep provider/database details out of logs while retaining a useful event marker.
-          // The publisher only resolves after its persistence transaction commits.
+          // New notification history is independent from the legacy operational alert.
           console.error(JSON.stringify({
             event: "notification.fanout",
             eventType: "lead.created",
@@ -89,6 +91,22 @@ export function startAlertsWorker(boss: PgBoss, pool: Pool): Promise<string> {
             result: "failed",
             errorCode: "notification_persistence_failed",
           }));
+        }
+
+        // Preserve the existing independent owner email until consumers migrate.
+        // The new delivery ledger remains the source of truth for preference-managed email.
+        try {
+          const tenant = await getTenant(pool, job.data.tenantId);
+          const owner = tenant?.ownerUserId ? await getUserById(pool, tenant.ownerUserId) : null;
+          if (owner) {
+            await sendAlertEmail(
+              owner.email,
+              "New lead on signalAI",
+              `<p>You have a new lead.</p><p><a href="${link}">View it in your dashboard</a></p>`
+            );
+          }
+        } catch (err) {
+          console.error("[alerts] legacy email alert lookup failed:", err instanceof Error ? err.message : "unknown error");
         }
       }
     }
