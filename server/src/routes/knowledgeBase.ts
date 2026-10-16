@@ -16,6 +16,7 @@ import { Sentry } from "../lib/sentry.js";
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_QUERY_LENGTH = 1000;
 const MAX_RETRIEVAL_RESULTS = 10;
+const MAX_PREVIEW_CHARACTERS = 100_000;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES } });
 
 /**
@@ -56,10 +57,12 @@ export function knowledgeBaseRouter(embeddingProvider: EmbeddingProvider | null)
         order by chunk_index asc`,
       [req.params.tenantId, req.params.documentId],
     );
+    const fullContent = result.rows.map((row) => row.content).join("\n\n");
     return res.status(200).json({
       documentId: document.id,
       filename: document.filename,
-      content: result.rows.map((row) => row.content).join("\n\n"),
+      content: fullContent.slice(0, MAX_PREVIEW_CHARACTERS),
+      truncated: fullContent.length > MAX_PREVIEW_CHARACTERS,
       chunkCount: result.rows.length,
     });
   });
