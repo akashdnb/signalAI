@@ -740,7 +740,7 @@ export function AppShell() {
     connected: account.status === "healthy",
   }));
   const accountsLoading = connectedAccounts === null && accountError === null;
-  const showAccountSelector = /\\/content\\/?$/.test(location.pathname);
+  const showAccountSelector = location.pathname.endsWith("/content");
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
