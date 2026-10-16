@@ -223,6 +223,45 @@ export async function deleteDraftCampaign(
   }
 }
 
+/**
+ * Runtime selection for reusable journeys must be scoped to the receiving
+ * Instagram business account, not merely its workspace. This uses the durable
+ * meta_tokens row + explicit journey binding and excludes disconnected accounts.
+ */
+export async function listActiveCampaignKeywordsForInstagramAccount(
+  pool: Queryable,
+  tenantId: string,
+  instagramAccountId: string,
+): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
+  const result = await pool.query<{
+    id: string;
+    keywords: string[];
+    target_media_ids: string[];
+    trigger_source: TriggerSource;
+    reply_channel: ReplyChannel;
+  }>(
+    `select c.id, c.keywords, c.target_media_ids, c.trigger_source, c.reply_channel
+       from campaigns c
+       join campaign_instagram_accounts cia on cia.campaign_id = c.id
+       join meta_tokens mt on mt.id = cia.meta_token_id
+      where c.tenant_id = $1
+        and mt.tenant_id = $1
+        and mt.instagram_account_id = $2
+        and mt.status = 'healthy'
+        and cia.enabled = true
+        and c.enabled = true
+      order by c.created_at asc`,
+    [tenantId, instagramAccountId],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    keywords: row.keywords,
+    targetMediaIds: row.target_media_ids,
+    triggerSource: row.trigger_source,
+    replyChannel: row.reply_channel,
+  }));
+}
+
 export async function listActiveCampaignKeywords(pool: Queryable, tenantId: string): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
   const result = await pool.query<{ id: string; keywords: string[]; target_media_ids: string[]; trigger_source: TriggerSource; reply_channel: ReplyChannel }>(`select id, keywords, target_media_ids, trigger_source, reply_channel from campaigns where tenant_id = $1 and enabled = true`, [tenantId]);
   return result.rows.map((row) => ({ id: row.id, keywords: row.keywords, targetMediaIds: row.target_media_ids, triggerSource: row.trigger_source, replyChannel: row.reply_channel }));
