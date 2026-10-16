@@ -56,7 +56,7 @@ export async function createJourneyDraftWithClient(
     edges: edges ?? defaultGraph.edges,
     version: defaultGraph.version,
   };
-  const validation = validateJourneyGraph(graphToPersist, await listMilestonesWithClient(client, tenantId, campaign.id));
+  const validation = validateJourneyGraph(graphToPersist, []);
   if (!validation.valid) {
     throw new DraftLifecycleError("validation_error", "The draft graph is invalid.", {
       validationErrors: validation.errors.map((error) => ({
