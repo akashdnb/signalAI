@@ -4,6 +4,14 @@ Chronological log of shipped changes, newest first. Each entry names the driving
 
 ---
 
+## 2026-10-16 — Post-merge stabilization (in review)
+
+- The stabilization audit found that `profileRouter` exists and the Settings page calls its GET/PATCH endpoints, but the current `server/src/app.ts` did not mount it. This causes application-level 404s despite the route handler existing. The stabilization PR restores application registration and adds `createApp()`-level regression coverage.
+- The Knowledge Base/profile audit now records the final routes, authorization and intentionally unimplemented notification preferences, while separating historical implementation notes from post-merge verification.
+- **Verification caveat:** this is a PR entry, not yet a shipped change. It must not be treated as released until review and manually dispatched server/client CI pass.
+
+---
+
 ## 2026-09-29 — Milestone Multi-Field Capture + Tenant Field-Definitions Registry + Unified Settings
 
 Raised from a real live conversation review (migrations `1758240000043`–`1758240000044`). Full
