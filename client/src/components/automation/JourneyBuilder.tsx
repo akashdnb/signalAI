@@ -2,6 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  ApiError,
+  type JourneyValidationError,
   type Campaign,
   type FieldDefinition,
   type InstagramMessagePresentation,
@@ -129,12 +131,14 @@ export function JourneyBuilder({
   const [publishing, setPublishing] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishValidationErrors, setPublishValidationErrors] = useState<JourneyValidationError[]>([]);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [togglingEnabled, setTogglingEnabled] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
   const journeyDirty = canvasDirty || milestonesDirty;
+  const hasUnsavedChanges = journeyDirty || detailsDirty;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -154,7 +158,7 @@ export function JourneyBuilder({
 
   const requestNavigation = useCallback(
     (action: () => void | Promise<void>) => {
-      if (!journeyDirty) {
+      if (!hasUnsavedChanges) {
         void action();
         return;
       }
@@ -163,7 +167,7 @@ export function JourneyBuilder({
       setUnsavedDialogError(null);
       setShowUnsavedDialog(true);
     },
-    [journeyDirty],
+    [hasUnsavedChanges],
   );
 
   async function saveCanvasDraft(): Promise<boolean> {
@@ -203,9 +207,22 @@ export function JourneyBuilder({
   }
 
   async function saveAndContinue() {
+    if (detailsDirty) {
+      if (subTab === "details") {
+        const detailsSaved = await detailsRef.current?.save();
+        if (!detailsSaved) {
+          setUnsavedDialogError("Couldn't save Setup changes. Your edits are still here.");
+          return;
+        }
+      } else {
+        setUnsavedDialogError("Save or discard the unsaved Setup changes on the Setup tab before continuing.");
+        return;
+      }
+    }
+
     const saved = await saveCanvasDraft();
-    if (!saved) {
-      setUnsavedDialogError("Couldn't save this automation. Your changes are still here; please try again.");
+    if (!saved && journeyDirty) {
+      setUnsavedDialogError("Couldn't save this journey. Your graph changes are still here; please try again.");
       return;
     }
 
@@ -217,6 +234,14 @@ export function JourneyBuilder({
   }
 
   async function discardAndContinue() {
+    if (detailsDirty) {
+      if (subTab === "details") {
+        detailsRef.current?.discard();
+      } else {
+        setUnsavedDialogError("Open Setup and discard its unsaved changes before continuing.");
+        return;
+      }
+    }
     canvasActionsRef.current?.discardDraft();
     setMilestonesState(savedMilestonesRef.current);
     setMilestonesDirty(false);
@@ -228,7 +253,7 @@ export function JourneyBuilder({
   }
 
   useEffect(() => {
-    if (!journeyDirty) return;
+    if (!hasUnsavedChanges) return;
 
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -237,13 +262,13 @@ export function JourneyBuilder({
 
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [journeyDirty]);
+  }, [hasUnsavedChanges]);
 
   // Guard browser back/forward within the SPA. Restore the current history
   // entry before opening the dialog; if the user confirms, navigate to the
   // destination captured from the blocked popstate instead.
   useEffect(() => {
-    if (!journeyDirty) return;
+    if (!hasUnsavedChanges) return;
 
     const interceptPopState = (event: PopStateEvent) => {
       const targetIndex =
@@ -276,13 +301,13 @@ export function JourneyBuilder({
 
     window.addEventListener("popstate", interceptPopState, true);
     return () => window.removeEventListener("popstate", interceptPopState, true);
-  }, [journeyDirty, navigate, requestNavigation]);
+  }, [hasUnsavedChanges, navigate, requestNavigation]);
 
   // BrowserRouter does not block SPA navigation by itself. Intercept ordinary
   // same-origin links while a canvas draft exists and resume navigation only
   // after the user explicitly saves or discards it.
   useEffect(() => {
-    if (!journeyDirty) return;
+    if (!hasUnsavedChanges) return;
 
     const interceptInternalLink = (event: MouseEvent) => {
       if (
@@ -327,7 +352,7 @@ export function JourneyBuilder({
 
     document.addEventListener("click", interceptInternalLink, true);
     return () => document.removeEventListener("click", interceptInternalLink, true);
-  }, [journeyDirty, navigate, requestNavigation]);
+  }, [hasUnsavedChanges, navigate, requestNavigation]);
 
   async function loadMilestones() {
     const requestId = ++milestonesLoadRequestRef.current;
@@ -509,6 +534,11 @@ export function JourneyBuilder({
   }
 
   function requestPublish() {
+    if (detailsDirty) {
+      setPublishError("Save or discard the unsaved Setup changes before publishing this journey.");
+      setSubTab("details");
+      return;
+    }
     requestNavigation(() => {
       if (builderVersion === null) {
         setPublishError("The current version is still loading.");
@@ -516,6 +546,8 @@ export function JourneyBuilder({
       }
 
       setMenuOpen(false);
+      setPublishValidationErrors([]);
+      setPublishError(null);
       setShowPublishConfirm(true);
     });
   }
@@ -534,6 +566,28 @@ export function JourneyBuilder({
       setPublishError(
         error instanceof Error ? error.message : "Couldn't publish this journey",
       );
+      if (error instanceof ApiError) {
+        const payload = error.payload;
+        if (
+          typeof payload === "object" &&
+          payload !== null &&
+          "details" in payload &&
+          Array.isArray((payload as { details?: unknown }).details)
+        ) {
+          setPublishValidationErrors(
+            (payload as { details: JourneyValidationError[] }).details.filter(
+              (item) =>
+                typeof item === "object" &&
+                item !== null &&
+                typeof item.message === "string",
+            ),
+          );
+        } else {
+          setPublishValidationErrors([]);
+        }
+      } else {
+        setPublishValidationErrors([]);
+      }
     } finally {
       setPublishing(false);
     }
@@ -586,7 +640,7 @@ export function JourneyBuilder({
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={() => void saveCanvasDraft()}
                 >
-                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading setup…" : "Save changes"}
+                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading setup…" : "Save journey"}
                 </button>
               )}
 
@@ -782,8 +836,30 @@ export function JourneyBuilder({
           </div>
         </div>
 
-        {publishError && (
-          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{publishError}</div>
+        {publishError && !showPublishConfirm && (
+          <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">
+            <p className="m-0">{publishError}</p>
+            {publishValidationErrors.length > 0 && (
+              <ul className="mb-0 mt-2 list-disc pl-5">
+                {publishValidationErrors.map((item, index) => (
+                  <li key={item.code + (item.nodeId ?? "") + (item.edgeId ?? "") + index}>{item.message}</li>
+                ))}
+              </ul>
+            )}
+            {publishValidationErrors.length > 0 && (
+              <button
+                type="button"
+                className="mt-2 font-semibold underline"
+                onClick={() => {
+                  setPublishError(null);
+                  setPublishValidationErrors([]);
+                  setSubTab("builder");
+                }}
+              >
+                Return to journey flow
+              </button>
+            )}
+          </div>
         )}        {toggleError && !showActivateConfirm && (
           <div className="banner banner-error mx-4 mt-3 md:mx-5" role="alert">{toggleError}</div>
         )}
@@ -936,6 +1012,21 @@ export function JourneyBuilder({
             if (!publishing) setShowPublishConfirm(false);
           }}
         >
+          {publishError && (
+            <div className="banner banner-error mb-4" role="alert">
+              <p className="m-0">{publishError}</p>
+              {publishValidationErrors.length > 0 && (
+                <ul className="mb-0 mt-2 list-disc pl-5">
+                  {publishValidationErrors.map((item, index) => (
+                    <li key={item.code + (item.nodeId ?? "") + (item.edgeId ?? "") + index}>{item.message}</li>
+                  ))}
+                </ul>
+              )}
+              {publishValidationErrors.length > 0 && (
+                <p className="m-0 mt-2 text-xs">Return to the Flow tab to correct these items, save the journey, and publish again.</p>
+              )}
+            </div>
+          )}
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
             <p className="m-0 text-sm font-semibold">
               {campaign.enabled
@@ -1103,7 +1194,9 @@ export function JourneyBuilder({
           onClose={keepEditing}
         >
           <p className="m-0 text-sm text-ink">
-            You have unsaved automation changes. Save or discard them before continuing; unsaved changes will be lost if you continue without saving.
+            {detailsDirty
+              ? "You have unsaved automation changes. The graph and Setup settings use separate save controls; finish both before leaving."
+              : "You have unsaved flow or goal changes. Save or discard them before continuing."}
           </p>
           {unsavedDialogError && (
             <div className="banner banner-error mt-3">{unsavedDialogError}</div>
@@ -1138,6 +1231,8 @@ export function JourneyBuilder({
         <PreviewDialog
           tenantId={tenantId}
           campaign={campaign}
+          hasUnsavedChanges={hasUnsavedChanges}
+          savedVersion={builderVersion}
           onClose={() => setShowPreview(false)}
         />
       )}
@@ -1147,6 +1242,8 @@ export function JourneyBuilder({
           tenantId={tenantId}
           campaign={campaign}
           milestones={milestones}
+          hasUnsavedChanges={hasUnsavedChanges}
+          savedVersion={builderVersion}
           onClose={() => setShowTestJourney(false)}
         />
       )}

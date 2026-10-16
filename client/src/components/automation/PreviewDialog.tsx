@@ -5,10 +5,14 @@ import { BottomSheet } from "../BottomSheet";
 export function PreviewDialog({
   tenantId,
   campaign,
+  hasUnsavedChanges = false,
+  savedVersion,
   onClose,
 }: {
   tenantId: string;
   campaign: Campaign;
+  hasUnsavedChanges?: boolean;
+  savedVersion: number | null;
   onClose: () => void;
 }) {
   const [sampleText, setSampleText] = useState("");
@@ -34,8 +38,14 @@ export function PreviewDialog({
   return (
     <BottomSheet title="Preview conversation" onClose={onClose} maxWidth={520}>
       <p className="muted small mt-0">
-        Simulates an Instagram DM for <strong className="text-ink">{campaign.name}</strong>.
+        Preview uses saved reply settings for <strong className="text-ink">{campaign.name}</strong>
+        {savedVersion === null ? "." : ` (builder v${savedVersion}).`} It doesn't save, publish, or send an Instagram message.
       </p>
+      {hasUnsavedChanges && (
+        <div className="banner banner-error mb-3" role="status">
+          You have unsaved changes. This preview does not include them; save the journey before checking the latest draft.
+        </div>
+      )}
 
       <div className="mb-3 rounded-xl bg-chip p-3">
         <div className="text-xs font-medium text-subtle">User</div>
