@@ -5,6 +5,7 @@ import {
   api,
   clearSession,
   loadSession,
+  saveSession,
   type BillingSummary,
   type TenantSummary,
   type UsageSummary,
@@ -442,9 +443,14 @@ function AccountHeader({
 export function AppShell() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
-  const [account, setAccount] = useState<AccountHealth | null>(null);
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -463,7 +469,8 @@ export function AppShell() {
   // simplification rather than a persisted step field.
   const [wizardLatchedOpen, setWizardLatchedOpen] = useState(false);
   const session = loadSession();
-  const sessionValid = Boolean(tenantId && session && session.tenantId === tenantId);
+  // tenantId is a requested workspace context, not an authorization token. Every tenant endpoint re-checks membership server-side.
+  const sessionValid = Boolean(tenantId && session?.token);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
@@ -538,6 +545,41 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionValid]);
 
+  async function reloadWorkspaces(): Promise<WorkspaceSummary[] | null> {
+    try {
+      const next = await workspaceApi.listWorkspaces();
+      setWorkspaces(next);
+      setWorkspaceError(null);
+      return next;
+    } catch (err) {
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401) {
+        clearSession();
+        navigate("/login", { replace: true });
+      }
+      setWorkspaces(null);
+      setWorkspaceError(err instanceof Error ? err.message : "Could not load your workspaces.");
+      return null;
+    }
+  }
+
+  async function reloadConnectedAccounts(): Promise<void> {
+    if (!tenantId) return;
+    try {
+      const next = await workspaceApi.listConnectedAccounts(tenantId);
+      setConnectedAccounts(next);
+      setAccountError(null);
+    } catch (err) {
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401) {
+        clearSession();
+        navigate("/login", { replace: true });
+      }
+      setConnectedAccounts(null);
+      setAccountError(err instanceof Error ? err.message : "Could not load Instagram accounts.");
+    }
+  }
+
   async function reloadTenant() {
     if (!tenantId) return;
     try {
@@ -545,37 +587,131 @@ export function AppShell() {
       setTenant(t);
       setTenantError(null);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401) {
         navigate("/login", { replace: true });
         return;
       }
-      setTenantError(err instanceof Error ? err.message : "Failed to load tenant");
+      if (status === 403) {
+        const available = await reloadWorkspaces();
+        const fallback = available?.find((workspace) => workspace.tenantId !== tenantId) ?? available?.[0];
+        if (fallback) {
+          const activeSession = loadSession();
+          if (activeSession) saveSession({ ...activeSession, tenantId: fallback.tenantId });
+          navigate("/dashboard/" + fallback.tenantId, { replace: true });
+          return;
+        }
+        setTenantError("Access denied: this workspace is not available to your account. Ask a workspace owner to invite you, or sign in with another account.");
+        return;
+      }
+      setTenantError(err instanceof Error ? err.message : "Failed to load workspace");
     }
   }
 
   useEffect(() => {
-    if (sessionValid) reloadTenant();
+    if (sessionValid) {
+      void reloadTenant();
+      void reloadWorkspaces();
+      void reloadConnectedAccounts();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, sessionValid]);
+
+  useEffect(() => {
+    if (!tenantId) {
+      setSelectedAccountIdState(null);
+      return;
+    }
+    const stored = localStorage.getItem("signalai.account-context:" + tenantId);
+    setSelectedAccountIdState(stored || null);
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!tenantId || connectedAccounts === null) return;
+    const key = "signalai.account-context:" + tenantId;
+    const stored = localStorage.getItem(key);
+    if (stored && connectedAccounts.some((account) => account.id === stored)) {
+      setSelectedAccountIdState(stored);
+    } else {
+      if (stored) localStorage.removeItem(key);
+      setSelectedAccountIdState(null);
+    }
+  }, [tenantId, connectedAccounts]);
+
+  async function handleSelectWorkspace(workspaceId: string) {
+    let target = workspaces?.find((workspace) => workspace.tenantId === workspaceId);
+    if (!target) {
+      const refreshed = await reloadWorkspaces();
+      target = refreshed?.find((workspace) => workspace.tenantId === workspaceId);
+    }
+    if (!target) {
+      setWorkspaceError("That workspace is not in the list of workspaces available to your account.");
+      return;
+    }
+    const activeSession = loadSession();
+    if (!activeSession) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    const routePrefix = "/dashboard/" + tenantId;
+    let suffix = location.pathname.startsWith(routePrefix) ? location.pathname.slice(routePrefix.length) : "";
+    if (suffix.startsWith("/leads/")) suffix = "/leads";
+    else if (suffix.startsWith("/inbox/")) suffix = "/inbox";
+    else if (suffix.startsWith("/automation/")) suffix = "/automation";
+    else if (!["", "/inbox", "/leads", "/automation", "/knowledge", "/content", "/analytics", "/team", "/integrations", "/billing", "/settings"].includes(suffix)) suffix = "";
+
+    saveSession({ ...activeSession, tenantId: target.tenantId });
+    setSelectedAccountIdState(null);
+    navigate("/dashboard/" + target.tenantId + suffix);
+  }
+
+  async function handleCreateWorkspace(name: string, description: string): Promise<WorkspaceSwitcherOption> {
+    const created = await workspaceApi.createWorkspace(name, description);
+    setWorkspaces((current) => [...(current ?? []).filter((workspace) => workspace.tenantId !== created.tenantId), created]);
+    setWorkspaceError(null);
+    return { id: created.tenantId, name: created.name, description: created.description, role: created.role };
+  }
+
+  function handleSelectAccount(accountId: string) {
+    if (!tenantId) return;
+    const key = "signalai.account-context:" + tenantId;
+    if (!accountId) {
+      localStorage.removeItem(key);
+      setSelectedAccountIdState(null);
+      return;
+    }
+    if (!connectedAccounts?.some((account) => account.id === accountId)) {
+      setAccountError("Choose an Instagram account from the server-provided account list.");
+      return;
+    }
+    localStorage.setItem(key, accountId);
+    setSelectedAccountIdState(accountId);
+    setAccountError(null);
+  }
+
+  function handleManageAccounts() {
+    if (!tenantId) return;
+    setMobileAccountOpen(false);
+    navigate("/dashboard/" + tenantId + "/integrations");
+  }
 
   useEffect(() => {
     if (!sessionValid || !tenantId) return;
     let cancelled = false;
     Promise.all([
-      api.getAccountHealth(tenantId),
       api.getUsage(tenantId),
       api.getBilling(tenantId),
       api.getLeads(tenantId, { unreadOnly: true }),
     ])
-      .then(([a, u, b, unread]) => {
+      .then(([u, b, unread]) => {
         if (cancelled) return;
-        setAccount(a);
         setUsage(u);
         setBilling(b);
         setUnreadCount(unread.length);
       })
       .catch(() => {
-        // Header chrome degrades gracefully — a failed fetch just leaves these panels blank, it's not a page-blocking error.
+        // Header usage chrome degrades gracefully; page-level data remains responsible for actionable errors.
       });
     return () => {
       cancelled = true;
@@ -590,6 +726,21 @@ export function AppShell() {
   if (!tenantId || !sessionValid) return null;
 
   const showWizard = Boolean(tenant) && (tenant!.industry === null || wizardLatchedOpen);
+  const workspaceRole = workspaces?.find((workspace) => workspace.tenantId === tenantId)?.role ?? null;
+  const workspaceOptions: WorkspaceSwitcherOption[] | null = workspaces?.map((workspace) => ({
+    id: workspace.tenantId,
+    name: workspace.name,
+    description: workspace.description,
+    role: workspace.role,
+  })) ?? null;
+  const accountOptions: ConnectedAccountSwitcherOption[] = (connectedAccounts ?? []).map((account) => ({
+    id: account.id,
+    handle: account.instagramUsername ? "@" + account.instagramUsername : "Instagram account",
+    label: account.instagramUsername ? "@" + account.instagramUsername : "Instagram account",
+    connected: account.status === "healthy",
+  }));
+  const accountsLoading = connectedAccounts === null && accountError === null;
+  const showAccountSelector = /\\/content\\/?$/.test(location.pathname);
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
@@ -674,24 +825,52 @@ export function AppShell() {
 
         <AccountHeader
           tenant={tenant}
-          account={account}
+          connectedAccounts={connectedAccounts}
           usage={usage}
           email={session?.email}
           firstName={session?.firstName}
           lastName={session?.lastName}
           picture={session?.picture}
+          workspaceOptions={workspaceOptions}
+          currentWorkspaceId={tenantId}
+          currentWorkspaceRole={workspaceRole}
+          workspaceError={workspaceError}
+          onReloadWorkspaces={() => { void reloadWorkspaces(); }}
+          onSelectWorkspace={(id) => { void handleSelectWorkspace(id); }}
+          onCreateWorkspace={handleCreateWorkspace}
+          accountOptions={accountOptions}
+          selectedAccountId={selectedAccountId}
+          accountError={accountError}
+          accountsLoading={accountsLoading}
+          onSelectAccount={handleSelectAccount}
+          onManageAccounts={handleManageAccounts}
+          showAccountSelector={showAccountSelector}
           onLogout={handleLogout}
         />
 
         {mobileAccountOpen && (
           <MobileAccountSheet
             tenant={tenant}
-            account={account}
+            connectedAccounts={connectedAccounts}
             usage={usage}
             email={session?.email}
             firstName={session?.firstName}
             lastName={session?.lastName}
             picture={session?.picture}
+            workspaceOptions={workspaceOptions}
+            currentWorkspaceId={tenantId}
+            currentWorkspaceRole={workspaceRole}
+            workspaceError={workspaceError}
+            onReloadWorkspaces={() => { void reloadWorkspaces(); }}
+            onSelectWorkspace={(id) => { void handleSelectWorkspace(id); }}
+            onCreateWorkspace={handleCreateWorkspace}
+            accountOptions={accountOptions}
+            selectedAccountId={selectedAccountId}
+            accountError={accountError}
+            accountsLoading={accountsLoading}
+            onSelectAccount={handleSelectAccount}
+            onManageAccounts={handleManageAccounts}
+            showAccountSelector={showAccountSelector}
             onClose={() => setMobileAccountOpen(false)}
             onLogout={handleLogout}
           />
@@ -703,7 +882,20 @@ export function AppShell() {
               <div className="banner banner-error">{tenantError}</div>
             </div>
           )}
-          <TenantContext.Provider value={{ tenant, error: tenantError, reload: reloadTenant }}>
+          <TenantContext.Provider value={{
+            tenant,
+            error: tenantError,
+            reload: () => { void reloadTenant(); },
+            workspaces,
+            workspaceError,
+            workspaceRole,
+            reloadWorkspaces: () => { void reloadWorkspaces(); },
+            connectedAccounts,
+            accountError,
+            reloadConnectedAccounts: () => { void reloadConnectedAccounts(); },
+            selectedAccountId,
+            setSelectedAccountId: handleSelectAccount,
+          }}>
             {showWizard ? (
               <OnboardingWizard
                 tenantId={tenantId}
