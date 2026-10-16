@@ -100,3 +100,51 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - Rendered before/after visual checks across light/dark themes and widths 390/768/1024/1440 remain outstanding.
 - Production has not been deployed or modified by this migration.
 - Next: do a focused Leads visual parity PR while preserving the richer real production filters, account scope, pagination, and data; separately inspect and polish the actual production JourneyBuilder editor against preview BuilderScreen (do not reshape AutomationPage catalog into a canvas); then stage all changes for full rendered QA and deploy only once steps 1–4 and the visual check are complete.
+
+## 2026-10-17 — Release branch divergence and visual QA status
+
+**Timestamp:** 2026-10-17 02:46 Asia/Kolkata (IST)
+
+### Verified source drift / visual reference
+
+- The live Render preview service `signalai-precision-operations-preview` is configured to branch `feat/precision-operations-product-ui`.
+- Its `client/src/pages/PrecisionOperationsPreviewPage.tsx` is approximately 124 KB (blob SHA `35382f4865c6ae78ab37a53b7f5c57a6747db03e`) and `client/src/styles/precision-operations-preview.css` approximately 152 KB (blob SHA `d5da61d519cddc0e7fd7edfca22a20dab53e846c`). The same paths on `feat/preview-to-production-foundation` are approximately 28.7 KB (blob SHA `c1d838c048c26bde2227238383b81fe2f9d392be`) and approximately 43.4 KB (blob SHA `2d081d2d591cd91496b9df6da40bd5c8948d344e`).
+- The deployed preview contains newer Preview Full Screens plus design-system/color/palette override files that are not present on foundation. Visual parity tasks must therefore use the **live rendered preview** as the source of truth. Do not copy `.po-*` or `--po-*` styles into production; keep the guide's production-token policy.
+
+### Release blocker: main/foundation divergence
+
+- GitHub compare `main` → `feat/preview-to-production-foundation` remains diverged. `main` head is `f81a47e5ffc10b0da35bd12897c5fa997778e5e2`; foundation head at audit time is `0d398f44665ec2e72b96d32cb33ac02e6e1553cd`; merge base is `dbc787a797105e3a8a16515099dfb78339f57ed2`. `main` is 33 commits ahead of the merge base and those commits are absent from foundation; foundation has 114 unique commits.
+- Main-only production behavior includes workspace/account selection and role access controls, tenant-validated selected-account scoping across Leads/Inbox/Content/Analytics, newer API pagination and CRM filters, persisted notifications, analytics correctness, knowledge APIs, migration-history/notification-schema fixes (#84–#86), and MCP/OAuth/capability paths. The current foundation Leads page also lacks several main filters/context.
+- **Release blocker:** a foundation deploy is unsafe until a reviewed reconciliation PR brings main-only production behavior into a child branch from foundation and then back into foundation. Never write to `main`.
+
+### Current visual PRs / CI and smoke status
+
+- PR #93 (`style(builder): align production journey editor with preview`) remains open and unmerged at head `003baced0c610b6d0f705591e6ec2cf84a7ce95d`. It is a narrow presentation-only change: the PR adds a scoped parity stylesheet and a small page hook, with no preview tokens or API/behavior removal.
+- PR #94 (`style(leads): polish production table visual hierarchy`) remains open and unmerged at head `f3076db1c0eb709bb4fa27584c9040a1a3cd404e`. It is a narrow CSS-only presentation change with no preview tokens or API/behavior removal.
+- Verified CI mapping: PR #93 head passed `client-ci` run **#518** (lint/typecheck/build); its Chromium smoke run **#424** failed. PR #94 head passed `client-ci` run **#521** (lint/typecheck/build); its Chromium smoke run **#427** failed.
+- Both Chromium smoke runs failed the same six assertions, with 26 other tests passing: Team mobile fit; automation-list keyboard dismissal; Inbox fixture/text mobile behavior; unresolved Instagram username fallback; AI reply preferences initial expansion; and draft status label. The failures are similar across the two sibling PRs but are **not confirmed pre-existing** without a base-branch smoke run. Do not claim smoke passed.
+- Neither PR has received rendered before/after checks in both themes and responsive widths. Visual QA remains outstanding.
+
+### Reconciliation attempt
+
+- Branch `task/reconcile-main-into-foundation` exists, but its first pass made no code/merge commit and opened no PR. GitHub compare currently confirms that branch is identical to foundation (`0d398f44665ec2e72b96d32cb33ac02e6e1553cd`).
+- A follow-up investigation is checking whether GitHub Git Data APIs can support a safe true merge commit. No reconciliation has been completed and no production deployment occurred.
+
+### Step 1 status
+
+- Step 1 stylesheet/token consolidation remains **NOT complete**. The existing `## NEEDS DECISION` question about whether the production-bundled preview route/palette remains or is retired remains unanswered.
+- No `--po-*` token replacement, preview-route removal, or production/workflow CSS merge has been performed.
+
+### Next steps / release gates
+
+1. Finish a safe main-to-foundation reconciliation PR. Do not merge or deploy until it is reviewed; never write to `main`.
+2. Bring PRs #93/#94 onto the reconciled base if needed.
+3. Rerun relevant builds/smoke and visually inspect light/dark themes at 390/768/1024/1440 CSS px.
+4. Resolve or accurately document the smoke failures and the outstanding preview-route decision.
+5. Deploy only after all release gates pass.
+
+### Verification
+
+- Read `AGENTS.md`, the existing orchestrator log, current foundation/main branch metadata, the main/foundation compare, the reconciliation branch compare, and PR #93/#94 metadata before this docs-only update.
+- Verified the exact CI/smoke run mapping above through GitHub Actions metadata and Chromium job logs; no new build or smoke run was started by this task.
+- This PR changes only `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md`. No application files were modified. No merge, deploy, or `main` change was performed.
