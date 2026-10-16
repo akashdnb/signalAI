@@ -19,6 +19,31 @@ import { PIPELINE_STAGES, formatRelativeTime, leadDisplayName } from "../lib/lea
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
+type ReportingPeriod = "7d" | "30d" | "month" | "all";
+
+const PERIOD_OPTIONS: { value: ReportingPeriod; label: string }[] = [
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "month", label: "This month" },
+  { value: "all", label: "All time" },
+];
+
+const PERIOD_NOTE: Record<ReportingPeriod, string> = {
+  "7d": "in last 7 days",
+  "30d": "in last 30 days",
+  month: "this month",
+  all: "in all time",
+};
+
+/** Real cutoff for the selected reporting period — `null` means "All time" (no filtering). */
+function periodStart(period: ReportingPeriod): Date | null {
+  const now = new Date();
+  if (period === "7d") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (period === "30d") return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  if (period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
+  return null;
+}
+
 function formatMoney(revenue: RevenueByCurrency[]): string {
   if (revenue.length === 0) return "—";
   const [top, ...rest] = revenue;
@@ -55,6 +80,7 @@ export function DashboardPage() {
   const [reloadCount, setReloadCount] = useState(0);
   const [connecting, setConnecting] = useState(false);
   const [definitionsOpen, setDefinitionsOpen] = useState(false);
+  const [period, setPeriod] = useState<ReportingPeriod>("7d");
   const justConnected = searchParams.get("connected") === "1";
 
   useEffect(() => {
@@ -137,6 +163,13 @@ export function DashboardPage() {
     : [];
   const maxStageCount = Math.max(1, ...stageRows.map((stage) => stage.count));
 
+  // Reporting period: a real filter, not a decorative one — it slices the
+  // actual timeseries and lead-creation dates this page already has, rather
+  // than only swapping a caption.
+  const cutoff = periodStart(period);
+  const filteredTimeseries = timeseries?.filter((point) => !cutoff || new Date(point.date) >= cutoff) ?? null;
+  const newLeadsInPeriod = leads?.filter((lead) => !cutoff || new Date(lead.createdAt) >= cutoff).length ?? null;
+
   // "Needs your attention" — each count is real, drawn from data this page
   // already fetches (plus a dedicated campaigns fetch for the draft count),
   // not the preview's fixed sample copy.
@@ -195,8 +228,21 @@ export function DashboardPage() {
           <h1>Overview</h1>
           <p className="muted">A clear view of what needs attention across your Instagram operations.</p>
         </div>
-        {account?.connected && <span className="pill pill-ok"><span className="mr-1">●</span>Instagram connected</span>}
       </header>
+
+      <div className="overview-toolbar">
+        {account?.connected && <span className="pill pill-ok"><span className="mr-1">●</span>Instagram connected</span>}
+        <label className="overview-period-select">
+          <span className="sr-only">Reporting period</span>
+          <select value={period} onChange={(e) => setPeriod(e.target.value as ReportingPeriod)}>
+            {PERIOD_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {dataLoadError && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
@@ -224,7 +270,7 @@ export function DashboardPage() {
       )}
 
       <section className="overview-metrics" aria-label="Lead metrics">
-        <Metric label="New leads" value={analytics ? analytics.uniqueLeads.toLocaleString() : "—"} note="current workspace total" />
+        <Metric label="New leads" value={newLeadsInPeriod !== null ? newLeadsInPeriod.toLocaleString() : "—"} note={PERIOD_NOTE[period]} />
         <Metric label="Qualified leads" value={funnel ? qualifiedCount.toLocaleString() : "—"} note="current pipeline" />
         <Metric label="Meetings scheduled" value={funnel ? meetingCount.toLocaleString() : "—"} note="current pipeline" />
         <Metric label="Revenue" value={revenue ? formatMoney(revenue) : "—"} note={revenue?.length ? "won deals" : "No won revenue recorded"} />
@@ -240,10 +286,10 @@ export function DashboardPage() {
             </div>
             <Link to={`/dashboard/${tenantId}/analytics`}>Open analytics →</Link>
           </header>
-          {timeseries === null ? (
+          {filteredTimeseries === null ? (
             <p className="muted">{dataLoadError ? "Conversation data is unavailable." : "Loading…"}</p>
           ) : (
-            <ConversationsChart data={timeseries} />
+            <ConversationsChart data={filteredTimeseries} />
           )}
         </section>
 
