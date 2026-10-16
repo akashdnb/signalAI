@@ -178,7 +178,6 @@ export const INDUSTRY_LABEL: Record<TenantIndustry, string> = {
 export interface TenantSummary {
   id: string;
   name: string;
-  description?: string | null;
   billingStatus: "none" | "active" | "canceled";
   industry: TenantIndustry | null;
 }
@@ -309,8 +308,6 @@ export interface Campaign {
 
 export interface ObservedMedia {
   mediaId: string;
-  /** Provider Instagram account ID; null on legacy metadata that cannot be attributed. */
-  instagramAccountId?: string | null;
   commentCount: number;
   lastSeenAt: string | null;
   /** Cached Graph API metadata — null until enriched (see server's routes/campaigns.ts), which happens lazily whenever the picker loads an entry it doesn't have this for yet. */
@@ -783,11 +780,11 @@ export const api = {
   updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
     request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
 
-  getTopPosts: (tenantId: string) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts`),
-  getTopKeywords: (tenantId: string) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords`),
+  getTopPosts: (tenantId: string, accountId?: string | null) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getTopKeywords: (tenantId: string, accountId?: string | null) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
-  getFunnel: (tenantId: string) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel`),
-  getRevenue: (tenantId: string) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue`),
+  getFunnel: (tenantId: string, accountId?: string | null) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getRevenue: (tenantId: string, accountId?: string | null) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getConversationsTimeseries: (tenantId: string) =>
     request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
   getDropoff: (tenantId: string, campaignId: string) =>
@@ -840,7 +837,7 @@ export const api = {
   // Backs the campaign editor's post-targeting picker: posts this tenant
   // has actually received a comment on, derived from ingested events
   // rather than a Graph API media-listing call.
-  listObservedMedia: (tenantId: string, accountId?: string | null) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  listObservedMedia: (tenantId: string) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media`),
   // Resolves a pasted post/Reel URL against the connected account's own
   // media and adds it as a known post — usable for targeting even before
   // any comment on it has arrived.
