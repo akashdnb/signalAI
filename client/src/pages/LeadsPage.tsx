@@ -69,7 +69,7 @@ export function LeadsPage() {
         setError(null);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        if (err instanceof ApiError && (err.status === 401)) {
           navigate("/login", { replace: true });
           return;
         }
