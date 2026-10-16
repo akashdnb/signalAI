@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
 import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember, type WorkspaceRole } from "../api/workspace";
-import { useTenant } from "../context/TenantContext";
 
 function formatRole(role: WorkspaceMember["role"]): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -37,7 +36,6 @@ function formatDate(iso: string): string {
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
-  useTenant();
   const [role, setRole] = useState<WorkspaceRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [roleError, setRoleError] = useState<string | null>(null);
