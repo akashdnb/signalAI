@@ -5,11 +5,11 @@ import type { ConversationsTimeseriesPoint } from "../api";
  * Dashboard's "Activity over time" chart: single-color bars (total events
  * per day) over the trailing real days from getConversationsTimeseries — no
  * invented trend data, matching the preview's plain bar-chart treatment
- * (one accent color, no legend, big total count above the chart) instead of
- * a two-series stacked chart or a line chart. The Comments/DMs split is
- * still real and still shown, just in the per-bar hover tooltip and the
- * "View as table" fallback rather than as a second bar color. Ships its own
- * tooltip per bar, plus an accessible table fallback below.
+ * exactly (one accent color, no legend, no table fallback, no hover
+ * read-out — just the big total count above a plain bar grid). The
+ * Comments/DMs split is still real, it's just not surfaced on this chart at
+ * all (same as the preview), rather than as a second bar color or an extra
+ * table/tooltip the preview doesn't have.
  */
 export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoint[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -36,37 +36,6 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
             <p className="muted mb-0 mt-1 text-sm">Comments and DMs sent will appear here when activity is recorded.</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg bg-chip/50 px-3 py-2">
-            <div className="text-xs text-subtle">Comments</div>
-            <div className="text-lg font-semibold text-ink">0</div>
-          </div>
-          <div className="rounded-lg bg-chip/50 px-3 py-2">
-            <div className="text-xs text-subtle">DMs sent</div>
-            <div className="text-lg font-semibold text-ink">0</div>
-          </div>
-        </div>
-        <details>
-          <summary className="cursor-pointer text-xs text-subtle">View daily records</summary>
-          <table className="table mt-2">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Comments</th>
-                <th>DMs sent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((point) => (
-                <tr key={point.date}>
-                  <td>{new Date(point.date).toLocaleDateString()}</td>
-                  <td>{point.comments}</td>
-                  <td>{point.dms}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
       </div>
     );
   }
@@ -94,8 +63,6 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
     data.length > 1
       ? `${new Date(data[0]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${new Date(data[data.length - 1]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
       : new Date(data[0]!.date).toLocaleDateString();
-
-  const hovered = hoverIndex !== null ? data[hoverIndex] : null;
 
   return (
     <div>
@@ -126,35 +93,6 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
           </g>
         ))}
       </svg>
-
-      {hovered && (
-        <div className="text-xs text-subtle">
-          <strong className="text-ink">{new Date(hovered.date).toLocaleDateString()}</strong> — {hovered.comments} comments,{" "}
-          {hovered.dms} DMs
-        </div>
-      )}
-
-      <details className="mt-2">
-        <summary className="cursor-pointer text-xs text-subtle">View as table</summary>
-        <table className="table mt-2">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Comments</th>
-              <th>DMs sent</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((d) => (
-              <tr key={d.date}>
-                <td>{new Date(d.date).toLocaleDateString()}</td>
-                <td>{d.comments}</td>
-                <td>{d.dms}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
     </div>
   );
 }
