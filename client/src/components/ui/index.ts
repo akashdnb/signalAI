@@ -1,5 +1,5 @@
 export { ConnectedAccountSwitcher } from "./ConnectedAccountSwitcher";
-export type { ConnectedAccountSwitcherOption, ConnectedAccountSwitcherProps, WorkspaceSwitcherOption } from "./ConnectedAccountSwitcher";
+export type { ConnectedAccountSwitcherOption, ConnectedAccountSwitcherProps } from "./ConnectedAccountSwitcher";
 export { Button } from "./Button";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./Button";
 export { EmptyState } from "./EmptyState";
@@ -11,3 +11,5 @@ export { Section } from "./Section";
 export { Skeleton } from "./Skeleton";
 export { StatusBadge } from "./StatusBadge";
 export type { StatusTone } from "./StatusBadge";
+
+export { WorkspaceContextSwitcher } from "../WorkspaceContextSwitcher";
