@@ -7,7 +7,24 @@ import { verifySessionToken } from "../lib/session.js";
 
 const MCP_READ_SCOPE = "signalai:read";
 const MCP_WRITE_SCOPE = "signalai:write";
-const MCP_SUPPORTED_SCOPES = [MCP_READ_SCOPE, MCP_WRITE_SCOPE] as const;
+const MCP_AUTOMATION_READ_SCOPE = "automation:read";
+const MCP_AUTOMATION_WRITE_SCOPE = "automation:write";
+const MCP_AUTOMATION_VALIDATE_SCOPE = "automation:validate";
+const MCP_AUTOMATION_PUBLISH_SCOPE = "signalai:automation:publish";
+const MCP_AUTOMATION_ACTIVATE_SCOPE = "automation:activate";
+const MCP_AUTOMATION_PAUSE_SCOPE = "automation:pause";
+const MCP_AUTOMATION_OPERATE_SCOPE = "signalai:automation:operate";
+const MCP_SUPPORTED_SCOPES = [
+  MCP_READ_SCOPE,
+  MCP_WRITE_SCOPE,
+  MCP_AUTOMATION_READ_SCOPE,
+  MCP_AUTOMATION_WRITE_SCOPE,
+  MCP_AUTOMATION_VALIDATE_SCOPE,
+  MCP_AUTOMATION_PUBLISH_SCOPE,
+  MCP_AUTOMATION_ACTIVATE_SCOPE,
+  MCP_AUTOMATION_PAUSE_SCOPE,
+  MCP_AUTOMATION_OPERATE_SCOPE,
+] as const;
 const MCP_SUPPORTED_SCOPE_SET = new Set<string>(MCP_SUPPORTED_SCOPES);
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
