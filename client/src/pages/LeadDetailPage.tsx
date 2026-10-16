@@ -170,7 +170,7 @@ export function LeadDetailPage() {
           </div>
         </>}
         {activeTab === "conversation" && <section className="card lead-detail-timeline"><h2>Conversation</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["event", "reply"]} onError={setError} /></section>}
-        {activeTab === "activities" && <section className="card lead-detail-timeline"><h2>Activities</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["activity"]} onError={setError} /></section>}
+        {activeTab === "activities" && <section className="card lead-detail-timeline"><h2>Activities</h2><ThreadPanel tenantId={tenantId} leadId={leadId} refreshToken={timelineRefreshToken} kindFilter={["activity"]} variant="timeline" onError={setError} /></section>}
         {activeTab === "notes" && <section className="card lead-detail-timeline"><h2>Notes</h2>{notes === null ? <p className="muted">Loading…</p> : notes.length === 0 ? <p className="muted">No notes yet.</p> : <ul className="list">{notes.map((n) => <li className="list-item" key={n.id} style={{ display: "block" }}><div>{n.body}</div><div className="timeline-meta">{formatDate(n.createdAt)}</div></li>)}</ul>}<div className="inline-form"><textarea aria-label="Internal note" placeholder="Add an internal note…" value={noteBody} onChange={(e) => setNoteBody(e.target.value)} rows={2} /><button className="btn-secondary btn-small" disabled={savingNote || !noteBody.trim()} onClick={handleAddNote}>Add note</button></div></section>}
         </div>
       </>}

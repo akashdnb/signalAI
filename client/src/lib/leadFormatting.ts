@@ -28,6 +28,19 @@ export function formatRelativeTime(iso: string | null | undefined): string {
   return date.toLocaleDateString();
 }
 
+/** Same thresholds as formatRelativeTime without the "ago" suffix — the Inbox conversation list shows bare "2m"/"1h" against each row's timestamp. */
+export function formatCompactRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 1) return "now";
+  if (diffMin < 60) return `${diffMin}m`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h`;
+  return date.toLocaleDateString();
+}
+
 export function formatLastContactVia(lastEventType: string | null): string {
   if (lastEventType === "comment") return "Comment";
   if (lastEventType === "message") return "DM";

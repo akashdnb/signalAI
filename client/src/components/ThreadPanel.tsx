@@ -11,9 +11,25 @@ export interface ThreadPanelProps {
   kindFilter?: TimelineEntry["kind"][];
   pageSize?: number;
   onError?: (message: string | null) => void;
+  /** "chat" (default) renders inbound/outbound message bubbles, matching the preview's Inbox and Lead detail → Conversation screens. "timeline" keeps the flat activity-log rendering, used by Lead detail → Activities. */
+  variant?: "chat" | "timeline";
 }
 
-export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, kindFilter, pageSize = 10, onError }: ThreadPanelProps) {
+/** Real equivalent of the preview's "10:24 AM · Comment" bubble captions: a real event/reply type label instead of its fabricated "Example AI reply" text. */
+function bubbleCaption(entry: TimelineEntry): string {
+  if (entry.kind === "event") return entry.eventType === "comment" ? "Comment" : "DM";
+  if (entry.kind === "reply") return entry.engine === "human" ? "Team reply" : "AI reply";
+  return "Activity";
+}
+
+function bubbleTimestamp(iso: string): string {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (date.toDateString() === new Date().toDateString()) return time;
+  return `${date.toLocaleDateString()} ${time}`;
+}
+
+export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, kindFilter, pageSize = 10, onError, variant = "chat" }: ThreadPanelProps) {
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -113,16 +129,31 @@ export function ThreadPanel({ tenantId, leadId, refreshToken, pendingEntries, ki
         {hasMore && <button type="button" className="btn-secondary btn-small" disabled={loadingMore} onClick={() => void handleLoadOlder()}>{loadingMore ? "Loading older messages…" : "Load older messages"}</button>}
         {olderError && <span className="text-sm text-subtle" role="alert">{olderError}</span>}
       </div>
-      {allEntries.map((entry, index) => (
-        <div className="timeline-entry" key={`${entry.kind}-${entry.occurredAt}-${index}`}>
-          {entry.kind === "event" ? (
-            <><strong>{entry.eventType === "comment" ? "Comment" : "DM"}</strong>{entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}<div>{entry.text ?? "—"}</div></>
-          ) : entry.kind === "reply" ? (
-            <><strong>{entry.engine === "human" ? "Team reply" : "Bot reply"} ({entry.channel === "comment" ? "comment" : "DM"})</strong><span className="pill">{entry.engine === "human" ? "Sent by a teammate" : entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}</span><div>{entry.text}</div></>
-          ) : <div>{entry.summary}</div>}
-          <div className="timeline-meta">{formatDate(entry.occurredAt)}</div>
+      {variant === "chat" ? (
+        <div className="thread-messages">
+          {allEntries.map((entry, index) => {
+            const outgoing = entry.kind === "reply";
+            const text = entry.kind === "event" ? entry.text ?? "—" : entry.kind === "reply" ? entry.text : entry.summary;
+            return (
+              <div className={`thread-message ${outgoing ? "thread-message-outgoing" : "thread-message-incoming"}`} key={`${entry.kind}-${entry.occurredAt}-${index}`}>
+                <span>{text}</span>
+                <small>{bubbleTimestamp(entry.occurredAt)} · {bubbleCaption(entry)}</small>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      ) : (
+        allEntries.map((entry, index) => (
+          <div className="timeline-entry" key={`${entry.kind}-${entry.occurredAt}-${index}`}>
+            {entry.kind === "event" ? (
+              <><strong>{entry.eventType === "comment" ? "Comment" : "DM"}</strong>{entry.matchedKeyword && <span className="pill pill-ok">{entry.matchedKeyword}</span>}<div>{entry.text ?? "—"}</div></>
+            ) : entry.kind === "reply" ? (
+              <><strong>{entry.engine === "human" ? "Team reply" : "Bot reply"} ({entry.channel === "comment" ? "comment" : "DM"})</strong><span className="pill">{entry.engine === "human" ? "Sent by a teammate" : entry.engine === "ai_generated" ? "AI-generated" : "Rule-based"}</span><div>{entry.text}</div></>
+            ) : <div>{entry.summary}</div>}
+            <div className="timeline-meta">{formatDate(entry.occurredAt)}</div>
+          </div>
+        ))
+      )}
     </div>
   );
 }

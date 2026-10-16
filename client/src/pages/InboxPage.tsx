@@ -1,19 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
   api,
   type HandoffStatus,
   type LeadListItem,
-  type LeadTag,
   type PipelineStage,
   type TenantMember,
   type TimelineEntry,
 } from "../api";
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
+import { InstagramMarkIcon } from "../components/icons";
 import { Pagination } from "../components/Pagination";
 import { ThreadPanel } from "../components/ThreadPanel";
-import { PIPELINE_STAGES, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
+import {
+  PIPELINE_STAGES,
+  formatCompactRelativeTime,
+  formatLastContactVia,
+  formatMessagingWindow,
+  leadDisplayName,
+} from "../lib/leadFormatting";
 
 type Tab = "all" | "unread" | "ai" | "qualified" | "attention";
 
@@ -28,13 +35,28 @@ const TABS: { value: Tab; label: string }[] = [
 const POLL_INTERVAL_MS = 15000;
 const PAGE_SIZE = 20;
 
+/** Inbox-specific handoff copy/color — distinct from the fuller sentences `handoffLabel` renders on Leads/Lead detail. */
+function inboxHandoffTag(status: HandoffStatus): { text: string; tone: StatusTone } {
+  if (status === "human") return { text: "Human handling", tone: "info" };
+  if (status === "requested") return { text: "Needs attention", tone: "warning" };
+  return { text: "AI handling", tone: "accent" };
+}
+
+/** "studio_owner" -> "SO", "ankitpathak2108" -> "AN" — first letters of up to two underscore/dot/dash-separated segments, falling back to the first two characters of a single-word handle. */
+function initialsFor(username: string | null): string {
+  const cleaned = (username ?? "").trim();
+  if (!cleaned) return "?";
+  const segments = cleaned.split(/[._-]+/).filter(Boolean);
+  if (segments.length >= 2) return (segments[0]![0] + segments[1]![0]).toUpperCase();
+  return cleaned.slice(0, 2).toUpperCase();
+}
+
 export function InboxPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
 
   const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
   const [members, setMembers] = useState<TenantMember[] | null>(null);
-  const [tags, setTags] = useState<LeadTag[] | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -46,6 +68,7 @@ export function InboxPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+  const [allCount, setAllCount] = useState<number | null>(null);
 
   const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
@@ -131,17 +154,13 @@ export function InboxPage() {
     });
   }, [tenantId]);
 
+  /** Total conversation count, independent of the active tab — matches the preview's "All" tab count badge. */
   useEffect(() => {
-    if (!tenantId || !selectedLeadId) {
-      setTags(null);
-      return;
-    }
-    setTags(null);
-    api
-      .listLeadTags(tenantId, selectedLeadId)
-      .then(setTags)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load tags"));
-  }, [tenantId, selectedLeadId]);
+    if (!tenantId) return;
+    getLeadsPage(tenantId, 1, 1, {}).then((result) => setAllCount(result.total)).catch(() => {
+      // Non-critical — the All-tab count badge just stays hidden.
+    });
+  }, [tenantId, reloadCount]);
 
   function handleSelectLead(lead: LeadListItem) {
     if (!tenantId) return;
@@ -233,6 +252,7 @@ export function InboxPage() {
   return (
     <div className="page page-workspace">
       <h1>Inbox</h1>
+      <p className="muted inbox-subtitle">Review Instagram conversations and decide when AI or a person should reply.</p>
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
           <span>{error}</span>
@@ -257,6 +277,7 @@ export function InboxPage() {
                 onFocus={(e) => e.currentTarget.scrollIntoView({ inline: "nearest", block: "nearest" })}
               >
                 {t.label}
+                {t.value === "all" && allCount !== null && <span className="inbox-tab-count">{allCount}</span>}
               </button>
             ))}
           </div>
@@ -272,29 +293,34 @@ export function InboxPage() {
           ) : (
             <>
               <ul className="list" style={{ margin: 0 }}>
-                {leads.map((lead) => (
-                  <li key={lead.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectLead(lead)}
-                      className="list-item-button"
-                      style={{ display: "block", width: "100%", padding: "0.75rem 1rem" }}
-                    >
-                      <div className="flex items-center gap-2">
-                        {lead.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
-                        <strong className="truncate" title={lead.username ?? "Instagram username unavailable"}>{leadDisplayName(lead.username)}</strong>
-                        <span className="text-subtle ml-auto shrink-0 text-xs">{formatRelativeTime(lead.lastInboundAt)}</span>
-                      </div>
-                      <div className="muted small truncate">
-                        {!lead.username && <span>Username unavailable · </span>}
-                        {lead.lastMessagePreview ?? "No messages yet"}
-                      </div>
-                      <span className={handoffLabel(lead.handoffStatus).className} style={{ marginLeft: 0 }}>
-                        {handoffLabel(lead.handoffStatus).text}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                {leads.map((lead) => {
+                  const handoffTag = inboxHandoffTag(lead.handoffStatus);
+                  return (
+                    <li key={lead.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectLead(lead)}
+                        className={`list-item-button inbox-conversation ${selectedLeadId === lead.id ? "inbox-conversation-selected" : ""}`}
+                      >
+                        <span className="inbox-avatar" aria-hidden="true">{initialsFor(lead.username)}</span>
+                        <span className="inbox-conversation-body">
+                          <span className="inbox-conversation-first">
+                            <strong className="truncate" title={lead.username ?? "Instagram username unavailable"}>{leadDisplayName(lead.username)}</strong>
+                            <small>{formatCompactRelativeTime(lead.lastInboundAt)}</small>
+                          </span>
+                          <span className="inbox-conversation-preview">
+                            {!lead.username && <span>Username unavailable · </span>}
+                            {lead.lastMessagePreview ?? "No messages yet"}
+                          </span>
+                          <span className="inbox-conversation-bottom">
+                            {lead.unread && <span className="inbox-unread-dot" aria-label="Unread" />}
+                            <StatusBadge tone={handoffTag.tone}>{handoffTag.text}</StatusBadge>
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
               {pageData && (
                 <Pagination
@@ -321,7 +347,23 @@ export function InboxPage() {
                   ← Conversations
                 </button>
               </div>
+              <div className="inbox-thread-header">
+                <span className="inbox-avatar" aria-hidden="true">{initialsFor(selectedLead.username)}</span>
+                <span className="inbox-thread-header-identity">
+                  <strong>{leadDisplayName(selectedLead.username)}</strong>
+                  <span>Instagram conversation</span>
+                </span>
+                <StatusBadge tone={inboxHandoffTag(selectedLead.handoffStatus).tone}>{inboxHandoffTag(selectedLead.handoffStatus).text}</StatusBadge>
+              </div>
               <div className="min-h-0 flex-1 overflow-hidden p-3">
+                <div className="inbox-post-context">
+                  <InstagramMarkIcon className="h-[17px] w-[17px] shrink-0 text-accent" />
+                  <span>
+                    <strong>Last contact via {formatLastContactVia(selectedLead.lastEventType)}</strong>
+                    <small>{selectedLead.lastMessagePreview ?? "No message preview available"}</small>
+                  </span>
+                  <StatusBadge tone="neutral">{formatLastContactVia(selectedLead.lastEventType)}</StatusBadge>
+                </div>
                 <ThreadPanel
                   tenantId={tenantId}
                   leadId={selectedLead.id}
@@ -332,7 +374,7 @@ export function InboxPage() {
               </div>
               <div className="border-t border-line p-3">
                 {selectedLead.handoffStatus !== "human" ? (
-                  <div className="space-y-2">
+                  <div className={selectedLead.handoffStatus === "ai" ? "inbox-ai-composer" : "space-y-2"}>
                     {!selectedLead.ownerUserId ? (
                       <p className="muted small" role="status">
                         Assign an owner in the lead panel before taking over this conversation.
@@ -341,9 +383,13 @@ export function InboxPage() {
                       <p className="muted small" role="status">
                         Human attention requested. This conversation is assigned to {members?.find((member) => member.userId === selectedLead.ownerUserId)?.email ?? "the current owner"}.
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="muted small" role="status">
+                        AI is handling this conversation. Take over before composing a human reply.
+                      </p>
+                    )}
                     <button
-                      className="btn-primary"
+                      className="btn-primary btn-small"
                       disabled={busy || !selectedLead.ownerUserId}
                       onClick={() => handleHandoff("takeover")}
                     >
@@ -394,64 +440,59 @@ export function InboxPage() {
         {/* Compact lead panel */}
         <div className={`md:w-72 md:shrink-0 md:overflow-y-auto ${selectedLeadId ? "block" : "hidden md:block"}`}>
           {selectedLead && (
-            <div className="p-3">
-              <h3>Lead</h3>
-              <div className="field-group">
-                <label>
-                  Pipeline stage
-                  <select
-                    value={selectedLead.pipelineStage}
-                    disabled={busy}
-                    onChange={(e) => handleStageChange(e.target.value as PipelineStage)}
-                  >
-                    {PIPELINE_STAGES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Owner
-                  <select value={selectedLead.ownerUserId ?? ""} disabled={busy} onChange={(e) => handleOwnerChange(e.target.value)}>
-                    <option value="">Unassigned</option>
-                    {(members ?? []).map((m) => (
-                      <option key={m.userId} value={m.userId}>
-                        {m.email}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <div className="p-3 inbox-details">
+              <span className="inbox-eyebrow">Lead context</span>
+              <h3>{leadDisplayName(selectedLead.username)}</h3>
+              <p className="muted small">Instagram contact</p>
+
+              <div className="inbox-detail-row">
+                <span>Handoff status</span>
+                <StatusBadge tone={inboxHandoffTag(selectedLead.handoffStatus).tone}>{inboxHandoffTag(selectedLead.handoffStatus).text}</StatusBadge>
+              </div>
+              <div className="inbox-detail-row">
+                <span>Pipeline stage</span>
+                <select
+                  value={selectedLead.pipelineStage}
+                  disabled={busy}
+                  onChange={(e) => handleStageChange(e.target.value as PipelineStage)}
+                >
+                  {PIPELINE_STAGES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="inbox-detail-row">
+                <span>Owner</span>
+                <select value={selectedLead.ownerUserId ?? ""} disabled={busy} onChange={(e) => handleOwnerChange(e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {(members ?? []).map((m) => (
+                    <option key={m.userId} value={m.userId}>
+                      {m.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="inbox-detail-row">
+                <span>Messaging window</span>
+                <strong>{formatMessagingWindow(selectedLead.windowOpenUntil).label}</strong>
+              </div>
+              <div className="inbox-detail-row">
+                <span>Last contact via</span>
+                <strong>{formatLastContactVia(selectedLead.lastEventType)}</strong>
               </div>
 
               {selectedLead.handoffStatus === "human" && (
-                <button className="btn-secondary btn-small" disabled={busy} onClick={() => handleHandoff("release")}>
+                <button className="btn-secondary btn-small inbox-full-width" disabled={busy} onClick={() => handleHandoff("release")}>
                   Return to AI
                 </button>
               )}
               {selectedLead.handoffStatus === "ai" && (
-                <button className="btn-secondary btn-small" disabled={busy} onClick={() => handleHandoff("request")}>
+                <button className="btn-secondary btn-small inbox-full-width" disabled={busy} onClick={() => handleHandoff("request")}>
                   Escalate for attention
                 </button>
               )}
-
-              <div style={{ marginTop: "1rem" }}>
-                {tags === null ? (
-                  <p className="muted small">Loading tags…</p>
-                ) : tags.length === 0 ? (
-                  <p className="muted small">No tags.</p>
-                ) : (
-                  tags.map((t) => (
-                    <span className="tag-chip" key={t.tagId}>
-                      {t.name}
-                    </span>
-                  ))
-                )}
-              </div>
-
-              <p style={{ marginTop: "1rem" }}>
-                <Link to={`/dashboard/${tenantId}/leads/${selectedLead.id}`}>Open full profile →</Link>
-              </p>
             </div>
           )}
         </div>

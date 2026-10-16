@@ -132,6 +132,54 @@
 .page-workspace > .flex.flex-col > div:nth-child(3) { width: 270px; background: var(--card-bg); }
 .page-workspace .tag-chip { display: inline-flex; align-items: center; min-height: 28px; margin: 0 0.35rem 0.35rem 0; padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-muted); font-size: 0.78rem; }
 
+/* Inbox subtitle + "All" tab count — the preview's page header has a description line, and its All tab carries the total conversation count. */
+.inbox-subtitle { margin: 0.35rem 0 1rem; max-width: 560px; }
+.inbox-tab-count { display: inline-flex; min-width: 18px; height: 18px; margin-left: 0.4rem; align-items: center; justify-content: center; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 0.72rem; font-weight: 800; }
+
+/* Inbox conversation list — avatar + stacked rows, matching the preview's card layout instead of a plain text list. */
+.inbox-avatar { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 50%; background: var(--surface-muted); color: var(--text-muted); font-size: 0.72rem; font-weight: 800; letter-spacing: -0.02em; }
+.page-workspace .inbox-conversation { display: flex; align-items: flex-start; gap: 0.6rem; width: 100%; padding: 0.85rem 0.7rem; }
+.page-workspace .inbox-conversation.inbox-conversation-selected { background: var(--surface-selected); box-shadow: inset 2px 0 0 var(--accent); }
+.inbox-conversation-body { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0.35rem; }
+.inbox-conversation-first { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4rem; }
+.inbox-conversation-first strong { overflow: hidden; font-size: 0.875rem; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-conversation-first small { flex: none; color: var(--text-muted); font-size: 0.75rem; }
+.inbox-conversation-preview { display: -webkit-box; overflow: hidden; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.inbox-conversation-bottom { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.inbox-unread-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* Inbox thread header + post-context card — the preview always shows who you're talking to and how the conversation started above the message thread. */
+.inbox-thread-header { display: flex; align-items: center; gap: 0.6rem; min-height: 61px; padding: 0 0.75rem; border-bottom: 1px solid var(--surface-divider); }
+.inbox-thread-header-identity { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0.1rem; }
+.inbox-thread-header-identity strong { font-size: 0.875rem; }
+.inbox-thread-header-identity span { color: var(--text-muted); font-size: 0.85rem; }
+.inbox-post-context { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; padding: 0.65rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
+.inbox-post-context > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 0.15rem; }
+.inbox-post-context strong { font-size: 0.85rem; }
+.inbox-post-context small { overflow: hidden; color: var(--text-muted); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Chat-bubble thread rendering — shared by Inbox and Lead detail → Conversation (ThreadPanel's "chat" variant). */
+.thread-messages { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.25rem 0 0.75rem; }
+.thread-message { display: flex; max-width: 85%; flex-direction: column; gap: 0.3rem; }
+.thread-message-outgoing { align-self: flex-end; align-items: flex-end; }
+.thread-message-incoming { align-self: flex-start; }
+.thread-message > span { padding: 0.65rem 0.75rem; border: 1px solid var(--border); border-radius: 10px 10px 10px 2px; background: var(--surface-muted); font-size: 0.875rem; line-height: 1.5; }
+.thread-message-outgoing > span { border-radius: 10px 10px 2px; border-color: var(--accent-soft); background: var(--accent-soft); color: var(--text); }
+.thread-message small { color: var(--text-muted); font-size: 0.75rem; }
+
+/* Inbox AI-handling composer row — message + take-over action side by side, matching the preview. */
+.inbox-ai-composer { display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; }
+.inbox-ai-composer p { margin: 0; }
+
+/* Inbox lead-context panel — eyebrow label + bordered detail rows instead of a plain field list. */
+.inbox-eyebrow { display: block; margin-bottom: 0.3rem; color: var(--text-muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.inbox-details h3 { margin: 0.3rem 0 0.15rem; font-size: 1rem; }
+.inbox-detail-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0; border-bottom: 1px solid var(--surface-divider); font-size: 0.85rem; }
+.inbox-detail-row > span:first-child { color: var(--text-muted); }
+.inbox-detail-row > strong { font-weight: 700; }
+.inbox-detail-row select { min-height: 32px; max-width: 150px; border-radius: 6px; font-size: 0.85rem; }
+.inbox-full-width { width: 100%; margin-top: 0.75rem; }
+
 @media (max-width: 900px) {
   .page-wide .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page-wide .stat-grid .stat:nth-child(2n) { border-right: 0; }
