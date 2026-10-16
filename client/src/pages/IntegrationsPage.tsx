@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api } from "../api";
-import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
+import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole } from "../api/workspace";
+import { useTenant } from "../context/TenantContext";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
 
 function formatDate(iso: string | null): string {
@@ -12,6 +13,9 @@ function formatDate(iso: string | null): string {
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { tenant } = useTenant();
+  const [role, setRole] = useState<WorkspaceRole | null>(null);
+  const [loadingRole, setLoadingRole] = useState(true);
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -92,7 +96,7 @@ export function IntegrationsPage() {
           <h1>Integrations</h1>
           <p className="muted">Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account.</p>
         </div>
-        <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
+        {(role === "owner" || role === "admin") && <button className="btn-primary btn-small" onClick={handleConnect} disabled={loadingRole || connecting || reconnectingId !== null}>
           <span className="inline-flex items-center gap-1.5">
             <InstagramMarkIcon className="h-4 w-4" />
             {connecting ? "Redirecting…" : "Add Instagram account"}
@@ -150,7 +154,7 @@ export function IntegrationsPage() {
                 </span>
 
                 <span className="flex shrink-0 gap-2">
-                  {account.status === "error" ? (
+                  {role === "member" ? null : account.status === "error" ? (
                     <button
                       className="btn-primary btn-small"
                       onClick={() => void handleReconnect(account.id)}
