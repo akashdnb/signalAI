@@ -17,6 +17,10 @@ export interface LeadListFilters {
   tagId?: string;
   handoffStatus?: HandoffStatus;
   unreadOnly?: boolean;
+  from?: string;
+  to?: string;
+  qualification?: "qualified" | "unqualified";
+  sort?: "activity_desc" | "activity_asc" | "created_desc" | "created_asc" | "stage_asc" | "stage_desc" | "username_asc" | "username_desc";
 }
 
 export interface CampaignListFilters {
@@ -93,6 +97,10 @@ export function getLeadsPage(
       tagId: filters.tagId,
       handoffStatus: filters.handoffStatus,
       unread: filters.unreadOnly,
+      from: filters.from,
+      to: filters.to,
+      qualification: filters.qualification,
+      sort: filters.sort,
     })}`,
   );
 }
