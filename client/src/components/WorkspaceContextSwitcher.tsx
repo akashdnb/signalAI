@@ -131,6 +131,8 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
     return <div className="border-b border-line bg-card px-4 py-2 md:px-5"><ErrorState title="Workspace context unavailable" description={error} action={<Button size="sm" variant="secondary" onClick={() => void loadWorkspaces().catch(() => undefined)}>Retry</Button>} className="min-h-12 py-2" /></div>;
   }
 
+  const availableWorkspaces = workspaces ?? [];
+
   return (
     <div className="relative z-20 border-b border-line bg-card px-4 py-2 md:px-5">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -149,11 +151,11 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
         </button>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {accountContext}
-          {currentWorkspace && <span className="shrink-0 text-xs text-subtle">{workspaces.length > 1 ? `${workspaces.length} workspaces` : "Workspace"}</span>}
+          {currentWorkspace && <span className="shrink-0 text-xs text-subtle">{availableWorkspaces.length > 1 ? `${availableWorkspaces.length} workspaces` : "Workspace"}</span>}
         </div>
       </div>
 
-      {error && workspaces.length > 0 && <p role="alert" className="mb-0 mt-2 text-sm text-err-ink">{error}</p>}
+      {error && availableWorkspaces.length > 0 && <p role="alert" className="mb-0 mt-2 text-sm text-err-ink">{error}</p>}
 
       {open && (
         <>
@@ -181,11 +183,11 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
               </form>
             ) : (
               <>
-                {workspaces.length === 0 ? (
+                {availableWorkspaces.length === 0 ? (
                   <EmptyState title="No workspaces available" description="This account does not have workspace access yet." className="min-h-24 py-4" />
                 ) : (
                   <ul className="m-0 list-none space-y-1 p-0">
-                    {workspaces.map((workspace) => (
+                    {availableWorkspaces.map((workspace) => (
                       <li key={workspace.tenantId}>
                         <button
                           type="button"
@@ -203,7 +205,6 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
                     ))}
                   </ul>
                 )}
-                {currentWorkspace && currentWorkspace.role === "member" && <p className="mb-0 mt-3 border-t border-line pt-3 text-xs leading-5 text-subtle">Your role allows workspace use, while workspace settings and membership management are restricted.</p>}
               </>
             )}
           </div>
