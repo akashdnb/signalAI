@@ -106,7 +106,36 @@ export async function recordMediaMetadataRefreshFailure(
   tenantId: string,
   mediaId: string,
   retryAt: Date,
+  instagramAccountId?: string,
 ): Promise<void> {
+  if (instagramAccountId) {
+    const result = await pool.query(
+      `update media_metadata
+          set refresh_failure_count = least(coalesce(refresh_failure_count, 0) + 1, 3),
+              refresh_retry_at = $4
+        where tenant_id = $1 and media_id = $2 and instagram_account_id = $3`,
+      [tenantId, mediaId, instagramAccountId, retryAt],
+    );
+
+    if ((result.rowCount ?? 0) > 0) return;
+
+    // Keep a selected account's retry record in its own metadata bucket,
+    // rather than marking other accounts' cache rows for the same media ID.
+    await pool.query(
+      `insert into media_metadata
+         (tenant_id, instagram_account_id, media_id, fetched_at, refresh_failure_count, refresh_retry_at)
+       values ($1, $2, $3, null, 1, $4)
+       on conflict (tenant_id, instagram_account_id, media_id)
+       where instagram_account_id is not null
+       do update set
+         refresh_failure_count = least(media_metadata.refresh_failure_count + 1, 3),
+         refresh_retry_at = excluded.refresh_retry_at`,
+      [tenantId, instagramAccountId, mediaId, retryAt],
+    );
+    return;
+  }
+
+  // Workspace-wide requests retain aggregate, media-level retry state.
   const result = await pool.query(
     `update media_metadata m
         set refresh_failure_count = least(
