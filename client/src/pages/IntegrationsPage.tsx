@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api } from "../api";
+import { api } from "../api";
 import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole } from "../api/workspace";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
 
