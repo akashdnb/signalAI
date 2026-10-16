@@ -57,7 +57,6 @@ export function WorkspaceContextSwitcher() {
   }, []);
 
   const currentWorkspace = workspaces?.find((workspace) => workspace.tenantId === tenantId) ?? null;
-  const canEditWorkspace = currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin";
 
   function switchWorkspace(next: WorkspaceSummary) {
     if (next.tenantId === tenantId) {
@@ -175,7 +174,7 @@ export function WorkspaceContextSwitcher() {
                     ))}
                   </ul>
                 )}
-                {currentWorkspace && !canCreate && <p className="mb-0 mt-3 border-t border-line pt-3 text-xs leading-5 text-subtle">Your {roleLabel(currentWorkspace.role).toLowerCase()} role can use this workspace. Workspace creation is available to owners and admins only.</p>}
+                {currentWorkspace && currentWorkspace.role === "member" && <p className="mb-0 mt-3 border-t border-line pt-3 text-xs leading-5 text-subtle">Your role allows workspace use, while workspace settings and membership management are restricted.</p>}
               </>
             )}
           </div>
