@@ -584,6 +584,38 @@ export function AppShell() {
           mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
+        <div className="flex flex-col gap-3 px-3 py-4">
+          <div className="flex items-center justify-between px-2">
+            <Logo size="md" />
+            <div className="flex items-center gap-1 md:hidden">
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="flex h-11 w-11 items-center justify-center text-subtle"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <CloseIcon className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          <ConnectedAccountSwitcher
+            realMode
+            workspaceName={tenant?.name ?? "Workspace"}
+            providerLabel="Instagram accounts"
+            providerIcon={<InstagramMarkIcon className="h-4 w-4" />}
+            workspaces={workspaces}
+            currentWorkspaceId={tenantId}
+            currentRole={role ?? undefined}
+            workspacesLoading={workspaceLoading}
+            workspaceError={workspaceError}
+            onWorkspaceSelect={selectWorkspace}
+            onCreateWorkspace={createWorkspace}
+            accounts={accountOptions}
+            selectedAccountId={selectedAccountId}
+            onSelect={setSelectedAccountId}
+            onManageAccounts={() => navigate(`/dashboard/${tenantId}/integrations`)}
+          />
+        </div>
         <nav className="flex-1 overflow-y-auto px-3">
           <NavList
             items={PRIMARY_NAV}
