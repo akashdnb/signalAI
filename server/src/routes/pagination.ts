@@ -170,7 +170,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
     conditions.push(`(
       exists (
         select 1 from lead_pii p2
-        where p2.tenant_id = l.tenant_id and p2.lead_id = l.id
+        where p2.lead_id = l.id
           and p2.deleted_at is null and strpos(lower(coalesce(p2.username, '')), ${p}) > 0
       )
       or exists (
@@ -229,7 +229,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
      from leads l
      left join lateral (
        select username from lead_pii
-       where tenant_id = l.tenant_id and lead_id = l.id and deleted_at is null and username is not null
+       where lead_id = l.id and deleted_at is null and username is not null
        order by created_at desc, id desc limit 1
      ) p on true
      left join lateral (
@@ -244,7 +244,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
      ) e on true
      left join lateral (
        select comment_text, dm_text from lead_pii
-       where tenant_id = l.tenant_id and lead_event_id = e.id and deleted_at is null
+       where lead_event_id = e.id and deleted_at is null
      ) pii on true
      where ${where}
      order by ${orderBy}
