@@ -684,4 +684,110 @@ describe("dashboard routes (BUI backend surface)", () => {
     const withFreshSession = await request(app).get(`/tenants/${tenant.id}/leads`).set(freshHeader);
     expect(withFreshSession.status).toBe(200);
   });
+  it("validates account filters against the active tenant before returning leads", async () => {
+    const pool = getPool();
+    const { tenant: tenantA, authHeader: authA } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { tenant: tenantB } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
+    const keyring = new Map([["v1", randomBytes(32)]]);
+    const app = createApp();
+
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-a", accessToken: "unused-a" });
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-b", accessToken: "unused-b" });
+    await upsertToken(pool, keyring, { tenantId: tenantB.id, instagramAccountId: "acct-other-tenant", accessToken: "unused-c" });
+
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "shared-user", "acct-a");
+    await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "shared-user", "acct-b");
+    const leadOtherTenant = await findOrCreateLeadByInstagramUserId(pool, tenantB.id, "other-user", "acct-other-tenant");
+
+    const accountRows = await pool.query<{ id: string; instagram_account_id: string }>(
+      `select id, instagram_account_id from meta_tokens where tenant_id = $1 order by instagram_account_id`,
+      [tenantA.id],
+    );
+    const rowA = accountRows.rows.find((row) => row.instagram_account_id === "acct-a")!;
+    const rowB = accountRows.rows.find((row) => row.instagram_account_id === "acct-b")!;
+    const ownAccount = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${rowA.id}`).set(authA);
+    expect(ownAccount.status).toBe(200);
+    expect(ownAccount.body).toHaveLength(1);
+    expect(ownAccount.body[0].id).toBe(leadA.id);
+
+    const otherAccount = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${rowB.id}`).set(authA);
+    expect(otherAccount.status).toBe(200);
+    expect(otherAccount.body).toHaveLength(1);
+    expect(otherAccount.body[0].id).not.toBe(leadA.id);
+
+    const foreignAccountRow = await pool.query<{ id: string }>(
+      `select id from meta_tokens where tenant_id = $1 and instagram_account_id = $2`,
+      [tenantB.id, "acct-other-tenant"],
+    );
+    const forged = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${foreignAccountRow.rows[0]!.id}`).set(authA);
+    expect(forged.status).toBe(404);
+    expect(forged.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+    expect(leadOtherTenant.tenantId).toBe(tenantB.id);
+  });
+
+  it("scopes analytics aggregates to a validated Instagram account", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "analytics-multi-account");
+    const { tenant: otherTenant } = await createLoggedInTenant(pool, SESSION_SECRET, "analytics-other-workspace");
+    const keyring = new Map([["v1", randomBytes(32)]]);
+    const app = createApp();
+
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "analytics-acct-a", accessToken: "unused-a" });
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "analytics-acct-b", accessToken: "unused-b" });
+    await upsertToken(pool, keyring, { tenantId: otherTenant.id, instagramAccountId: "analytics-foreign", accessToken: "unused-foreign" });
+    const accountRows = await pool.query<{ id: string; instagram_account_id: string }>(
+      "select id, instagram_account_id from meta_tokens where tenant_id = $1",
+      [tenant.id],
+    );
+    const rowA = accountRows.rows.find((row) => row.instagram_account_id === "analytics-acct-a")!;
+    const rowB = accountRows.rows.find((row) => row.instagram_account_id === "analytics-acct-b")!;
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "same-person", "analytics-acct-a");
+    const leadB = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "same-person", "analytics-acct-b");
+
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id, leadId: leadA.id, metaEventId: "analytics-comment-a",
+      eventType: "comment", occurredAt: new Date("2026-10-10T10:00:00Z"), sequence: 1,
+      attributes: { mediaId: "shared-post-id", instagramAccountId: "analytics-acct-a", matchedKeyword: "fitness" },
+    });
+    await insertEventIdempotent(pool, {
+      tenantId: tenant.id, leadId: leadB.id, metaEventId: "analytics-comment-b",
+      eventType: "comment", occurredAt: new Date("2026-10-10T11:00:00Z"), sequence: 1,
+      attributes: { mediaId: "shared-post-id", instagramAccountId: "analytics-acct-b", matchedKeyword: "real-estate" },
+    });
+    await pool.query(
+      "insert into account_sends (tenant_id, instagram_account_id) values ($1, $2), ($1, $3)",
+      [tenant.id, "analytics-acct-a", "analytics-acct-b"],
+    );
+
+    const funnelA = await request(app).get(`/tenants/${tenant.id}/analytics/funnel?accountId=${rowA.id}`).set(authHeader);
+    const funnelB = await request(app).get(`/tenants/${tenant.id}/analytics/funnel?accountId=${rowB.id}`).set(authHeader);
+    expect(funnelA.status).toBe(200);
+    expect(funnelB.status).toBe(200);
+    expect(funnelA.body.stages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "comments", count: 1 }),
+      expect.objectContaining({ key: "dms", count: 1 }),
+      expect.objectContaining({ key: "leads", count: 1 }),
+    ]));
+    expect(funnelB.body.stages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "comments", count: 1 }),
+      expect.objectContaining({ key: "dms", count: 1 }),
+      expect.objectContaining({ key: "leads", count: 1 }),
+    ]));
+
+    const keywordsA = await request(app).get(`/tenants/${tenant.id}/analytics/top-keywords?accountId=${rowA.id}`).set(authHeader);
+    const keywordsB = await request(app).get(`/tenants/${tenant.id}/analytics/top-keywords?accountId=${rowB.id}`).set(authHeader);
+    expect(keywordsA.status).toBe(200);
+    expect(keywordsA.body.map((item: { keyword: string }) => item.keyword)).toEqual(["fitness"]);
+    expect(keywordsB.status).toBe(200);
+    expect(keywordsB.body.map((item: { keyword: string }) => item.keyword)).toEqual(["real-estate"]);
+
+    const foreignRow = await pool.query<{ id: string }>(
+      "select id from meta_tokens where tenant_id = $1 and instagram_account_id = $2",
+      [otherTenant.id, "analytics-foreign"],
+    );
+    const forged = await request(app).get(`/tenants/${tenant.id}/analytics/funnel?accountId=${foreignRow.rows[0]!.id}`).set(authHeader);
+    expect(forged.status).toBe(404);
+    expect(forged.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+  });
+
 });
