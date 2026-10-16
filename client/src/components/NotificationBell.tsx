@@ -37,19 +37,18 @@ export function NotificationBell({ tenantId }: { tenantId: string }) {
   }
 
   useEffect(() => {
-    if (open) void loadInbox();
-    // Deliberately refresh only on open/workspace change; no polling loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tenantId]);
+    void loadInbox();
+  }, [tenantId, open]);
 
   async function markRead(notificationId: string) {
     setSavingId(notificationId);
     setError(null);
     try {
       await api.markNotificationRead(tenantId, notificationId);
+      const wasUnread = items.some((item) => item.id === notificationId && !item.readAt);
       setItems((current) => current.map((item) =>
         item.id === notificationId && !item.readAt ? { ...item, readAt: new Date().toISOString() } : item));
-      setUnreadCount((current) => Math.max(0, current - (items.some((item) => item.id === notificationId && !item.readAt) ? 1 : 0)));
+      if (wasUnread) setUnreadCount((current) => Math.max(0, current - 1));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not mark this notification as read.");
     } finally {
