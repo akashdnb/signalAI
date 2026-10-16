@@ -15,6 +15,8 @@ interface Props {
 }
 
 export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }: Props) {
+  const { workspaceRole, workspaceError } = useTenant();
+  const canManageAccounts = workspaceRole === "owner" || workspaceRole === "admin";
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[]>([]);
   const [bindings, setBindings] = useState<JourneyAccountBinding[]>([]);
   const [loading, setLoading] = useState(true);
