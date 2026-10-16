@@ -7,7 +7,7 @@ import { createLoggedInTenant, sessionHeaderFor } from "../../__tests__/helpers/
 import { findOrCreateUserByEmail } from "../../db/users.js";
 import { publishNotificationEvent } from "../../notifications/service.js";
 import { getBoss, stopBoss } from "../../queue/boss.js";
-import { ensureNotificationQueue, startNotificationDeliveryWorker } from "../../notifications/service.js";
+import { ensureNotificationQueue } from "../../notifications/service.js";
 
 const SESSION_SECRET = "test-session-secret";
 
@@ -116,8 +116,8 @@ describe("notification routes and durable event delivery", () => {
       });
       const delivery = await getPool().query("select id,status,attempts from notification_deliveries where event_id = $1 and channel = 'email'", [result.eventId]);
       expect(delivery.rows[0].status).toBe("pending"); // the provider has not been run yet, so no success is invented
-      await startNotificationDeliveryWorker(boss, getPool());
-      // Drive provider classification directly to avoid waiting on asynchronous polling in this API/DB test.
+      // Exercise the provider contract directly: a 422 from the configured
+      // provider is classified as permanent failure, never delivery success.
       const { deliverNotificationEmail } = await import("../../notifications/providers.js");
       const providerResult = await deliverNotificationEmail({ to: user.email, subject: "Test", html: "<p>Test</p>" });
       expect(providerResult).toMatchObject({ ok: false, failureClass: "permanent", errorCode: "provider_rejected_request" });

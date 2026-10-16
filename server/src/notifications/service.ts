@@ -39,6 +39,7 @@ function asSafeErrorCode(code: string): string {
 export async function ensureNotificationQueue(boss: PgBoss): Promise<void> {
   const { ensureNotifyQueue } = await import("../queue/boss.js");
   await ensureNotifyQueue(boss, NOTIFICATION_DELIVERY_QUEUE);
+  await boss.schedule(NOTIFICATION_DELIVERY_QUEUE, "*/1 * * * *", { type: "sweep-due" }, { tz: "UTC" });
 }
 
 /**
@@ -159,8 +160,36 @@ export async function publishNotificationEvent(pool: Pool, boss: PgBoss, input: 
 }
 
 export async function startNotificationDeliveryWorker(boss: PgBoss, pool: Pool): Promise<string> {
-  return boss.work<{ deliveryId: string }>(NOTIFICATION_DELIVERY_QUEUE, { localConcurrency: 2 }, async (jobs: Job<{ deliveryId: string }>[]) => {
+  return boss.work<{ deliveryId: string; type?: string }>(NOTIFICATION_DELIVERY_QUEUE, { localConcurrency: 2 }, async (jobs: Job<{ deliveryId: string; type?: string }>[]) => {
     for (const job of jobs) {
+      if (job.data.type === "sweep-due") {
+        // Recover interrupted claims from a worker restart. Ambiguous provider
+        // outcomes can cause a duplicate external send, but attempts are bounded.
+        await pool.query(
+          "update notification_deliveries set status = case when attempts < max_attempts then 'retrying' else 'failed' end, next_attempt_at = case when attempts < max_attempts then now() else null end, last_error_code = 'worker_interrupted', updated_at = now() where channel = 'email' and status = 'processing' and updated_at < now() - interval '10 minutes'"
+        );
+        await pool.query(
+          "update notification_deliveries set status = 'failed', next_attempt_at = null, last_error_code = 'retry_limit_exhausted', updated_at = now() where channel = 'email' and status = 'retrying' and attempts >= max_attempts"
+        );
+        const due = await pool.query<{ id: string }>(
+          `select id from notification_deliveries
+            where channel = 'email' and status = 'retrying'
+              and next_attempt_at is not null and next_attempt_at <= now()
+              and attempts < max_attempts
+            order by next_attempt_at asc limit 100`,
+        );
+        for (const row of due.rows) {
+          const claim = await pool.query(
+            `update notification_deliveries set status = 'pending', updated_at = now()
+              where id = $1 and status = 'retrying' and next_attempt_at <= now() returning id`,
+            [row.id],
+          );
+          if (claim.rowCount) {
+            await boss.send(NOTIFICATION_DELIVERY_QUEUE, { deliveryId: row.id }, { retryLimit: 0 });
+          }
+        }
+        continue;
+      }
       const deliveryId = job.data.deliveryId;
       const claim = await pool.query<{
         id: string; event_id: string; tenant_id: string; recipient_user_id: string;
