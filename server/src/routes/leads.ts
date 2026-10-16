@@ -21,7 +21,7 @@ import { createDeal, listDealsForLead, updateDealStage, type DealStage } from ".
 import { listTenantMembers } from "../db/tenantMembers.js";
 import { getTopPosts, getTopKeywords } from "../db/analytics.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
-import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
+import { getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
 import { sendInstagramMessage } from "../lib/instagramSend.js";
 import { recordSentReply } from "../db/sentReplies.js";
@@ -210,13 +210,15 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
     return res.status(409).json({ error: "the messaging window is closed — a fresh inbound DM is required, or an approved HUMAN_AGENT support reply must be within 7 days of the customer's last DM" });
   }
 
-  const account = await getSoleConnectedAccount(pool, tenantId);
-  if (!account) return res.status(409).json({ error: "no Instagram account connected for this tenant" });
+  const instagramAccountId = lead.instagramAccountId;
+  if (!instagramAccountId) {
+    return res.status(409).json({ error: "this lead is not associated with a specific Instagram account; open a new account-scoped conversation before replying" });
+  }
 
-  const token = await getDecryptedToken(pool, config.tokenKeyring, tenantId, account.instagramAccountId);
-  if (!token) return res.status(409).json({ error: "Instagram connection is not currently valid — reconnect and try again" });
+  const token = await getDecryptedToken(pool, config.tokenKeyring, tenantId, instagramAccountId);
+  if (!token) return res.status(409).json({ error: "Instagram connection for this lead is not currently valid — reconnect and try again" });
 
-  const reserved = await tryReserveSend(pool, tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT);
+  const reserved = await tryReserveSend(pool, tenantId, instagramAccountId, HOURLY_SEND_LIMIT);
   if (!reserved) return res.status(429).json({ error: "hourly send limit reached for this Instagram account — try again shortly" });
 
   const sendResult = await sendInstagramMessage(
