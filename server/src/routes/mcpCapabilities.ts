@@ -266,7 +266,8 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
   if (!Object.keys(changes).length) throw new CapabilityInputError("changes must include at least one supported field.");
 
   const found = await client.query<{
-    id: string; name: string; enabled: boolean; builder_version: number; keywords: string[]; mcp_metadata: Record<string, unknown>;
+    id: string; name: string; enabled: boolean; builder_version: number;
+    keywords: string[]; mcp_metadata: Record<string, unknown>;
   }>(
     `select id, name, enabled, builder_version, keywords, mcp_metadata
        from campaigns where id = $1 and tenant_id = $2 for update`,
@@ -289,25 +290,13 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
     );
   }
 
-  let version = campaign.builder_version;
   const graphChanges = changes.nodes !== undefined || changes.edges !== undefined;
-  const graph = graphChanges ? await getBuilderGraphWithClient(client, tenantId, automationId) : null;
-  if (graphChanges && !graph) throw new ResourceNotFoundError();
-
-  const set: string[] = [];
-  const values: unknown[] = [automationId, tenantId];
-  const addSet = (sql: string, value: unknown) => { values.push(value); set.push(sql.replace("?", `$${values.length}`)); };
-  if (changes.name !== undefined) {
-    const name = requireString(changes.name, "changes.name");
-    if (name.length > 120) throw new CapabilityInputError("changes.name must be 120 characters or fewer.");
-    addSet("name = ?", name);
-  }
-  if (changes.trigger !== undefined) addSet("keywords = ?", [requireString(changes.trigger, "changes.trigger")]);
-  if (changes.metadata !== undefined) addSet("mcp_metadata = ?::jsonb", JSON.stringify(requireObject(changes.metadata, "changes.metadata")));
-
+  let version: number;
   if (graphChanges) {
-    const nodes = changes.nodes === undefined ? graph!.nodes : normalizeNodes(changes.nodes);
-    const edges = changes.edges === undefined ? graph!.edges : normalizeEdges(changes.edges);
+    const graph = await getBuilderGraphWithClient(client, tenantId, automationId);
+    if (!graph) throw new ResourceNotFoundError();
+    const nodes = changes.nodes === undefined ? graph.nodes : normalizeNodes(changes.nodes);
+    const edges = changes.edges === undefined ? graph.edges : normalizeEdges(changes.edges);
     const save = await saveBuilderGraphWithClient(
       client, tenantId, automationId, expectedVersion, nodes, edges,
     );
@@ -324,35 +313,43 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
     }
     version = save.graph.version;
   } else {
-    values.push(expectedVersion + 1);
-    set.push(`builder_version = $${values.length}`);
-    set.push("updated_at = now()");
-    const updated = await client.query(
-      `update campaigns set ${set.join(", ")}
-        where id = $1 and tenant_id = $2 and builder_version = $3`,
-      [...values, expectedVersion],
-    );
-    if (updated.rowCount !== 1) {
-      const current = await client.query<{ builder_version: number }>(
-        "select builder_version from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId],
-      );
-      throw new CapabilityError("The automation changed elsewhere.", 409, "version_conflict", {
-        currentVersion: current.rows[0]?.builder_version ?? null, recovery: "reread_automation",
-      });
-    }
     version = expectedVersion + 1;
   }
 
-  // Apply scalar changes after a graph save; all writes stay in this transaction.
-  if (graphChanges && set.length) {
-    values.push(version);
-    const updateSql = set.join(", ");
-    // The graph save already increased builder_version; scalar edit does not increment it again.
-    await client.query(
-      `update campaigns set ${updateSql}, updated_at = now() where id = $1 and tenant_id = $2`,
-      [...values, automationId, tenantId].slice(0, 0),
-    );
+  const scalarSet: string[] = [];
+  const values: unknown[] = [automationId, tenantId];
+  const addSet = (column: string, value: unknown) => {
+    values.push(value);
+    scalarSet.push(`${column} = $${values.length}`);
+  };
+  if (changes.name !== undefined) {
+    const name = requireString(changes.name, "changes.name");
+    if (name.length > 120) throw new CapabilityInputError("changes.name must be 120 characters or fewer.");
+    addSet("name", name);
   }
+  if (changes.trigger !== undefined) addSet("keywords", [requireString(changes.trigger, "changes.trigger")]);
+  if (changes.metadata !== undefined) {
+    addSet("mcp_metadata", JSON.stringify(requireObject(changes.metadata, "changes.metadata")));
+    scalarSet[scalarSet.length - 1] = scalarSet[scalarSet.length - 1]!.replace(/mcp_metadata = /, "mcp_metadata = ") + "::jsonb";
+  }
+  if (!graphChanges) scalarSet.push(`builder_version = ${version}`);
+  scalarSet.push("updated_at = now()");
+  const versionGuard = graphChanges ? "" : " and builder_version = $3";
+  const queryValues = graphChanges ? values : [...values, expectedVersion];
+  const update = await client.query(
+    `update campaigns set ${scalarSet.join(", ")}
+      where id = $1 and tenant_id = $2${versionGuard}`,
+    queryValues,
+  );
+  if (update.rowCount !== 1) {
+    const current = await client.query<{ builder_version: number }>(
+      "select builder_version from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId],
+    );
+    throw new CapabilityError("The automation changed elsewhere.", 409, "version_conflict", {
+      currentVersion: current.rows[0]?.builder_version ?? null, recovery: "reread_automation",
+    });
+  }
+
   const currentGraph = await getBuilderGraphWithClient(client, tenantId, automationId);
   const current = await client.query<{ name: string; keywords: string[]; mcp_metadata: Record<string, unknown> }>(
     "select name, keywords, mcp_metadata from campaigns where id = $1 and tenant_id = $2",
