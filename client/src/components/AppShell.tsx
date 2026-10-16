@@ -365,6 +365,8 @@ export function AppShell() {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
+  const [connectedAccountsTenantId, setConnectedAccountsTenantId] = useState<string | null>(null);
+  const connectedAccountsRequestIdRef = useRef(0);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
@@ -480,13 +482,18 @@ export function AppShell() {
 
   async function reloadConnectedAccounts(): Promise<void> {
     if (!tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++connectedAccountsRequestIdRef.current;
+    setConnectedAccountsTenantId(requestedTenantId);
     setConnectedAccounts(null);
     setAccountError(null);
     try {
-      const available = await workspaceApi.listConnectedAccounts(tenantId);
+      const available = await workspaceApi.listConnectedAccounts(requestedTenantId);
+      if (requestId !== connectedAccountsRequestIdRef.current) return;
       setConnectedAccounts(available);
       setAccountError(null);
     } catch (err) {
+      if (requestId !== connectedAccountsRequestIdRef.current) return;
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
         clearSession();
@@ -506,7 +513,7 @@ export function AppShell() {
       setAccountError(null);
       return;
     }
-    if (!connectedAccounts?.some((connected) => connected.id === accountId)) {
+    if (connectedAccountsTenantId !== tenantId || !connectedAccounts?.some((connected) => connected.id === accountId)) {
       setAccountError("Choose an Instagram account from the server-provided list.");
       return;
     }
@@ -539,7 +546,7 @@ export function AppShell() {
   }, [tenantId]);
 
   useEffect(() => {
-    if (!tenantId || connectedAccounts === null) return;
+    if (!tenantId || connectedAccountsTenantId !== tenantId || connectedAccounts === null) return;
     const key = "signalai.account-context:" + tenantId;
     const stored = localStorage.getItem(key);
     if (stored && connectedAccounts.some((connected) => connected.id === stored)) {
@@ -548,7 +555,7 @@ export function AppShell() {
       if (stored) localStorage.removeItem(key);
       setSelectedAccountIdState(null);
     }
-  }, [tenantId, connectedAccounts]);
+  }, [tenantId, connectedAccounts, connectedAccountsTenantId]);
 
   async function reloadTenant() {
     if (!tenantId) return;
