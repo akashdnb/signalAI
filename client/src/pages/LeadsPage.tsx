@@ -154,7 +154,7 @@ export function LeadsPage() {
                         </td>
                         <td className="max-w-[14rem]">
                           {lead.ownerUserId
-                            ? (members?.find((member) => member.userId === lead.ownerUserId)?.email ?? (membersError ? "Owner details unavailable" : "Assigned teammate")) 
+                            ? (members?.find((member) => member.userId === lead.ownerUserId)?.email ?? (membersError ? "Owner details unavailable" : "Assigned teammate"))
                             : "Unassigned"}
                           {lead.handoffStatus === "requested" && (
                             <Link className="link-button block mt-1" to={`/dashboard/${tenantId}/leads/${lead.id}`}>

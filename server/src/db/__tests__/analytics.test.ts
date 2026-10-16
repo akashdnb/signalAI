@@ -32,12 +32,12 @@ describe("Phase 2A analytics: Top Performing Posts / Top Trigger Keywords", () =
 
     await upsertMediaMetadata(pool, tenant.id, {
       mediaId: "reel-popular",
-      caption: "Our giveaway reel (legacy metadata)",
+      caption: "Our giveaway reel (account 1)",
       mediaType: "REEL",
       thumbnailUrl: null,
       permalink: "https://instagram.com/reel/popular",
       postedAt: null,
-    });
+    }, "acct-1");
     // A second account-scoped metadata row must enrich the post, not
     // multiply every matching event in the top-posts aggregation.
     await upsertMediaMetadata(pool, tenant.id, {
