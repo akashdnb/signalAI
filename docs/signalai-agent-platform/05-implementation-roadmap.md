@@ -6,6 +6,21 @@ Build the reusable foundation before building a large number of AI tools. Each p
 
 The deployment strategy is **modular core first, independent workloads second, specialized services only when justified**.
 
+## Runtime strategy
+
+The existing `signalai-server` remains on its current TypeScript stack and owns product truth. New AI/execution services use Python 3.12+.
+
+| Component | Runtime | Primary role |
+|---|---|---|
+| `signalai-server` | Existing TypeScript stack | Product/API, domain, capabilities, persistence, auth |
+| `signalai-worker` | Python + FastAPI + ARQ/Redis | Async execution, retries, bulk and scheduled jobs |
+| `signalai-connectors` | Python + FastAPI | External providers, research and enrichment |
+| `signalai-mcp` | Python + MCP SDK + FastAPI | MCP transport and capability exposure |
+| `signalai-agent` | Python + FastAPI | LLM planning, reasoning and orchestration |
+| Web SDK | TypeScript | Browser/customer channel |
+
+Cross-language boundaries use versioned JSON/OpenAPI/JSON Schema contracts. Python services must not directly mutate the core database or duplicate domain invariants.
+
 ## Phase 1 — Capability foundation
 
 ### Build
@@ -32,7 +47,7 @@ The core domain remains a modular monolith rather than being prematurely split i
 
 ## Phase 2 — Async worker extraction
 
-Introduce `signalai-worker` when background execution is large enough to justify independent scaling and failure isolation.
+Build `signalai-worker` as the first independently deployable workload. The worker is Python-based and consumes explicit, versioned job contracts from `signalai-server` through the queue.
 
 ### Move to the worker
 
@@ -44,16 +59,29 @@ Introduce `signalai-worker` when background execution is large enough to justify
 - heavy connector synchronization
 - expensive analytics/materialization work
 
+### Initial worker stack
+
+- Python 3.12+
+- FastAPI for health/readiness and operational endpoints
+- ARQ + Redis for asynchronous job execution
+- Pydantic for job contracts
+- pytest/ruff for quality gates
+
 ### Rules
 
 - worker uses the same capability/application contracts
 - worker does not become a second business-logic implementation
 - worker does not bypass authorization/validation/audit/idempotency requirements
+- worker does not directly mutate product persistence
 - job state remains observable from the core product
+- idempotency keys are mandatory for retryable work
+- correlation IDs travel from the originating request through queue execution
 
 ### Exit criteria
 
 API responsiveness and background throughput can be scaled independently, while the core domain remains owned by `signalai-server`.
+
+At least one real asynchronous SignalAI workload runs successfully through the worker with retry, idempotency, status/progress and recovery behavior verified.
 
 ## Phase 3 — Read-only MCP
 
@@ -66,7 +94,7 @@ Expose a small, useful read-only surface:
 - analytics
 - automations
 
-MCP can initially run as an adapter inside `signalai-server`.
+MCP is initially a capability adapter. When deployed separately, `signalai-mcp` uses **Python + the MCP SDK + FastAPI** and calls the same capability contracts rather than implementing business logic again.
 
 ### Exit criteria
 
@@ -143,11 +171,11 @@ Prioritize connectors based on the acquisition workflow:
 7. LinkedIn / Instagram research
 8. Additional messaging/customer channels
 
-Initially connectors can be modules used by `signalai-server` and/or `signalai-worker`.
+The connector runtime is planned as **Python + FastAPI** because connector workloads are expected to overlap with research, extraction, enrichment and data-processing workloads.
 
-Extract `signalai-connectors` only when provider runtime dependencies, scaling, security, rate limiting, or deployment cadence justify a separate service.
+Initially connectors can be modules or worker-side implementations. Extract `signalai-connectors` only when provider runtime dependencies, scaling, security, rate limiting, or deployment cadence justify a separate service.
 
-Connector availability must not leak provider-specific models into core resources.
+Connector availability must not leak provider-specific models into core resources. Providers return normalized contracts to the capability layer.
 
 ## Phase 8 — Agent workflows
 
@@ -164,6 +192,8 @@ Find 100 US Shopify agencies
 ```
 
 Use Jobs for long-running work and expose progress through AG-UI and job status through APIs/MCP.
+
+`signalai-agent` is planned as **Python + FastAPI** because model execution, planning loops, AI SDKs and evaluation workloads require an AI-oriented runtime.
 
 Initially agent orchestration may live with the core application. Extract `signalai-agent` when model execution, planning loops, dependency footprint, scaling, or security requirements justify an independent runtime.
 
@@ -191,10 +221,10 @@ Extract services only when operational evidence supports the boundary.
 
 Potential extractions:
 
-- `signalai-agent`
-- `signalai-mcp`
-- `signalai-connectors`
-- additional high-volume channel workers
+- `signalai-agent` — Python
+- `signalai-mcp` — Python
+- `signalai-connectors` — Python
+- additional high-volume channel workers — Python where execution/AI/data workloads benefit from it
 
 ### Do not extract prematurely
 
@@ -256,7 +286,7 @@ Then validate asynchronous execution:
 Company/research request
  -> capability
  -> Job
- -> signalai-worker
+ -> signalai-worker (Python)
  -> progress/status
  -> normalized result
 ```
