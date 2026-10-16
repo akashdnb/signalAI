@@ -81,7 +81,7 @@ export function InboxPage() {
       if (result.page !== page) setPage(result.page);
       setError(null);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         navigate("/login", { replace: true });
         return;
       }
