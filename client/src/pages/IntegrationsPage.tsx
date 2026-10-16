@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTenant } from "../context/TenantContext";
 import { ApiError, api } from "../api";
 import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
@@ -12,6 +13,8 @@ function formatDate(iso: string | null): string {
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { workspaceRole, workspaceError, reloadConnectedAccounts } = useTenant();
+  const canManageAccounts = workspaceRole === "owner" || workspaceRole === "admin";
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -44,6 +47,10 @@ export function IntegrationsPage() {
 
   async function handleConnect() {
     if (!tenantId) return;
+    if (!canManageAccounts) {
+      setError("Only workspace owners and admins can connect Instagram accounts.");
+      return;
+    }
     setConnecting(true);
     setError(null);
     try {
@@ -57,6 +64,10 @@ export function IntegrationsPage() {
 
   async function handleReconnect(accountId: string) {
     if (!tenantId) return;
+    if (!canManageAccounts) {
+      setError("Only workspace owners and admins can reconnect Instagram accounts.");
+      return;
+    }
     setReconnectingId(accountId);
     setError(null);
     try {
@@ -70,12 +81,17 @@ export function IntegrationsPage() {
 
   async function handleDisconnect(accountId: string) {
     if (!tenantId) return;
+    if (!canManageAccounts) {
+      setError("Only workspace owners and admins can disconnect Instagram accounts.");
+      return;
+    }
     setDisconnectingId(accountId);
     setError(null);
     try {
       await workspaceApi.disconnectAccount(tenantId, accountId);
       setConfirmingId(null);
       await loadAccounts();
+      reloadConnectedAccounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't disconnect Instagram");
     } finally {
@@ -92,13 +108,24 @@ export function IntegrationsPage() {
           <h1>Integrations</h1>
           <p className="muted">Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account.</p>
         </div>
-        <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
-          <span className="inline-flex items-center gap-1.5">
-            <InstagramMarkIcon className="h-4 w-4" />
-            {connecting ? "Redirecting…" : "Add Instagram account"}
-          </span>
-        </button>
+        {canManageAccounts && (
+          <button className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
+            <span className="inline-flex items-center gap-1.5">
+              <InstagramMarkIcon className="h-4 w-4" />
+              {connecting ? "Redirecting…" : "Add Instagram account"}
+            </span>
+          </button>
+        )}
       </div>
+
+      {workspaceRole === null && (
+        <div className={workspaceError ? "banner banner-error" : "banner"} role={workspaceError ? "alert" : "status"}>
+          {workspaceError ? "Workspace access could not be verified. Account-management actions remain disabled until access is available." : "Checking workspace permissions…"}
+        </div>
+      )}
+      {workspaceRole !== null && !canManageAccounts && (
+        <div className="banner" role="status">You can view connected Instagram accounts. Only workspace owners and admins can connect, reconnect, or disconnect an account.</div>
+      )}
 
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
@@ -149,30 +176,32 @@ export function IntegrationsPage() {
                   </span>
                 </span>
 
-                <span className="flex shrink-0 gap-2">
-                  {account.status === "error" ? (
-                    <button
-                      className="btn-primary btn-small"
-                      onClick={() => void handleReconnect(account.id)}
-                      disabled={reconnectingId === account.id || connecting}
-                    >
-                      {reconnectingId === account.id ? "Redirecting…" : "Reconnect"}
-                    </button>
-                  ) : confirmingId === account.id ? (
-                    <>
-                      <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
-                        {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                {canManageAccounts && (
+                  <span className="flex shrink-0 flex-wrap gap-2">
+                    {account.status === "error" ? (
+                      <button
+                        className="btn-primary btn-small"
+                        onClick={() => void handleReconnect(account.id)}
+                        disabled={reconnectingId === account.id || connecting}
+                      >
+                        {reconnectingId === account.id ? "Redirecting…" : "Reconnect"}
                       </button>
-                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
-                        Cancel
+                    ) : confirmingId === account.id ? (
+                      <>
+                        <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
+                          {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                        </button>
+                        <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
+                        Disconnect
                       </button>
-                    </>
-                  ) : (
-                    <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
-                      Disconnect
-                    </button>
-                  )}
-                </span>
+                    )}
+                  </span>
+                )}
               </div>
             ))}
           </div>
