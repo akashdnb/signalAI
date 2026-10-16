@@ -49,8 +49,10 @@ describe("alertsQueue worker", () => {
   });
 
   it("sends a Telegram alert with a dashboard link, no PII, when a new-lead job runs", async () => {
+    const owner = await findOrCreateUserByEmail(getPool(), "telegram-owner@example.com");
+    const tenant = await createTenantForUser(getPool(), "creator-telegram", owner.id);
     await startAlertsWorker(boss, getPool());
-    await enqueueNewLeadAlert(boss, { tenantId: "tenant-1", leadId: "lead-1" });
+    await enqueueNewLeadAlert(boss, { tenantId: tenant.id, leadId: "lead-1" });
 
     const deadline = Date.now() + 10000;
     while (vi.mocked(sendTelegramAlert).mock.calls.length === 0 && Date.now() < deadline) {
@@ -59,7 +61,7 @@ describe("alertsQueue worker", () => {
 
     expect(sendTelegramAlert).toHaveBeenCalledTimes(1);
     const [text] = vi.mocked(sendTelegramAlert).mock.calls[0]!;
-    expect(text).toContain("tenant-1");
+    expect(text).toContain(tenant.id);
     expect(text).toContain("lead-1");
   }, 15000);
 
@@ -88,18 +90,15 @@ describe("alertsQueue worker", () => {
     expect(notification.rows).toMatchObject([{ event_type: "lead.created", tenant_id: tenant.id, entity_id: "lead-1" }]);
   }, 15000);
 
-  it("skips the email but still succeeds when the tenant/owner can't be resolved (e.g. a synthetic tenantId in a test)", async () => {
+  it("does not perform external alert delivery when notification persistence fails", async () => {
     await startAlertsWorker(boss, getPool());
-    await enqueueNewLeadAlert(boss, { tenantId: "tenant-1", leadId: "lead-1" });
+    await enqueueNewLeadAlert(boss, { tenantId: "missing-tenant", leadId: "lead-1" });
 
-    const deadline = Date.now() + 10000;
-    while (vi.mocked(sendTelegramAlert).mock.calls.length === 0 && Date.now() < deadline) {
-      await sleep(500);
-    }
+    await sleep(1500);
 
-    expect(sendTelegramAlert).toHaveBeenCalledTimes(1); // the job still completes cleanly
+    expect(sendTelegramAlert).not.toHaveBeenCalled();
     expect(sendAlertEmail).not.toHaveBeenCalled();
-  }, 15000);
+  }, 5000);
 
   it("registers under the expected queue name", () => {
     expect(ALERTS_QUEUE).toBe("alerts");
