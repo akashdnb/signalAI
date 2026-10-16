@@ -2,8 +2,6 @@ name: client-ci
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: read
@@ -30,4 +28,6 @@ jobs:
       - name: Typecheck and build
         run: npm run build
         env:
+          # A reserved placeholder is enough for static build validation; this
+          # workflow does not deploy the resulting bundle.
           VITE_API_BASE_URL: https://signalai-ci.invalid
