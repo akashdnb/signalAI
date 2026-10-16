@@ -1,5 +1,4 @@
-import { Router, type Response } from "express";
-import type { Pool } from "pg";
+import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import {
   getLead,
@@ -22,35 +21,12 @@ import { createDeal, listDealsForLead, updateDealStage, type DealStage } from ".
 import { listTenantMembers } from "../db/tenantMembers.js";
 import { getTopPosts, getTopKeywords } from "../db/analytics.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
-import { getDecryptedToken, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
+import { getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
 import { sendInstagramMessage } from "../lib/instagramSend.js";
 import { recordSentReply } from "../db/sentReplies.js";
 import { HOURLY_SEND_LIMIT } from "../lib/sendLimits.js";
 import { config } from "../config.js";
-
-type AnalyticsAccountScope =
-  | { ok: true; instagramAccountId?: string }
-  | { ok: false };
-
-async function resolveAnalyticsAccountScope(
-  pool: Pool,
-  tenantId: string,
-  rawAccountRowId: unknown,
-  res: Response,
-): Promise<AnalyticsAccountScope> {
-  if (rawAccountRowId === undefined) return { ok: true };
-  if (typeof rawAccountRowId !== "string" || rawAccountRowId.length === 0) {
-    res.status(400).json({ error: "accountId must be a single connected-account identifier" });
-    return { ok: false };
-  }
-  const instagramAccountId = await resolveInstagramAccountIdForTenant(pool, tenantId, rawAccountRowId);
-  if (!instagramAccountId) {
-    res.status(404).json({ error: "Instagram account not found for this workspace" });
-    return { ok: false };
-  }
-  return { ok: true, instagramAccountId };
-}
 
 export const leadsRouter = Router();
 
@@ -267,6 +243,8 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
 
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   const notes = await listLeadNotes(getPool(), tenantId, leadId);
   return res.status(200).json(notes);
 });
@@ -381,17 +359,11 @@ leadsRouter.get("/tenants/:tenantId/members", async (req, res) => {
 });
 
 leadsRouter.get("/tenants/:tenantId/analytics/top-posts", async (req, res) => {
-  const pool = getPool();
-  const scope = await resolveAnalyticsAccountScope(pool, req.params.tenantId, req.query.accountId, res);
-  if (!scope.ok) return;
-  const posts = await getTopPosts(pool, req.params.tenantId, 10, scope.instagramAccountId);
+  const posts = await getTopPosts(getPool(), req.params.tenantId);
   return res.status(200).json(posts);
 });
 
 leadsRouter.get("/tenants/:tenantId/analytics/top-keywords", async (req, res) => {
-  const pool = getPool();
-  const scope = await resolveAnalyticsAccountScope(pool, req.params.tenantId, req.query.accountId, res);
-  if (!scope.ok) return;
-  const keywords = await getTopKeywords(pool, req.params.tenantId, 10, scope.instagramAccountId);
+  const keywords = await getTopKeywords(getPool(), req.params.tenantId);
   return res.status(200).json(keywords);
 });
