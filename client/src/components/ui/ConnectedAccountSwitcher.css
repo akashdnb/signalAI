@@ -250,8 +250,8 @@
 /* The same registered switcher is used by the real application shell. These styles
    are intentionally separate from the preview-only palette above. */
 .sai-account-switcher--product {
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: min(720px, 70vw);
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
@@ -260,20 +260,22 @@
 .sai-account-switcher--product select,
 .sai-account-switcher--product input,
 .sai-account-switcher--product textarea {
-  color: var(--ink);
+  color: var(--color-ink);
 }
 
 .sai-account-switcher--product button:focus-visible,
 .sai-account-switcher--product select:focus-visible,
 .sai-account-switcher--product input:focus-visible,
 .sai-account-switcher--product textarea:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 @media (max-width: 767px) {
   .sai-account-switcher--product {
     align-items: stretch;
+    width: 100%;
+    max-width: 100%;
   }
 
   .sai-account-switcher--product > div {
