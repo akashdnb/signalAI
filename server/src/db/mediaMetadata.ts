@@ -184,7 +184,7 @@ export async function listKnownMediaForTenant(
   // metadata in SQL. Filtering the one-row-per-media workspace response in
   // the browser would miss media seen by more than one connected account.
   const eventAccountFilter = instagramAccountId
-    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2"
+    ? "and coalesce(e.attributes->>'instagramAccountId', l.instagram_account_id) = $2 and (l.instagram_account_id is null or l.instagram_account_id = $2)"
     : "";
   const mediaAccountFilter = instagramAccountId
     ? "and instagram_account_id = $2"
