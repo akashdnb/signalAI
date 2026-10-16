@@ -4,7 +4,7 @@ import { CheckCircleIcon, ChevronDownIcon } from "../icons";
 import "./ConnectedAccountSwitcher.css";
 
 export type ConnectedAccountSwitcherOption = { id: string; handle: string; label: string; connected?: boolean };
-export type ConnectedAccountSwitcherProps = { workspaceName: string; providerLabel: string; providerIcon: ReactNode; accounts: ConnectedAccountSwitcherOption[]; selectedAccountId: string; onSelect: (accountId: string) => void; onManageAccounts?: () => void; previewOnly?: boolean; showAccountSelector?: boolean; accountsLoading?: boolean; accountError?: string | null };
+export type ConnectedAccountSwitcherProps = { workspaceName: string; providerLabel: string; providerIcon: ReactNode; accounts: ConnectedAccountSwitcherOption[]; selectedAccountId: string; onSelect: (accountId: string) => void; onManageAccounts?: () => void; previewOnly?: boolean; showAccountSelector?: boolean; accountsLoading?: boolean; accountError?: string | null; onRetryAccounts?: () => void };
 type Workspace = { id: string; name: string; description: string; initials: string };
 const WORKSPACES: Workspace[] = [
   { id: "my-workspace", name: "My workspace", description: "Current workspace", initials: "MW" },
@@ -116,6 +116,7 @@ function ProductAccountContextSelector({
   showAccountSelector = true,
   accountsLoading = false,
   accountError,
+  onRetryAccounts,
 }: ProductAccountContextProps) {
   const [value, setValue] = useState(selectedAccountId || "");
   useEffect(() => {
@@ -152,7 +153,16 @@ function ProductAccountContextSelector({
         </select>
       </label>
       {accountError ? (
-        <span className="max-w-36 text-xs text-err-ink" role="status" title={accountError}>Unavailable</span>
+        <span className="flex shrink-0 items-center gap-2" role="status">
+          <span className="max-w-36 text-xs text-err-ink" title={accountError}>Unavailable</span>
+          <button
+            type="button"
+            className="text-xs font-semibold text-accent underline-offset-2 hover:underline"
+            onClick={onRetryAccounts}
+          >
+            Retry
+          </button>
+        </span>
       ) : accounts.length === 0 && !accountsLoading ? (
         <button
           type="button"
