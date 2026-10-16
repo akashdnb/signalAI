@@ -1,8 +1,9 @@
+-- Up Migration
 -- Notification infrastructure: controlled event catalog, persisted user policy,
 -- in-app inbox, idempotent event receipt, and per-channel delivery history.
 -- Provider secrets and raw provider response bodies are deliberately not persisted.
 
-create table notification_events (
+create table if not exists notification_events (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
   event_type text not null,
@@ -27,10 +28,10 @@ create table notification_events (
     )),
   unique (tenant_id, event_type, idempotency_key)
 );
-create index notification_events_tenant_created_idx
+create index if not exists notification_events_tenant_created_idx
   on notification_events (tenant_id, created_at desc);
 
-create table notifications (
+create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references notification_events(id) on delete cascade,
   tenant_id uuid not null references tenants(id) on delete cascade,
@@ -45,13 +46,13 @@ create table notifications (
   created_at timestamptz not null default now(),
   unique (event_id, user_id)
 );
-create index notifications_user_inbox_idx
+create index if not exists notifications_user_inbox_idx
   on notifications (tenant_id, user_id, created_at desc);
-create index notifications_user_unread_idx
+create index if not exists notifications_user_unread_idx
   on notifications (tenant_id, user_id, created_at desc)
   where read_at is null;
 
-create table notification_preferences (
+create table if not exists notification_preferences (
   tenant_id uuid not null references tenants(id) on delete cascade,
   user_id uuid not null references users(id) on delete cascade,
   event_type text not null,
@@ -71,10 +72,10 @@ create table notification_preferences (
   constraint notification_preferences_channel_check
     check (channel in ('email', 'in_app'))
 );
-create index notification_preferences_user_idx
+create index if not exists notification_preferences_user_idx
   on notification_preferences (tenant_id, user_id);
 
-create table notification_deliveries (
+create table if not exists notification_deliveries (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references notification_events(id) on delete cascade,
   tenant_id uuid not null references tenants(id) on delete cascade,
@@ -98,12 +99,12 @@ create table notification_deliveries (
     check (attempts >= 0 and max_attempts between 1 and 5),
   unique (event_id, recipient_user_id, channel)
 );
-create index notification_deliveries_due_idx
+create index if not exists notification_deliveries_due_idx
   on notification_deliveries (status, next_attempt_at)
   where status in ('pending', 'retrying');
 
 -- Down Migration
-drop table notification_deliveries;
-drop table notification_preferences;
-drop table notifications;
-drop table notification_events;
+drop table if exists notification_deliveries;
+drop table if exists notification_preferences;
+drop table if exists notifications;
+drop table if exists notification_events;
