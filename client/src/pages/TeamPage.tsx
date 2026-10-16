@@ -73,7 +73,11 @@ export function TeamPage() {
         setError(err instanceof Error ? err.message : "Could not load workspace members.");
       });
 
-    const workspaceRequest = workspaceApi.listWorkspaces()\n      .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))\n      .catch(() => setRole(null));\n\n    const invitationRequest = workspaceApi.listInvitations(tenantId)
+    const workspaceRequest = workspaceApi.listWorkspaces()
+      .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))
+      .catch(() => setRole(null));
+
+    const invitationRequest = workspaceApi.listInvitations(tenantId)
       .then((nextInvitations) => {
         setInvitations(nextInvitations ?? []);
         setInvitationsForbidden(false);
@@ -95,10 +99,6 @@ export function TeamPage() {
         setInvitationsLoading(false);
         setError(err instanceof Error ? err.message : "Could not load workspace invitations.");
       });
-
-    const workspaceRequest = workspaceApi.listWorkspaces()
-      .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))
-      .catch(() => setRole(null));
 
     await Promise.all([memberRequest, invitationRequest, workspaceRequest]);
   }
