@@ -56,7 +56,7 @@ export function IntegrationsPage() {
   }, [tenantId]);
 
   async function handleConnect() {
-    if (!tenantId) return;
+    if (!tenantId || loadingRole || !(role === "owner" || role === "admin")) return;
     setConnecting(true);
     setError(null);
     try {
