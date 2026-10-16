@@ -11,6 +11,7 @@ export interface TenantContextValue {
   error: string | null;
   reload: () => void;
   reloadWorkspaces: () => void;
+  reloadConnectedAccounts: () => void;
   workspaces: WorkspaceSummary[] | null;
   workspaceError: string | null;
   workspaceRole: WorkspaceRole | null;
