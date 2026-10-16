@@ -248,7 +248,7 @@ async function ingestOneEvent(
 
     await enqueueLeadEvent(
       boss,
-      { tenantId, leadId: lead.id, leadEventId: inserted.id, sequence },
+      { tenantId, leadId: lead.id, leadEventId: inserted.id, sequence, instagramAccountId: event.instagramAccountId },
       { client },
     );
 
