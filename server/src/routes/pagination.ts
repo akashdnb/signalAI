@@ -12,6 +12,8 @@ const MAX_PAGE_SIZE = 100;
 const TIMELINE_DEFAULT_PAGE_SIZE = 50;
 const TIMELINE_MAX_PAGE_SIZE = 200;
 
+type PublicKnowledgeBaseDocument = Omit<KnowledgeBaseDocument, "storageKey">;
+
 export interface PaginatedResponse<T> { items: T[]; page: number; pageSize: number; total: number; totalPages: number; }
 
 function parsePagination(query: Record<string, unknown>): { page: number; pageSize: number } {
@@ -72,9 +74,18 @@ function mapCampaign(row: {
 function mapDocument(row: {
   id: string; tenant_id: string; filename: string; content_type: string; storage_key: string; version: number;
   status: KnowledgeBaseDocumentStatus; error_reason: string | null; superseded_at: Date | null; created_at: Date;
-}): KnowledgeBaseDocument {
-  const { storageKey: _storageKey, ...document } = { id: row.id, tenantId: row.tenant_id, filename: row.filename, contentType: row.content_type, storageKey: row.storage_key, version: row.version, status: row.status, errorReason: row.error_reason, supersededAt: row.superseded_at, createdAt: row.created_at };
-  return document;
+}): PublicKnowledgeBaseDocument {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    filename: row.filename,
+    contentType: row.content_type,
+    version: row.version,
+    status: row.status,
+    errorReason: row.error_reason,
+    supersededAt: row.superseded_at,
+    createdAt: row.created_at,
+  };
 }
 
 export const paginationRouter = Router();
