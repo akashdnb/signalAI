@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
-import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember } from "../api/workspace";
+import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember, type WorkspaceRole } from "../api/workspace";
+import { useTenant } from "../context/TenantContext";
 
 function formatRole(role: WorkspaceMember["role"]): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -36,6 +37,11 @@ function formatDate(iso: string): string {
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { tenant } = useTenant();
+  const [role, setRole] = useState<WorkspaceRole | null>(null);
+  const [invitationsForbidden, setInvitationsForbidden] = useState(false);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [invitationsLoading, setInvitationsLoading] = useState(true);
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -47,22 +53,53 @@ export function TeamPage() {
 
   async function load() {
     if (!tenantId) return;
-    try {
-      const [nextMembers, nextInvitations] = await Promise.all([
-        workspaceApi.listMembers(tenantId),
-        workspaceApi.listInvitations(tenantId),
-      ]);
-      setMembers(nextMembers);
-      setInvitations(nextInvitations ?? []);
-      setError(null);
-    } catch (err) {
-      const status = (err as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
-        navigate("/login", { replace: true });
-        return;
-      }
-      setError(err instanceof Error ? err.message : "Failed to load team");
-    }
+    setMembersLoading(true);
+    setInvitationsLoading(true);
+    setError(null);
+    const memberRequest = workspaceApi.listMembers(tenantId)
+      .then((nextMembers) => {
+        setMembers(nextMembers);
+        setMembersLoading(false);
+      })
+      .catch((err) => {
+        const status = (err as Error & { status?: number }).status;
+        if (status === 401) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        setMembers([]);
+        setMembersLoading(false);
+        setError(err instanceof Error ? err.message : "Could not load workspace members.");
+      });
+
+    const invitationRequest = workspaceApi.listInvitations(tenantId)
+      .then((nextInvitations) => {
+        setInvitations(nextInvitations ?? []);
+        setInvitationsForbidden(false);
+        setInvitationsLoading(false);
+      })
+      .catch((err) => {
+        const status = (err as Error & { status?: number }).status;
+        if (status === 401) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (status === 403) {
+          setInvitations([]);
+          setInvitationsForbidden(true);
+          setInvitationsLoading(false);
+          return;
+        }
+        setInvitations([]);
+        setInvitationsLoading(false);
+        setError(err instanceof Error ? err.message : "Could not load workspace invitations.");
+      });
+
+    const workspaceRequest = workspaceApi.listWorkspaces()
+      .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))
+      .catch(() => setRole(null));
+
+    await Promise.all([memberRequest, invitationRequest, workspaceRequest]);
   }
 
   useEffect(() => {
@@ -142,13 +179,14 @@ export function TeamPage() {
 
   if (!tenantId) return null;
 
+  const canManageMembers = role === "owner" || role === "admin";
   const pendingInvitations = invitations.filter(isPendingInvitation);
   const resolvedInvitations = invitations.filter((invitation) => !isPendingInvitation(invitation));
 
   return (
     <div className="page page-wide">
       <h1>Team</h1>
-      <p className="muted">Everyone with access to this workspace.</p>
+      <p className="muted">Everyone with access to this workspace{role ? ` · Your role: ${formatRole(role)}` : ""}.</p>
 
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
@@ -236,7 +274,7 @@ export function TeamPage() {
         )}
       </section>
 
-      {pendingInvitations.length > 0 && (
+      {invitationsForbidden && <section className="card"><h2>Invitations</h2><p className="muted mb-0">Only workspace owners and admins can view or manage invitations.</p></section>}\n\n      {canManageMembers && invitationsLoading && <section className="card"><h2>Invitations</h2><p className="muted" role="status">Loading invitations…</p></section>}\n\n      {canManageMembers && !invitationsLoading && pendingInvitations.length > 0 && (
         <section className="card">
           <h2>Pending invitations</h2>
           <p className="muted small">Invitations are single-use and expire automatically. Resend to issue a fresh invitation link.</p>
@@ -276,7 +314,7 @@ export function TeamPage() {
         </section>
       )}
 
-      {resolvedInvitations.length > 0 && (
+      {canManageMembers && !invitationsLoading && resolvedInvitations.length > 0 && (
         <section className="card">
           <h2>Invitation history</h2>
           <p className="muted small">Resolved invitations stay visible so you can tell whether a teammate accepted, was cancelled, or let the invitation expire.</p>
