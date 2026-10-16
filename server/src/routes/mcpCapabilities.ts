@@ -2,7 +2,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Pool, PoolClient } from "pg";
 import { getPool } from "../db/pool.js";
-import { getCampaign as getCampaignFromDomain } from "../db/campaigns.js";
+import { createCampaignWithClient, getCampaign as getCampaignFromDomain } from "../db/campaigns.js";
 import {
   listMilestonesWithClient,
 } from "../db/milestones.js";
@@ -213,14 +213,7 @@ async function createDraft(client: PoolClient, tenantId: string, input: Record<s
   const metadata = input.metadata === undefined ? {} : requireObject(input.metadata, "metadata");
   if (Object.keys(metadata).length > 50) throw new CapabilityInputError("metadata must contain at most 50 keys.");
 
-  const inserted = await client.query<{ id: string; name: string; builder_version: number }>(
-    `insert into campaigns(tenant_id, name, keywords, enabled)
-     values ($1,$2,$3,false)
-     returning id, name, builder_version`,
-    [tenantId, name, [trigger]],
-  );
-  const campaign = inserted.rows[0];
-  if (!campaign) throw new Error("campaign_create_failed");
+  const campaign = await createCampaignWithClient(client, tenantId, name, [trigger]);
   const graph = await getBuilderGraphWithClient(client, tenantId, campaign.id);
   if (!graph) throw new Error("draft_graph_unavailable");
   let nodesToPersist = graph.nodes;
