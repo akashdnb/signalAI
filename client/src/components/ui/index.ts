@@ -11,3 +11,5 @@ export { Section } from "./Section";
 export { Skeleton } from "./Skeleton";
 export { StatusBadge } from "./StatusBadge";
 export type { StatusTone } from "./StatusBadge";
+
+export { WorkspaceContextSwitcher } from "../WorkspaceContextSwitcher";
