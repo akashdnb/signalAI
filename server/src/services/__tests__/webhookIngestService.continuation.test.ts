@@ -17,6 +17,26 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function createBoundCampaign(
+  pool: ReturnType<typeof getPool>,
+  tenantId: string,
+  instagramAccountId: string,
+  name: string,
+  keywords: string[],
+  options?: Parameters<typeof createCampaign>[4],
+) {
+  const campaign = await createCampaign(pool, tenantId, name, keywords, options);
+  await pool.query(
+    `insert into campaign_instagram_accounts (campaign_id, meta_token_id)
+     select $1, mt.id
+       from meta_tokens mt
+      where mt.tenant_id = $2 and mt.instagram_account_id = $3
+     on conflict (campaign_id, meta_token_id) do nothing`,
+    [campaign.id, tenantId, instagramAccountId],
+  );
+  return campaign;
+}
+
 const keyring = new Map<string, Buffer>([["v1", randomBytes(32)]]);
 
 async function matchedFieldsFor(pool: ReturnType<typeof getPool>, metaEventId: string) {
@@ -63,7 +83,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "message" });
+    const campaign = await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "message" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -96,7 +116,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "message" });
+    await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "message" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -116,7 +136,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "message" });
+    const campaign = await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "message" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -148,7 +168,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Comment to DM", ["LINK"], { triggerSource: "both", replyChannel: "dm" });
+    const campaign = await createBoundCampaign(pool, tenant.id, "acct-1", "Comment to DM", ["LINK"], { triggerSource: "both", replyChannel: "dm" });
 
     await ingestWebhookEvents(pool, boss, [{
       instagramAccountId: "acct-1",
@@ -186,7 +206,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "both" });
+    const campaign = await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "both" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -219,7 +239,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "message" });
+    const campaign = await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "message" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -250,7 +270,7 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaign = await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "message" });
+    const campaign = await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "message" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -281,8 +301,8 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     const pool = getPool();
     const tenant = await createTenant(pool, "creator-a");
     await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-1", accessToken: "unused" });
-    const campaignA = await createCampaign(pool, tenant.id, "Products", ["product"], { triggerSource: "message" });
-    const campaignB = await createCampaign(pool, tenant.id, "Support", ["help"], { triggerSource: "message" });
+    const campaignA = await createBoundCampaign(pool, tenant.id, "acct-1", "Products", ["product"], { triggerSource: "message" });
+    const campaignB = await createBoundCampaign(pool, tenant.id, "acct-1", "Support", ["help"], { triggerSource: "message" });
 
     await ingestWebhookEvents(pool, boss, [
       {
@@ -311,4 +331,46 @@ describe("webhookIngestService — DM Conversation Continuation", () => {
     expect(lead.activeDmCampaignId).toBe(campaignB.id);
     expect(await matchedFieldsFor(pool, "evt-2")).toEqual({ matchedCampaignId: campaignB.id, matchedKeyword: "help" });
   });
+  it("does not match a journey on an unassigned account and keeps the same person separate per account", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "multi-account-tenant");
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-a", accessToken: "unused" });
+    await upsertToken(pool, keyring, { tenantId: tenant.id, instagramAccountId: "acct-b", accessToken: "unused" });
+
+    const campaign = await createCampaign(pool, tenant.id, "Account A only", ["product"], { triggerSource: "message" });
+    await pool.query(
+      `insert into campaign_instagram_accounts (campaign_id, meta_token_id)
+       select $1, id from meta_tokens where tenant_id = $2 and instagram_account_id = 'acct-a'`,
+      [campaign.id, tenant.id],
+    );
+
+    await ingestWebhookEvents(pool, boss, [{
+      instagramAccountId: "acct-b",
+      instagramUserId: "same-person",
+      metaEventId: "evt-account-b-unassigned",
+      eventType: "message",
+      occurredAt: new Date(),
+      dmText: "I want the product",
+    }]);
+    expect(await matchedFieldsFor(pool, "evt-account-b-unassigned")).toEqual({ matchedCampaignId: null, matchedKeyword: null });
+
+    await ingestWebhookEvents(pool, boss, [{
+      instagramAccountId: "acct-a",
+      instagramUserId: "same-person",
+      metaEventId: "evt-account-a-assigned",
+      eventType: "message",
+      occurredAt: new Date(),
+      dmText: "I want the product",
+    }]);
+    expect(await matchedFieldsFor(pool, "evt-account-a-assigned")).toEqual({ matchedCampaignId: campaign.id, matchedKeyword: "product" });
+
+    const identities = await pool.query<{ id: string; instagram_account_id: string | null }>(
+      `select id, instagram_account_id from leads where tenant_id = $1 and instagram_user_id = $2 order by instagram_account_id`,
+      [tenant.id, "same-person"],
+    );
+    expect(identities.rows).toHaveLength(2);
+    expect(identities.rows.map((row) => row.instagram_account_id)).toEqual(["acct-a", "acct-b"]);
+    expect(identities.rows[0]!.id).not.toBe(identities.rows[1]!.id);
+  });
+
 });
