@@ -623,7 +623,7 @@ export function AppShell() {
     connected: connected.status === "healthy",
   }));
   const accountsLoading = connectedAccounts === null && accountError === null;
-  const showAccountSelector = ["/inbox", "/leads", "/content"].some((suffix) =>
+  const showAccountSelector = ["/inbox", "/leads", "/content", "/analytics"].some((suffix) =>
     location.pathname.endsWith(suffix) || location.pathname.includes(suffix + "/"),
   );
 
