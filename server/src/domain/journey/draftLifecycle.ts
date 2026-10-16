@@ -126,7 +126,7 @@ export async function updateJourneyDraftWithClient(
     updatedAt: Date;
     mcp_metadata: Record<string, unknown>;
     published: boolean;
-  >(
+  }>(
     `select c.id, c.tenant_id as "tenantId", c.name, c.description, c.keywords,
             c.enabled, c.reply_mode as "replyMode", c.reply_templates as "replyTemplates",
             c.default_reply_template as "defaultReplyTemplate", c.cta_link as "ctaLink",
