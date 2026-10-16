@@ -803,7 +803,7 @@ export const api = {
   // Backs the campaign editor's post-targeting picker: posts this tenant
   // has actually received a comment on, derived from ingested events
   // rather than a Graph API media-listing call.
-  listObservedMedia: (tenantId: string) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media`),
+  listObservedMedia: (tenantId: string, accountId?: string | null) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   // Resolves a pasted post/Reel URL against the connected account's own
   // media and adds it as a known post — usable for targeting even before
   // any comment on it has arrived.
