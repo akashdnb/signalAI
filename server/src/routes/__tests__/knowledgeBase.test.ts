@@ -66,6 +66,19 @@ describe("knowledge base routes (Phase 2C)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 413 for files larger than the upload limit", async () => {
+    const { tenant, authHeader } = await createLoggedInTenant(getPool(), SESSION_SECRET, "creator-large-upload");
+    const app = createApp({ embeddingProvider: fakeEmbeddingProvider() });
+    const oversized = Buffer.alloc(10 * 1024 * 1024 + 1, "x");
+    const res = await request(app)
+      .post(`/tenants/${tenant.id}/knowledge-base`)
+      .set(authHeader)
+      .attach("file", oversized, { filename: "oversized.txt", contentType: "text/plain" });
+    expect(res.status).toBe(413);
+    expect(res.body.error).toMatch(/maximum upload size is 10 MB/i);
+    expect(mockUploadObject).not.toHaveBeenCalled();
+  });
+
   it("rejects an unsupported file type before ingestion starts", async () => {
     const { tenant, authHeader } = await createLoggedInTenant(getPool(), SESSION_SECRET, "creator-a");
     const app = createApp({ embeddingProvider: fakeEmbeddingProvider() });
