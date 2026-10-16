@@ -644,13 +644,16 @@ export function AppShell() {
 
   const showWizard = Boolean(tenant) && (tenant!.industry === null || wizardLatchedOpen);
   const workspaceRole = workspaces?.find((workspace) => workspace.tenantId === tenantId)?.role ?? null;
-  const accountOptions: ConnectedAccountSwitcherOption[] = (connectedAccounts ?? []).map((connected) => ({
+  // Do not render a previous workspace's account names for even one frame
+  // after the route context changes; only use inventory fetched for this tenant.
+  const currentConnectedAccounts = connectedAccountsTenantId === tenantId ? connectedAccounts : null;
+  const accountOptions: ConnectedAccountSwitcherOption[] = (currentConnectedAccounts ?? []).map((connected) => ({
     id: connected.id,
     handle: connected.instagramUsername ? "@" + connected.instagramUsername : "Instagram account",
     label: connected.instagramUsername ? "@" + connected.instagramUsername : "Instagram account",
     connected: connected.status === "healthy",
   }));
-  const accountsLoading = connectedAccounts === null && accountError === null;
+  const accountsLoading = currentConnectedAccounts === null && accountError === null;
   // Scope the visible context control to list/report screens. A nested
   // lead-detail route is tied to its selected lead and doesn't change when
   // the list filter changes, so showing the selector there would be misleading.
