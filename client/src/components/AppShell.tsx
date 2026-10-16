@@ -238,6 +238,7 @@ function MobileAccountSheet({
           currentWorkspaceRole={currentWorkspaceRole}
           workspaceError={workspaceError}
           onReloadWorkspaces={onReloadWorkspaces}
+          onReloadAccounts={onReloadAccounts}
           onSelectWorkspace={onSelectWorkspace}
           onCreateWorkspace={onCreateWorkspace}
           showAccountSelector={showAccountSelector}
@@ -348,6 +349,7 @@ function AccountHeader({
           currentWorkspaceRole={currentWorkspaceRole}
           workspaceError={workspaceError}
           onReloadWorkspaces={onReloadWorkspaces}
+          onReloadAccounts={onReloadAccounts}
           onSelectWorkspace={onSelectWorkspace}
           onCreateWorkspace={onCreateWorkspace}
           showAccountSelector={showAccountSelector}
@@ -844,7 +846,6 @@ export function AppShell() {
           accountOptions={accountOptions}
           selectedAccountId={selectedAccountId}
           accountError={accountError}
-          onReloadAccounts={onReloadAccounts}
           accountsLoading={accountsLoading}
           onSelectAccount={handleSelectAccount}
           onManageAccounts={handleManageAccounts}
@@ -872,7 +873,6 @@ export function AppShell() {
             accountOptions={accountOptions}
             selectedAccountId={selectedAccountId}
             accountError={accountError}
-            onReloadAccounts={() => { void reloadConnectedAccounts(); }}
             accountsLoading={accountsLoading}
             onSelectAccount={handleSelectAccount}
             onManageAccounts={handleManageAccounts}
