@@ -13,7 +13,7 @@ This is a runtime/deployment boundary, not a business-domain microservice split.
 | Component | Language | Framework/runtime | Primary responsibility |
 |---|---|---|---|
 | `signalai-server` | TypeScript | Existing SignalAI server stack | Product source of truth, auth, domain rules, persistence, capability layer, API |
-| `signalai-worker` | Python 3.12 | ARQ + Redis; FastAPI for health/ops | Async jobs, retries, bulk work, research, enrichment, scheduled work |
+| `signalai-worker` | Python 3.12 | asyncpg + PostgreSQL execution queue; FastAPI for health/ops | Async jobs, retries, bulk work, research, enrichment, scheduled work |
 | `signalai-connectors` | Python 3.12 | FastAPI + async HTTP | External provider integrations and normalized provider results |
 | `signalai-mcp` | Python 3.12 | Official MCP Python SDK v2 + Streamable HTTP | External MCP protocol adapter over SignalAI capabilities |
 | `signalai-agent` | Python 3.12 | FastAPI | Planning/orchestration, LLM execution and agent workflows |
@@ -86,11 +86,12 @@ Stable IDs are carried in contracts (`tenantId`, `jobId`, `correlationId`, resou
 
 ### `signalai-worker`
 
-- consumes explicit jobs
-- is stateless between jobs except durable queue/idempotency state
-- retries transient work
-- reports job lifecycle/progress
-- never directly mutates product persistence
+- consumes explicit jobs from the server-owned PostgreSQL `execution_jobs` table
+- claims work using transactional `FOR UPDATE SKIP LOCKED`
+- uses leases and heartbeats for long-running work
+- retries transient failures with bounded backoff
+- recovers expired leases
+- never directly implements product persistence/domain rules
 - invokes capabilities/contracts rather than copying domain rules
 
 ### `signalai-connectors`
