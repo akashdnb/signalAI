@@ -45,7 +45,7 @@ jobs:
       # tsconfig.build.json. Only this step exercises what Render actually runs,
       # and its absence is why a broken build reached the deploy.
       - run: npm run build
-      - run: npx node-pg-migrate up --migration-file-language sql
+      - run: npm run migrate:up
       # --no-file-parallelism: CI runners have far fewer CPU cores than a
       # typical dev machine, and several queue test files (leadEventsQueue,
       # dlqUnblocks, deadLetterEvidence, ...) share the same pgboss.job

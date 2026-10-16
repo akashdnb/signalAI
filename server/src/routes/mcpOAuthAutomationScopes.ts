@@ -7,10 +7,20 @@ import { verifySessionToken } from "../lib/session.js";
 
 export const MCP_AUTOMATION_PUBLISH_SCOPE = "signalai:automation:publish";
 export const MCP_AUTOMATION_OPERATE_SCOPE = "signalai:automation:operate";
+export const MCP_AUTOMATION_READ_SCOPE = "automation:read";
+export const MCP_AUTOMATION_WRITE_SCOPE = "automation:write";
+export const MCP_AUTOMATION_VALIDATE_SCOPE = "automation:validate";
+export const MCP_AUTOMATION_ACTIVATE_SCOPE = "automation:activate";
+export const MCP_AUTOMATION_PAUSE_SCOPE = "automation:pause";
 const SUPPORTED_SCOPES = [
   "signalai:read",
   "signalai:write",
+  MCP_AUTOMATION_READ_SCOPE,
+  MCP_AUTOMATION_WRITE_SCOPE,
+  MCP_AUTOMATION_VALIDATE_SCOPE,
   MCP_AUTOMATION_PUBLISH_SCOPE,
+  MCP_AUTOMATION_ACTIVATE_SCOPE,
+  MCP_AUTOMATION_PAUSE_SCOPE,
   MCP_AUTOMATION_OPERATE_SCOPE,
 ] as const;
 const SUPPORTED_SCOPE_SET = new Set<string>(SUPPORTED_SCOPES);
@@ -126,6 +136,8 @@ router.get("/oauth/authorize", async (req, res) => {
   if (responseType !== "code") return errorRedirect(res, redirectUri, "unsupported_response_type", state);
   if (codeChallengeMethod !== "S256" || codeChallenge.length < 43) return errorRedirect(res, redirectUri, "invalid_request", state);
   const scopes = scopeText.split(/\s+/).filter(Boolean);
+  // Legacy coarse scopes and granular automation scopes are both supported.
+  // Reject malformed, duplicated, and unknown scopes before issuing a code.
   if (!scopes.length || scopes.some((scope) => !SUPPORTED_SCOPE_SET.has(scope)) || new Set(scopes).size !== scopes.length) {
     return errorRedirect(res, redirectUri, "invalid_scope", state);
   }

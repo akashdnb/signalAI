@@ -11,13 +11,18 @@ describe("MCP OAuth scope metadata", () => {
     delete process.env.MCP_PUBLIC_URL;
   });
 
-  it("advertises read, write, publish, and operate scopes in OAuth and protected-resource metadata", async () => {
+  it("advertises legacy and granular automation scopes in OAuth and protected-resource metadata", async () => {
     const app = createApp();
     const expectedScopes = [
       "signalai:read",
       "signalai:write",
       "signalai:automation:publish",
       "signalai:automation:operate",
+      "automation:read",
+      "automation:write",
+      "automation:validate",
+      "automation:activate",
+      "automation:pause",
     ];
 
     const oauth = await request(app).get("/.well-known/oauth-authorization-server");
