@@ -77,7 +77,8 @@ mcpCapabilitiesRouter.post("/v1/capabilities/:capability", requireMcpServiceAuth
     return res.status(200).json({ ...result, correlationId });
   } catch (error) {
     if (error instanceof CapabilityError) {
-      const retryAfter = error.statusCode === 429 ? 60 : undefined;
+      const retryAfter = error.statusCode === 429 && typeof error.details?.retryAfterSeconds === "number"
+        ? error.details.retryAfterSeconds : undefined;
       if (retryAfter) res.setHeader("Retry-After", String(retryAfter));
       return res.status(error.statusCode).json({
         error: error.code, code: error.code, message: error.message,
@@ -333,9 +334,10 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
   }
   scalarSet.push("updated_at = now()");
   if (scalarSet.length > 1 || !graphChanges) {
+    const versionGuard = graphChanges ? "" : ` and builder_version = ${values.length + 1}`;
     const update = await client.query(
       `update campaigns set ${scalarSet.join(", ")}
-        where id = $1 and tenant_id = $2${graphChanges ? "" : ` and builder_version = ${values.length}`}`,
+        where id = $1 and tenant_id = $2${versionGuard}`,
       graphChanges ? values : [...values, expectedVersion],
     );
     if (update.rowCount !== 1) {
@@ -586,7 +588,7 @@ async function getLead(pool: ReturnType<typeof getPool>, tenantId: string, leadI
      where l.id = $1 and l.tenant_id = $2`,
     [leadId, tenantId],
   );
-  if (!result.rows[0]) throw new CapabilityInputError("lead_not_found");
+  if (!result.rows[0]) throw new ResourceNotFoundError();
   return { capability: "lead.get", lead: result.rows[0] };
 }
 
@@ -671,7 +673,7 @@ async function listAutomations(pool: ReturnType<typeof getPool>, tenantId: strin
 
 async function getAutomation(pool: ReturnType<typeof getPool>, tenantId: string, automationId: string) {
   const campaign = await pool.query(`select * from campaigns where id = $1 and tenant_id = $2`, [automationId, tenantId]);
-  if (!campaign.rows[0]) throw new CapabilityInputError("automation_not_found");
+  if (!campaign.rows[0]) throw new ResourceNotFoundError();
   const nodes = await pool.query(
     `select id, type, position_x as "positionX", position_y as "positionY", data, parent_group_id as "parentGroupId", collapsed
      from journey_nodes where campaign_id = $1 and tenant_id = $2 order by created_at asc`,
