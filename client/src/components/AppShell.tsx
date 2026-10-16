@@ -685,7 +685,7 @@ export function AppShell() {
           expiresAt: selected.expiresAt,
         };
       })()
-    : accountTenantId === tenantId ? account : null;
+    : accountTenantId === tenantId && !selectedAccountId ? account : null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
