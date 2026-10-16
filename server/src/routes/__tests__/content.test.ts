@@ -428,6 +428,17 @@ describe("content observed-media route", () => {
       .set(authA);
     expect(forbiddenAccount.status).toBe(404);
     expect(forbiddenAccount.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+
+    const repeatedAccount = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=${rowA.id}&accountId=${rowB.id}`)
+      .set(authA);
+    expect(repeatedAccount.status).toBe(400);
+    expect(repeatedAccount.body).toMatchObject({ error: "accountId must be a single connected-account identifier" });
+
+    const emptyAccount = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=`)
+      .set(authA);
+    expect(emptyAccount.status).toBe(400);
   });
 
 });
