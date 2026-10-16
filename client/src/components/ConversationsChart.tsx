@@ -2,10 +2,13 @@ import { useState } from "react";
 import type { ConversationsTimeseriesPoint } from "../api";
 
 /**
- * Dashboard's "Activity over time" chart: stacked bars (Comments, DMs) over
- * the trailing real days from getConversationsTimeseries — no invented
- * trend data, matching the preview's bar-chart treatment (incl. the big
- * total count above the chart) instead of a line chart. Ships its own
+ * Dashboard's "Activity over time" chart: single-color bars (total events
+ * per day) over the trailing real days from getConversationsTimeseries — no
+ * invented trend data, matching the preview's plain bar-chart treatment
+ * (one accent color, no legend, big total count above the chart) instead of
+ * a two-series stacked chart or a line chart. The Comments/DMs split is
+ * still real and still shown, just in the per-bar hover tooltip and the
+ * "View as table" fallback rather than as a second bar color. Ships its own
  * tooltip per bar, plus an accessible table fallback below.
  */
 export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoint[] }) {
@@ -82,11 +85,9 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
   const bars = data.map((d, i) => {
     const total = d.comments + d.dms;
     const totalH = (total / maxTotal) * plotH;
-    const commentsH = total > 0 ? (d.comments / total) * totalH : 0;
-    const dmsH = totalH - commentsH;
     const x = padding.left + i * (barW + gap);
     const top = padding.top + plotH - totalH;
-    return { x, top, totalH, commentsH, dmsH, total };
+    return { x, top, totalH, total };
   });
 
   const period =
@@ -103,28 +104,14 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
         <span className="ml-2 text-sm text-subtle">inbound events · {period}</span>
       </div>
 
-      <div className="mb-3 flex items-center gap-4 text-sm">
-        <span className="flex items-center gap-1.5 text-subtle">
-          <span className="h-2 w-2 rounded-full" style={{ background: "var(--accent)" }} />
-          Comments
-        </span>
-        <span className="flex items-center gap-1.5 text-subtle">
-          <span className="h-2 w-2 rounded-full" style={{ background: "var(--accent-cyan)" }} />
-          DMs sent
-        </span>
-      </div>
-
-      <svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Comments and DMs, ${period}`}>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Inbound comments and DMs, ${period}`}>
         <line x1={padding.left} x2={width - padding.right} y1={padding.top + plotH} y2={padding.top + plotH} stroke="var(--border)" strokeWidth={1} />
 
         {bars.map((bar, i) => (
           <g key={data[i]!.date} onMouseEnter={() => setHoverIndex(i)} onMouseLeave={() => setHoverIndex((v) => (v === i ? null : v))}>
             <rect x={bar.x} y={padding.top} width={barW} height={plotH} fill="transparent" />
             {bar.total > 0 && (
-              <>
-                <rect x={bar.x} y={bar.top + bar.dmsH} width={barW} height={bar.commentsH} rx={2} fill="var(--accent)" opacity={hoverIndex === null || hoverIndex === i ? 1 : 0.45} />
-                <rect x={bar.x} y={bar.top} width={barW} height={bar.dmsH} rx={2} fill="var(--accent-cyan)" opacity={hoverIndex === null || hoverIndex === i ? 1 : 0.45} />
-              </>
+              <rect x={bar.x} y={bar.top} width={barW} height={bar.totalH} rx={2} fill="var(--accent)" opacity={hoverIndex === null || hoverIndex === i ? 1 : 0.45} />
             )}
             {bar.total > 0 && (
               <text x={bar.x + barW / 2} y={bar.top - 6} fontSize="11" fill="var(--text-muted)" textAnchor="middle">
