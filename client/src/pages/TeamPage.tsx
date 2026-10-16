@@ -48,7 +48,7 @@ function explainInvitationError(error: unknown): string {
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
-  const { tenant, reload, reloadWorkspaces, workspaceRole, workspaces, workspaceError } = useTenant();
+  const { tenant, reload, reloadWorkspaces, workspaceRole, workspaceError } = useTenant();
   const canManageWorkspace = workspaceRole === "owner" || workspaceRole === "admin";
 
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
@@ -124,7 +124,10 @@ export function TeamPage() {
       reloadWorkspaces();
       setSettingsSaved(true);
     } catch (err) {
-      setError(explainInvitationError(err));
+      const status = (err as Error & { status?: number }).status;
+      setError(status === 403
+        ? "Only workspace owners and admins can change workspace details."
+        : err instanceof Error ? err.message : "Could not save workspace settings.");
     } finally {
       setSavingWorkspace(false);
     }
@@ -330,7 +333,7 @@ export function TeamPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-ink">{member.email}</span>
-                      {member.userId === members[0]?.userId && isOwner && <span className="muted small">Workspace owner</span>}
+                      {isOwner && <span className="muted small">Workspace owner</span>}
                     </span>
                   </span>
                   {isOwner ? (
