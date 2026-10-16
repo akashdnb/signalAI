@@ -41,8 +41,9 @@ export function TeamPage() {
   const [role, setRole] = useState<WorkspaceRole | null>(null);
   const [invitationsForbidden, setInvitationsForbidden] = useState(false);
   const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState<string | null>(null);
   const [invitationsLoading, setInvitationsLoading] = useState(true);
-  const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -72,7 +73,7 @@ export function TeamPage() {
         setError(err instanceof Error ? err.message : "Could not load workspace members.");
       });
 
-    const invitationRequest = workspaceApi.listInvitations(tenantId)
+    const workspaceRequest = workspaceApi.listWorkspaces()\n      .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))\n      .catch(() => setRole(null));\n\n    const invitationRequest = workspaceApi.listInvitations(tenantId)
       .then((nextInvitations) => {
         setInvitations(nextInvitations ?? []);
         setInvitationsForbidden(false);
