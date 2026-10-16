@@ -49,44 +49,10 @@ function mapCampaign(row: {
   target_media_ids: string[]; reply_channel: ReplyChannel; trigger_source: TriggerSource; tone: CampaignTone;
   language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
 }): Campaign {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    name: row.name,
-    description: row.description,
-    keywords: row.keywords,
-    enabled: row.enabled,
-    published: row.has_published_version ?? false,
-    replyMode: row.reply_mode,
-    replyTemplates: row.reply_templates,
-    defaultReplyTemplate: row.default_reply_template,
-    ctaLink: row.cta_link,
-    targetMediaIds: row.target_media_ids,
-    replyChannel: row.reply_channel,
-    triggerSource: row.trigger_source,
-    tone: row.tone,
-    language: row.language,
-    useKnowledgeBase: row.use_knowledge_base,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return { id: row.id, tenantId: row.tenant_id, name: row.name, description: row.description, keywords: row.keywords, enabled: row.enabled, published: row.has_published_version ?? false, replyMode: row.reply_mode, replyTemplates: row.reply_templates, defaultReplyTemplate: row.default_reply_template, ctaLink: row.cta_link, targetMediaIds: row.target_media_ids, replyChannel: row.reply_channel, triggerSource: row.trigger_source, tone: row.tone, language: row.language, useKnowledgeBase: row.use_knowledge_base, createdAt: row.created_at, updatedAt: row.updated_at };
 }
-
-function mapDocument(row: {
-  id: string; tenant_id: string; filename: string; content_type: string; storage_key: string; version: number;
-  status: KnowledgeBaseDocumentStatus; error_reason: string | null; superseded_at: Date | null; created_at: Date;
-}): PublicKnowledgeBaseDocument {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    filename: row.filename,
-    contentType: row.content_type,
-    version: row.version,
-    status: row.status,
-    errorReason: row.error_reason,
-    supersededAt: row.superseded_at,
-    createdAt: row.created_at,
-  };
+function mapDocument(row: { id: string; tenant_id: string; filename: string; content_type: string; storage_key: string; version: number; status: KnowledgeBaseDocumentStatus; error_reason: string | null; superseded_at: Date | null; created_at: Date; }): PublicKnowledgeBaseDocument {
+  return { id: row.id, tenantId: row.tenant_id, filename: row.filename, contentType: row.content_type, version: row.version, status: row.status, errorReason: row.error_reason, supersededAt: row.superseded_at, createdAt: row.created_at };
 }
 
 export const paginationRouter = Router();
@@ -99,9 +65,7 @@ paginationRouter.get("/tenants/:tenantId/leads/:leadId/timeline", async (req, re
   const rawLimit = Number(req.query.limit);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, TIMELINE_MAX_PAGE_SIZE) : TIMELINE_DEFAULT_PAGE_SIZE;
   const before = typeof req.query.before === "string" ? req.query.before : undefined;
-  if (before) {
-    try { decodeTimelineCursor(before); } catch { return res.status(400).json({ error: "before must be a valid timeline cursor" }); }
-  }
+  if (before) { try { decodeTimelineCursor(before); } catch { return res.status(400).json({ error: "before must be a valid timeline cursor" }); } }
   return res.status(200).json(await getLeadTimelinePage(getPool(), tenantId, leadId, limit, before));
 });
 
@@ -109,11 +73,24 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   const tenantId = req.params.tenantId;
   const query = req.query as Record<string, unknown>;
   const { page: requestedPage, pageSize } = parsePagination(query);
-  const { stage, ownerUserId, q, tagId, handoffStatus, unread } = query;
+  const { stage, ownerUserId, q, tagId, handoffStatus, unread, from, to, sort = "activity_desc", qualification, sourceMediaId } = query;
   if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
   if (handoffStatus !== undefined && !VALID_HANDOFF_STATUSES.includes(handoffStatus as HandoffStatus)) return res.status(400).json({ error: `handoffStatus must be one of ${VALID_HANDOFF_STATUSES.join(", ")}` });
+  const validSorts = ["activity_desc", "activity_asc", "created_desc", "created_asc", "stage_asc", "stage_desc", "username_asc", "username_desc"] as const;
+  if (typeof sort !== "string" || !validSorts.includes(sort as (typeof validSorts)[number])) return res.status(400).json({ error: `sort must be one of ${validSorts.join(", ")}` });
+  if (qualification !== undefined && qualification !== "qualified" && qualification !== "unqualified") return res.status(400).json({ error: "qualification must be qualified or unqualified" });
+  const validDate = (value: unknown): value is string => { if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false; const parsed = new Date(`${value}T00:00:00.000Z`); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; };
+  if (from !== undefined && !validDate(from)) return res.status(400).json({ error: "from must be a valid YYYY-MM-DD date" });
+  if (to !== undefined && !validDate(to)) return res.status(400).json({ error: "to must be a valid YYYY-MM-DD date" });
+  if (validDate(from) && validDate(to) && from > to) return res.status(400).json({ error: "from must be on or before to" });
+  if (unread !== undefined && unread !== "true" && unread !== "false") return res.status(400).json({ error: "unread must be true or false" });
   const pool = getPool();
-  const requestedAccountRowId = typeof query.accountId === "string" && query.accountId ? query.accountId : undefined;
+  if (query.accountId !== undefined && typeof query.accountId !== "string") {
+    return res.status(400).json({ error: "accountId must be a single connected account ID" });
+  }
+  const requestedAccountRowId = typeof query.accountId === "string" && query.accountId.trim()
+    ? query.accountId.trim()
+    : undefined;
   const providerAccountId = requestedAccountRowId
     ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
     : undefined;
@@ -122,13 +99,21 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   }
   const conditions = ["l.tenant_id = $1"];
   const params: unknown[] = [tenantId];
-  if (providerAccountId) { params.push(providerAccountId); conditions.push(`l.instagram_account_id = $${params.length}`); }
+  if (providerAccountId) {
+    params.push(providerAccountId);
+    conditions.push(`l.instagram_account_id = ${params.length}`);
+  }
   if (stage) { params.push(stage); conditions.push(`l.pipeline_stage = $${params.length}`); }
   if (typeof ownerUserId === "string" && ownerUserId) { params.push(ownerUserId); conditions.push(`l.owner_user_id = $${params.length}`); }
-  if (typeof tagId === "string" && tagId) { params.push(tagId); conditions.push(`exists (select 1 from lead_tags lt where lt.lead_id = l.id and lt.tag_id = $${params.length})`); }
-  if (typeof q === "string" && q.trim()) { params.push(`%${q.trim()}%`); conditions.push(`exists (select 1 from lead_pii p2 where p2.lead_id = l.id and p2.deleted_at is null and p2.username ilike $${params.length})`); }
+  if (typeof tagId === "string" && tagId) { params.push(tagId); conditions.push(`exists (select 1 from lead_tags lt join tags t on t.id = lt.tag_id and t.tenant_id = lt.tenant_id where lt.tenant_id = l.tenant_id and lt.lead_id = l.id and lt.tag_id = $${params.length})`); }
+  if (typeof q === "string" && q.trim()) { params.push(q.trim().slice(0, 200).toLocaleLowerCase("en-US")); const p = `$${params.length}`; conditions.push(`(exists (select 1 from lead_pii p2 where p2.lead_id = l.id and p2.deleted_at is null and strpos(lower(coalesce(p2.username, '')), ${p}) > 0) or exists (select 1 from lead_captured_facts cf where cf.tenant_id = l.tenant_id and cf.lead_id = l.id and cf.deleted_at is null and strpos(lower(cf.facts::text), ${p}) > 0))`); }
   if (handoffStatus) { params.push(handoffStatus); conditions.push(`l.handoff_status = $${params.length}`); }
-  if (unread === "true") conditions.push(`l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)`);
+  if (unread === "true") conditions.push("l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)"); else if (unread === "false") conditions.push("(l.last_inbound_at is null or (l.last_read_at is not null and l.last_inbound_at <= l.last_read_at))");
+  if (typeof sourceMediaId === "string" && sourceMediaId.trim()) { params.push(sourceMediaId.trim()); conditions.push(`exists (select 1 from lead_events source_event where source_event.tenant_id = l.tenant_id and source_event.lead_id = l.id and source_event.event_type = 'comment' and source_event.attributes->>'mediaId' = $${params.length})`); }
+  if (qualification === "qualified") conditions.push("l.pipeline_stage = 'qualified'");
+  if (qualification === "unqualified") conditions.push("l.pipeline_stage <> 'qualified'");
+  if (validDate(from)) { params.push(from); conditions.push(`coalesce(l.last_inbound_at, l.created_at) >= $${params.length}::date`); }
+  if (validDate(to)) { params.push(to); conditions.push(`coalesce(l.last_inbound_at, l.created_at) < ($${params.length}::date + interval '1 day')`); }
   const where = conditions.join(" and ");
   const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from leads l where ${where}`, params);
   const total = Number(countResult.rows[0]?.count ?? 0);
@@ -136,90 +121,22 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   const page = Math.min(requestedPage, totalPages);
   const offset = (page - 1) * pageSize;
   const dataParams = [...params, pageSize, offset];
-  const result = await pool.query<{
-    id: string; instagram_user_id: string | null; username: string | null; last_event_type: string | null; last_message_preview: string | null;
-    unread: boolean; active_milestone_id: string | null; last_inbound_at: Date | null; window_open_until: Date | null; last_dm_at: Date | null; created_at: Date;
-    pipeline_stage: PipelineStage; owner_user_id: string | null; handoff_status: HandoffStatus;
-  }>(
-    `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, last_dm.last_dm_at, l.created_at, l.pipeline_stage, l.owner_user_id, l.handoff_status,
-            p.username, e.event_type as last_event_type, coalesce(pii.comment_text, pii.dm_text) as last_message_preview,
-            (l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)) as unread
-     from leads l
-     left join lateral (select username from lead_pii where lead_id = l.id and deleted_at is null and username is not null order by created_at desc limit 1) p on true
-     left join lateral (select occurred_at as last_dm_at from lead_events where tenant_id = l.tenant_id and lead_id = l.id and event_type = 'message' order by occurred_at desc, id desc limit 1) last_dm on true
-     left join lateral (select id, event_type from lead_events where lead_id = l.id order by occurred_at desc, id desc limit 1) e on true
-     left join lateral (select comment_text, dm_text from lead_pii where lead_event_id = e.id and deleted_at is null) pii on true
-     where ${where}
-     order by coalesce(l.last_inbound_at, l.created_at) desc, l.id desc
-     limit $${dataParams.length - 1} offset $${dataParams.length}`,
-    dataParams,
-  );
+  const orderBy = { activity_desc: "coalesce(l.last_inbound_at, l.created_at) desc, l.id desc", activity_asc: "coalesce(l.last_inbound_at, l.created_at) asc, l.id asc", created_desc: "l.created_at desc, l.id desc", created_asc: "l.created_at asc, l.id asc", stage_asc: "l.pipeline_stage asc, l.id asc", stage_desc: "l.pipeline_stage desc, l.id desc", username_asc: "coalesce(p.username, '') asc, l.id asc", username_desc: "coalesce(p.username, '') desc, l.id desc" }[sort as (typeof validSorts)[number]];
+  const result = await pool.query<{ id: string; instagram_user_id: string | null; username: string | null; last_event_type: string | null; last_message_preview: string | null; unread: boolean; active_milestone_id: string | null; last_inbound_at: Date | null; window_open_until: Date | null; last_dm_at: Date | null; created_at: Date; pipeline_stage: PipelineStage; owner_user_id: string | null; handoff_status: HandoffStatus; }>(`select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, last_dm.last_dm_at, l.created_at, l.pipeline_stage, l.owner_user_id, l.handoff_status, p.username, e.event_type as last_event_type, coalesce(pii.comment_text, pii.dm_text) as last_message_preview, (l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)) as unread from leads l left join lateral (select username from lead_pii where lead_id = l.id and deleted_at is null and username is not null order by created_at desc limit 1) p on true left join lateral (select occurred_at as last_dm_at from lead_events where tenant_id = l.tenant_id and lead_id = l.id and event_type = 'message' order by occurred_at desc, id desc limit 1) last_dm on true left join lateral (select id, event_type from lead_events where tenant_id = l.tenant_id and lead_id = l.id order by occurred_at desc, id desc limit 1) e on true left join lateral (select comment_text, dm_text from lead_pii where lead_event_id = e.id and deleted_at is null) pii on true where ${where} order by ${orderBy} limit $${dataParams.length - 1} offset $${dataParams.length}`, dataParams);
   const items = result.rows.map((row) => ({ id: row.id, instagramUserId: row.instagram_user_id, username: row.username, lastEventType: row.last_event_type, lastMessagePreview: row.last_message_preview, unread: row.unread, activeMilestoneId: row.active_milestone_id, lastInboundAt: row.last_inbound_at, windowOpenUntil: row.last_dm_at ? new Date(row.last_dm_at.getTime() + 24 * 60 * 60 * 1000).toISOString() : null, humanAgentWindowUntil: config.instagramHumanAgentEnabled && row.last_dm_at ? new Date(row.last_dm_at.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() : null, createdAt: row.created_at, pipelineStage: row.pipeline_stage, ownerUserId: row.owner_user_id, handoffStatus: row.handoff_status }));
   return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
 
 paginationRouter.get("/tenants/:tenantId/campaigns", async (req, res) => {
-  const tenantId = req.params.tenantId;
-  const query = req.query as Record<string, unknown>;
-  const { page: requestedPage, pageSize } = parsePagination(query);
-  const search = parseString(query, "q")?.trim();
-  const status = parseString(query, "status");
-  const trigger = parseString(query, "trigger");
-  const sortValue = parseString(query, "sort") ?? "updated_desc";
-  if (status !== undefined && status !== "all" && status !== "active" && status !== "inactive") return res.status(400).json({ error: "status must be all, active or inactive" });
-  if (trigger !== undefined && trigger !== "all" && !VALID_CAMPAIGN_TRIGGERS.includes(trigger as TriggerSource)) return res.status(400).json({ error: `trigger must be all or one of ${VALID_CAMPAIGN_TRIGGERS.join(", ")}` });
-  if (!VALID_CAMPAIGN_SORTS.includes(sortValue as CampaignSort)) return res.status(400).json({ error: `sort must be one of ${VALID_CAMPAIGN_SORTS.join(", ")}` });
-  const conditions = ["tenant_id = $1"];
-  const params: unknown[] = [tenantId];
-  if (status === "active") conditions.push("enabled = true");
-  if (status === "inactive") conditions.push("enabled = false");
-  if (trigger && trigger !== "all") { params.push(trigger); conditions.push(`trigger_source = $${params.length}`); }
-  if (search) { params.push(`%${search}%`); conditions.push(`(name ilike $${params.length} or coalesce(description, '') ilike $${params.length} or exists (select 1 from unnest(keywords) keyword where keyword ilike $${params.length}))`); }
-  const where = conditions.join(" and ");
-  const pool = getPool();
-  const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from campaigns where ${where}`, params);
-  const total = Number(countResult.rows[0]?.count ?? 0);
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(requestedPage, totalPages);
-  const offset = (page - 1) * pageSize;
-  const orderBy = { updated_desc: "updated_at desc, id desc", updated_asc: "updated_at asc, id asc", name_asc: "name asc, id asc", name_desc: "name desc, id desc" }[sortValue as CampaignSort];
-  const result = await pool.query<{
-    id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean;
-    has_published_version?: boolean; reply_mode: ReplyMode;
-    reply_templates: string[]; default_reply_template: string; cta_link: string | null; target_media_ids: string[]; reply_channel: ReplyChannel;
-    trigger_source: TriggerSource; tone: CampaignTone; language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date;
-  }>(
-    `select campaigns.*,
-            exists (
-              select 1
-                from campaign_journey_versions published
-               where published.tenant_id = campaigns.tenant_id
-                 and published.campaign_id = campaigns.id
-            ) as has_published_version
-       from campaigns
-       where ${where}
-       order by ${orderBy}
-       limit $${params.length + 1} offset $${params.length + 2}`,
-    [...params, pageSize, offset],
-  );
-  const items = result.rows.map(mapCampaign);
-  return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
+  const tenantId = req.params.tenantId; const query = req.query as Record<string, unknown>; const { page: requestedPage, pageSize } = parsePagination(query); const search = parseString(query, "q")?.trim(); const status = parseString(query, "status"); const trigger = parseString(query, "trigger"); const sortValue = parseString(query, "sort") ?? "updated_desc";
+  if (status !== undefined && status !== "all" && status !== "active" && status !== "inactive") return res.status(400).json({ error: "status must be all, active or inactive" }); if (trigger !== undefined && trigger !== "all" && !VALID_CAMPAIGN_TRIGGERS.includes(trigger as TriggerSource)) return res.status(400).json({ error: `trigger must be all or one of ${VALID_CAMPAIGN_TRIGGERS.join(", ")}` }); if (!VALID_CAMPAIGN_SORTS.includes(sortValue as CampaignSort)) return res.status(400).json({ error: `sort must be one of ${VALID_CAMPAIGN_SORTS.join(", ")}` });
+  const conditions = ["tenant_id = $1"]; const params: unknown[] = [tenantId]; if (status === "active") conditions.push("enabled = true"); if (status === "inactive") conditions.push("enabled = false"); if (trigger && trigger !== "all") { params.push(trigger); conditions.push(`trigger_source = $${params.length}`); } if (search) { params.push(`%${search}%`); conditions.push(`(name ilike $${params.length} or coalesce(description, '') ilike $${params.length} or exists (select 1 from unnest(keywords) keyword where keyword ilike $${params.length}))`); }
+  const where = conditions.join(" and "); const pool = getPool(); const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from campaigns where ${where}`, params); const total = Number(countResult.rows[0]?.count ?? 0); const totalPages = Math.max(1, Math.ceil(total / pageSize)); const page = Math.min(requestedPage, totalPages); const offset = (page - 1) * pageSize; const orderBy = { updated_desc: "updated_at desc, id desc", updated_asc: "updated_at asc, id asc", name_asc: "name asc, id asc", name_desc: "name desc, id desc" }[sortValue as CampaignSort];
+  const result = await pool.query<{ id: string; tenant_id: string; name: string; description: string | null; keywords: string[]; enabled: boolean; has_published_version?: boolean; reply_mode: ReplyMode; reply_templates: string[]; default_reply_template: string; cta_link: string | null; target_media_ids: string[]; reply_channel: ReplyChannel; trigger_source: TriggerSource; tone: CampaignTone; language: CampaignLanguage; use_knowledge_base: boolean; created_at: Date; updated_at: Date; }>(`select campaigns.*, exists (select 1 from campaign_journey_versions published where published.tenant_id = campaigns.tenant_id and published.campaign_id = campaigns.id) as has_published_version from campaigns where ${where} order by ${orderBy} limit $${params.length + 1} offset $${params.length + 2}`, [...params, pageSize, offset]);
+  const items = result.rows.map(mapCampaign); return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : items);
 });
 
 paginationRouter.get("/tenants/:tenantId/knowledge-base", async (req, res) => {
-  const tenantId = req.params.tenantId;
-  const query = req.query as Record<string, unknown>;
-  const { page: requestedPage, pageSize } = parsePagination(query);
-  const pool = getPool();
-  const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from knowledge_base_documents where tenant_id = $1`, [tenantId]);
-  const total = Number(countResult.rows[0]?.count ?? 0);
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(requestedPage, totalPages);
-  const offset = (page - 1) * pageSize;
-  const result = await pool.query<{
-    id: string; tenant_id: string; filename: string; content_type: string; storage_key: string; version: number;
-    status: KnowledgeBaseDocumentStatus; error_reason: string | null; superseded_at: Date | null; created_at: Date;
-  }>(`select * from knowledge_base_documents where tenant_id = $1 order by filename asc, version desc, id asc limit $2 offset $3`, [tenantId, pageSize, offset]);
-  const items = result.rows.map(mapDocument);
-  return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : { documents: items });
+  const tenantId = req.params.tenantId; const query = req.query as Record<string, unknown>; const { page: requestedPage, pageSize } = parsePagination(query); const pool = getPool(); const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from knowledge_base_documents where tenant_id = $1`, [tenantId]); const total = Number(countResult.rows[0]?.count ?? 0); const totalPages = Math.max(1, Math.ceil(total / pageSize)); const page = Math.min(requestedPage, totalPages); const offset = (page - 1) * pageSize;
+  const result = await pool.query<{ id: string; tenant_id: string; filename: string; content_type: string; storage_key: string; version: number; status: KnowledgeBaseDocumentStatus; error_reason: string | null; superseded_at: Date | null; created_at: Date; }>(`select * from knowledge_base_documents where tenant_id = $1 order by filename asc, version desc, id asc limit $2 offset $3`, [tenantId, pageSize, offset]); const items = result.rows.map(mapDocument); return res.status(200).json(hasExplicitPagination(query) ? toPage(items, page, pageSize, total) : { documents: items });
 });
