@@ -105,29 +105,28 @@ export async function updateJourneyDraftWithClient(
   },
 ): Promise<JourneyDraft & { previousVersion: number }> {
   const found = await client.query<{
-    campaign: Campaign;
+    id: string;
+    tenantId: string;
+    name: string;
+    description: string | null;
+    enabled: boolean;
     builder_version: number;
+    keywords: string[];
+    replyMode: Campaign["replyMode"];
+    replyTemplates: string[];
+    defaultReplyTemplate: string;
+    ctaLink: string | null;
+    targetMediaIds: string[];
+    replyChannel: Campaign["replyChannel"];
+    triggerSource: Campaign["triggerSource"];
+    tone: Campaign["tone"];
+    language: Campaign["language"];
+    useKnowledgeBase: boolean;
+    createdAt: Date;
+    updatedAt: Date;
     mcp_metadata: Record<string, unknown>;
     published: boolean;
-  }>(
-    `select c.id, c.tenant_id as "tenantId", c.name, c.description, c.keywords,
-            c.enabled, c.reply_mode as "replyMode", c.reply_templates as "replyTemplates",
-            c.default_reply_template as "defaultReplyTemplate", c.cta_link as "ctaLink",
-            c.target_media_ids as "targetMediaIds", c.reply_channel as "replyChannel",
-            c.trigger_source as "triggerSource", c.tone, c.language,
-            c.use_knowledge_base as "useKnowledgeBase", c.created_at as "createdAt",
-            c.updated_at as "updatedAt", c.builder_version,
-            c.mcp_metadata,
-            exists (
-              select 1 from campaign_journey_versions v
-               where v.tenant_id = c.tenant_id and v.campaign_id = c.id
-            ) as published
-       from campaigns c
-       where c.id = $1 and c.tenant_id = $2
-       for update`,
-    [automationId, tenantId],
-  );
-  const row = found.rows[0];
+  }>(  const row = found.rows[0];
   if (!row) throw new DraftLifecycleError("resource_not_found", "Automation not found in this workspace.");
   if (row.enabled || row.published) {
     throw new DraftLifecycleError("invalid_lifecycle_state", "Only inactive, unpublished drafts can be edited.");
@@ -207,24 +206,24 @@ export async function updateJourneyDraftWithClient(
   return {
     campaign: {
       id: row.id,
-      tenantId: row.tenant_id,
+      tenantId: row.tenantId,
       name: current?.name ?? row.name,
       description: row.description,
       keywords: current?.keywords ?? row.keywords,
       enabled: false,
       published: false,
-      replyMode: row.reply_mode,
-      replyTemplates: row.reply_templates,
-      defaultReplyTemplate: row.default_reply_template,
-      ctaLink: row.cta_link,
-      targetMediaIds: row.target_media_ids,
-      replyChannel: row.reply_channel,
-      triggerSource: row.trigger_source,
+      replyMode: row.replyMode,
+      replyTemplates: row.replyTemplates,
+      defaultReplyTemplate: row.defaultReplyTemplate,
+      ctaLink: row.ctaLink,
+      targetMediaIds: row.targetMediaIds,
+      replyChannel: row.replyChannel,
+      triggerSource: row.triggerSource,
       tone: row.tone,
       language: row.language,
-      useKnowledgeBase: row.use_knowledge_base,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      useKnowledgeBase: row.useKnowledgeBase,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     },
     graph: graphNow ?? { nodes: [], edges: [], version },
     metadata: current?.mcp_metadata ?? row.mcp_metadata ?? {},
