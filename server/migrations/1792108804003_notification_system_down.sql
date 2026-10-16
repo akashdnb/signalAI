@@ -1,5 +1,5 @@
 -- Down Migration
-drop table notification_deliveries;
-drop table notification_preferences;
-drop table notifications;
-drop table notification_events;
+drop table if exists notification_deliveries;
+drop table if exists notification_preferences;
+drop table if exists notifications;
+drop table if exists notification_events;
