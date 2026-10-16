@@ -334,8 +334,8 @@ function AccountHeader({
   const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
   return (
-    <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="hidden min-h-14 h-auto flex-wrap items-center justify-between gap-2 border-b border-line bg-card px-3 py-2 md:flex xl:px-5">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <ConnectedAccountSwitcher
           workspaceName={tenant?.name ?? "Workspace"}
           providerLabel="Instagram"
@@ -361,7 +361,7 @@ function AccountHeader({
         </span>
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-3">
         {usage && (
           <div className="w-36">
             <div className="flex items-center justify-between text-xs text-subtle">
