@@ -2,16 +2,11 @@ import { randomUUID, createHash } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Pool, PoolClient } from "pg";
 import { getPool } from "../db/pool.js";
+import { getCampaign } from "../db/campaigns.js";
 import {
-  createCampaign,
-  getCampaign,
-} from "../db/campaigns.js";
-import {
-  listMilestones,
   listMilestonesWithClient,
 } from "../db/milestones.js";
 import {
-  getBuilderGraph,
   getBuilderGraphWithClient,
   saveBuilderGraphWithClient,
   type BuilderGraph,
@@ -333,14 +328,14 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
     scalarSet[scalarSet.length - 1] = scalarSet[scalarSet.length - 1]!.replace(/(mcp_metadata = \$\d+)/, "$1::jsonb");
   }
   if (!graphChanges) {
-    scalarSet.push(`builder_version = ${values.length + 1}`);
     values.push(version);
+    scalarSet.push(`builder_version = ${values.length}`);
   }
   scalarSet.push("updated_at = now()");
   if (scalarSet.length > 1 || !graphChanges) {
     const update = await client.query(
       `update campaigns set ${scalarSet.join(", ")}
-        where id = $1 and tenant_id = $2${graphChanges ? "" : " and builder_version = ${values.length + 1}"}`,
+        where id = $1 and tenant_id = $2${graphChanges ? "" : ` and builder_version = ${values.length}`}`,
       graphChanges ? values : [...values, expectedVersion],
     );
     if (update.rowCount !== 1) {
