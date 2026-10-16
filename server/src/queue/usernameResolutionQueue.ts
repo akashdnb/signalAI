@@ -1,7 +1,8 @@
 import type { PgBoss } from "pg-boss";
 import type { Pool, PoolClient } from "pg";
 import { asPgBossDb } from "./leadEventsQueue.js";
-import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
+import { getDecryptedToken } from "../db/tokens.js";
+import { getLead } from "../db/leads.js";
 import { hasKnownUsername, backfillLeadPiiUsername, listLeadsMissingInstagramUsername } from "../db/pii.js";
 import { fetchInstagramUsername } from "../lib/instagramProfile.js";
 import { Sentry } from "../lib/sentry.js";
@@ -14,6 +15,7 @@ export interface ResolveUsernameJob {
   leadId: string;
   leadEventId: string;
   instagramUserId: string;
+  instagramAccountId?: string | null;
 }
 
 export async function ensureUsernameResolutionQueue(boss: PgBoss): Promise<void> {
@@ -33,7 +35,7 @@ export async function enqueueUsernameResolution(
   options?: { client?: PoolClient },
 ): Promise<void> {
   await boss.send(USERNAME_RESOLUTION_QUEUE, job, {
-    singletonKey: `${job.tenantId}:${job.instagramUserId}`,
+    singletonKey: `${job.tenantId}:${job.instagramAccountId ?? "unattributed"}:${job.instagramUserId}`,
     ...(options?.client ? { db: asPgBossDb(options.client) } : {}),
   });
 }
@@ -76,14 +78,17 @@ export function startUsernameResolutionWorker(
       // call entirely rather than overwrite/duplicate work.
       if (await hasKnownUsername(pool, tenantId, leadId)) continue;
 
-      const account = await getSoleConnectedAccount(pool, tenantId);
-      if (!account) continue;
+      const lead = await getLead(pool, tenantId, leadId);
+      const instagramAccountId = job.data.instagramAccountId ?? lead?.instagramAccountId ?? null;
+      // Older multi-account leads may not be attributable to a single account.
+      // Never guess a token from workspace context for a profile lookup.
+      if (!instagramAccountId || lead?.instagramAccountId !== instagramAccountId) continue;
 
       const token = await getDecryptedToken(
         pool,
         keyring,
         tenantId,
-        account.instagramAccountId,
+        instagramAccountId,
       );
       if (!token) continue;
 
