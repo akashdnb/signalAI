@@ -330,24 +330,27 @@ async function updateDraft(client: PoolClient, tenantId: string, input: Record<s
   if (changes.trigger !== undefined) addSet("keywords", [requireString(changes.trigger, "changes.trigger")]);
   if (changes.metadata !== undefined) {
     addSet("mcp_metadata", JSON.stringify(requireObject(changes.metadata, "changes.metadata")));
-    scalarSet[scalarSet.length - 1] = scalarSet[scalarSet.length - 1]!.replace(/mcp_metadata = /, "mcp_metadata = ") + "::jsonb";
+    scalarSet[scalarSet.length - 1] = scalarSet[scalarSet.length - 1]!.replace(/(mcp_metadata = \$\d+)/, "$1::jsonb");
   }
-  if (!graphChanges) scalarSet.push(`builder_version = ${version}`);
+  if (!graphChanges) {
+    scalarSet.push(`builder_version = ${values.length + 1}`);
+    values.push(version);
+  }
   scalarSet.push("updated_at = now()");
-  const versionGuard = graphChanges ? "" : " and builder_version = $3";
-  const queryValues = graphChanges ? values : [...values, expectedVersion];
-  const update = await client.query(
-    `update campaigns set ${scalarSet.join(", ")}
-      where id = $1 and tenant_id = $2${versionGuard}`,
-    queryValues,
-  );
-  if (update.rowCount !== 1) {
-    const current = await client.query<{ builder_version: number }>(
-      "select builder_version from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId],
+  if (scalarSet.length > 1 || !graphChanges) {
+    const update = await client.query(
+      `update campaigns set ${scalarSet.join(", ")}
+        where id = $1 and tenant_id = $2${graphChanges ? "" : " and builder_version = ${values.length + 1}"}`,
+      graphChanges ? values : [...values, expectedVersion],
     );
-    throw new CapabilityError("The automation changed elsewhere.", 409, "version_conflict", {
-      currentVersion: current.rows[0]?.builder_version ?? null, recovery: "reread_automation",
-    });
+    if (update.rowCount !== 1) {
+      const current = await client.query<{ builder_version: number }>(
+        "select builder_version from campaigns where id = $1 and tenant_id = $2", [automationId, tenantId],
+      );
+      throw new CapabilityError("The automation changed elsewhere.", 409, "version_conflict", {
+        currentVersion: current.rows[0]?.builder_version ?? null, recovery: "reread_automation",
+      });
+    }
   }
 
   const currentGraph = await getBuilderGraphWithClient(client, tenantId, automationId);
