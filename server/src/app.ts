@@ -27,6 +27,7 @@ import { journeyRuntimeRouter } from "./routes/journeyRuntime.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
+import { profileRouter } from "./routes/profile.js";
 import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
 import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
 import { leadScoringRulesRouter } from "./routes/leadScoringRules.js";
@@ -118,6 +119,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use("/tenants/:tenantId", dashboardReadCacheHeaders);
   app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
 
+  app.use(profileRouter);
   app.use(leadsRouter);
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);
