@@ -182,6 +182,39 @@ export interface TenantSummary {
   industry: TenantIndustry | null;
 }
 
+
+
+/** User-owned profile: never accepts a target user id. */
+export interface UserProfile {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePictureUrl: string | null;
+  createdAt: string;
+}
+
+export interface KnowledgeBaseDocumentPreview {
+  documentId: string;
+  filename: string;
+  content: string;
+  /** True when preview content was capped to keep responses bounded. */
+  truncated: boolean;
+  chunkCount: number;
+}
+
+export interface KnowledgeRetrievalResult {
+  content: string;
+  documentId: string;
+  similarity: number;
+}
+
+export interface KnowledgeRetrievalResponse {
+  query: string;
+  results: KnowledgeRetrievalResult[];
+  count: number;
+}
+
 export interface AccountHealth {
   connected: boolean;
   instagramAccountId?: string;
@@ -844,8 +877,21 @@ export const api = {
     }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
 
+  getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
+  updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
+    request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+
   listKnowledgeBaseDocuments: (tenantId: string) =>
     request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
+  getKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<{ document: Omit<KnowledgeBaseDocument, "storageKey"> }>(`/tenants/${tenantId}/knowledge-base/${documentId}`).then((r) => r.document),
+  previewKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<KnowledgeBaseDocumentPreview>(`/tenants/${tenantId}/knowledge-base/${documentId}/preview`),
+  retrieveKnowledgeBase: (tenantId: string, query: string, limit = 5) =>
+    request<KnowledgeRetrievalResponse>(`/tenants/${tenantId}/knowledge-base/retrieval`, {
+      method: "POST",
+      body: JSON.stringify({ query, limit }),
+    }),
   uploadKnowledgeBaseDocument: (tenantId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

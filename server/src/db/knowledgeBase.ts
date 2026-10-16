@@ -136,9 +136,7 @@ export async function markDocumentReady(
  * Fail-closed on any ingestion step's exception (parse/chunk/embed/store):
  * this version is marked `failed` and never becomes queryable — the
  * tenant's prior `ready` version (if any) is untouched and keeps serving
- * retrieval, matching this codebase's established fail-closed shape
- * elsewhere (replyEngine.ts/milestoneEngine.ts fall back to rule-based
- * rather than a half-generated reply).
+ * retrieval, matching this codebase's established fail-closed shape.
  */
 export async function markDocumentFailed(
   pool: Queryable,
@@ -171,16 +169,15 @@ export async function getDocument(
   return result.rows[0] ? toDocument(result.rows[0]) : null;
 }
 
-/** Returns the deleted document (so the caller can also remove its S3 object), or null if it didn't exist for this tenant. Chunks cascade via the explicit delete below, since the FK has no ON DELETE CASCADE (matching this schema's general preference for explicit, auditable deletes over implicit cascades). */
+/** Returns the deleted document (so the caller can also remove its S3 object), or null if it didn't exist for this tenant. Both chunk and document deletes are tenant-scoped so a guessed foreign document id cannot remove another tenant's indexed data. */
 export async function deleteDocument(pool: Pool, tenantId: string, documentId: string): Promise<KnowledgeBaseDocument | null> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Chunks first — the FK from knowledge_base_chunks to
-    // knowledge_base_documents has no ON DELETE CASCADE (explicit,
-    // auditable deletes over implicit ones, matching this schema's general
-    // preference), so deleting the parent row first violates it.
-    await client.query(`delete from knowledge_base_chunks where document_id = $1`, [documentId]);
+    await client.query(
+      `delete from knowledge_base_chunks where document_id = $1 and tenant_id = $2`,
+      [documentId, tenantId],
+    );
     const result = await client.query<KnowledgeBaseDocumentRow>(
       `delete from knowledge_base_documents where id = $1 and tenant_id = $2 returning *`,
       [documentId, tenantId],
@@ -236,11 +233,9 @@ export interface RetrievedChunk {
 /**
  * Tenant-Isolated Retrieval (roadmap Phase 2C): filtered by `tenant_id` at
  * this query itself, not by a join or an application-layer check
- * afterward — "a leak here is a live AI reply exposing another client's
- * data, not just a dashboard bug." Only chunks belonging to a `ready`,
- * non-superseded document version are considered, so an in-progress
- * re-upload's old version keeps serving retrieval until the new one is
- * actually ready.
+ * afterward. Only chunks belonging to a `ready`, non-superseded document
+ * version are considered, so an in-progress re-upload's old version keeps
+ * serving retrieval until the new one is actually ready.
  *
  * No ANN index (ivfflat/hnsw) yet — deferred until row counts at pilot
  * scale justify one; a sequential `<=>` scan filtered by tenant_id is

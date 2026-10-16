@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type KnowledgeBaseDocument } from "../api";
+import { api, type KnowledgeBaseDocument, type KnowledgeBaseDocumentPreview, type KnowledgeRetrievalResponse } from "../api";
 import { getKnowledgeBaseDocumentsPage, type PaginatedResponse } from "../api/pagination";
+import { Button, Field, TextInput } from "./ui";
 import { Pagination } from "./Pagination";
 
 const STATUS_LABEL: Record<KnowledgeBaseDocument["status"], string> = {
@@ -28,6 +29,12 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<KnowledgeBaseDocumentPreview | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [retrieval, setRetrieval] = useState<KnowledgeRetrievalResponse | null>(null);
+  const [retrievalLoading, setRetrievalLoading] = useState(false);
+  const [retrievalError, setRetrievalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -70,11 +77,46 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
     setError(null);
     try {
       await api.deleteKnowledgeBaseDocument(tenantId, documentId);
+      if (preview?.documentId === documentId) setPreview(null);
       setReloadToken((value) => value + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete document");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handlePreview(documentId: string) {
+    setPreviewLoadingId(documentId);
+    setError(null);
+    try {
+      const result = await api.previewKnowledgeBaseDocument(tenantId, documentId);
+      setPreview(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to preview this source");
+      setPreview(null);
+    } finally {
+      setPreviewLoadingId(null);
+    }
+  }
+
+  async function handleRetrievalCheck(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!query.trim()) {
+      setRetrievalError("Enter a question to test against your ready sources.");
+      setRetrieval(null);
+      return;
+    }
+    setRetrievalLoading(true);
+    setRetrievalError(null);
+    setRetrieval(null);
+    try {
+      const result = await api.retrieveKnowledgeBase(tenantId, query.trim());
+      setRetrieval(result);
+    } catch (err) {
+      setRetrievalError(err instanceof Error ? err.message : "Knowledge retrieval failed");
+    } finally {
+      setRetrievalLoading(false);
     }
   }
 
@@ -95,9 +137,9 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
             <strong>Upload a source</strong>
             <p className="muted small mt-1 mb-0">PDF, TXT, or Markdown. Processing happens after upload; only Ready sources are used for grounded replies.</p>
           </div>
-          <button type="button" className="btn-primary btn-small" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+          <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
             {uploading ? "Uploading…" : "Choose file"}
-          </button>
+          </Button>
         </div>
         <input
           ref={fileInputRef}
@@ -109,6 +151,45 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
         />
       </div>
 
+      <section className="mt-6 border-b border-line pb-5">
+        <h3 className="text-base font-semibold text-ink">Test knowledge retrieval</h3>
+        <p className="muted small mt-1">Check which stored passages would be returned for a question. This uses the configured embedding service and your ready sources.</p>
+        <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={handleRetrievalCheck}>
+          <div className="min-w-[240px] flex-1">
+            <Field label="Sample question" htmlFor="kb-retrieval-query">
+              <TextInput
+                id="kb-retrieval-query"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                maxLength={1000}
+                placeholder="e.g. What is the refund policy?"
+              />
+            </Field>
+          </div>
+          <Button type="submit" size="md" disabled={retrievalLoading}>
+            {retrievalLoading ? "Checking…" : "Check retrieval"}
+          </Button>
+        </form>
+        {retrievalError && <p className="mt-2 text-sm text-err-ink" role="alert">{retrievalError}</p>}
+        {retrieval && (
+          <div className="mt-3" aria-live="polite">
+            {retrieval.count === 0 ? (
+              <p className="muted small">No matching passages were found in ready sources.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="muted small">{retrieval.count} matching passage{retrieval.count === 1 ? "" : "s"} returned.</p>
+                {retrieval.results.map((item, index) => (
+                  <div className="border-l-2 border-line pl-3" key={`${item.documentId}-${index}`}>
+                    <p className="m-0 text-sm text-ink whitespace-pre-wrap">{item.content}</p>
+                    <p className="muted small mt-1">Similarity {item.similarity.toFixed(3)} · Source ID {item.documentId}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
       {documents === null ? (
         <p className="muted" role="status">Loading…</p>
       ) : documents.length === 0 ? (
@@ -119,8 +200,8 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
       ) : (
         <>
           <div className="overflow-x-auto mt-4">
-            <table className="table min-w-[760px]">
-              <thead><tr><th>Source</th><th>Version</th><th>Status</th><th>Uploaded</th><th></th></tr></thead>
+            <table className="table min-w-[840px]">
+              <thead><tr><th>Source</th><th>Version</th><th>Status</th><th>Uploaded</th><th>Actions</th></tr></thead>
               <tbody>
                 {documents.map((doc) => (
                   <tr key={doc.id}>
@@ -137,9 +218,14 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
                     </td>
                     <td className="whitespace-nowrap" title={formatDate(doc.createdAt)}>{formatDate(doc.createdAt)}</td>
                     <td>
-                      <button className="btn-secondary btn-small" onClick={() => void handleDelete(doc.id)} disabled={deletingId === doc.id}>
-                        {deletingId === doc.id ? "Deleting…" : "Delete"}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="secondary" size="sm" onClick={() => void handlePreview(doc.id)} disabled={doc.status !== "ready" || previewLoadingId === doc.id}>
+                          {previewLoadingId === doc.id ? "Loading…" : "Preview"}
+                        </Button>
+                        <Button variant="danger" size="sm" onClick={() => void handleDelete(doc.id)} disabled={deletingId === doc.id}>
+                          {deletingId === doc.id ? "Deleting…" : "Delete"}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -148,6 +234,24 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
           </div>
           {pageData && <Pagination page={pageData.page} totalPages={pageData.totalPages} total={pageData.total} pageSize={pageData.pageSize} onPageChange={setPage} label="documents" />}
         </>
+      )}
+
+      {preview && (
+        <section className="mt-5 border-t border-line pt-4" aria-labelledby="kb-preview-heading">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 id="kb-preview-heading" className="text-base font-semibold text-ink">{preview.filename}</h3>
+              <p className="muted small mt-1">Indexed text preview · {preview.chunkCount} chunk{preview.chunkCount === 1 ? "" : "s"}</p>
+              {preview.truncated && <p className="muted small mt-1">Preview is limited to the first 100,000 characters.</p>}
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setPreview(null)}>Close preview</Button>
+          </div>
+          {preview.content ? (
+            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-card p-3 text-sm text-ink">{preview.content}</pre>
+          ) : (
+            <p className="muted small mt-3">The source has no indexed text available to preview.</p>
+          )}
+        </section>
       )}
     </section>
   );
