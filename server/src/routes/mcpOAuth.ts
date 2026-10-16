@@ -5,7 +5,10 @@ import { getPool } from "../db/pool.js";
 import { getUserSessionVersion } from "../db/users.js";
 import { verifySessionToken } from "../lib/session.js";
 
-const MCP_SCOPE = "signalai:read";
+const MCP_READ_SCOPE = "signalai:read";
+const MCP_WRITE_SCOPE = "signalai:write";
+const MCP_SUPPORTED_SCOPES = [MCP_READ_SCOPE, MCP_WRITE_SCOPE] as const;
+const MCP_SUPPORTED_SCOPE_SET = new Set<string>(MCP_SUPPORTED_SCOPES);
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 const CODE_TTL_SECONDS = 5 * 60;
@@ -53,7 +56,7 @@ function oauthMetadata() {
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
-    scopes_supported: [MCP_SCOPE],
+    scopes_supported: [...MCP_SUPPORTED_SCOPES],
     token_endpoint_auth_methods_supported: ["none"],
   };
 }
@@ -118,6 +121,16 @@ mcpOAuthRouter.get("/.well-known/oauth-authorization-server", (_req, res) => {
   return res.json(oauthMetadata());
 });
 
+mcpOAuthRouter.get("/.well-known/oauth-protected-resource/mcp", (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=300");
+  return res.json({
+    resource: resourceUrl(),
+    authorization_servers: [issuerUrl()],
+    scopes_supported: [...MCP_SUPPORTED_SCOPES],
+    bearer_methods_supported: ["header"],
+  });
+});
+
 mcpOAuthRouter.get("/.well-known/openid-configuration", (_req, res) => {
   res.setHeader("Cache-Control", "public, max-age=300");
   return res.json({
@@ -173,7 +186,11 @@ mcpOAuthRouter.get("/oauth/authorize", async (req, res) => {
   if (responseType !== "code") return errorRedirect(res, redirectUri, "unsupported_response_type", state);
   if (codeChallengeMethod !== "S256" || codeChallenge.length < 43) return errorRedirect(res, redirectUri, "invalid_request", state);
   const scopes = scopeText.split(/\s+/).filter(Boolean);
-  if (!scopes.includes(MCP_SCOPE)) return errorRedirect(res, redirectUri, "invalid_scope", state);
+  if (
+    scopes.length === 0 ||
+    scopes.some((scope) => !MCP_SUPPORTED_SCOPE_SET.has(scope)) ||
+    new Set(scopes).size !== scopes.length
+  ) return errorRedirect(res, redirectUri, "invalid_scope", state);
   if (!configuredMcpPublicUrl()) return res.status(503).json({ error: "mcp_oauth_not_configured" });
   if (resource !== resourceUrl()) return errorRedirect(res, redirectUri, "invalid_target", state);
 
@@ -238,22 +255,53 @@ mcpOAuthRouter.post("/oauth/token", async (req, res) => {
   if (grantType === "refresh_token") {
     const refreshToken = typeof req.body?.refresh_token === "string" ? req.body.refresh_token : "";
     if (!refreshToken) return res.status(400).json({ error: "invalid_request" });
-    const result = await getPool().query<{
-      clientId: string;
-      scopes: string[];
-      resource: string;
-      userId: string;
-      tenantId: string;
-    }>(
-      `select client_id as "clientId", scopes, resource, user_id as "userId", tenant_id as "tenantId"
-       from mcp_oauth_tokens
-       where refresh_token_hash = $1 and revoked_at is null and refresh_expires_at > now()`,
-      [sha256(refreshToken)],
-    );
-    const grant = result.rows[0];
-    if (!grant) return res.status(400).json({ error: "invalid_grant" });
-    await getPool().query(`update mcp_oauth_tokens set revoked_at = now() where refresh_token_hash = $1`, [sha256(refreshToken)]);
-    return issueTokens(res, grant.clientId, grant.scopes, grant.resource, grant.userId, grant.tenantId);
+    const clientId = typeof req.body?.client_id === "string" ? req.body.client_id : "";
+    const refreshHash = sha256(refreshToken);
+    const client = await getPool().connect();
+    const nextAccessToken = randomToken();
+    const nextRefreshToken = randomToken();
+    try {
+      await client.query("BEGIN");
+      const issued = await client.query<{
+        clientId: string;
+        scopes: string[];
+        resource: string;
+        userId: string;
+        tenantId: string;
+      }>(
+        `update mcp_oauth_tokens
+         set revoked_at = now()
+         where refresh_token_hash = $1 and client_id = $2 and revoked_at is null
+           and refresh_expires_at > now()
+         returning client_id as "clientId", scopes, resource, user_id as "userId", tenant_id as "tenantId"`,
+        [refreshHash, clientId],
+      );
+      const grant = issued.rows[0];
+      if (!grant) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "invalid_grant" });
+      }
+      await client.query(
+        `insert into mcp_oauth_tokens(access_token_hash, refresh_token_hash, client_id, scopes, resource, user_id, tenant_id, access_expires_at, refresh_expires_at)
+         values ($1,$2,$3,$4,$5,$6,$7,now() + ($8 * interval '1 second'),now() + ($9 * interval '1 second'))`,
+        [sha256(nextAccessToken), sha256(nextRefreshToken), grant.clientId, grant.scopes, grant.resource, grant.userId, grant.tenantId, ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS],
+      );
+      await client.query("COMMIT");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Pragma", "no-cache");
+      return res.json({
+        access_token: nextAccessToken,
+        token_type: "Bearer",
+        expires_in: ACCESS_TOKEN_TTL_SECONDS,
+        refresh_token: nextRefreshToken,
+        scope: grant.scopes.join(" "),
+      });
+    } catch {
+      try { await client.query("ROLLBACK"); } catch { /* transaction already closed */ }
+      return res.status(500).json({ error: "upstream_error" });
+    } finally {
+      client.release();
+    }
   }
 
   return res.status(400).json({ error: "unsupported_grant_type" });
@@ -311,6 +359,7 @@ mcpOAuthRouter.post("/oauth/introspect", async (req, res) => {
 
   return res.json({
     active: true,
+    iss: issuerUrl(),
     client_id: row.clientId,
     scope: row.scopes.join(" "),
     exp: Math.floor(row.expiresAt.getTime() / 1000),
