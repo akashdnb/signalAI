@@ -110,13 +110,8 @@ export function dashboardRouter(
     }
     const tenantId = req.params.tenantId;
     const pool = getPool();
-    const accountRowId = typeof accountId === "string" && accountId ? accountId : undefined;
-    const instagramAccountId = accountRowId
-      ? await resolveInstagramAccountIdForTenant(pool, tenantId, accountRowId)
-      : undefined;
-    if (accountRowId && !instagramAccountId) {
-      return res.status(404).json({ error: "Instagram account not found for this workspace" });
-    }
+    const scope = await resolveRequestedAccountScope(pool, tenantId, accountId, res);
+    if (!scope.ok) return;
     const leads = await listLeadsForTenant(pool, tenantId, 100, {
       stage: stage as PipelineStage | undefined,
       ownerUserId: typeof ownerUserId === "string" ? ownerUserId : undefined,
@@ -124,7 +119,7 @@ export function dashboardRouter(
       tagId: typeof tagId === "string" ? tagId : undefined,
       handoffStatus: handoffStatus as HandoffStatus | undefined,
       unreadOnly: unread === "true",
-      instagramAccountId,
+      instagramAccountId: scope.instagramAccountId,
     });
     return res.status(200).json(leads);
   });
