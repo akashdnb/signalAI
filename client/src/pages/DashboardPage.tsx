@@ -9,7 +9,6 @@ import {
   type ConversationsTimeseriesPoint,
   type Funnel,
   type LeadListItem,
-  type PipelineStage,
   type RevenueByCurrency,
 } from "../api";
 import { ConversationsChart } from "../components/ConversationsChart";
@@ -120,23 +119,10 @@ export function DashboardPage() {
 
   if (!tenantId) return null;
 
-  // The funnel endpoint is the canonical all-lead snapshot. The Leads page is
-  // paginated, so deriving Overview totals from its first page can undercount
-  // stages (for example 20 visible leads versus 24 total leads).
-  const stageCounts = funnel
-    ? funnel.stages.reduce(
-        (acc, stage) => {
-          const match = PIPELINE_STAGES.find((pipelineStage) => pipelineStage.value === stage.key);
-          if (match) acc[match.value] = stage.count;
-          return acc;
-        },
-        Object.fromEntries(PIPELINE_STAGES.map((s) => [s.value, 0])) as Record<PipelineStage, number>,
-      )
-    : undefined;
-  const categorizedLeadCount = stageCounts
-    ? Object.values(stageCounts).reduce((total, count) => total + count, 0)
-    : 0;
-  const uncategorizedLeadCount = funnel ? Math.max(0, (analytics?.uniqueLeads ?? categorizedLeadCount) - categorizedLeadCount) : 0;
+  // The funnel endpoint provides a full current-stage distribution. The Leads
+  // page is paginated, so its visible page must never drive dashboard totals.
+  const stageCounts = funnel?.stageCounts;
+  const uncategorizedLeadCount = funnel?.unmappedLeadCount ?? 0;
 
   const qualifiedCount = funnel?.stages.find((s) => s.key === "qualified")?.count ?? 0;
   const meetingCount = funnel?.stages.find((s) => s.key === "meeting")?.count ?? 0;
@@ -153,9 +139,9 @@ export function DashboardPage() {
             {tenant?.name ? `${tenant.name} — h` : "H"}ere's what's happening with your Instagram leads.
           </p>
         </div>
-        {account?.connected && (
+        {account?.connected && account.status === "healthy" && (
           <span className="pill pill-ok">
-            <span className="mr-1">●</span>Instagram connected
+            <span className="mr-1">●</span>Instagram healthy
           </span>
         )}
       </div>
@@ -182,6 +168,22 @@ export function DashboardPage() {
         </div>
       )}
 
+      {account?.connected && account.status === "error" && (
+        <div className="banner banner-error flex flex-wrap items-start justify-between gap-3" role="alert">
+          <div className="min-w-0">
+            <strong>Instagram connection needs attention.</strong>
+            <p className="m-0 mt-1">Automatic replies for journeys using this account may be paused until the account is reconnected.</p>
+            {account.lastError && <p className="m-0 mt-1 text-sm">Latest check: {account.lastError}</p>}
+          </div>
+          <Link className="link-button" to={`/dashboard/${tenantId}/integrations`}>Review connection</Link>
+        </div>
+      )}
+      {account?.connected && account.status !== "healthy" && account.status !== "error" && (
+        <div className="banner flex flex-wrap items-center justify-between gap-3" role="status">
+          <span>An Instagram connection exists, but its health status is unavailable.</span>
+          <Link className="link-button" to={`/dashboard/${tenantId}/integrations`}>Check connection</Link>
+        </div>
+      )}
       {account !== null && !account.connected && (
         <div className="card" style={{ borderColor: "var(--accent-soft)" }}>
           <h2>Connect Instagram</h2>
@@ -193,7 +195,7 @@ export function DashboardPage() {
       )}
 
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={LeadsIcon} value={analytics ? analytics.uniqueLeads.toLocaleString() : "—"} label="New leads" />
+        <StatCard icon={LeadsIcon} value={analytics ? analytics.uniqueLeads.toLocaleString() : "—"} label="All leads" />
         <StatCard icon={InboxIcon} value={funnel ? qualifiedCount.toLocaleString() : "—"} label="Qualified leads" />
         <StatCard icon={CalendarIcon} value={funnel ? meetingCount.toLocaleString() : "—"} label="Meetings scheduled" />
         <StatCard icon={RevenueIcon} value={revenue ? formatMoney(revenue) : "—"} label="Revenue (won)" />
@@ -210,7 +212,8 @@ export function DashboardPage() {
         </section>
 
         <section className="card mb-0">
-          <h2>Leads by stage</h2>
+          <h2>Leads by current stage</h2>
+          <p className="muted small">Mutually exclusive current statuses across all lead records.</p>
           {stageCounts === undefined ? (
             <p className="muted">{dataLoadError ? "Lead stage data is unavailable." : "Loading…"}</p>
           ) : (
