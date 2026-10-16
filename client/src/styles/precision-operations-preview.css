@@ -6,8 +6,6 @@
    The legacy preview --po-* variables are intentionally retained pending the
    route/palette decision; no mapping to shared production tokens is implemented. */
 .po-preview-app {
-  /* Existing shared-token vocabulary aliases are exact here only where proven.
-     Preview palette variables below are intentionally retained for pixel parity. */
   --po-canvas: #f6f7f4;
   --po-surface: #ffffff;
   --po-surface-muted: #f9faf7;
