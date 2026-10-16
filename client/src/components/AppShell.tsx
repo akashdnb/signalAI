@@ -654,6 +654,25 @@ export function AppShell() {
   const showAccountSelector = ["/inbox", "/leads", "/content", "/analytics"].some((suffix) =>
     location.pathname.endsWith(suffix) || location.pathname.includes(suffix + "/"),
   );
+  const headerAccount: AccountHealth | null = connectedAccountsTenantId === tenantId && connectedAccounts !== null
+    ? (() => {
+        const selected = selectedAccountId
+          ? connectedAccounts.find((connected) => connected.id === selectedAccountId)
+          : connectedAccounts.find((connected) => connected.status === "healthy") ?? connectedAccounts[0];
+        if (!selected) return { connected: false };
+        if (selectedAccountId && selected.id !== selectedAccountId) return { connected: false };
+        return {
+          connected: selectedAccountId
+            ? selected.status === "healthy"
+            : connectedAccounts.some((connected) => connected.status === "healthy"),
+          instagramAccountId: selected.instagramAccountId,
+          status: selected.status,
+          lastError: selected.lastError,
+          lastCheckedAt: selected.lastCheckedAt,
+          expiresAt: selected.expiresAt,
+        };
+      })()
+    : account;
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
@@ -738,7 +757,7 @@ export function AppShell() {
 
         <AccountHeader
           tenant={tenant}
-          account={account}
+          account={headerAccount}
           usage={usage}
           email={session?.email}
           firstName={session?.firstName}
@@ -767,7 +786,7 @@ export function AppShell() {
         {mobileAccountOpen && (
           <MobileAccountSheet
             tenant={tenant}
-            account={account}
+            account={headerAccount}
             usage={usage}
             email={session?.email}
             firstName={session?.firstName}
