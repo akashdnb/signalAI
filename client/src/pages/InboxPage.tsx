@@ -14,6 +14,7 @@ import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
 import { ThreadPanel } from "../components/ThreadPanel";
 import { PIPELINE_STAGES, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { useTenant } from "../context/TenantContext";
 
 type Tab = "all" | "unread" | "ai" | "qualified" | "attention";
 
@@ -31,6 +32,7 @@ const PAGE_SIZE = 20;
 export function InboxPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
 
   const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
   const [members, setMembers] = useState<TenantMember[] | null>(null);
@@ -73,6 +75,7 @@ export function InboxPage() {
       const result = await getLeadsPage(tenantId, page, PAGE_SIZE, {
         ...getFilters(),
         q: search.trim() || undefined,
+        accountId: selectedAccountId || undefined,
       });
       setPageData(result);
       if (result.page !== page) setPage(result.page);
@@ -88,12 +91,19 @@ export function InboxPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, search]);
+  }, [tab, search, selectedAccountId]);
 
   useEffect(() => {
     reloadLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, tab, search, page, reloadCount]);
+  }, [tenantId, tab, search, selectedAccountId, page, reloadCount]);
+
+  useEffect(() => {
+    setSelectedLeadId(null);
+    setTags(null);
+    setPendingEntries([]);
+    setComposeText("");
+  }, [selectedAccountId]);
 
   const selectedLastInboundAtRef = useRef<string | null>(null);
   const reloadLeadsRef = useRef(reloadLeads);
