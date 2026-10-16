@@ -112,7 +112,7 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
           MAX_METADATA_REFRESH_FAILURES,
         );
         const retryAt = new Date(Date.now() + retryDelayForFailure(failureCount));
-        await recordMediaMetadataRefreshFailure(pool, tenantId, entry.mediaId, retryAt);
+        await recordMediaMetadataRefreshFailure(pool, tenantId, entry.mediaId, retryAt, instagramAccountId);
         Sentry.captureException(lastError);
       }
     }
