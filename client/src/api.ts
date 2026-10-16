@@ -198,6 +198,8 @@ export interface KnowledgeBaseDocumentPreview {
   documentId: string;
   filename: string;
   content: string;
+  /** True when preview content was capped to keep responses bounded. */
+  truncated: boolean;
   chunkCount: number;
 }
 
