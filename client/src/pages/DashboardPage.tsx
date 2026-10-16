@@ -44,6 +44,27 @@ function periodStart(period: ReportingPeriod): Date | null {
   return null;
 }
 
+/**
+ * getConversationsTimeseries only returns rows for days that actually had
+ * activity, so a bounded period (7d/30d/month) with sparse real data
+ * clustered all its bars to one side with no slot at all for quiet days —
+ * unlike the preview's always-full 7-column grid. Filling the gaps with
+ * explicit zero-event days (never fabricating a count, just making absence
+ * visible) keeps every day in the window on the x-axis.
+ */
+function fillDailySeries(data: ConversationsTimeseriesPoint[], start: Date, end: Date): ConversationsTimeseriesPoint[] {
+  const byDay = new Map(data.map((point) => [new Date(point.date).toDateString(), point]));
+  const days: ConversationsTimeseriesPoint[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const lastDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  while (cursor <= lastDay) {
+    const existing = byDay.get(cursor.toDateString());
+    days.push(existing ?? { date: cursor.toISOString(), comments: 0, dms: 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
 function formatMoney(revenue: RevenueByCurrency[]): string {
   if (revenue.length === 0) return "—";
   const [top, ...rest] = revenue;
@@ -167,7 +188,8 @@ export function DashboardPage() {
   // actual timeseries and lead-creation dates this page already has, rather
   // than only swapping a caption.
   const cutoff = periodStart(period);
-  const filteredTimeseries = timeseries?.filter((point) => !cutoff || new Date(point.date) >= cutoff) ?? null;
+  const sparseTimeseries = timeseries?.filter((point) => !cutoff || new Date(point.date) >= cutoff) ?? null;
+  const filteredTimeseries = sparseTimeseries && cutoff ? fillDailySeries(sparseTimeseries, cutoff, new Date()) : sparseTimeseries;
   const newLeadsInPeriod = leads?.filter((lead) => !cutoff || new Date(lead.createdAt) >= cutoff).length ?? null;
 
   // "Needs your attention" — each count is real, drawn from data this page
