@@ -7,10 +7,20 @@ import { verifySessionToken } from "../lib/session.js";
 
 export const MCP_AUTOMATION_PUBLISH_SCOPE = "signalai:automation:publish";
 export const MCP_AUTOMATION_OPERATE_SCOPE = "signalai:automation:operate";
+export const MCP_AUTOMATION_READ_SCOPE = "automation:read";
+export const MCP_AUTOMATION_WRITE_SCOPE = "automation:write";
+export const MCP_AUTOMATION_VALIDATE_SCOPE = "automation:validate";
+export const MCP_AUTOMATION_ACTIVATE_SCOPE = "automation:activate";
+export const MCP_AUTOMATION_PAUSE_SCOPE = "automation:pause";
 const SUPPORTED_SCOPES = [
   "signalai:read",
   "signalai:write",
+  MCP_AUTOMATION_READ_SCOPE,
+  MCP_AUTOMATION_WRITE_SCOPE,
+  MCP_AUTOMATION_VALIDATE_SCOPE,
   MCP_AUTOMATION_PUBLISH_SCOPE,
+  MCP_AUTOMATION_ACTIVATE_SCOPE,
+  MCP_AUTOMATION_PAUSE_SCOPE,
   MCP_AUTOMATION_OPERATE_SCOPE,
 ] as const;
 const SUPPORTED_SCOPE_SET = new Set<string>(SUPPORTED_SCOPES);
