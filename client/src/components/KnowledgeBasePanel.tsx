@@ -242,6 +242,7 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
             <div>
               <h3 id="kb-preview-heading" className="text-base font-semibold text-ink">{preview.filename}</h3>
               <p className="muted small mt-1">Indexed text preview · {preview.chunkCount} chunk{preview.chunkCount === 1 ? "" : "s"}</p>
+              {preview.truncated && <p className="muted small mt-1">Preview is limited to the first 100,000 characters.</p>}
             </div>
             <Button variant="ghost" size="sm" onClick={() => setPreview(null)}>Close preview</Button>
           </div>
