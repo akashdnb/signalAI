@@ -50,7 +50,7 @@ export function AutomationTabs({
             className={`relative shrink-0 px-0 pb-2.5 pt-1 text-[14px] leading-5 transition-colors ${selected ? "font-semibold text-ink" : "text-subtle hover:text-ink"}`}
           >
             {tab.label}
-            <span aria-hidden="true" className={`absolute bottom-[-1px] left-1/2 h-[3px] -translate-x-1/2 rounded-full transition-opacity ${selected ? "w-full bg-[#7C3AED] opacity-100" : "w-0 opacity-0"}`} />
+            <span aria-hidden="true" className={`absolute bottom-[-1px] left-1/2 h-[3px] -translate-x-1/2 rounded-full transition-opacity ${selected ? "w-full bg-accent opacity-100" : "w-0 opacity-0"}`} />
           </button>
         );
       })}

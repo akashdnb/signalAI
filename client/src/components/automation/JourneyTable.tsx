@@ -68,19 +68,17 @@ function triggerSummary(campaign: Campaign): string {
   return `${triggerLabel(campaign.triggerSource)} · ${keywordLabel}`;
 }
 
+/** Trigger chip for "what starts this automation" — tied to the brand/primary
+ * color (same chip background as the active-nav/selection chip elsewhere),
+ * not a semantic status, so it reuses --pill-bg/--accent-hover rather than
+ * StatusBadge's "info" tone (which is a different, status-semantic blue) or
+ * StatusBadge's pill shape (preview uses a rounded-rectangle here, not a
+ * stadium pill). */
 function TriggerBadge({ campaign }: { campaign: Campaign }) {
   const isComment = campaign.triggerSource !== "message";
 
   return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] font-semibold ${
-        campaign.triggerSource === "both"
-          ? "bg-[#F3E8FF] text-[#5B21B6]"
-          : isComment
-            ? "bg-[#F3E8FF] text-[#6D28D9]"
-            : "bg-[#DBEAFE] text-[#1D4ED8]"
-      }`}
-    >
+    <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-chip px-3 py-1.5 text-[12px] font-semibold text-accent-hover">
       {isComment ? (
         <InstagramMarkIcon className="h-4 w-4" />
       ) : (
