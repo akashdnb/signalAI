@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTenant } from "../../context/TenantContext";
 
 const TIMEZONE_OPTIONS = [
@@ -22,6 +22,12 @@ export function SettingsGeneralPage() {
   const [workspaceName, setWorkspaceName] = useState(tenant?.name ?? "");
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   const [defaultOwner, setDefaultOwner] = useState("first_available");
+
+  // TenantContext fetches asynchronously, so `tenant` is often still null on
+  // first render — sync once it arrives instead of leaving the field blank.
+  useEffect(() => {
+    if (tenant?.name) setWorkspaceName(tenant.name);
+  }, [tenant?.name]);
 
   return (
     <section className="card">
