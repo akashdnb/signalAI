@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
-import { deleteTokensForTenant, getAccountHealth } from "../db/tokens.js";
+import { deleteTokensForTenant, getAccountHealth, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
 import {
   getCampaignAnalytics,
@@ -77,20 +77,30 @@ export function dashboardRouter(
   // Phase 2A Lead Filters/Lead Search, extended for the Inbox's filter tabs
   // (handoffStatus, unread): all optional, all AND'd together.
   router.get("/tenants/:tenantId/leads", async (req, res) => {
-    const { stage, ownerUserId, q, tagId, handoffStatus, unread } = req.query;
+    const { stage, ownerUserId, q, tagId, handoffStatus, unread, accountId } = req.query;
     if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) {
       return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
     }
     if (handoffStatus !== undefined && !VALID_HANDOFF_STATUSES.includes(handoffStatus as HandoffStatus)) {
       return res.status(400).json({ error: `handoffStatus must be one of ${VALID_HANDOFF_STATUSES.join(", ")}` });
     }
-    const leads = await listLeadsForTenant(getPool(), req.params.tenantId, 100, {
+    const tenantId = req.params.tenantId;
+    const pool = getPool();
+    const accountRowId = typeof accountId === "string" && accountId ? accountId : undefined;
+    const instagramAccountId = accountRowId
+      ? await resolveInstagramAccountIdForTenant(pool, tenantId, accountRowId)
+      : undefined;
+    if (accountRowId && !instagramAccountId) {
+      return res.status(404).json({ error: "Instagram account not found for this workspace" });
+    }
+    const leads = await listLeadsForTenant(pool, tenantId, 100, {
       stage: stage as PipelineStage | undefined,
       ownerUserId: typeof ownerUserId === "string" ? ownerUserId : undefined,
       q: typeof q === "string" ? q : undefined,
       tagId: typeof tagId === "string" ? tagId : undefined,
       handoffStatus: handoffStatus as HandoffStatus | undefined,
       unreadOnly: unread === "true",
+      instagramAccountId,
     });
     return res.status(200).json(leads);
   });
