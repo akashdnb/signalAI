@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import type { PgBoss, Job } from "pg-boss";
 import { getUserById } from "../db/users.js";
@@ -284,12 +283,8 @@ export async function startNotificationDeliveryWorker(boss: PgBoss, pool: Pool):
         errorCode,
       }));
 
-      if (canRetry) {
-        await boss.send(NOTIFICATION_DELIVERY_QUEUE, { deliveryId: delivery.id }, {
-          startAfter: nextAttemptAt!,
-          retryLimit: 0,
-        });
-      }
+      // A periodic sweeper is the sole retry scheduler. It re-enqueues a row
+      // only once it is due, and the worker atomically claims pending rows.
     }
   });
 }
@@ -306,6 +301,3 @@ function escapeHtml(value: string): string {
   });
 }
 
-export function notificationIdempotencyHash(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
