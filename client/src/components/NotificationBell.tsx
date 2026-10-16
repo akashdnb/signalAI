@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type InAppNotification } from "../api";
 import { Button } from "./ui";
 
@@ -21,7 +21,7 @@ export function NotificationBell({ tenantId }: { tenantId: string }) {
   const [markingAll, setMarkingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadInbox() {
+  const loadInbox = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
     setError(null);
@@ -34,11 +34,11 @@ export function NotificationBell({ tenantId }: { tenantId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tenantId]);
 
   useEffect(() => {
     void loadInbox();
-  }, [tenantId, open]);
+  }, [loadInbox, open]);
 
   async function markRead(notificationId: string) {
     setSavingId(notificationId);
