@@ -9,6 +9,8 @@ Build the reusable foundation before building a large number of AI tools. Each p
 ### Build
 
 - stable resource IDs and tenant ownership
+- Person / Identity / Conversation / ConversationThread resource model
+- channel abstraction
 - capability/application service boundaries
 - authorization context
 - domain validation boundaries
@@ -21,7 +23,7 @@ Build the reusable foundation before building a large number of AI tools. Each p
 
 ### Exit criteria
 
-A capability can be invoked without knowing whether its caller is UI, AG-UI, MCP or a worker.
+A capability can be invoked without knowing whether its caller is UI, AG-UI, MCP, a customer channel adapter, or a worker.
 
 ## Phase 2 — Read-only MCP
 
@@ -53,7 +55,30 @@ Then add research capabilities as the shared capability layer matures.
 
 The copilot can perform useful multi-step reads without duplicating business logic in the agent.
 
-## Phase 4 — Research engine
+## Phase 4 — Web channel foundation and SDK
+
+Build the website customer channel on top of the same conversation/capability layer.
+
+### Build
+
+- Web channel adapter
+- anonymous visitor sessions
+- Web SDK initialization and lifecycle
+- Web chat transport/API
+- conversation resume
+- authenticated website identity handoff
+- unified Person / Identity linking
+- streaming responses
+- lead capture events
+- channel handoff/continuation tokens
+
+### Exit criteria
+
+A client can install the Web SDK and a website visitor can start a conversation using the same SignalAI conversation and AI capabilities used by Instagram/WhatsApp.
+
+A visitor can safely authenticate and have the website conversation associated with the correct SignalAI Person/Lead.
+
+## Phase 5 — Research engine
 
 Implement:
 
@@ -69,7 +94,7 @@ Implement:
 
 A company can be transformed into a normalized research report and prospect score using multiple replaceable providers.
 
-## Phase 5 — External connectors
+## Phase 6 — External connectors
 
 Prioritize connectors based on the acquisition workflow:
 
@@ -80,10 +105,11 @@ Prioritize connectors based on the acquisition workflow:
 5. Wappalyzer-like technology detection
 6. Apollo / Hunter
 7. LinkedIn / Instagram research
+8. Additional messaging/customer channels
 
 Connector availability must not leak provider-specific models into core resources.
 
-## Phase 6 — Agent workflows
+## Phase 7 — Agent workflows
 
 Create multi-step workflows such as:
 
@@ -99,7 +125,7 @@ Find 100 US Shopify agencies
 
 Use Jobs for long-running work and expose progress through AG-UI and job status through APIs/MCP.
 
-## Phase 7 — Approved action layer
+## Phase 8 — Approved action layer
 
 Introduce:
 
@@ -111,16 +137,18 @@ Introduce:
 - sending outreach
 - campaign pause/resume
 - message actions
+- cross-channel conversation actions
 
 Require permission checks, validation, idempotency and audit logging.
 
-## Phase 8 — Extract services only when justified
+## Phase 9 — Extract services only when justified
 
 Potential extractions:
 
 - `signalai-mcp`
 - research workers
 - connector workers
+- high-volume channel workers
 
 Do not extract prematurely. Extraction should follow operational evidence rather than architectural preference.
 
@@ -134,11 +162,8 @@ Every phase must preserve:
 - auditability of consequential actions
 - test coverage for new capabilities
 - no duplicated business logic across adapters
+- safe identity resolution and cross-channel access control
 - anti-AI UI guidelines and component reuse policy
-
-## Priority rule
-
-When choosing between a quick feature-specific AI implementation and a reusable capability, prefer the reusable capability when the same operation is likely to be needed by the copilot, MCP, automation engine, or future integrations.
 
 ## First implementation slice
 
@@ -152,7 +177,19 @@ Company resource
  -> tenant/auth/audit/observability
 ```
 
-Then add research as the second vertical slice:
+Then validate the customer-channel architecture with a second vertical slice:
+
+```text
+Person / Identity
+ -> Conversation / Thread
+ -> Web channel adapter
+ -> Web SDK
+ -> conversation capability
+ -> same AI/automation layer
+ -> authenticated identity linking
+```
+
+Then add research as the third vertical slice:
 
 ```text
 Company
