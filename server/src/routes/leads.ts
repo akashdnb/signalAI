@@ -241,6 +241,8 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
 
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   const notes = await listLeadNotes(getPool(), tenantId, leadId);
   return res.status(200).json(notes);
 });
