@@ -45,6 +45,16 @@ export function IntegrationsPage() {
     void loadAccounts();
   }, [tenantId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRole(true);
+    workspaceApi.listWorkspaces()
+      .then((items) => { if (!cancelled) setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null); })
+      .catch(() => { if (!cancelled) setRole(null); })
+      .finally(() => { if (!cancelled) setLoadingRole(false); });
+    return () => { cancelled = true; };
+  }, [tenantId]);
+
   async function handleConnect() {
     if (!tenantId) return;
     setConnecting(true);
