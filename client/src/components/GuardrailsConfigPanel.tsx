@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 
-/**
- * Phase 2C Client Guardrails: brand voice, forbidden topics, and
- * escalation triggers, configured per tenant and layered on top of Phase
- * 1's Global Guardrails — see server/src/lib/guardrails.ts for why this
- * can only NARROW the platform-owned checks, never override or disable
- * them. This panel is a plain settings form; the narrowing-only guarantee
- * lives entirely server-side.
- */
-export function GuardrailsConfigPanel({ tenantId }: { tenantId: string }) {
+type GuardrailSection = "ai-behavior" | "forbidden-topics" | "escalation";
+
+function useGuardrailsConfig(tenantId: string) {
   const [loaded, setLoaded] = useState(false);
   const [brandVoice, setBrandVoice] = useState("");
   const [forbiddenTopics, setForbiddenTopics] = useState<string[]>([]);
@@ -36,7 +30,7 @@ export function GuardrailsConfigPanel({ tenantId }: { tenantId: string }) {
     };
   }, [tenantId]);
 
-  async function handleSave() {
+  async function save() {
     setSaving(true);
     setError(null);
     try {
@@ -55,84 +49,114 @@ export function GuardrailsConfigPanel({ tenantId }: { tenantId: string }) {
     }
   }
 
-  function renderStringListEditor(
-    label: string,
-    hint: string,
-    items: string[],
-    setItems: (items: string[]) => void,
-  ) {
+  return {
+    loaded,
+    brandVoice,
+    setBrandVoice,
+    forbiddenTopics,
+    setForbiddenTopics,
+    escalationTriggers,
+    setEscalationTriggers,
+    saving,
+    error,
+    save,
+  };
+}
+
+/** A single textarea editing a comma-separated string list, matching the preview's "Topic list"/"Escalation triggers" fields (plain text, not a repeatable add/remove list). */
+function CommaListEditor({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const [text, setText] = useState(() => value.join(", "));
+  useEffect(() => setText(value.join(", ")), [value]);
+  return (
+    <textarea
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(
+          e.target.value
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        );
+      }}
+      rows={4}
+    />
+  );
+}
+
+/**
+ * Phase 2C Client Guardrails: brand voice, forbidden topics, and escalation
+ * triggers, configured per tenant and layered on top of Phase 1's Global
+ * Guardrails — see server/src/lib/guardrails.ts for why this can only
+ * NARROW the platform-owned checks, never override or disable them.
+ *
+ * Split across three Settings sub-nav pages (`section`) to match the
+ * preview's literal IA. All three still share one tenant-wide config and
+ * one real save endpoint — each page's Save button submits the full current
+ * config, it just only shows and edits one field per page.
+ */
+export function GuardrailsConfigPanel({ tenantId, section }: { tenantId: string; section: GuardrailSection }) {
+  const g = useGuardrailsConfig(tenantId);
+
+  if (!g.loaded) {
+    return <section className="card">{g.error ? <div className="banner banner-error">{g.error}</div> : <p className="muted">Loading…</p>}</section>;
+  }
+
+  if (section === "ai-behavior") {
     return (
-      <>
-        <h4>{label}</h4>
-        <p className="muted small">{hint}</p>
-        {items.map((item, i) => (
-          <div key={i} className="milestone-row">
-            <input
-              type="text"
-              value={item}
-              onChange={(e) => {
-                const next = [...items];
-                next[i] = e.target.value;
-                setItems(next);
-              }}
-            />
-            <button
-              type="button"
-              className="btn-secondary btn-small"
-              onClick={() => setItems(items.filter((_, idx) => idx !== i))}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button type="button" className="btn-secondary btn-small" onClick={() => setItems([...items, ""])}>
-          Add
+      <section className="card">
+        <h2>AI behavior</h2>
+        <p className="muted small">How the assistant responds when context is incomplete or uncertain.</p>
+        {g.error && <div className="banner banner-error">{g.error}</div>}
+        <label className="mt-3 block">
+          <span className="mb-1 block text-sm font-medium text-ink">Instructions</span>
+          <textarea
+            value={g.brandVoice}
+            onChange={(e) => g.setBrandVoice(e.target.value)}
+            rows={5}
+            placeholder="e.g. Friendly and casual, never corporate-sounding."
+          />
+        </label>
+        <p className="muted small mt-2">Never invent facts, prices, availability, or guarantees.</p>
+        <button type="button" className="btn-primary btn-small mt-3" onClick={g.save} disabled={g.saving}>
+          {g.saving ? "Saving…" : "Save AI behavior"}
         </button>
-      </>
+      </section>
+    );
+  }
+
+  if (section === "forbidden-topics") {
+    return (
+      <section className="card">
+        <h2>Forbidden topics</h2>
+        <p className="muted small">Topics where the assistant should refuse, defer, or escalate.</p>
+        {g.error && <div className="banner banner-error">{g.error}</div>}
+        <label className="mt-3 block">
+          <span className="mb-1 block text-sm font-medium text-ink">Topic list</span>
+          <CommaListEditor value={g.forbiddenTopics} onChange={g.setForbiddenTopics} />
+        </label>
+        <button type="button" className="btn-primary btn-small mt-3" onClick={g.save} disabled={g.saving}>
+          {g.saving ? "Saving…" : "Save forbidden topics"}
+        </button>
+      </section>
     );
   }
 
   return (
     <section className="card">
-      <h2>Client Guardrails</h2>
-      <p className="muted small">
-        These narrow the platform's own safety checks for this tenant only — they can make replies more restrictive,
-        never less.
-      </p>
-      {error && <div className="banner banner-error">{error}</div>}
-      {!loaded ? (
-        <p className="muted">Loading…</p>
-      ) : (
-        <>
-          <label>
-            Brand voice
-            <textarea
-              value={brandVoice}
-              onChange={(e) => setBrandVoice(e.target.value)}
-              rows={3}
-              placeholder="e.g. Friendly and casual, never corporate-sounding."
-            />
-          </label>
-
-          {renderStringListEditor(
-            "Forbidden topics",
-            "A reply mentioning any of these is rejected and the fail-closed reply is used instead.",
-            forbiddenTopics,
-            setForbiddenTopics,
-          )}
-
-          {renderStringListEditor(
-            "Escalation triggers",
-            "A customer message containing any of these hands the conversation to a human immediately.",
-            escalationTriggers,
-            setEscalationTriggers,
-          )}
-
-          <button className="btn-primary btn-small" onClick={handleSave} disabled={saving} style={{ marginTop: "1rem" }}>
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </>
-      )}
+      <h2>Escalation rules</h2>
+      <p className="muted small">Situations that require human attention.</p>
+      {g.error && <div className="banner banner-error">{g.error}</div>}
+      <label className="mt-3 block">
+        <span className="mb-1 block text-sm font-medium text-ink">Escalation triggers</span>
+        <CommaListEditor value={g.escalationTriggers} onChange={g.setEscalationTriggers} />
+      </label>
+      <div className="mt-3 rounded-lg border border-warn-line bg-warn px-4 py-3 text-sm text-warn-ink">
+        <strong>Ownership matters.</strong> A human handoff should assign a teammate or appear in an unassigned work queue.
+      </div>
+      <button type="button" className="btn-primary btn-small mt-3" onClick={g.save} disabled={g.saving}>
+        {g.saving ? "Saving…" : "Save escalation rules"}
+      </button>
     </section>
   );
 }

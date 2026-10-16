@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
@@ -56,6 +56,33 @@ const LoginPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
+const SettingsGeneralPage = lazy(() =>
+  import("./pages/settings/SettingsGeneralPage").then((module) => ({ default: module.SettingsGeneralPage })),
+);
+const SettingsFieldsPage = lazy(() =>
+  import("./pages/settings/SettingsFieldsPage").then((module) => ({ default: module.SettingsFieldsPage })),
+);
+const SettingsAiBehaviorPage = lazy(() =>
+  import("./pages/settings/SettingsAiBehaviorPage").then((module) => ({ default: module.SettingsAiBehaviorPage })),
+);
+const SettingsForbiddenTopicsPage = lazy(() =>
+  import("./pages/settings/SettingsForbiddenTopicsPage").then((module) => ({ default: module.SettingsForbiddenTopicsPage })),
+);
+const SettingsEscalationPage = lazy(() =>
+  import("./pages/settings/SettingsEscalationPage").then((module) => ({ default: module.SettingsEscalationPage })),
+);
+const SettingsScoringPage = lazy(() =>
+  import("./pages/settings/SettingsScoringPage").then((module) => ({ default: module.SettingsScoringPage })),
+);
+const SettingsAppearancePage = lazy(() =>
+  import("./pages/settings/SettingsAppearancePage").then((module) => ({ default: module.SettingsAppearancePage })),
+);
+const SettingsProfilePage = lazy(() =>
+  import("./pages/settings/SettingsProfilePage").then((module) => ({ default: module.SettingsProfilePage })),
+);
+const SettingsNotificationsPage = lazy(() =>
+  import("./pages/settings/SettingsNotificationsPage").then((module) => ({ default: module.SettingsNotificationsPage })),
+);
 const TeamPage = lazy(() =>
   import("./pages/TeamPage").then((module) => ({ default: module.TeamPage })),
 );
@@ -80,6 +107,12 @@ function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
       <Page />
     </Suspense>
   );
+}
+
+/** Team & access and Plan & billing moved into Settings' sub-nav (matching the preview's IA) — these keep any existing bookmarks/links to the old top-level routes working. */
+function RedirectToSettingsSection({ section }: { section: string }) {
+  const { tenantId } = useParams<{ tenantId: string }>();
+  return <Navigate to={`/dashboard/${tenantId}/settings/${section}`} replace />;
 }
 
 function HomeRedirect() {
@@ -107,7 +140,20 @@ export default function App() {
       <Route path="/invite" element={<LazyPage Page={InvitationAcceptPage} />} />
       <Route path="/dashboard/:tenantId" element={<AppShell />}>
         <Route index element={<LazyPage Page={DashboardPage} />} />
-        <Route path="settings" element={<LazyPage Page={SettingsPage} />} />
+        <Route path="settings" element={<LazyPage Page={SettingsPage} />}>
+          <Route index element={<Navigate to="general" replace />} />
+          <Route path="general" element={<LazyPage Page={SettingsGeneralPage} />} />
+          <Route path="team" element={<LazyPage Page={TeamPage} />} />
+          <Route path="billing" element={<LazyPage Page={BillingPage} />} />
+          <Route path="fields" element={<LazyPage Page={SettingsFieldsPage} />} />
+          <Route path="ai-behavior" element={<LazyPage Page={SettingsAiBehaviorPage} />} />
+          <Route path="forbidden-topics" element={<LazyPage Page={SettingsForbiddenTopicsPage} />} />
+          <Route path="escalation" element={<LazyPage Page={SettingsEscalationPage} />} />
+          <Route path="scoring" element={<LazyPage Page={SettingsScoringPage} />} />
+          <Route path="appearance" element={<LazyPage Page={SettingsAppearancePage} />} />
+          <Route path="profile" element={<LazyPage Page={SettingsProfilePage} />} />
+          <Route path="notifications" element={<LazyPage Page={SettingsNotificationsPage} />} />
+        </Route>
         <Route path="leads/:leadId" element={<LazyPage Page={LeadDetailPage} />} />
         <Route path="inbox" element={<LazyPage Page={InboxPage} />} />
         <Route path="leads" element={<LazyPage Page={LeadsPage} />} />
@@ -116,9 +162,9 @@ export default function App() {
         <Route path="content" element={<LazyPage Page={ContentPage} />} />
         <Route path="knowledge" element={<LazyPage Page={KnowledgePage} />} />
         <Route path="analytics" element={<LazyPage Page={AnalyticsPage} />} />
-        <Route path="team" element={<LazyPage Page={TeamPage} />} />
+        <Route path="team" element={<RedirectToSettingsSection section="team" />} />
         <Route path="integrations" element={<LazyPage Page={IntegrationsPage} />} />
-        <Route path="billing" element={<LazyPage Page={BillingPage} />} />
+        <Route path="billing" element={<RedirectToSettingsSection section="billing" />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

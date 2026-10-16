@@ -75,7 +75,7 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
 
   return (
     <section className="card">
-      <h2>Captured fields</h2>
+      <h2>Lead fields</h2>
       <p className="muted small">
         Reusable typed fields that automations can capture, such as email, phone, country, or buying intent. The key is an internal identifier; the label is what your team sees.
       </p>

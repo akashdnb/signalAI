@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
-import { PageHeader, StatusBadge } from "../components/ui";
+import { StatusBadge } from "../components/ui";
 import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember } from "../api/workspace";
 
 function formatRole(role: WorkspaceMember["role"]): string {
@@ -155,27 +155,22 @@ export function TeamPage() {
   const resolvedInvitations = invitations.filter((invitation) => !isPendingInvitation(invitation));
 
   return (
-    <div className="page page-wide page-team">
-      <PageHeader
-        eyebrow="Workspace"
-        title="Team & access"
-        description="Manage who can access this workspace, what they can do, and outstanding invitations."
-        actions={
-          <button type="button" className="btn-primary btn-small" onClick={() => setInviting((value) => !value)}>
+    <div className="page-team">
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
+
+      <section className="card" aria-labelledby="team-members-title">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-4">
+          <div className="min-w-0">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.09em] text-subtle">Workspace members</div>
+            <h2 id="team-members-title" className="mb-1">People with access</h2>
+            <p className="muted small m-0">Owners manage billing and workspace access. Admins can manage members, connected accounts and automations. Members work with inbox, leads and automations.</p>
+          </div>
+          <button type="button" className="btn-primary btn-small shrink-0" onClick={() => setInviting((value) => !value)}>
             <span className="inline-flex items-center gap-1.5">
               <UserPlusIcon className="h-4 w-4" />
               {inviting ? "Close invite form" : "Invite teammate"}
             </span>
           </button>
-        }
-      />
-
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
-
-      <section className="card" aria-labelledby="team-members-title">
-        <div className="mb-4 border-b border-line pb-4">
-          <h2 id="team-members-title" className="mb-1">People with access</h2>
-          <p className="muted small m-0">Owners manage billing and workspace access. Admins can manage members, connected accounts and automations. Members work with inbox, leads and automations.</p>
         </div>
 
         {inviting && (

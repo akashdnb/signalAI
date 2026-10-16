@@ -217,7 +217,7 @@ export function ScoringRulesPanel({ tenantId }: { tenantId: string }) {
 
   return (
     <section className="card">
-      <h2>Custom Scoring Rules</h2>
+      <h2>Custom scoring rules</h2>
       <p className="muted small">
         Extra points added to or subtracted from a lead's score (Lead Intelligence) when a condition matches — on top
         of the built-in intent/need/budget/location/engagement scoring. Editing an existing rule isn't supported yet

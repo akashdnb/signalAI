@@ -21,10 +21,8 @@ import {
   AutomationIcon,
   BellIcon,
   BookIcon,
-  BroadcastIcon,
   ChevronDownIcon,
   CloseIcon,
-  ContactsIcon,
   ContentIcon,
   CreditCardIcon,
   HomeIcon,
@@ -36,7 +34,7 @@ import {
   MenuIcon,
   PanelToggleIcon,
   SettingsIcon,
-  TeamIcon,
+  SidebarExpandIcon,
 } from "./icons";
 
 interface NavItem {
@@ -56,14 +54,11 @@ const PRIMARY_NAV: NavItem[] = [
   { to: "knowledge", label: "Knowledge", icon: BookIcon },
   { to: "content", label: "Content", icon: ContentIcon },
   { to: "analytics", label: "Analytics", icon: AnalyticsIcon },
-  { to: "contacts", label: "Contacts", icon: ContactsIcon, disabled: true },
-  { to: "broadcasts", label: "Broadcasts", icon: BroadcastIcon, disabled: true },
 ];
 
+/** Team & access and Plan & billing live inside Settings' own sub-nav now, matching the preview's IA — not separate top-level routes here. */
 const SECONDARY_NAV: NavItem[] = [
-  { to: "team", label: "Team", icon: TeamIcon },
   { to: "integrations", label: "Integrations", icon: IntegrationsIcon },
-  { to: "billing", label: "Billing", icon: CreditCardIcon },
   { to: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -151,9 +146,9 @@ function PlanCard({
   if (collapsed) {
     return (
       <Link
-        to={`/dashboard/${tenantId}/billing`}
-        title={`Current plan: ${billing?.planTierLabel ?? "…"} — Upgrade`}
-        aria-label={`Current plan: ${billing?.planTierLabel ?? "…"} — Upgrade`}
+        to={`/dashboard/${tenantId}/settings/billing`}
+        title={`Current plan: ${billing?.planTierLabel ?? "…"} — View plan & usage`}
+        aria-label={`Current plan: ${billing?.planTierLabel ?? "…"} — View plan & usage`}
         className="flex h-10 items-center justify-center rounded-lg bg-accent text-white no-underline hover:bg-accent-hover"
       >
         <CreditCardIcon className="h-5 w-5" />
@@ -167,10 +162,11 @@ function PlanCard({
       <div className="mt-0.5 text-base font-semibold text-ink">{billing?.planTierLabel ?? "…"}</div>
       {renewalLine && <div className="mt-0.5 text-xs text-subtle">{renewalLine}</div>}
       <Link
-        to={`/dashboard/${tenantId}/billing`}
-        className="mt-2.5 block rounded-lg bg-accent px-3 py-1.5 text-center text-sm font-semibold text-white no-underline hover:bg-accent-hover"
+        to={`/dashboard/${tenantId}/settings/billing`}
+        className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-center text-sm font-semibold text-white no-underline hover:bg-accent-hover"
       >
-        Upgrade
+        <CreditCardIcon className="h-4 w-4" />
+        View plan &amp; usage
       </Link>
     </div>
   );
@@ -409,9 +405,12 @@ export function AppShell() {
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
   );
   // Desktop-only icon rail: persisted per browser, never affects the mobile drawer (which always shows labels).
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => typeof window !== "undefined" && window.localStorage.getItem("signalai.sidebarCollapsed") === "1",
-  );
+  // Defaults to collapsed (matching the preview's own default) until a user explicitly expands it.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem("signalai.sidebarCollapsed");
+    return stored === null ? true : stored === "1";
+  });
   useEffect(() => {
     window.localStorage.setItem("signalai.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);
@@ -607,9 +606,10 @@ export function AppShell() {
             title={sidebarCollapsed && !isMobileViewport ? "Expand sidebar" : undefined}
             tabIndex={sidebarCollapsed && !isMobileViewport ? 0 : -1}
             onClick={() => toggleSidebarCollapsed(false)}
-            className="rounded-lg"
+            className="flex items-center gap-1.5 rounded-lg"
           >
             <Logo size="md" wordmarkClassName={sidebarCollapsed ? "md:hidden" : ""} />
+            {sidebarCollapsed && <SidebarExpandIcon className="hidden h-4 w-4 shrink-0 text-subtle md:block" />}
           </button>
           <button
             ref={collapseSidebarButtonRef}

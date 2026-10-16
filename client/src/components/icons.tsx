@@ -225,7 +225,18 @@ export function PanelToggleIcon(props: IconProps) {
     <Icon {...props}>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M9 4.5v15" />
-      <path d="m14 9 3 3-3 3" />
+      <path d="m16 9-3 3 3 3" />
+    </Icon>
+  );
+}
+
+/** Shown next to the logo when the desktop rail is collapsed — the arrow points the opposite way from PanelToggleIcon's (which collapses), matching the preview's distinct expand/collapse glyphs. */
+export function SidebarExpandIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4.5v15" />
+      <path d="m13 9 3 3-3 3" />
     </Icon>
   );
 }
