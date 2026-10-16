@@ -162,3 +162,38 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - No integration commit was created. `task/reconcile-main-into-foundation` remains identical to foundation at `0d398f44665ec2e72b96d32cb33ac02e6e1553cd`; no outer reconciliation PR exists. `main`, foundation, PR #93/#94, and production deployment state were unchanged.
 - The worker intentionally stopped rather than manufacturing an unvalidated merge tree. Safe handoff is a genuine local Git checkout with semantic three-way conflict resolution, followed by client/server/build/migration/security validation. The local runtime in this chat could not reach github.com, so no local checkout or tests are available here.
 - **Deployment remains blocked.** Continue to use BrowserMCP only; NEVER use Browser Use.
+
+## 2026-10-17 — Cross-agent merge audit follow-up
+
+**Timestamp:** 2026-10-17 03:02 Asia/Kolkata (IST)
+
+### Audit outcome
+
+- The requested read-only cross-agent audit found **NO candidate safe to squash-merge into `feat/preview-to-production-foundation` now**.
+- Historical main-side snapshots that must be consumed through the current-main reconciliation rather than directly merged are **#81, #77, #75, #70, #71, #83, #72, #66, #63, #65, and #84–#86**. These are main-based historical snapshots whose changes overlap later fixes and/or the broader main/foundation divergence. Reconcile their final main state semantically rather than cherry-picking individual PRs.
+- **#57 is already the foundation branch itself**, not a separate merge candidate.
+- Open presentation-only PRs **#93 and #94** remain open and cannot be merged yet: current PR metadata does not provide a green overall CI state for either PR, and rendered parity verification remains incomplete. Their presentation-only scope does not remove the stale-base/reconciliation and visual-QA blockers.
+- Open main-based work **#76 and #62** also require the main→foundation reconciliation path; neither is a direct foundation merge candidate.
+
+### Reconciliation / POC status
+
+- Temporary POC PR **#97 was closed without merge**. It remains a disposable conflict-editor test only and is not product work to merge into foundation.
+- No code merge, deployment, or `main` change occurred during this audit step.
+
+### Release gate
+
+- Release remains blocked on a real local three-way reconciliation of current `main` into a child branch from current foundation, semantic conflict resolution, migration-history validation, and full client/server/browser checks. GitHub compare/PR metadata alone is not sufficient to manufacture the release merge tree.
+
+### Browser cleanup
+
+- Orchestration-owned stale agent/PR/source tabs were closed; user-owned tabs were left untouched.
+
+### Step 1 status
+
+- Step 1 token/style consolidation remains **INCOMPLETE**. The existing `## NEEDS DECISION` section remains unanswered; no preview-route disposition, `--po-*` remapping, or stylesheet consolidation decision was made in this step.
+
+### Verification
+
+- Read the current foundation `ORCHESTRATOR-LOG.md` before editing and preserved all prior history and the existing `## NEEDS DECISION` section.
+- Refetched the current foundation ref before creating `task/log-agent-audit` and changed only `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md` on that branch.
+- Checks actually run in this docs-only step: GitHub source/PR metadata inspection, current foundation ref/file inspection, branch creation, and log-file verification. No application build, lint, smoke, rendered-browser, merge, or deployment check was run.
