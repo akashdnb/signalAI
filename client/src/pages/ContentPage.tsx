@@ -40,6 +40,9 @@ export function ContentPage() {
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
+    setMedia(null);
+    setError(null);
+    setPreviewMedia(null);
     api
       .listObservedMedia(tenantId, selectedAccountId)
       .then((m) => {
