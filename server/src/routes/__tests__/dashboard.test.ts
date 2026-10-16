@@ -722,6 +722,25 @@ describe("dashboard routes (BUI backend surface)", () => {
     const forged = await request(app).get(`/tenants/${tenantA.id}/leads?accountId=${foreignAccountRow.rows[0]!.id}`).set(authA);
     expect(forged.status).toBe(404);
     expect(forged.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+
+    const repeatedLegacy = await request(app)
+      .get(`/tenants/${tenantA.id}/leads?accountId=${rowA.id}&accountId=${rowB.id}`)
+      .set(authA);
+    expect(repeatedLegacy.status).toBe(400);
+    const emptyLegacy = await request(app)
+      .get(`/tenants/${tenantA.id}/leads?accountId=`)
+      .set(authA);
+    expect(emptyLegacy.status).toBe(400);
+
+    const repeatedPaged = await request(app)
+      .get(`/tenants/${tenantA.id}/leads?page=1&accountId=${rowA.id}&accountId=${rowB.id}`)
+      .set(authA);
+    expect(repeatedPaged.status).toBe(400);
+    const emptyPaged = await request(app)
+      .get(`/tenants/${tenantA.id}/leads?page=1&accountId=`)
+      .set(authA);
+    expect(emptyPaged.status).toBe(400);
+
     expect(leadOtherTenant.tenantId).toBe(tenantB.id);
   });
 
