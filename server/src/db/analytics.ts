@@ -67,18 +67,31 @@ export interface TopPost {
  * itself already accepts.
  */
 export async function getTopPosts(pool: Pool, tenantId: string, limit = 10): Promise<TopPost[]> {
+  // Aggregate events first, then enrich with exactly one latest metadata row.
+  // media_metadata can contain one legacy row and multiple account-scoped rows for the same media ID;
+  // joining raw events to all of them would multiply comment counts.
   const result = await pool.query<{
     media_id: string;
     caption: string | null;
     permalink: string | null;
     comment_count: string;
   }>(
-    `select e.attributes->>'mediaId' as media_id, m.caption, m.permalink, count(*)::int as comment_count
-     from lead_events e
-     left join media_metadata m on m.tenant_id = e.tenant_id and m.media_id = e.attributes->>'mediaId'
-     where e.tenant_id = $1 and e.event_type = 'comment' and e.attributes->>'mediaId' is not null
-     group by e.attributes->>'mediaId', m.caption, m.permalink
-     order by comment_count desc
+    `with comment_counts as (
+       select attributes->>'mediaId' as media_id, count(*)::int as comment_count
+       from lead_events
+       where tenant_id = $1 and event_type = 'comment' and attributes->>'mediaId' is not null
+       group by attributes->>'mediaId'
+     )
+     select c.media_id, m.caption, m.permalink, c.comment_count
+     from comment_counts c
+     left join lateral (
+       select caption, permalink
+       from media_metadata
+       where tenant_id = $1 and media_id = c.media_id
+       order by fetched_at desc nulls last, instagram_account_id asc nulls last, id desc
+       limit 1
+     ) m on true
+     order by c.comment_count desc, c.media_id
      limit $2`,
     [tenantId, limit],
   );
@@ -115,29 +128,35 @@ export interface FunnelStage {
   count: number;
 }
 
+export type PipelineStage = "new" | "contacted" | "qualified" | "meeting_scheduled" | "won" | "lost";
+
 export interface Funnel {
   stages: FunnelStage[];
-  /** Leads still open — neither won nor lost — the roadmap's "leads without outcomes" gap made real, scoped to what's actually computable (no attribution/identity-matching concept exists yet for the rest of that gap). */
+  /** Exact, mutually exclusive current pipeline distribution used by the Overview chart. */
+  stageCounts: Record<PipelineStage, number>;
+  /** Any lead rows carrying a stage outside the known pipeline vocabulary. */
+  unmappedLeadCount: number;
+  /** Leads still open — neither won nor lost — the roadmap's "leads without outcomes" gap made real, scoped to what's actually computable. */
   openWithNoOutcome: number;
 }
 
 /**
- * R4 Analytics: built from each lead's CURRENT pipeline_stage (a live
- * snapshot, not a transition history — nothing else in this app tracks
- * leads any differently, see Dashboard/Leads pages) so "Qualified" etc.
- * below are cumulative "reached this stage or later" counts, and a lead
- * marked 'lost' after reaching Qualified no longer counts there — same
- * simplification the rest of the app already lives with. 'Reach' isn't
- * included: no impression/reach data exists anywhere to back it.
+ * Analytics reports a current-state snapshot, not a historical conversion
+ * cohort: lead_events/account_sends contribute activity totals, while
+ * stageRows are the source for the mutually-exclusive current stage
+ * distribution and cumulative progression counts. 'Reach' isn't included
+ * because impression/reach data does not exist in the data model.
  */
 export async function getPipelineFunnel(pool: Pool, tenantId: string): Promise<Funnel> {
-  const [comments, dmsSent, uniqueLeads, stageRows] = await Promise.all([
+  const [comments, dmsSent, stageRows] = await Promise.all([
     pool.query<{ count: string }>(
       `select count(*)::int as count from lead_events where tenant_id = $1 and event_type = 'comment'`,
       [tenantId],
     ),
-    pool.query<{ count: string }>(`select count(*)::int as count from account_sends where tenant_id = $1`, [tenantId]),
-    pool.query<{ count: string }>(`select count(*)::int as count from leads where tenant_id = $1`, [tenantId]),
+    pool.query<{ count: string }>(
+      `select count(*)::int as count from account_sends where tenant_id = $1`,
+      [tenantId],
+    ),
     pool.query<{ pipeline_stage: string; count: string }>(
       `select pipeline_stage, count(*)::int as count from leads where tenant_id = $1 group by pipeline_stage`,
       [tenantId],
@@ -145,17 +164,24 @@ export async function getPipelineFunnel(pool: Pool, tenantId: string): Promise<F
   ]);
 
   const byStage = new Map(stageRows.rows.map((r) => [r.pipeline_stage, Number(r.count)]));
-  const countAtLeast = (stages: string[]) => stages.reduce((sum, s) => sum + (byStage.get(s) ?? 0), 0);
+  const stages = ["new", "contacted", "qualified", "meeting_scheduled", "won", "lost"] as const;
+  const stageCounts = Object.fromEntries(stages.map((stage) => [stage, byStage.get(stage) ?? 0])) as Record<PipelineStage, number>;
+  const totalLeads = stageRows.rows.reduce((total, row) => total + Number(row.count), 0);
+  const knownStageTotal = Object.values(stageCounts).reduce((total, count) => total + count, 0);
+  const unmappedLeadCount = Math.max(0, totalLeads - knownStageTotal);
+  const countAtLeast = (stages: string[]) => stages.reduce((sum, stage) => sum + (byStage.get(stage) ?? 0), 0);
 
   return {
     stages: [
-      { key: "comments", label: "Comments", count: Number(comments.rows[0]!.count) },
-      { key: "dms", label: "DMs", count: Number(dmsSent.rows[0]!.count) },
-      { key: "leads", label: "Leads", count: Number(uniqueLeads.rows[0]!.count) },
-      { key: "qualified", label: "Qualified", count: countAtLeast(["qualified", "meeting_scheduled", "won"]) },
-      { key: "meeting", label: "Meeting Scheduled", count: countAtLeast(["meeting_scheduled", "won"]) },
+      { key: "comments", label: "Comments received", count: Number(comments.rows[0]!.count) },
+      { key: "dms", label: "DMs reserved", count: Number(dmsSent.rows[0]!.count) },
+      { key: "leads", label: "All leads", count: totalLeads },
+      { key: "qualified", label: "Qualified or later", count: countAtLeast(["qualified", "meeting_scheduled", "won"]) },
+      { key: "meeting", label: "Meeting scheduled or later", count: countAtLeast(["meeting_scheduled", "won"]) },
       { key: "won", label: "Won", count: countAtLeast(["won"]) },
     ],
+    stageCounts,
+    unmappedLeadCount,
     openWithNoOutcome: countAtLeast(["new", "contacted", "qualified", "meeting_scheduled"]),
   };
 }

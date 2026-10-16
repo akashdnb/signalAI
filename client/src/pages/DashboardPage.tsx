@@ -119,9 +119,8 @@ export function DashboardPage() {
 
   if (!tenantId) return null;
 
-  // The funnel endpoint is the canonical all-lead snapshot. The Leads page is
-  // paginated, so deriving Overview totals from its first page can undercount
-  // stages (for example 20 visible leads versus 24 total leads).
+  // The funnel endpoint provides a full current-stage distribution. The Leads
+  // page is paginated, so its visible page must never drive dashboard totals.
   const stageCounts = funnel?.stageCounts;
   const uncategorizedLeadCount = funnel?.unmappedLeadCount ?? 0;
 
