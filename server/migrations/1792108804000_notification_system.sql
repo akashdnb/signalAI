@@ -1,3 +1,4 @@
+-- Up Migration
 -- Notification infrastructure: controlled event catalog, persisted user policy,
 -- in-app inbox, idempotent event receipt, and per-channel delivery history.
 -- Provider secrets and raw provider response bodies are deliberately not persisted.
@@ -102,8 +103,3 @@ create index notification_deliveries_due_idx
   on notification_deliveries (status, next_attempt_at)
   where status in ('pending', 'retrying');
 
--- Down Migration
-drop table notification_deliveries;
-drop table notification_preferences;
-drop table notifications;
-drop table notification_events;
