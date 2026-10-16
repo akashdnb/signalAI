@@ -47,12 +47,15 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const requestedAccountRowId = typeof rawAccountRowId === "string"
     ? rawAccountRowId.trim()
     : undefined;
-  const instagramAccountId = requestedAccountRowId
+  // The account resolver deliberately returns null for unknown IDs; narrow
+  // that to undefined so database helpers receive only string | undefined.
+  const resolvedInstagramAccountId = requestedAccountRowId
     ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
-    : undefined;
-  if (requestedAccountRowId && !instagramAccountId) {
+    : null;
+  if (requestedAccountRowId && !resolvedInstagramAccountId) {
     return res.status(404).json({ error: "Instagram account not found for this workspace" });
   }
+  const instagramAccountId = resolvedInstagramAccountId ?? undefined;
   let media = await listKnownMediaForTenant(pool, tenantId, instagramAccountId);
   const now = Date.now();
 
