@@ -42,6 +42,7 @@ export function IntegrationsPage() {
       setAccounts(nextAccounts);
       setCurrentRole(workspace.role);
       setError(null);
+      reloadConnectedAccounts();
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
@@ -96,7 +97,6 @@ export function IntegrationsPage() {
       await workspaceApi.disconnectAccount(tenantId, accountId);
       setConfirmingId(null);
       await loadAccounts();
-      reloadConnectedAccounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't disconnect Instagram");
     } finally {
