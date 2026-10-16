@@ -25,9 +25,7 @@ class CapabilityInputError extends Error {
 
 export const mcpCapabilitiesRouter = Router();
 
-mcpCapabilitiesRouter.use(requireMcpServiceAuth);
-
-mcpCapabilitiesRouter.post("/v1/capabilities/:capability", async (req, res) => {
+mcpCapabilitiesRouter.post("/v1/capabilities/:capability", requireMcpServiceAuth, async (req, res) => {
   const rawCapability = req.params.capability;
   const capability = rawCapability.endsWith(":invoke")
     ? rawCapability.slice(0, -":invoke".length)
