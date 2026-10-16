@@ -42,6 +42,20 @@ mcpCapabilitiesRouter.post("/v1/capabilities/:capability", requireMcpServiceAuth
   const raw = req.params.capability;
   const capability = raw.endsWith(":invoke") ? raw.slice(0, -":invoke".length) : "";
   const tenantId = req.mcpTenantId!;
+  if (WRITE_CAPABILITIES.has(capability)) {
+    try {
+      requireHeader(req, "x-signalai-principal-id");
+      requireHeader(req, "x-signalai-client-id");
+      requireHeader(req, "idempotency-key");
+    } catch (error) {
+      if (error instanceof CapabilityError) {
+        return res.status(error.statusCode).json({
+          error: error.code, code: error.code, message: error.message,
+        });
+      }
+      return res.status(400).json({ error: "validation_error", code: "validation_error" });
+    }
+  }
   const correlationId = req.header("x-correlation-id") ?? randomUUID();
 
   if (!READ_CAPABILITIES.has(capability) && !WRITE_CAPABILITIES.has(capability)) {
