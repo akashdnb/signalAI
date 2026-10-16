@@ -21,6 +21,7 @@ interface OAuthState {
   cookieValue: string;
   nonce: string;
   createdAt: number;
+  returnTo: string | null;
 }
 interface GoogleIdentity {
   sub: string;
@@ -45,10 +46,20 @@ function signState(secret: string, payload: OAuthState): string {
 }
 function decodeStateBody(body: string): OAuthState | null {
   try {
-    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as OAuthState;
-    if (typeof payload.cookieValue !== "string" || typeof payload.nonce !== "string" || typeof payload.createdAt !== "number") return null;
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Partial<OAuthState>;
+    if (
+      typeof payload.cookieValue !== "string" ||
+      typeof payload.nonce !== "string" ||
+      typeof payload.createdAt !== "number" ||
+      (payload.returnTo !== null && typeof payload.returnTo !== "string")
+    ) return null;
     if (Date.now() - payload.createdAt > STATE_TTL_MS || payload.createdAt > Date.now() + 30_000) return null;
-    return payload;
+    return {
+      cookieValue: payload.cookieValue,
+      nonce: payload.nonce,
+      createdAt: payload.createdAt,
+      returnTo: payload.returnTo ?? null,
+    };
   } catch {
     return null;
   }
@@ -74,6 +85,20 @@ function redirectAuthError(res: Response, reason: string) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Referrer-Policy", "no-referrer");
   return res.redirect(`${config.appBaseUrl}/login?auth_error=${encodeURIComponent(reason)}`);
+}
+function allowedMcpReturnTo(value: string | undefined): string | null {
+  if (!value) return null;
+  const configured = (process.env.MCP_PUBLIC_URL ?? "").replace(/\/+$/, "");
+  if (!configured) return null;
+  try {
+    const candidate = new URL(value);
+    const allowed = new URL(configured);
+    if (candidate.origin !== allowed.origin) return null;
+    if (!candidate.pathname.startsWith("/oauth/authorize")) return null;
+    return candidate.toString();
+  } catch {
+    return null;
+  }
 }
 
 async function verifyGoogleIdToken(idToken: string, expectedNonce: string): Promise<GoogleIdentity> {
@@ -128,7 +153,8 @@ googleAuthRouter.get("/auth/google/start", async (req, res) => {
   try {
     const cookieValue = randomBytes(32).toString("base64url");
     const nonce = randomBytes(32).toString("base64url");
-    const statePayload: OAuthState = { cookieValue, nonce, createdAt: Date.now() };
+    const returnTo = allowedMcpReturnTo(typeof req.query.returnTo === "string" ? req.query.returnTo : undefined);
+    const statePayload: OAuthState = { cookieValue, nonce, createdAt: Date.now(), returnTo };
     const state = signState(config.sessionSecret, statePayload);
     await getPool().query(
       `insert into google_oauth_states (state_hash, cookie_hash, expires_at)
@@ -191,9 +217,22 @@ googleAuthRouter.get("/auth/google/callback", async (req, res) => {
     const version = (await getUserSessionVersion(getPool(), user.id)) ?? 1;
     const token = createSessionToken(config.sessionSecret, user.id, version);
     const handoff = await storeHandoff({
-      tenantId, token, email: user.email, firstName: user.firstName,
-      lastName: user.lastName, picture: user.profilePictureUrl,
+      tenantId,
+      token,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      picture: user.profilePictureUrl,
     });
+
+    if (statePayload.returnTo) {
+      const redirect = new URL(statePayload.returnTo);
+      redirect.searchParams.set("mcp_handoff", handoff);
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      return res.redirect(redirect.toString());
+    }
+
     const redirect = new URL("/login", config.appBaseUrl);
     redirect.searchParams.set("google_auth", "success");
     redirect.searchParams.set("handoff", handoff);
