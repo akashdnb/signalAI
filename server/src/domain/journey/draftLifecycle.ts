@@ -76,12 +76,8 @@ export async function createJourneyDraftWithClient(
     "update campaigns set mcp_metadata = $3::jsonb where id = $1 and tenant_id = $2",
     [campaign.id, tenantId, JSON.stringify(metadata)],
   );
-  const hydrated = await client.query<{ name: string; builder_version: number }>(
-    "select name, builder_version from campaigns where id = $1 and tenant_id = $2",
-    [campaign.id, tenantId],
-  );
   return {
-    campaign: { ...campaign, name: hydrated.rows[0]?.name ?? campaign.name, enabled: false },
+    campaign: { ...campaign, enabled: false },
     graph: save.graph,
     metadata,
   };
