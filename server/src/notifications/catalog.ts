@@ -1,5 +1,12 @@
 export type NotificationSeverity = "info" | "success" | "warning" | "critical";
 export type NotificationChannel = "email" | "in_app";
+export type NotificationEventType =
+  | "lead.created"
+  | "automation.execution_failed"
+  | "automation.execution_recovered"
+  | "instagram.connection_attention"
+  | "instagram.connection_disconnected"
+  | "system.operational_alert";
 
 export interface NotificationEventDefinition {
   type: NotificationEventType;
@@ -8,7 +15,7 @@ export interface NotificationEventDefinition {
   defaultSeverity: NotificationSeverity;
 }
 
-export const NOTIFICATION_EVENTS = [
+export const NOTIFICATION_EVENTS: readonly NotificationEventDefinition[] = [
   {
     type: "lead.created",
     label: "New leads",
@@ -45,9 +52,7 @@ export const NOTIFICATION_EVENTS = [
     description: "An important operational issue affects this workspace.",
     defaultSeverity: "critical",
   },
-] as const satisfies readonly NotificationEventDefinition[];
-
-export type NotificationEventType = (typeof NOTIFICATION_EVENTS)[number]["type"];
+];
 
 export const NOTIFICATION_CHANNELS: readonly {
   type: NotificationChannel;
