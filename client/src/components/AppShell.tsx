@@ -673,7 +673,7 @@ export function AppShell() {
     return { id: created.tenantId, name: created.name, description: created.description, role: created.role };
   }
 
-  function handleSelectAccount(accountId: string) {
+  function handleSelectAccount(accountId: string | null) {
     if (!tenantId) return;
     const key = "signalai.account-context:" + tenantId;
     if (!accountId) {
