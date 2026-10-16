@@ -22,7 +22,13 @@ export function LeadsPage() {
   const [members, setMembers] = useState<TenantMember[] | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
+  const [tags, setTags] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [tagFilter, setTagFilter] = useState("");
   const [handoffFilter, setHandoffFilter] = useState<HandoffStatus | "">("");
+  const [qualificationFilter, setQualificationFilter] = useState<"qualified" | "unqualified" | "">("");
+  const [activityFrom, setActivityFrom] = useState("");
+  const [activityTo, setActivityTo] = useState("");
+  const [sort, setSort] = useState<"activity_desc" | "activity_asc" | "created_desc" | "created_asc" | "stage_asc" | "stage_desc" | "username_asc" | "username_desc">("activity_desc");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -30,11 +36,17 @@ export function LeadsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [stageFilter, handoffFilter, search]);
+  }, [stageFilter, handoffFilter, qualificationFilter, tagFilter, activityFrom, activityTo, sort, search]);
 
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
+    api.listTenantTags(tenantId).then((result) => {
+      if (cancelled) return;
+      setTags(result.map((tag) => ({ id: tag.id, name: tag.name })));
+    }).catch(() => {
+      if (!cancelled) setTags(null);
+    });
     api.listMembers(tenantId).then((result) => {
       if (cancelled) return;
       setMembers(result);
@@ -58,6 +70,11 @@ export function LeadsPage() {
         const result = await getLeadsPage(tenantId!, page, PAGE_SIZE, {
           stage: stageFilter || undefined,
           handoffStatus: handoffFilter || undefined,
+          qualification: qualificationFilter || undefined,
+          tagId: tagFilter || undefined,
+          from: activityFrom || undefined,
+          to: activityTo || undefined,
+          sort,
           q: search.trim() || undefined,
         });
         if (cancelled) return;
@@ -77,7 +94,7 @@ export function LeadsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, stageFilter, handoffFilter, search, page, reloadCount, navigate]);
+  }, [tenantId, stageFilter, handoffFilter, qualificationFilter, tagFilter, activityFrom, activityTo, sort, search, page, reloadCount, navigate]);
 
   if (!tenantId) return null;
 
@@ -105,18 +122,46 @@ export function LeadsPage() {
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
+          <label className="sr-only" htmlFor="leads-qualification-filter">Qualification</label>
+          <select id="leads-qualification-filter" aria-label="Qualification" value={qualificationFilter} onChange={(e) => setQualificationFilter(e.target.value as "qualified" | "unqualified" | "")}>
+            <option value="">All qualification</option>
+            <option value="qualified">Qualified</option>
+            <option value="unqualified">Not qualified</option>
+          </select>
+          {tags && tags.length > 0 && <>
+            <label className="sr-only" htmlFor="leads-tag-filter">Tag</label>
+            <select id="leads-tag-filter" aria-label="Lead tag" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+              <option value="">All tags</option>
+              {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+            </select>
+          </>}
           <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
           <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
             {HANDOFF_FILTERS.map((h) => (
               <option key={h.value} value={h.value}>{h.label}</option>
             ))}
           </select>
-          <label className="sr-only" htmlFor="leads-search">Search leads by username</label>
+          <label className="sr-only" htmlFor="leads-activity-from">Activity from</label>
+          <input id="leads-activity-from" type="date" aria-label="Activity from" value={activityFrom} max={activityTo || undefined} onChange={(e) => setActivityFrom(e.target.value)} />
+          <label className="sr-only" htmlFor="leads-activity-to">Activity to</label>
+          <input id="leads-activity-to" type="date" aria-label="Activity to" min={activityFrom || undefined} onChange={(e) => setActivityTo(e.target.value)} value={activityTo} />
+          <label className="sr-only" htmlFor="leads-sort">Sort leads</label>
+          <select id="leads-sort" aria-label="Sort leads" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="activity_desc">Most recent activity</option>
+            <option value="activity_asc">Oldest activity</option>
+            <option value="created_desc">Newest leads</option>
+            <option value="created_asc">Oldest leads</option>
+            <option value="stage_asc">Stage A–Z</option>
+            <option value="stage_desc">Stage Z–A</option>
+            <option value="username_asc">Username A–Z</option>
+            <option value="username_desc">Username Z–A</option>
+          </select>
+          <label className="sr-only" htmlFor="leads-search">Search username or captured details</label>
           <input
             id="leads-search"
             type="text"
-            aria-label="Search leads by username"
-            placeholder="Search by username…"
+            aria-label="Search username or captured details"
+            placeholder="Search username, email, phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -178,7 +223,7 @@ export function LeadsPage() {
             </div>
             {pageData && (
               <p className="muted small mt-3" role="status">
-                Showing {pageData.items.length} of {pageData.total.toLocaleString()} leads{stageFilter || handoffFilter || search.trim() ? " matching the current filters" : ""}.
+                Showing {pageData.items.length} of {pageData.total.toLocaleString()} leads{stageFilter || handoffFilter || qualificationFilter || tagFilter || activityFrom || activityTo || search.trim() ? " matching the current filters" : ""}.
               </p>
             )}
             {pageData && (
