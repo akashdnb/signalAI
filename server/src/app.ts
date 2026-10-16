@@ -30,6 +30,7 @@ import { leadScoringRulesRouter } from "./routes/leadScoringRules.js";
 import { fieldDefinitionsRouter } from "./routes/fieldDefinitions.js";
 import { onboardingRouter } from "./routes/onboarding.js";
 import { workspaceManagementRouter } from "./routes/workspaceManagement.js";
+import { capabilitiesRouter } from "./routes/capabilities.js";
 import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
@@ -81,6 +82,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(workspaceManagementRouter);
+  app.use(capabilitiesRouter());
 
   app.use(paginationRouter);
   // Content media enrichment is registered before the legacy campaigns
