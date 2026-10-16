@@ -2,17 +2,8 @@ import { randomUUID, createHash } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Pool, PoolClient } from "pg";
 import { getPool } from "../db/pool.js";
-import { createCampaignWithClient, getCampaign as getCampaignFromDomain } from "../db/campaigns.js";
-import {
-  listMilestonesWithClient,
-} from "../db/milestones.js";
-import {
-  getBuilderGraphWithClient,
-  saveBuilderGraphWithClient,
-  type BuilderGraph,
-  type JourneyNode,
-  type JourneyEdge,
-} from "../db/journeyGraph.js";
+import { getCampaign as getCampaignFromDomain } from "../db/campaigns.js";
+import type { JourneyNode, JourneyEdge } from "../db/journeyGraph.js";
 import { DraftLifecycleError, createJourneyDraftWithClient, updateJourneyDraftWithClient, validateJourneyDraftWithClient } from "../domain/journey/draftLifecycle.js";
 
 const READ_CAPABILITIES = new Set([
