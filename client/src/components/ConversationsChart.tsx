@@ -2,13 +2,11 @@ import { useState } from "react";
 import type { ConversationsTimeseriesPoint } from "../api";
 
 /**
- * Dashboard's "Conversations over time" chart: two lines (Comments, DMs)
- * over the trailing 30 real days from getConversationsTimeseries — no
- * invented trend data. Colors are categorical (identity, not magnitude) so
- * they're assigned in fixed order from the two most separated brand hues
- * (purple/cyan) rather than adjacent steps of one ramp. Ships its own
- * crosshair+tooltip per the dataviz skill's default for line charts, plus
- * an accessible table fallback below.
+ * Dashboard's "Activity over time" chart: stacked bars (Comments, DMs) over
+ * the trailing real days from getConversationsTimeseries — no invented
+ * trend data, matching the preview's bar-chart treatment (incl. the big
+ * total count above the chart) instead of a line chart. Ships its own
+ * tooltip per bar, plus an accessible table fallback below.
  */
 export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoint[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -24,7 +22,8 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
     );
   }
 
-  const hasActivity = data.some((point) => point.comments > 0 || point.dms > 0);
+  const totalEvents = data.reduce((sum, point) => sum + point.comments + point.dms, 0);
+  const hasActivity = totalEvents > 0;
   if (!hasActivity) {
     return (
       <div className="space-y-3">
@@ -71,40 +70,39 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
 
   const width = 640;
   const height = 220;
-  const padding = { top: 12, right: 12, bottom: 24, left: 32 };
+  const padding = { top: 20, right: 8, bottom: 24, left: 8 };
   const plotW = width - padding.left - padding.right;
   const plotH = height - padding.top - padding.bottom;
 
-  const maxValue = Math.max(1, ...data.map((d) => Math.max(d.comments, d.dms)));
-  const stepX = data.length > 1 ? plotW / (data.length - 1) : 0;
+  const dayTotals = data.map((d) => d.comments + d.dms);
+  const maxTotal = Math.max(1, ...dayTotals);
+  const gap = data.length > 1 ? plotW * 0.015 : 0;
+  const barW = Math.max(2, plotW / data.length - gap);
 
-  // The series is capped at a short daily window, so direct mapping is
-  // inexpensive and keeps all hooks above the empty/zero-state early returns.
-  const points = data.map((d, i) => ({
-    x: padding.left + i * stepX,
-    comments: padding.top + plotH - (d.comments / maxValue) * plotH,
-    dms: padding.top + plotH - (d.dms / maxValue) * plotH,
-  }));
+  const bars = data.map((d, i) => {
+    const total = d.comments + d.dms;
+    const totalH = (total / maxTotal) * plotH;
+    const commentsH = total > 0 ? (d.comments / total) * totalH : 0;
+    const dmsH = totalH - commentsH;
+    const x = padding.left + i * (barW + gap);
+    const top = padding.top + plotH - totalH;
+    return { x, top, totalH, commentsH, dmsH, total };
+  });
 
-  const linePath = (key: "comments" | "dms") =>
-    points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p[key].toFixed(1)}`).join(" ");
-
-  function handleMove(e: React.MouseEvent<SVGRectElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (data.length <= 1) {
-      setHoverIndex(0);
-      return;
-    }
-    const relX = e.clientX - rect.left;
-    const idx = Math.round(relX / (rect.width / (data.length - 1)));
-    setHoverIndex(Math.max(0, Math.min(data.length - 1, idx)));
-  }
+  const period =
+    data.length > 1
+      ? `${new Date(data[0]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${new Date(data[data.length - 1]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+      : new Date(data[0]!.date).toLocaleDateString();
 
   const hovered = hoverIndex !== null ? data[hoverIndex] : null;
-  const hoveredPoint = hoverIndex !== null ? points[hoverIndex] : null;
 
   return (
     <div>
+      <div className="mb-4">
+        <span className="text-[32px] font-bold leading-none text-ink">{totalEvents.toLocaleString()}</span>
+        <span className="ml-2 text-sm text-subtle">inbound events · {period}</span>
+      </div>
+
       <div className="mb-3 flex items-center gap-4 text-sm">
         <span className="flex items-center gap-1.5 text-subtle">
           <span className="h-2 w-2 rounded-full" style={{ background: "var(--accent)" }} />
@@ -116,46 +114,30 @@ export function ConversationsChart({ data }: { data: ConversationsTimeseriesPoin
         </span>
       </div>
 
-      <svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Conversations over the last 30 days">
-        {[0, 0.5, 1].map((f) => (
-          <line
-            key={f}
-            x1={padding.left}
-            x2={width - padding.right}
-            y1={padding.top + plotH * f}
-            y2={padding.top + plotH * f}
-            stroke="var(--border)"
-            strokeWidth={1}
-          />
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Comments and DMs, ${period}`}>
+        <line x1={padding.left} x2={width - padding.right} y1={padding.top + plotH} y2={padding.top + plotH} stroke="var(--border)" strokeWidth={1} />
+
+        {bars.map((bar, i) => (
+          <g key={data[i]!.date} onMouseEnter={() => setHoverIndex(i)} onMouseLeave={() => setHoverIndex((v) => (v === i ? null : v))}>
+            <rect x={bar.x} y={padding.top} width={barW} height={plotH} fill="transparent" />
+            {bar.total > 0 && (
+              <>
+                <rect x={bar.x} y={bar.top + bar.dmsH} width={barW} height={bar.commentsH} rx={2} fill="var(--accent)" opacity={hoverIndex === null || hoverIndex === i ? 1 : 0.45} />
+                <rect x={bar.x} y={bar.top} width={barW} height={bar.dmsH} rx={2} fill="var(--accent-cyan)" opacity={hoverIndex === null || hoverIndex === i ? 1 : 0.45} />
+              </>
+            )}
+            {bar.total > 0 && (
+              <text x={bar.x + barW / 2} y={bar.top - 6} fontSize="11" fill="var(--text-muted)" textAnchor="middle">
+                {bar.total}
+              </text>
+            )}
+            {(data.length <= 10 || i === 0 || i === data.length - 1 || i === Math.floor((data.length - 1) / 2)) && (
+              <text x={bar.x + barW / 2} y={height - 4} fontSize="11" fill="var(--text-muted)" textAnchor="middle">
+                {new Date(data[i]!.date).toLocaleDateString(undefined, { weekday: data.length <= 10 ? "short" : undefined, month: data.length <= 10 ? undefined : "short", day: "numeric" })}
+              </text>
+            )}
+          </g>
         ))}
-
-        <path d={linePath("comments")} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        <path d={linePath("dms")} fill="none" stroke="var(--accent-cyan)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-
-        {hoveredPoint && (
-          <>
-            <line x1={hoveredPoint.x} x2={hoveredPoint.x} y1={padding.top} y2={padding.top + plotH} stroke="var(--border)" strokeWidth={1} />
-            <circle cx={hoveredPoint.x} cy={hoveredPoint.comments} r={4} fill="var(--accent)" stroke="var(--card-bg)" strokeWidth={2} />
-            <circle cx={hoveredPoint.x} cy={hoveredPoint.dms} r={4} fill="var(--accent-cyan)" stroke="var(--card-bg)" strokeWidth={2} />
-          </>
-        )}
-
-        {/* Date ticks: first, middle, last only — 30 labels would collide. */}
-        {[0, Math.floor((data.length - 1) / 2), data.length - 1].map((i) => (
-          <text key={i} x={points[i]?.x ?? 0} y={height - 4} fontSize="11" fill="var(--text-muted)" textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}>
-            {data[i] ? new Date(data[i]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
-          </text>
-        ))}
-
-        <rect
-          x={padding.left}
-          y={padding.top}
-          width={plotW}
-          height={plotH}
-          fill="transparent"
-          onMouseMove={handleMove}
-          onMouseLeave={() => setHoverIndex(null)}
-        />
       </svg>
 
       {hovered && (

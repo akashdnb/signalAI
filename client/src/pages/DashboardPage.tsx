@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ApiError,
   api,
-  loadSession,
   type AccountHealth,
   type Analytics,
   type ConversationsTimeseriesPoint,
@@ -13,8 +12,7 @@ import {
   type RevenueByCurrency,
 } from "../api";
 import { ConversationsChart } from "../components/ConversationsChart";
-import { useTenant } from "../context/TenantContext";
-import { PIPELINE_STAGES, deriveDisplayName, formatRelativeTime, leadDisplayName } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatRelativeTime, leadDisplayName } from "../lib/leadFormatting";
 
 const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
@@ -25,12 +23,6 @@ function formatMoney(revenue: RevenueByCurrency[]): string {
   const amount = top!.total.toLocaleString();
   const primary = symbol ? `${symbol}${amount}` : `${top!.currency} ${amount}`;
   return rest.length > 0 ? `${primary} +${rest.length} more` : primary;
-}
-
-function greetingForHour(hour: number): string {
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
 }
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
@@ -47,8 +39,6 @@ export function DashboardPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tenant } = useTenant();
-  const session = loadSession();
 
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -145,9 +135,8 @@ export function DashboardPage() {
     <div className="page page-wide page-overview">
       <header className="overview-header">
         <div>
-          <p className="overview-eyebrow">Overview</p>
-          <h1>{greetingForHour(new Date().getHours())}, {deriveDisplayName(session?.email)} 👋</h1>
-          <p className="muted">{tenant?.name ? `${tenant.name} — ` : ""}Here's what's happening with your Instagram operations.</p>
+          <h1>Overview</h1>
+          <p className="muted">A clear view of what needs attention across your Instagram operations.</p>
         </div>
         {account?.connected && <span className="pill pill-ok"><span className="mr-1">●</span>Instagram connected</span>}
       </header>
