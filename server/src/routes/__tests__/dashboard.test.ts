@@ -840,6 +840,19 @@ describe("dashboard routes (BUI backend surface)", () => {
     const forged = await request(app).get(`/tenants/${tenant.id}/analytics/funnel?accountId=${foreignRow.rows[0]!.id}`).set(authHeader);
     expect(forged.status).toBe(404);
     expect(forged.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+
+    const repeatedAnalytics = await request(app)
+      .get(`/tenants/${tenant.id}/analytics/funnel?accountId=${rowA.id}&accountId=${rowB.id}`)
+      .set(authHeader);
+    expect(repeatedAnalytics.status).toBe(400);
+    const emptyAnalytics = await request(app)
+      .get(`/tenants/${tenant.id}/analytics?accountId=`)
+      .set(authHeader);
+    expect(emptyAnalytics.status).toBe(400);
+    const repeatedTopPosts = await request(app)
+      .get(`/tenants/${tenant.id}/analytics/top-posts?accountId=${rowA.id}&accountId=${rowB.id}`)
+      .set(authHeader);
+    expect(repeatedTopPosts.status).toBe(400);
   });
 
 });
