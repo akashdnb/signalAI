@@ -108,6 +108,22 @@ export async function createCampaign(
   return toCampaign(result.rows[0]!);
 }
 
+/** Create an unpublished campaign using a caller-owned pool/client transaction. */
+export async function createCampaignWithClient(
+  client: Queryable,
+  tenantId: string,
+  name: string,
+  keywords: string[],
+): Promise<Campaign> {
+  const result = await client.query<CampaignRow>(
+    `insert into campaigns (tenant_id, name, keywords, enabled)
+     values ($1, $2, $3, false)
+     returning *`,
+    [tenantId, name, keywords],
+  );
+  return toCampaign(result.rows[0]!);
+}
+
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(`select campaigns.*, exists (select 1 from campaign_journey_versions published where published.tenant_id = campaigns.tenant_id and published.campaign_id = campaigns.id) as published from campaigns where campaigns.tenant_id = $1 order by campaigns.created_at desc`, [tenantId]);
   return result.rows.map(toCampaign);
