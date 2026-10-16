@@ -178,6 +178,7 @@ export const INDUSTRY_LABEL: Record<TenantIndustry, string> = {
 export interface TenantSummary {
   id: string;
   name: string;
+  description?: string | null;
   billingStatus: "none" | "active" | "canceled";
   industry: TenantIndustry | null;
 }
@@ -308,6 +309,8 @@ export interface Campaign {
 
 export interface ObservedMedia {
   mediaId: string;
+  /** Instagram business account that owns this media; absent on legacy unattributed metadata. */
+  instagramAccountId?: string | null;
   commentCount: number;
   lastSeenAt: string | null;
   /** Cached Graph API metadata — null until enriched (see server's routes/campaigns.ts), which happens lazily whenever the picker loads an entry it doesn't have this for yet. */
@@ -837,7 +840,7 @@ export const api = {
   // Backs the campaign editor's post-targeting picker: posts this tenant
   // has actually received a comment on, derived from ingested events
   // rather than a Graph API media-listing call.
-  listObservedMedia: (tenantId: string) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media`),
+  listObservedMedia: (tenantId: string, accountId?: string | null) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   // Resolves a pasted post/Reel URL against the connected account's own
   // media and adds it as a known post — usable for targeting even before
   // any comment on it has arrived.
