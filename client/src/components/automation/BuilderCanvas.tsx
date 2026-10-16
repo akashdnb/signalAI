@@ -21,6 +21,7 @@ import {
 
 import {
   api,
+  ApiError,
   type BuilderGraph,
   type Campaign,
   type JourneyEdge,
@@ -40,6 +41,7 @@ import {
   TrashIcon,
 } from "../icons";
 import { BuilderNode } from "./BuilderNode";
+import { BottomSheet } from "../BottomSheet";
 
 export interface MessageJourneyTarget {
   id: string;
@@ -565,6 +567,8 @@ export function BuilderCanvas({
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadErrorKind, setLoadErrorKind] = useState<"load" | "save" | null>(null);
+  const [conflictVersion, setConflictVersion] = useState<number | null>(null);
+  const [showConflictRecovery, setShowConflictRecovery] = useState(false);
 
   const setVersion = useCallback(
     (version: number) => {
@@ -605,6 +609,8 @@ export function BuilderCanvas({
     }));
     setLoadError(null);
     setLoadErrorKind(null);
+    setConflictVersion(null);
+    setShowConflictRecovery(false);
     onCanvasDirtyChange?.(false);
     onSaveStateChange?.("saved");
   }, [onCanvasDirtyChange, onSaveStateChange, setEdges, setNodes]);
@@ -1008,6 +1014,7 @@ export function BuilderCanvas({
       onSaveStateChange?.("saving");
       setLoadError(null);
       setLoadErrorKind(null);
+      setConflictVersion(null);
 
       try {
         const saved = await api.saveBuilderGraph(
@@ -1043,6 +1050,16 @@ export function BuilderCanvas({
           error instanceof Error ? error.message : "Failed to save journey",
         );
         setLoadErrorKind("save");
+        if (error instanceof ApiError && error.status === 409) {
+          const payload = error.payload;
+          const currentVersion =
+            typeof payload === "object" && payload !== null &&
+            "currentVersion" in payload &&
+            typeof (payload as { currentVersion?: unknown }).currentVersion === "number"
+              ? (payload as { currentVersion: number }).currentVersion
+              : null;
+          setConflictVersion(currentVersion);
+        }
         // Keep the local draft intact on conflicts or failures so nothing the
         // user has changed is silently discarded.
         return false;
@@ -1311,17 +1328,27 @@ export function BuilderCanvas({
       {loadError && (
         <div className="absolute left-4 right-4 top-4 z-30 flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-subtle shadow-sm md:left-[205px]">
           <span>{loadError}</span>
-          <button
-            type="button"
-            className="font-semibold text-accent hover:text-accent-hover"
-            onClick={() =>
-              loadErrorKind === "save"
-                ? void persistGraph(milestones)
-                : void loadGraph(false)
-            }
-          >
-            {loadErrorKind === "save" ? "Retry save" : "Retry loading"}
-          </button>
+          {loadErrorKind === "save" && conflictVersion !== null ? (
+            <button
+              type="button"
+              className="font-semibold text-accent hover:text-accent-hover"
+              onClick={() => setShowConflictRecovery(true)}
+            >
+              Review version conflict
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="font-semibold text-accent hover:text-accent-hover"
+              onClick={() =>
+                loadErrorKind === "save"
+                  ? void persistGraph(milestones)
+                  : void loadGraph(false)
+              }
+            >
+              {loadErrorKind === "save" ? "Retry save" : "Retry loading"}
+            </button>
+          )}
         </div>
       )}
 
@@ -1428,6 +1455,43 @@ export function BuilderCanvas({
         <div className="absolute bottom-4 right-4 z-20 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[11px] text-subtle shadow-sm">
           Saving…
         </div>
+      )}
+
+      {showConflictRecovery && (
+        <BottomSheet
+          title="Journey changed elsewhere"
+          onClose={() => setShowConflictRecovery(false)}
+          maxWidth={500}
+        >
+          <div className="banner banner-error">
+            {conflictVersion === null
+              ? "A newer journey version exists on the server."
+              : `The server is on version v${conflictVersion}.`}
+            {" "}Your local edits are still here and have not been saved. Saving again without loading the latest version would repeat the conflict.
+          </div>
+          <p className="muted mt-3 text-sm leading-5">
+            Keep editing to copy your changes somewhere safe, or load the latest saved journey and reapply them. Loading the server version replaces this local draft.
+          </p>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className="btn-secondary min-h-11"
+              onClick={() => setShowConflictRecovery(false)}
+            >
+              Keep my draft
+            </button>
+            <button
+              type="button"
+              className="btn-primary min-h-11"
+              onClick={() => {
+                setShowConflictRecovery(false);
+                void loadGraph(false);
+              }}
+            >
+              Load latest saved version
+            </button>
+          </div>
+        </BottomSheet>
       )}
     </div>
   );

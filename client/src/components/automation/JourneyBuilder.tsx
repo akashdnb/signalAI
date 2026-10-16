@@ -135,6 +135,7 @@ export function JourneyBuilder({
 
   const detailsRef = useRef<CampaignEditorHandle>(null);
   const journeyDirty = canvasDirty || milestonesDirty;
+  const hasUnsavedChanges = journeyDirty || detailsDirty;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -154,7 +155,7 @@ export function JourneyBuilder({
 
   const requestNavigation = useCallback(
     (action: () => void | Promise<void>) => {
-      if (!journeyDirty) {
+      if (!hasUnsavedChanges) {
         void action();
         return;
       }
@@ -163,7 +164,7 @@ export function JourneyBuilder({
       setUnsavedDialogError(null);
       setShowUnsavedDialog(true);
     },
-    [journeyDirty],
+    [hasUnsavedChanges],
   );
 
   async function saveCanvasDraft(): Promise<boolean> {
@@ -228,7 +229,7 @@ export function JourneyBuilder({
   }
 
   useEffect(() => {
-    if (!journeyDirty) return;
+    if (!hasUnsavedChanges) return;
 
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -237,13 +238,13 @@ export function JourneyBuilder({
 
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [journeyDirty]);
+  }, [hasUnsavedChanges]);
 
   // Guard browser back/forward within the SPA. Restore the current history
   // entry before opening the dialog; if the user confirms, navigate to the
   // destination captured from the blocked popstate instead.
   useEffect(() => {
-    if (!journeyDirty) return;
+    if (!hasUnsavedChanges) return;
 
     const interceptPopState = (event: PopStateEvent) => {
       const targetIndex =
@@ -276,13 +277,13 @@ export function JourneyBuilder({
 
     window.addEventListener("popstate", interceptPopState, true);
     return () => window.removeEventListener("popstate", interceptPopState, true);
-  }, [journeyDirty, navigate, requestNavigation]);
+  }, [hasUnsavedChanges, navigate, requestNavigation]);
 
   // BrowserRouter does not block SPA navigation by itself. Intercept ordinary
   // same-origin links while a canvas draft exists and resume navigation only
   // after the user explicitly saves or discards it.
   useEffect(() => {
-    if (!journeyDirty) return;
+    if (!hasUnsavedChanges) return;
 
     const interceptInternalLink = (event: MouseEvent) => {
       if (
@@ -327,7 +328,7 @@ export function JourneyBuilder({
 
     document.addEventListener("click", interceptInternalLink, true);
     return () => document.removeEventListener("click", interceptInternalLink, true);
-  }, [journeyDirty, navigate, requestNavigation]);
+  }, [hasUnsavedChanges, navigate, requestNavigation]);
 
   async function loadMilestones() {
     const requestId = ++milestonesLoadRequestRef.current;
@@ -509,6 +510,11 @@ export function JourneyBuilder({
   }
 
   function requestPublish() {
+    if (detailsDirty) {
+      setPublishError("Save or discard the unsaved Setup changes before publishing this journey.");
+      setSubTab("details");
+      return;
+    }
     requestNavigation(() => {
       if (builderVersion === null) {
         setPublishError("The current version is still loading.");
@@ -586,7 +592,7 @@ export function JourneyBuilder({
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={() => void saveCanvasDraft()}
                 >
-                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading setup…" : "Save changes"}
+                  {builderSaveState === "saving" ? "Saving…" : milestonesLoading ? "Loading setup…" : "Save journey"}
                 </button>
               )}
 
@@ -1138,6 +1144,8 @@ export function JourneyBuilder({
         <PreviewDialog
           tenantId={tenantId}
           campaign={campaign}
+          hasUnsavedChanges={hasUnsavedChanges}
+          savedVersion={builderVersion}
           onClose={() => setShowPreview(false)}
         />
       )}
@@ -1147,6 +1155,8 @@ export function JourneyBuilder({
           tenantId={tenantId}
           campaign={campaign}
           milestones={milestones}
+          hasUnsavedChanges={hasUnsavedChanges}
+          savedVersion={builderVersion}
           onClose={() => setShowTestJourney(false)}
         />
       )}

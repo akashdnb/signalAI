@@ -14,11 +14,15 @@ export function TestJourneyDialog({
   tenantId,
   campaign,
   milestones,
+  hasUnsavedChanges = false,
+  savedVersion,
   onClose,
 }: {
   tenantId: string;
   campaign: Campaign;
   milestones: Milestone[];
+  hasUnsavedChanges?: boolean;
+  savedVersion: number | null;
   onClose: () => void;
 }) {
   const [started, setStarted] = useState(false);
@@ -77,9 +81,14 @@ export function TestJourneyDialog({
       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950">
         <p className="m-0 text-sm font-semibold">Sample walkthrough, not a live Instagram test</p>
         <p className="m-0 mt-1 text-xs leading-5">
-          SignalAI checks the first reply using the preview service. Later goal steps are simulated in this window only; no real lead, Instagram conversation, or captured data is changed.
+          SignalAI checks the first reply using saved settings{savedVersion === null ? "" : ` (builder v${savedVersion})`}. Later goal steps are simulated in this window only; no real lead, Instagram conversation, or captured data is changed.
         </p>
       </div>
+      {hasUnsavedChanges && (
+        <div className="banner banner-error mb-4" role="status">
+          This walkthrough uses saved settings and does not include your unsaved draft. Save the journey before testing your latest changes.
+        </div>
+      )}
 
       {!started ? (
         <button type="button" className="btn-primary" onClick={handleStart}>

@@ -170,6 +170,64 @@ describe("journey publishing", () => {
     expect(latest.body.version).toBe(2);
   });
 
+  it("does not publish an invalid saved graph and returns actionable validation errors", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(
+      pool,
+      SESSION_SECRET,
+      "creator-invalid-publish",
+    );
+    const app = createApp();
+
+    const create = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns`)
+      .set(authHeader)
+      .send({ name: "Invalid publish", keywords: ["DETAILS"] });
+    expect(create.status).toBe(201);
+    const campaignId = create.body.id as string;
+
+    // Structurally saveable, semantically invalid: no trigger and no terminal.
+    // Publication must invoke the server's canonical validator.
+    const save = await request(app)
+      .put(`/tenants/${tenant.id}/campaigns/${campaignId}/builder`)
+      .set(authHeader)
+      .send({
+        expectedVersion: 1,
+        nodes: [
+          {
+            id: "22222222-2222-2222-2222-222222222222",
+            type: "message",
+            position: { x: 0, y: 100 },
+            data: {},
+            parentGroupId: null,
+            collapsed: false,
+          },
+        ],
+        edges: [],
+      });
+    expect(save.status).toBe(200);
+    expect(save.body.version).toBe(2);
+
+    const publish = await request(app)
+      .post(`/tenants/${tenant.id}/campaigns/${campaignId}/journey/publish`)
+      .set(authHeader)
+      .send({ expectedBuilderVersion: 2 });
+    expect(publish.status).toBe(400);
+    expect(publish.body.error).toBe("journey validation failed");
+    expect(publish.body.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "INVALID_TRIGGER_COUNT" }),
+        expect.objectContaining({ code: "NO_TERMINAL_NODE" }),
+      ]),
+    );
+
+    const published = await request(app)
+      .get(`/tenants/${tenant.id}/campaigns/${campaignId}/journey/published`)
+      .set(authHeader);
+    expect(published.status).toBe(200);
+    expect(published.body).toBeNull();
+  });
+
   it("rejects publishing with a stale builder version", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(
