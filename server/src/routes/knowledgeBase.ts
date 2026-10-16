@@ -127,7 +127,18 @@ export function knowledgeBaseRouter(embeddingProvider: EmbeddingProvider | null)
     }
   });
 
-  router.post("/tenants/:tenantId/knowledge-base", upload.single("file"), async (req, res) => {
+  router.post(
+    "/tenants/:tenantId/knowledge-base",
+    (req, res, next) => {
+      upload.single("file")(req, res, (err: unknown) => {
+        if (err && typeof err === "object" && "code" in err && err.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({ error: "file is too large; the maximum upload size is 10 MB" });
+        }
+        if (err) return next(err);
+        return next();
+      });
+    },
+    async (req, res) => {
     if (!embeddingProvider) {
       return res.status(503).json({ error: "the knowledge base is not configured on this server" });
     }
@@ -154,7 +165,7 @@ export function knowledgeBaseRouter(embeddingProvider: EmbeddingProvider | null)
       Sentry.captureException(err);
       return res.status(502).json({ error: "failed to ingest the uploaded document" });
     }
-  });
+    });
 
   router.delete("/tenants/:tenantId/knowledge-base/:documentId", async (req, res) => {
     const deleted = await deleteDocument(getPool(), req.params.tenantId!, req.params.documentId!);
