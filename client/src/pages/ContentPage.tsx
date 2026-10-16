@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type ObservedMedia } from "../api";
 import { PlayIcon } from "../components/icons";
+import { useTenant } from "../context/TenantContext";
 
 const TYPE_LABEL: Record<string, string> = {
   IMAGE: "Image",
@@ -27,6 +28,7 @@ function mediaPreviewLabel(mediaType: string | null): string {
 export function ContentPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
 
   const [media, setMedia] = useState<ObservedMedia[] | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -38,8 +40,11 @@ export function ContentPage() {
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
+    setMedia(null);
+    setError(null);
+    setPreviewMedia(null);
     api
-      .listObservedMedia(tenantId)
+      .listObservedMedia(tenantId, selectedAccountId)
       .then((m) => {
         if (!cancelled) {
           setMedia(m);
@@ -49,7 +54,7 @@ export function ContentPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        if (err instanceof ApiError && (err.status === 401)) {
           navigate("/login", { replace: true });
           return;
         }
@@ -58,7 +63,7 @@ export function ContentPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate, reloadCount]);
+  }, [tenantId, navigate, reloadCount, selectedAccountId]);
 
   useEffect(() => {
     if (!previewMedia) return;
