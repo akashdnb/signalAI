@@ -51,13 +51,29 @@ export async function createJourneyDraftWithClient(
   const campaign = await createCampaignWithClient(client, tenantId, name, [trigger]);
   const defaultGraph = await getBuilderGraphWithClient(client, tenantId, campaign.id);
   if (!defaultGraph) throw new Error("draft_graph_unavailable");
+  const graphToPersist: BuilderGraph = {
+    nodes: nodes ?? defaultGraph.nodes,
+    edges: edges ?? defaultGraph.edges,
+    version: defaultGraph.version,
+  };
+  const validation = validateJourneyGraph(graphToPersist, await listMilestonesWithClient(client, tenantId, campaign.id));
+  if (!validation.valid) {
+    throw new DraftLifecycleError("validation_error", "The draft graph is invalid.", {
+      validationErrors: validation.errors.map((error) => ({
+        code: error.code.toLowerCase(),
+        message: error.message,
+        ...(error.nodeId ? { nodeId: error.nodeId } : {}),
+        ...(error.edgeId ? { edgeId: error.edgeId } : {}),
+      })),
+    });
+  }
   const save = await saveBuilderGraphWithClient(
     client,
     tenantId,
     campaign.id,
     defaultGraph.version,
-    nodes ?? defaultGraph.nodes,
-    edges ?? defaultGraph.edges,
+    graphToPersist.nodes,
+    graphToPersist.edges,
   );
   if (save.status === "not_found") {
     throw new DraftLifecycleError("resource_not_found", "The draft could not be found.");
