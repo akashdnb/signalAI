@@ -413,6 +413,81 @@ describe("leads routes (Phase 2A)", () => {
     expect(list.body).toHaveLength(1);
   });
 
+  it("GET notes rejects a lead id outside the authorized tenant", async () => {
+    const pool = getPool();
+    const { tenant: tenantA, authHeader: authA } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { tenant: tenantB, authHeader: authB } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "ig-user-a");
+    await request(createApp())
+      .post(`/tenants/${tenantA.id}/leads/${leadA.id}/notes`)
+      .set(authA)
+      .send({ body: "Private note" });
+
+    const app = createApp();
+    const crossTenant = await request(app)
+      .get(`/tenants/${tenantB.id}/leads/${leadA.id}/notes`)
+      .set(authB);
+    expect(crossTenant.status).toBe(404);
+
+    // User A also cannot request tenant B's route by changing the tenant ID.
+    const crossUser = await request(app)
+      .get(`/tenants/${tenantB.id}/leads/${leadA.id}/notes`)
+      .set(authA);
+    expect([401, 403]).toContain(crossUser.status);
+  });
+
+  it("GET leads filters and sorts on the server, including captured facts", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const qualified = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-qualified");
+    const newer = await findOrCreateLeadByInstagramUserId(pool, tenant.id, "ig-newer");
+
+    await pool.query(
+      "update leads set pipeline_stage = 'qualified', created_at = now() - interval '2 days' where id = $1 and tenant_id = $2",
+      [qualified.id, tenant.id],
+    );
+    await pool.query(
+      "update leads set created_at = now() where id = $1 and tenant_id = $2",
+      [newer.id, tenant.id],
+    );
+    await mergeCapturedFacts(pool, tenant.id, qualified.id, { email: "buyer@example.com", budget: "5000" });
+
+    const app = createApp();
+    const filtered = await request(app)
+      .get(`/tenants/${tenant.id}/leads?q=buyer%40example.com&qualification=qualified&page=1&pageSize=20`)
+      .set(authHeader);
+    expect(filtered.status).toBe(200);
+    expect(filtered.body.total).toBe(1);
+    expect(filtered.body.items.map((item: { id: string }) => item.id)).toEqual([qualified.id]);
+
+    const invalidSort = await request(app)
+      .get(`/tenants/${tenant.id}/leads?sort=not-a-sort&page=1&pageSize=20`)
+      .set(authHeader);
+    expect(invalidSort.status).toBe(400);
+
+    const sorted = await request(app)
+      .get(`/tenants/${tenant.id}/leads?sort=created_asc&page=1&pageSize=20`)
+      .set(authHeader);
+    expect(sorted.status).toBe(200);
+    expect(sorted.body.items[0].id).toBe(qualified.id);
+  });
+
+  it("GET leads date filters validate dates and reject reversed ranges", async () => {
+    const pool = getPool();
+    const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const app = createApp();
+
+    const invalid = await request(app)
+      .get(`/tenants/${tenant.id}/leads?from=2026-02-30&page=1&pageSize=20`)
+      .set(authHeader);
+    expect(invalid.status).toBe(400);
+
+    const reversed = await request(app)
+      .get(`/tenants/${tenant.id}/leads?from=2026-10-10&to=2026-10-09&page=1&pageSize=20`)
+      .set(authHeader);
+    expect(reversed.status).toBe(400);
+  });
+
   it("GET timeline merges events and activity", async () => {
     const pool = getPool();
     const { tenant, authHeader } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
