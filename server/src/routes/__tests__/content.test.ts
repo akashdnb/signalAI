@@ -373,6 +373,11 @@ describe("content observed-media route", () => {
        values ($1, $2, 'evt-shared-media-b', 'comment', now(), 1, $3::jsonb)`,
       [tenantA.id, leadB.id, JSON.stringify({ mediaId: "same-media-id", instagramAccountId: "acct-b" })],
     );
+    await pool.query(
+      `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
+       values ($1, $2, 'evt-misattributed-media', 'comment', now() + interval '1 second', 2, $3::jsonb)`,
+      [tenantA.id, leadA.id, JSON.stringify({ mediaId: "wrong-account-post", instagramAccountId: "acct-b" })],
+    );
     await upsertMediaMetadata(pool, tenantA.id, {
       mediaId: "same-media-id",
       caption: "Account A post",
