@@ -4,7 +4,7 @@ import { findTenantByInstagramAccountId } from "../db/accounts.js";
 import { findOrCreateLeadByInstagramUserId, nextSequence, setActiveDmCampaignId, updateLastInboundAt, updateMessagingWindow } from "../db/leads.js";
 import { insertEventIdempotent } from "../db/events.js";
 import { insertPii } from "../db/pii.js";
-import { listActiveCampaignKeywords, type ReplyChannel, type TriggerSource } from "../db/campaigns.js";
+import { listActiveCampaignKeywordsForInstagramAccount, type ReplyChannel, type TriggerSource } from "../db/campaigns.js";
 import { findMatchingCampaign, resolveDmCampaignTrigger } from "../lib/keywordMatch.js";
 import { enqueueLeadEvent } from "../queue/leadEventsQueue.js";
 import { enqueueNewLeadAlert } from "../queue/alertsQueue.js";
@@ -17,9 +17,9 @@ const MESSAGING_WINDOW_HOURS = 24;
 /**
  * Ingests every event from one webhook payload. Meta can batch up to
  * ~1000 updates into a single POST, so tenant resolution and the active-
- * campaign list are each looked up once per distinct account/tenant
- * across the whole batch (R1-07 fix), not once per event — an N+1 that
- * mattered as soon as more than one event shared an account.
+ * tenant identity is resolved once per distinct account across the batch.
+ * Campaigns are separately cached per connected Instagram account: workspace-
+ * level reusable journeys only run when that account is explicitly attached.
  */
 export async function ingestWebhookEvents(
   pool: Pool,
@@ -27,7 +27,7 @@ export async function ingestWebhookEvents(
   events: ParsedWebhookEvent[],
 ): Promise<void> {
   const tenantIdByAccount = new Map<string, string | null>();
-  const campaignsByTenant = new Map<
+  const campaignsByAccount = new Map<
     string,
     Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>
   >();
@@ -47,10 +47,10 @@ export async function ingestWebhookEvents(
       continue;
     }
 
-    let campaigns = campaignsByTenant.get(tenantId);
+    let campaigns = campaignsByAccount.get(event.instagramAccountId);
     if (!campaigns) {
-      campaigns = await listActiveCampaignKeywords(pool, tenantId);
-      campaignsByTenant.set(tenantId, campaigns);
+      campaigns = await listActiveCampaignKeywordsForInstagramAccount(pool, tenantId, event.instagramAccountId);
+      campaignsByAccount.set(event.instagramAccountId, campaigns);
     }
 
     if (event.isEcho) {
