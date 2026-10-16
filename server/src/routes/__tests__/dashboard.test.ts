@@ -759,6 +759,19 @@ describe("dashboard routes (BUI backend surface)", () => {
       [tenant.id, "analytics-acct-a", "analytics-acct-b"],
     );
 
+    await recordDeadLetterEvent(pool, {
+      queueName: "lead-events",
+      sourceJobId: "analytics-dlq-a",
+      jobData: { tenantId: tenant.id, leadId: leadA.id, leadEventId: "failed-a", sequence: 1, instagramAccountId: "analytics-acct-a" },
+      failureOutput: { message: "failed A" },
+    });
+    await recordDeadLetterEvent(pool, {
+      queueName: "lead-events",
+      sourceJobId: "analytics-dlq-b",
+      jobData: { tenantId: tenant.id, leadId: leadB.id, leadEventId: "failed-b", sequence: 1, instagramAccountId: "analytics-acct-b" },
+      failureOutput: { message: "failed B" },
+    });
+
     const funnelA = await request(app).get(`/tenants/${tenant.id}/analytics/funnel?accountId=${rowA.id}`).set(authHeader);
     const funnelB = await request(app).get(`/tenants/${tenant.id}/analytics/funnel?accountId=${rowB.id}`).set(authHeader);
     expect(funnelA.status).toBe(200);
@@ -780,6 +793,20 @@ describe("dashboard routes (BUI backend surface)", () => {
     expect(keywordsA.body.map((item: { keyword: string }) => item.keyword)).toEqual(["fitness"]);
     expect(keywordsB.status).toBe(200);
     expect(keywordsB.body.map((item: { keyword: string }) => item.keyword)).toEqual(["real-estate"]);
+
+    const postsA = await request(app).get(`/tenants/${tenant.id}/analytics/top-posts?accountId=${rowA.id}`).set(authHeader);
+    const postsB = await request(app).get(`/tenants/${tenant.id}/analytics/top-posts?accountId=${rowB.id}`).set(authHeader);
+    expect(postsA.status).toBe(200);
+    expect(postsB.status).toBe(200);
+    expect(postsA.body[0]).toMatchObject({ mediaId: "shared-post-id", commentCount: 1 });
+    expect(postsB.body[0]).toMatchObject({ mediaId: "shared-post-id", commentCount: 1 });
+
+    const summaryA = await request(app).get(`/tenants/${tenant.id}/analytics?accountId=${rowA.id}`).set(authHeader);
+    const summaryB = await request(app).get(`/tenants/${tenant.id}/analytics?accountId=${rowB.id}`).set(authHeader);
+    expect(summaryA.status).toBe(200);
+    expect(summaryB.status).toBe(200);
+    expect(summaryA.body.dmFailures).toBe(1);
+    expect(summaryB.body.dmFailures).toBe(1);
 
     const foreignRow = await pool.query<{ id: string }>(
       "select id from meta_tokens where tenant_id = $1 and instagram_account_id = $2",
