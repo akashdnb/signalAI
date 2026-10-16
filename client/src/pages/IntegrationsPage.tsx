@@ -24,6 +24,9 @@ export function IntegrationsPage() {
 
   async function loadAccounts() {
     if (!tenantId) return;
+    setAccounts(null);
+    setError(null);
+    setConfirmingId(null);
     try {
       setAccounts(await workspaceApi.listConnectedAccounts(tenantId));
       setError(null);
