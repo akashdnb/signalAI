@@ -245,3 +245,102 @@
   .po-preview-app .sai-account-switcher__chevron,
   .po-preview-app .sai-account-switcher__panel { animation: none; transition: none; }
 }
+
+
+/* Production mode shares the same switcher with the preview, but uses the
+   application's semantic color tokens and avoids preview-only CSS variables. */
+.sai-account-switcher:not(.po-preview-app .sai-account-switcher) {
+  color: var(--color-ink, var(--text-primary, #242234));
+}
+.sai-account-switcher__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 5px 9px 5px 5px;
+  border: 1px solid var(--line, #e6e3ed);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: inherit;
+  text-align: left;
+}
+.sai-account-switcher__trigger:hover,
+.sai-account-switcher__trigger[aria-expanded="true"] {
+  background: var(--chip, #f5f2fb);
+}
+.sai-account-switcher__trigger:focus-visible,
+.sai-account-switcher__option:focus-visible,
+.sai-account-switcher__create-trigger:focus-visible,
+.sai-account-switcher__submit:focus-visible,
+.sai-account-switcher__cancel:focus-visible {
+  outline: 2px solid var(--accent, #7655d9);
+  outline-offset: 2px;
+}
+.sai-account-switcher__provider-chip,
+.sai-account-switcher__option-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--chip, #f5f2fb);
+  color: var(--accent, #7655d9);
+  font-weight: 750;
+}
+.sai-account-switcher__provider-chip { width: 34px; height: 34px; font-size: 10px; }
+.sai-account-switcher__identity,
+.sai-account-switcher__option-copy { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; gap: 2px; }
+.sai-account-switcher__identity strong { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.sai-account-switcher__identity small,
+.sai-account-switcher__option-copy small { overflow: hidden; color: var(--subtle, #696777); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.sai-account-switcher__chevron { width: 15px; height: 15px; flex: 0 0 15px; color: var(--subtle, #696777); }
+.sai-account-switcher__panel {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 110;
+  width: 330px; max-width: min(330px, calc(100vw - 24px));
+  max-height: min(75vh, 620px); overflow-y: auto; padding: 8px;
+  border: 1px solid var(--line, #e6e3ed); border-radius: 12px;
+  background: var(--card, #fff); color: var(--ink, #242234);
+  box-shadow: 0 16px 36px rgb(20 16 40 / 16%);
+}
+.sai-account-switcher__panel-heading { padding: 8px 9px 10px; border-bottom: 1px solid var(--line, #e6e3ed); }
+.sai-account-switcher__panel-heading > div { display: flex; flex-direction: column; gap: 3px; }
+.sai-account-switcher__panel-heading strong { font-size: 13px; font-weight: 700; }
+.sai-account-switcher__panel-heading small { color: var(--subtle, #696777); font-size: 11px; }
+.sai-account-switcher__options { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; }
+.sai-account-switcher__option { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 48px; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.sai-account-switcher__option:hover,
+.sai-account-switcher__option.is-selected { background: var(--chip, #f5f2fb); }
+.sai-account-switcher__option-icon { width: 32px; height: 32px; font-size: 10px; }
+.sai-account-switcher__option-copy strong { overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.sai-account-switcher__selected-icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--accent, #7655d9); }
+.sai-account-switcher__message { margin: 8px 9px; color: var(--subtle, #696777); font-size: 12px; line-height: 1.5; }
+.sai-account-switcher__message--error { color: var(--error, #b42318); }
+.sai-account-switcher__create,
+.sai-account-switcher__accounts { margin-top: 9px; padding: 9px 8px 3px; border-top: 1px solid var(--line, #e6e3ed); }
+.sai-account-switcher__create-trigger,
+.sai-account-switcher__accounts-heading button { padding: 0; border: 0; background: none; color: var(--accent, #7655d9); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.sai-account-switcher__create-form { display: grid; gap: 10px; }
+.sai-account-switcher__create-form label,
+.sai-account-switcher__account-select { display: grid; gap: 5px; color: var(--subtle, #696777); font-size: 11px; font-weight: 600; }
+.sai-account-switcher__create-form input,
+.sai-account-switcher__account-select select { width: 100%; min-width: 0; min-height: 37px; padding: 7px 9px; border: 1px solid var(--line, #e6e3ed); border-radius: 8px; background: var(--card, #fff); color: var(--ink, #242234); font: inherit; font-size: 13px; }
+.sai-account-switcher__create-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.sai-account-switcher__create-actions button { min-height: 35px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 650; cursor: pointer; }
+.sai-account-switcher__cancel { border: 1px solid var(--line, #e6e3ed); background: transparent; color: inherit; }
+.sai-account-switcher__submit { border: 1px solid var(--accent, #7655d9); background: var(--accent, #7655d9); color: white; }
+.sai-account-switcher__submit:disabled,
+.sai-account-switcher__cancel:disabled { cursor: not-allowed; opacity: .6; }
+.sai-account-switcher__accounts-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.sai-account-switcher__account-select { margin-bottom: 6px; }
+.sai-account-switcher__preview-account-hint { display: flex; align-items: center; gap: 6px; padding: 10px; color: var(--subtle, #696777); font-size: 11px; }
+@media (max-width: 767px) {
+  .sai-account-switcher { width: 100%; max-width: 100%; }
+  .sai-account-switcher__panel { right: 0; left: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sai-account-switcher__trigger,
+  .sai-account-switcher__chevron,
+  .sai-account-switcher__panel { animation: none; transition: none; }
+}
