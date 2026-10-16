@@ -2,7 +2,7 @@
 
 Roadmap item: **Complete Missing Backend APIs for Precision Operations**
 
-**Status:** Implemented on `main`; this document describes the post-merge implementation and the verification status of the stabilization pass. Endpoint behavior below was checked against the current route and application wiring.
+**Status:** Feature implementation is merged. This document records the current endpoint contracts, the post-merge profile registration regression found during stabilization, the fix proposed by PR #73, and the limits of verification performed so far.
 
 ## Implementation map
 
@@ -23,7 +23,9 @@ Roadmap item: **Complete Missing Backend APIs for Precision Operations**
 
 ### Profile route mounting
 
-The profile handler implementation exists in `server/src/routes/profile.ts`, and the client Settings page calls `GET/PATCH /me/profile`. During this stabilization audit, the current `server/src/app.ts` was inspected and **does not import or mount `profileRouter`**. This means router-level tests can pass while production requests through `createApp()` return 404. The route-registration regression is being corrected by mounting `profileRouter` in the actual application and adding a `createApp()`-level regression test.
+The profile handlers in `server/src/routes/profile.ts` exist, and the Settings page calls `GET/PATCH /me/profile`. The inspected `main` revision of `server/src/app.ts` did not import or mount `profileRouter`. Thus router implementation and route-level coverage alone did not guarantee the endpoint was reachable through the production `createApp()`.
+
+**Fix proposed in PR #73:** import and mount `profileRouter` in `createApp()`, with a dedicated application-wiring test covering authenticated GET/PATCH and rejection of an unauthenticated read. This correction is pending PR review and CI; it should not be described as shipped until merged.
 
 ### API security and behavior
 
@@ -38,14 +40,12 @@ The profile handler implementation exists in `server/src/routes/profile.ts`, and
 
 - **Notifications:** preferences remain unimplemented. The app has no persisted preference model or backed preference/event workflow. Adding apparently saved settings without a defined set of categories/channels, source events, delivery provider, defaults, opt-out/consent semantics, and retention policy would be misleading.
 - **Workspace settings:** existing backed rename/description and tenant-wide settings are reused rather than adding duplicate endpoints.
-- No MCP, automation-builder lifecycle, billing, team/multi-account feature, or unrelated analytics changes are part of this stabilization fix.
+- No MCP, automation-builder lifecycle, billing, team/multi-account feature, or unrelated analytics changes are part of PR #73.
 
-## Tests
+## Tests and verification
 
 Existing Knowledge Base integration coverage targets preview/retrieval validation and provider configuration, tenant-scoped access, foreign-tenant detail/preview/source requests, private storage metadata, and deletion isolation.
 
-Existing profile route tests cover authenticated own-profile reads/updates, validation, unsupported fields, persistence, explicit clearing, and unauthenticated access. Because those tests exercise the router via `createApp()` only if the router is mounted, a dedicated application-wiring regression test has been added to protect both GET and PATCH registration through `createApp()`.
+Existing profile route tests cover authenticated own-profile reads/updates, validation, unsupported fields, persistence, explicit clearing, and unauthenticated access. PR #73 adds a distinct `createApp()`-level test to prevent profile routes being implemented but left unmounted.
 
-## Verification status
-
-The stabilization branch adds a test that exercises the real application wiring. The local execution environment in this session cannot clone the repository because GitHub DNS/network access is unavailable; therefore this pass does not claim local test, typecheck, lint, or build results. The repository's server and client GitHub Actions workflows use `workflow_dispatch`; the available GitHub connector does not provide workflow dispatch. The PR must remain unmerged until these workflows are manually dispatched and pass.
+The code and diff have been inspected through GitHub. Local tests, typecheck, lint, and build have **not** been run in this session because the execution environment cannot resolve GitHub for cloning. The repository's server and client CI workflows require manual `workflow_dispatch`; the available GitHub connector does not expose a dispatch action, and no CI run is currently associated with the PR head. Keep PR #73 unmerged until server and client workflows are manually dispatched and pass.
