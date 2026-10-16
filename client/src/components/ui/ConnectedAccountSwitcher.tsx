@@ -127,7 +127,7 @@ function PreviewConnectedAccountSwitcher({ workspaceName, accounts, selectedAcco
 }
 
 function workspaceInitials(name: string): string {
-  const words = name.trim().split(/\\s+/).filter(Boolean);
+  const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "WS";
   return (words.length === 1 ? words[0]!.slice(0, 2) : words.slice(0, 2).map((word) => word[0]).join("")).toUpperCase();
 }
