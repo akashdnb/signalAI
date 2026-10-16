@@ -789,6 +789,7 @@ export function AppShell() {
               selectedAccountId={selectedAccountId ?? ""}
               onSelect={(id) => handleSelectAccount(id || null)}
               onManageAccounts={handleManageAccounts}
+              onRetryAccounts={() => { void reloadConnectedAccounts(); }}
               showAccountSelector={showAccountSelector}
               accountsLoading={accountsLoading}
               accountError={accountError}
