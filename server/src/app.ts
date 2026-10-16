@@ -33,6 +33,7 @@ import { onboardingRouter } from "./routes/onboarding.js";
 import { workspaceManagementRouter } from "./routes/workspaceManagement.js";
 import { workspacesRouter } from "./routes/workspaces.js";
 import { billingAccountsRouter } from "./routes/billingAccounts.js";
+import { mcpCapabilitiesRouter } from "./routes/mcpCapabilities.js";
 import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
@@ -87,6 +88,10 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(workspacesRouter);
   app.use(billingAccountsRouter);
   app.use(workspaceManagementRouter);
+
+  // Client-facing SignalAI MCP read boundary. It is service-authenticated
+  // and tenant-scoped; the MCP service never receives database credentials.
+  app.use(mcpCapabilitiesRouter);
 
   app.use(paginationRouter);
   // Content media enrichment is registered before the legacy campaigns
