@@ -4,6 +4,7 @@ import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStag
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
 import { PIPELINE_STAGES, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { useTenant } from "../context/TenantContext";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -17,6 +18,7 @@ const PAGE_SIZE = 20;
 export function LeadsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
 
   const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
   const [members, setMembers] = useState<TenantMember[] | null>(null);
@@ -30,7 +32,7 @@ export function LeadsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [stageFilter, handoffFilter, search]);
+  }, [stageFilter, handoffFilter, search, selectedAccountId]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -59,6 +61,7 @@ export function LeadsPage() {
           stage: stageFilter || undefined,
           handoffStatus: handoffFilter || undefined,
           q: search.trim() || undefined,
+          accountId: selectedAccountId || undefined,
         });
         if (cancelled) return;
         setPageData(result);
@@ -77,7 +80,7 @@ export function LeadsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, stageFilter, handoffFilter, search, page, reloadCount, navigate]);
+  }, [tenantId, stageFilter, handoffFilter, search, selectedAccountId, page, reloadCount, navigate]);
 
   if (!tenantId) return null;
 
