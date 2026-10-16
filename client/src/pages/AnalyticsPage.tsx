@@ -92,7 +92,7 @@ export function AnalyticsPage() {
       ]);
       if (cancelled) return;
 
-      const authFailure = results.find((result) => result.status === "rejected" && result.reason instanceof ApiError && (result.reason.status === 401 || result.reason.status === 403));
+      const authFailure = results.find((result) => result.status === "rejected" && result.reason instanceof ApiError && (result.reason.status === 401));
       if (authFailure) {
         navigate("/login", { replace: true });
         return;
