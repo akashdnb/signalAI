@@ -99,11 +99,13 @@ export function InboxPage() {
   }, [tenantId, tab, search, selectedAccountId, page, reloadCount]);
 
   useEffect(() => {
+    setPageData(null);
+    setError(null);
     setSelectedLeadId(null);
     setTags(null);
     setPendingEntries([]);
     setComposeText("");
-  }, [selectedAccountId]);
+  }, [tenantId, selectedAccountId]);
 
   const selectedLastInboundAtRef = useRef<string | null>(null);
   const reloadLeadsRef = useRef(reloadLeads);
