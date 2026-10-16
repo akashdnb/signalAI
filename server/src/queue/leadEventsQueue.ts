@@ -10,6 +10,8 @@ export interface LeadEventJob {
   leadId: string;
   leadEventId: string;
   sequence: number;
+  /** Connected Instagram provider account for account-scoped analytics and retry diagnostics. */
+  instagramAccountId?: string;
 }
 
 /**
