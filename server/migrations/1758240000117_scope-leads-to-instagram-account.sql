@@ -7,11 +7,8 @@
 alter table leads
   add column instagram_account_id text;
 
-alter table leads
-  add constraint leads_instagram_account_fk
-  foreign key (instagram_account_id)
-  references meta_tokens(instagram_account_id)
-  on delete set null;
+-- Keep the provider account ID after disconnect. It is durable conversation identity,
+-- not a foreign key to the currently connected credential row.
 
 update leads l
    set instagram_account_id = only_account.instagram_account_id
