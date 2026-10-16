@@ -1,7 +1,8 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
+import type { Pool } from "pg";
 import { getPool } from "../db/pool.js";
 import { getTenant } from "../db/tenants.js";
-import { deleteTokensForTenant, getAccountHealth } from "../db/tokens.js";
+import { deleteTokensForTenant, getAccountHealth, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
 import { listLeadsForTenant, type HandoffStatus, type PipelineStage } from "../db/leads.js";
 import {
   getCampaignAnalytics,
@@ -25,6 +26,29 @@ import { getGuardrailsConfig } from "../db/guardrailsConfig.js";
 import type { LLMProvider } from "../llm/provider.js";
 import type { EmbeddingProvider } from "../llm/embeddingProvider.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
+
+type RequestedAccountScope =
+  | { ok: true; instagramAccountId?: string }
+  | { ok: false };
+
+async function resolveRequestedAccountScope(
+  pool: Pool,
+  tenantId: string,
+  rawAccountRowId: unknown,
+  res: Response,
+): Promise<RequestedAccountScope> {
+  if (rawAccountRowId === undefined) return { ok: true };
+  if (typeof rawAccountRowId !== "string" || rawAccountRowId.length === 0) {
+    res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+    return { ok: false };
+  }
+  const instagramAccountId = await resolveInstagramAccountIdForTenant(pool, tenantId, rawAccountRowId);
+  if (!instagramAccountId) {
+    res.status(404).json({ error: "Instagram account not found for this workspace" });
+    return { ok: false };
+  }
+  return { ok: true, instagramAccountId };
+}
 
 const UNCONFIGURED_PREVIEW_PROVIDER: LLMProvider = {
   name: "unconfigured",
@@ -77,26 +101,39 @@ export function dashboardRouter(
   // Phase 2A Lead Filters/Lead Search, extended for the Inbox's filter tabs
   // (handoffStatus, unread): all optional, all AND'd together.
   router.get("/tenants/:tenantId/leads", async (req, res) => {
-    const { stage, ownerUserId, q, tagId, handoffStatus, unread } = req.query;
+    const { stage, ownerUserId, q, tagId, handoffStatus, unread, accountId } = req.query;
     if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) {
       return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
     }
     if (handoffStatus !== undefined && !VALID_HANDOFF_STATUSES.includes(handoffStatus as HandoffStatus)) {
       return res.status(400).json({ error: `handoffStatus must be one of ${VALID_HANDOFF_STATUSES.join(", ")}` });
     }
-    const leads = await listLeadsForTenant(getPool(), req.params.tenantId, 100, {
+    const tenantId = req.params.tenantId;
+    const pool = getPool();
+    const accountRowId = typeof accountId === "string" && accountId ? accountId : undefined;
+    const instagramAccountId = accountRowId
+      ? await resolveInstagramAccountIdForTenant(pool, tenantId, accountRowId)
+      : undefined;
+    if (accountRowId && !instagramAccountId) {
+      return res.status(404).json({ error: "Instagram account not found for this workspace" });
+    }
+    const leads = await listLeadsForTenant(pool, tenantId, 100, {
       stage: stage as PipelineStage | undefined,
       ownerUserId: typeof ownerUserId === "string" ? ownerUserId : undefined,
       q: typeof q === "string" ? q : undefined,
       tagId: typeof tagId === "string" ? tagId : undefined,
       handoffStatus: handoffStatus as HandoffStatus | undefined,
       unreadOnly: unread === "true",
+      instagramAccountId,
     });
     return res.status(200).json(leads);
   });
 
   router.get("/tenants/:tenantId/analytics", async (req, res) => {
-    const analytics = await getTenantAnalytics(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const analytics = await getTenantAnalytics(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(analytics);
   });
 
@@ -104,19 +141,28 @@ export function dashboardRouter(
   // lead's current pipeline_stage, not a transition history) and a
   // won-deals revenue rollup, grouped by currency.
   router.get("/tenants/:tenantId/analytics/funnel", async (req, res) => {
-    const funnel = await getPipelineFunnel(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const funnel = await getPipelineFunnel(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(funnel);
   });
 
   router.get("/tenants/:tenantId/analytics/revenue", async (req, res) => {
-    const revenue = await getRevenueSummary(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const revenue = await getRevenueSummary(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(revenue);
   });
 
   // Dashboard R6: trailing-30-day comment/DM counts for the "Conversations
   // over time" chart.
   router.get("/tenants/:tenantId/analytics/timeseries", async (req, res) => {
-    const timeseries = await getConversationsTimeseries(getPool(), req.params.tenantId);
+    const pool = getPool();
+    const scope = await resolveRequestedAccountScope(pool, req.params.tenantId, req.query.accountId, res);
+    if (!scope.ok) return;
+    const timeseries = await getConversationsTimeseries(pool, req.params.tenantId, scope.instagramAccountId);
     return res.status(200).json(timeseries);
   });
 
