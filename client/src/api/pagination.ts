@@ -17,6 +17,7 @@ export interface LeadListFilters {
   tagId?: string;
   handoffStatus?: HandoffStatus;
   unreadOnly?: boolean;
+  accountId?: string;
 }
 
 export interface CampaignListFilters {
@@ -46,7 +47,7 @@ async function getPage<T>(
     } catch {
       // Keep the HTTP status text when the response is not JSON.
     }
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       localStorage.removeItem("signalai.session");
     }
     throw new ApiError(response.status, message);
@@ -93,6 +94,7 @@ export function getLeadsPage(
       tagId: filters.tagId,
       handoffStatus: filters.handoffStatus,
       unread: filters.unreadOnly,
+      accountId: filters.accountId,
     })}`,
   );
 }
