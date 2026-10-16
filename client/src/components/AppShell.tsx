@@ -6,22 +6,24 @@ import {
   clearSession,
   loadSession,
   saveSession,
+  type AccountHealth,
   type BillingSummary,
   type TenantSummary,
   type UsageSummary,
 } from "../api";
 import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole, type WorkspaceSummary } from "../api/workspace";
 import { BottomSheet } from "./BottomSheet";
+import { ConnectedAccountSwitcher, type ConnectedAccountSwitcherOption } from "./ui/ConnectedAccountSwitcher";
+import { NotificationBell } from "./NotificationBell";
 import { TenantContext } from "../context/TenantContext";
+import { WorkspaceContextSwitcher } from "./WorkspaceContextSwitcher";
 import { deriveDisplayName } from "../lib/leadFormatting";
 import { Logo } from "./Logo";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { ThemeToggle } from "./ThemeToggle";
-import { ConnectedAccountSwitcher, type ConnectedAccountSwitcherOption, type WorkspaceSwitcherOption } from "./ui/ConnectedAccountSwitcher";
 import {
   AnalyticsIcon,
   AutomationIcon,
-  BellIcon,
   BookIcon,
   BroadcastIcon,
   ChevronDownIcon,
@@ -145,61 +147,19 @@ function PlanCard({ tenantId, billing }: { tenantId: string; billing: BillingSum
   );
 }
 
-type WorkspaceContextControls = {
-  workspaceOptions: WorkspaceSwitcherOption[] | null;
-  currentWorkspaceId: string;
-  currentWorkspaceRole: WorkspaceRole | null;
-  workspaceError: string | null;
-  onReloadWorkspaces: () => void;
-  onReloadAccounts: () => void;
-  onSelectWorkspace: (workspaceId: string) => void;
-  onCreateWorkspace: (name: string, description: string) => Promise<WorkspaceSwitcherOption>;
-  connectedAccounts: ConnectedInstagramAccount[] | null;
-  accountOptions: ConnectedAccountSwitcherOption[];
-  selectedAccountId: string | null;
-  accountError: string | null;
-  accountsLoading: boolean;
-  onSelectAccount: (accountId: string) => void;
-  onManageAccounts: () => void;
-  showAccountSelector: boolean;
-};
-
-function accountHealthSummary(accounts: ConnectedInstagramAccount[] | null, error: string | null): string {
-  if (accounts === null) return error ? "Connection status unavailable" : "Checking Instagram accounts…";
-  if (accounts.length === 0) return "No Instagram accounts connected";
-  const attention = accounts.filter((account) => account.status !== "healthy").length;
-  return accounts.length + " Instagram account" + (accounts.length === 1 ? "" : "s")
-    + (attention > 0 ? " · " + attention + " need attention" : " · All healthy");
-}
-
 function MobileAccountSheet({
   tenant,
-  connectedAccounts,
+  account,
   usage,
   email,
   firstName,
   lastName,
   picture,
-  workspaceOptions,
-  currentWorkspaceId,
-  currentWorkspaceRole,
-  workspaceError,
-  onReloadWorkspaces,
-  onReloadAccounts,
-  onSelectWorkspace,
-  onCreateWorkspace,
-  accountOptions,
-  selectedAccountId,
-  accountError,
-  accountsLoading,
-  onSelectAccount,
-  onManageAccounts,
-  showAccountSelector,
   onClose,
   onLogout,
 }: {
   tenant: TenantSummary | null;
-  connectedAccounts: ConnectedInstagramAccount[] | null;
+  account: AccountHealth | null;
   usage: UsageSummary | null;
   email?: string;
   firstName?: string;
@@ -207,7 +167,7 @@ function MobileAccountSheet({
   picture?: string;
   onClose: () => void;
   onLogout: () => void;
-} & WorkspaceContextControls) {
+}) {
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
   const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
   const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
@@ -219,32 +179,15 @@ function MobileAccountSheet({
           <InstagramMarkIcon className="h-5.5 w-5.5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-base font-semibold text-ink">{tenant?.name ?? "Workspace"}</div>
-          <span className="text-sm text-subtle">{accountHealthSummary(connectedAccounts, accountError)}</span>
+          <div className="truncate text-base font-semibold text-ink">{tenant?.name ?? "…"}</div>
+          {account?.connected ? (
+            <span className="pill pill-ok m-0 inline-block">
+              <span className="mr-1">●</span>Connected
+            </span>
+          ) : (
+            <span className="text-sm text-subtle">Instagram not connected</span>
+          )}
         </div>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-line p-2">
-        <ConnectedAccountSwitcher
-          workspaceName={tenant?.name ?? "Workspace"}
-          providerLabel="Instagram"
-          providerIcon={<InstagramMarkIcon />}
-          accounts={accountOptions}
-          selectedAccountId={selectedAccountId ?? ""}
-          onSelect={onSelectAccount}
-          onManageAccounts={onManageAccounts}
-          workspaces={workspaceOptions}
-          currentWorkspaceId={currentWorkspaceId}
-          currentWorkspaceRole={currentWorkspaceRole}
-          workspaceError={workspaceError}
-          onReloadWorkspaces={onReloadWorkspaces}
-          onReloadAccounts={onReloadAccounts}
-          onSelectWorkspace={onSelectWorkspace}
-          onCreateWorkspace={onCreateWorkspace}
-          showAccountSelector={showAccountSelector}
-          accountsLoading={accountsLoading}
-          accountError={accountError}
-        />
       </div>
 
       {usage && (
@@ -274,7 +217,7 @@ function MobileAccountSheet({
         </span>
         <div>
           <div className="text-base font-medium text-ink">{profileName}</div>
-          <div className="text-sm text-subtle">{currentWorkspaceRole ? currentWorkspaceRole.charAt(0).toUpperCase() + currentWorkspaceRole.slice(1) : "Workspace access loading"}</div>
+          <div className="text-sm text-subtle">Owner</div>
         </div>
       </div>
 
@@ -297,71 +240,47 @@ function MobileAccountSheet({
 
 function AccountHeader({
   tenant,
-  connectedAccounts,
+  account,
   usage,
   email,
   firstName,
   lastName,
   picture,
-  workspaceOptions,
-  currentWorkspaceId,
-  currentWorkspaceRole,
-  workspaceError,
-  onReloadWorkspaces,
-  onSelectWorkspace,
-  onCreateWorkspace,
-  accountOptions,
-  selectedAccountId,
-  accountError,
-  accountsLoading,
-  onSelectAccount,
-  onManageAccounts,
-  showAccountSelector,
   onLogout,
 }: {
   tenant: TenantSummary | null;
-  connectedAccounts: ConnectedInstagramAccount[] | null;
+  account: AccountHealth | null;
   usage: UsageSummary | null;
   email?: string;
   firstName?: string;
   lastName?: string;
   picture?: string;
   onLogout: () => void;
-} & WorkspaceContextControls) {
+}) {
   const [profileOpen, setProfileOpen] = useState(false);
   const tokenPct = usage ? Math.min(100, Math.round((usage.tokens.used / Math.max(usage.tokens.allowance, 1)) * 100)) : 0;
   const profileName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(email);
   const profileInitial = (firstName?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
   return (
-    <header className="hidden min-h-14 h-auto flex-wrap items-center justify-between gap-2 border-b border-line bg-card px-3 py-2 md:flex xl:px-5">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <ConnectedAccountSwitcher
-          workspaceName={tenant?.name ?? "Workspace"}
-          providerLabel="Instagram"
-          providerIcon={<InstagramMarkIcon />}
-          accounts={accountOptions}
-          selectedAccountId={selectedAccountId ?? ""}
-          onSelect={onSelectAccount}
-          onManageAccounts={onManageAccounts}
-          workspaces={workspaceOptions}
-          currentWorkspaceId={currentWorkspaceId}
-          currentWorkspaceRole={currentWorkspaceRole}
-          workspaceError={workspaceError}
-          onReloadWorkspaces={onReloadWorkspaces}
-          onReloadAccounts={onReloadAccounts}
-          onSelectWorkspace={onSelectWorkspace}
-          onCreateWorkspace={onCreateWorkspace}
-          showAccountSelector={showAccountSelector}
-          accountsLoading={accountsLoading}
-          accountError={accountError}
-        />
-        <span className="hidden xl:block truncate text-xs text-subtle" title={accountHealthSummary(connectedAccounts, accountError)}>
-          {accountHealthSummary(connectedAccounts, accountError)}
+    <header className="hidden h-14 items-center justify-between gap-4 border-b border-line bg-card px-5 md:flex">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip text-accent">
+          <InstagramMarkIcon className="h-4 w-4" />
         </span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-ink">{tenant?.name ?? "…"}</div>
+          {account?.connected ? (
+            <span className="pill pill-ok m-0 inline-block">
+              <span className="mr-1">●</span>Connected
+            </span>
+          ) : (
+            <span className="text-xs text-subtle">Instagram not connected</span>
+          )}
+        </div>
       </div>
 
-      <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-3">
+      <div className="flex shrink-0 items-center gap-4">
         {usage && (
           <div className="w-36">
             <div className="flex items-center justify-between text-xs text-subtle">
@@ -383,23 +302,14 @@ function AccountHeader({
 
         <ThemeToggle />
 
-        <button
-          type="button"
-          aria-label="Notifications (coming soon)"
-          title="Notifications are not available yet"
-          disabled
-          className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-subtle opacity-50"
-        >
-          <BellIcon className="h-4.5 w-4.5" />
-        </button>
+{/* Notification inbox lives in this workspace; opening it fetches only the signed-in user's records. */}
+        <NotificationBell tenantId={tenant?.id ?? ""} />
 
         <div className="relative">
           <button
             type="button"
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-chip"
-            aria-haspopup="menu"
-            aria-expanded={profileOpen}
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-sm font-semibold text-white">
               {picture ? (
@@ -408,7 +318,7 @@ function AccountHeader({
             </span>
             <span className="text-left leading-tight">
               <span className="block text-sm font-medium text-ink">{profileName}</span>
-              <span className="block text-xs text-subtle">{currentWorkspaceRole ? currentWorkspaceRole.charAt(0).toUpperCase() + currentWorkspaceRole.slice(1) : "Workspace access loading"}</span>
+              <span className="block text-xs text-subtle">Owner</span>
             </span>
             <ChevronDownIcon className="h-4 w-4 text-subtle" />
           </button>
@@ -450,6 +360,8 @@ export function AppShell() {
   const location = useLocation();
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [account, setAccount] = useState<AccountHealth | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[] | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
@@ -473,8 +385,7 @@ export function AppShell() {
   // simplification rather than a persisted step field.
   const [wizardLatchedOpen, setWizardLatchedOpen] = useState(false);
   const session = loadSession();
-  // tenantId is a requested workspace context, not an authorization token. Every tenant endpoint re-checks membership server-side.
-  const sessionValid = Boolean(tenantId && session?.token);
+  const sessionValid = Boolean(tenantId && session);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
@@ -551,10 +462,10 @@ export function AppShell() {
 
   async function reloadWorkspaces(): Promise<WorkspaceSummary[] | null> {
     try {
-      const next = await workspaceApi.listWorkspaces();
-      setWorkspaces(next);
+      const available = await workspaceApi.listWorkspaces();
+      setWorkspaces(available);
       setWorkspaceError(null);
-      return next;
+      return available;
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
       if (status === 401) {
@@ -572,8 +483,8 @@ export function AppShell() {
     setConnectedAccounts(null);
     setAccountError(null);
     try {
-      const next = await workspaceApi.listConnectedAccounts(tenantId);
-      setConnectedAccounts(next);
+      const available = await workspaceApi.listConnectedAccounts(tenantId);
+      setConnectedAccounts(available);
       setAccountError(null);
     } catch (err) {
       const status = (err as Error & { status?: number }).status;
@@ -586,37 +497,32 @@ export function AppShell() {
     }
   }
 
-  async function reloadTenant() {
+  function handleSelectAccount(accountId: string | null) {
     if (!tenantId) return;
-    try {
-      const t = await api.getTenant(tenantId);
-      setTenant(t);
-      setTenantError(null);
-    } catch (err) {
-      const status = (err as Error & { status?: number }).status;
-      if (status === 401) {
-        navigate("/login", { replace: true });
-        return;
-      }
-      if (status === 403) {
-        const available = await reloadWorkspaces();
-        const fallback = available?.find((workspace) => workspace.tenantId !== tenantId) ?? available?.[0];
-        if (fallback) {
-          const activeSession = loadSession();
-          if (activeSession) saveSession({ ...activeSession, tenantId: fallback.tenantId });
-          navigate("/dashboard/" + fallback.tenantId, { replace: true });
-          return;
-        }
-        setTenantError("Access denied: this workspace is not available to your account. Ask a workspace owner to invite you, or sign in with another account.");
-        return;
-      }
-      setTenantError(err instanceof Error ? err.message : "Failed to load workspace");
+    const key = "signalai.account-context:" + tenantId;
+    if (!accountId) {
+      localStorage.removeItem(key);
+      setSelectedAccountIdState(null);
+      setAccountError(null);
+      return;
     }
+    if (!connectedAccounts?.some((connected) => connected.id === accountId)) {
+      setAccountError("Choose an Instagram account from the server-provided list.");
+      return;
+    }
+    localStorage.setItem(key, accountId);
+    setSelectedAccountIdState(accountId);
+    setAccountError(null);
+  }
+
+  function handleManageAccounts() {
+    if (!tenantId) return;
+    setMobileAccountOpen(false);
+    navigate(`/dashboard/${tenantId}/integrations`);
   }
 
   useEffect(() => {
     if (sessionValid) {
-      void reloadTenant();
       void reloadWorkspaces();
       void reloadConnectedAccounts();
     }
@@ -636,7 +542,7 @@ export function AppShell() {
     if (!tenantId || connectedAccounts === null) return;
     const key = "signalai.account-context:" + tenantId;
     const stored = localStorage.getItem(key);
-    if (stored && connectedAccounts.some((account) => account.id === stored)) {
+    if (stored && connectedAccounts.some((connected) => connected.id === stored)) {
       setSelectedAccountIdState(stored);
     } else {
       if (stored) localStorage.removeItem(key);
@@ -644,80 +550,57 @@ export function AppShell() {
     }
   }, [tenantId, connectedAccounts]);
 
-  async function handleSelectWorkspace(workspaceId: string) {
-    let target = workspaces?.find((workspace) => workspace.tenantId === workspaceId);
-    if (!target) {
-      const refreshed = await reloadWorkspaces();
-      target = refreshed?.find((workspace) => workspace.tenantId === workspaceId);
-    }
-    if (!target) {
-      setWorkspaceError("That workspace is not in the list of workspaces available to your account.");
-      return;
-    }
-    const activeSession = loadSession();
-    if (!activeSession) {
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    const routePrefix = "/dashboard/" + tenantId;
-    let suffix = location.pathname.startsWith(routePrefix) ? location.pathname.slice(routePrefix.length) : "";
-    if (suffix.startsWith("/leads/")) suffix = "/leads";
-    else if (suffix.startsWith("/inbox/")) suffix = "/inbox";
-    else if (suffix.startsWith("/automation/")) suffix = "/automation";
-    else if (!["", "/inbox", "/leads", "/automation", "/knowledge", "/content", "/analytics", "/team", "/integrations", "/billing", "/settings"].includes(suffix)) suffix = "";
-
-    saveSession({ ...activeSession, tenantId: target.tenantId });
-    setSelectedAccountIdState(null);
-    navigate("/dashboard/" + target.tenantId + suffix);
-  }
-
-  async function handleCreateWorkspace(name: string, description: string): Promise<WorkspaceSwitcherOption> {
-    const created = await workspaceApi.createWorkspace(name, description);
-    setWorkspaces((current) => [...(current ?? []).filter((workspace) => workspace.tenantId !== created.tenantId), created]);
-    setWorkspaceError(null);
-    return { id: created.tenantId, name: created.name, description: created.description, role: created.role };
-  }
-
-  function handleSelectAccount(accountId: string | null) {
+  async function reloadTenant() {
     if (!tenantId) return;
-    const key = "signalai.account-context:" + tenantId;
-    if (!accountId) {
-      localStorage.removeItem(key);
-      setSelectedAccountIdState(null);
-      return;
+    try {
+      const t = await api.getTenant(tenantId);
+      setTenant(t);
+      setTenantError(null);
+      setAccessDenied(false);
+      const activeSession = loadSession();
+      if (activeSession && activeSession.tenantId !== tenantId) {
+        saveSession({ ...activeSession, tenantId });
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
+        navigate("/login", { replace: true });
+        return;
+      }
+      if (err instanceof ApiError && err.status === 403) {
+        setTenant(null);
+        setAccessDenied(true);
+        setTenantError("You don’t have access to this workspace. Choose a workspace you belong to.");
+        return;
+      }
+      setAccessDenied(false);
+      setTenantError(err instanceof Error ? err.message : "Failed to load workspace");
     }
-    if (!connectedAccounts?.some((account) => account.id === accountId)) {
-      setAccountError("Choose an Instagram account from the server-provided account list.");
-      return;
-    }
-    localStorage.setItem(key, accountId);
-    setSelectedAccountIdState(accountId);
-    setAccountError(null);
   }
 
-  function handleManageAccounts() {
-    if (!tenantId) return;
-    setMobileAccountOpen(false);
-    navigate("/dashboard/" + tenantId + "/integrations");
-  }
+  useEffect(() => {
+    if (sessionValid) reloadTenant();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, sessionValid]);
 
   useEffect(() => {
     if (!sessionValid || !tenantId) return;
     let cancelled = false;
     Promise.all([
+      api.getAccountHealth(tenantId),
       api.getUsage(tenantId),
       api.getBilling(tenantId),
       api.getLeads(tenantId, { unreadOnly: true }),
     ])
-      .then(([u, b, unread]) => {
+      .then(([a, u, b, unread]) => {
         if (cancelled) return;
+        setAccount(a);
         setUsage(u);
         setBilling(b);
         setUnreadCount(unread.length);
       })
       .catch(() => {
-        // Header usage chrome degrades gracefully; page-level data remains responsible for actionable errors.
+        // Header chrome degrades gracefully — a failed fetch just leaves these panels blank, it's not a page-blocking error.
       });
     return () => {
       cancelled = true;
@@ -733,20 +616,16 @@ export function AppShell() {
 
   const showWizard = Boolean(tenant) && (tenant!.industry === null || wizardLatchedOpen);
   const workspaceRole = workspaces?.find((workspace) => workspace.tenantId === tenantId)?.role ?? null;
-  const workspaceOptions: WorkspaceSwitcherOption[] | null = workspaces?.map((workspace) => ({
-    id: workspace.tenantId,
-    name: workspace.name,
-    description: workspace.description,
-    role: workspace.role,
-  })) ?? null;
-  const accountOptions: ConnectedAccountSwitcherOption[] = (connectedAccounts ?? []).map((account) => ({
-    id: account.id,
-    handle: account.instagramUsername ? "@" + account.instagramUsername : "Instagram account",
-    label: account.instagramUsername ? "@" + account.instagramUsername : "Instagram account",
-    connected: account.status === "healthy",
+  const accountOptions: ConnectedAccountSwitcherOption[] = (connectedAccounts ?? []).map((connected) => ({
+    id: connected.id,
+    handle: connected.instagramUsername ? "@" + connected.instagramUsername : "Instagram account",
+    label: connected.instagramUsername ? "@" + connected.instagramUsername : "Instagram account",
+    connected: connected.status === "healthy",
   }));
   const accountsLoading = connectedAccounts === null && accountError === null;
-  const showAccountSelector = ["/inbox", "/leads", "/content", "/analytics"].some((route) => location.pathname.endsWith(route));
+  const showAccountSelector = ["/inbox", "/leads", "/content"].some((suffix) =>
+    location.pathname.endsWith(suffix) || location.pathname.includes(suffix + "/"),
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas text-ink">
@@ -831,73 +710,68 @@ export function AppShell() {
 
         <AccountHeader
           tenant={tenant}
-          connectedAccounts={connectedAccounts}
+          account={account}
           usage={usage}
           email={session?.email}
           firstName={session?.firstName}
           lastName={session?.lastName}
           picture={session?.picture}
-          workspaceOptions={workspaceOptions}
-          currentWorkspaceId={tenantId}
-          currentWorkspaceRole={workspaceRole}
-          workspaceError={workspaceError}
-          onReloadWorkspaces={() => { void reloadWorkspaces(); }}
-          onReloadAccounts={() => { void reloadConnectedAccounts(); }}
-          onSelectWorkspace={(id) => { void handleSelectWorkspace(id); }}
-          onCreateWorkspace={handleCreateWorkspace}
-          accountOptions={accountOptions}
-          selectedAccountId={selectedAccountId}
-          accountError={accountError}
-          accountsLoading={accountsLoading}
-          onSelectAccount={handleSelectAccount}
-          onManageAccounts={handleManageAccounts}
-          showAccountSelector={showAccountSelector}
           onLogout={handleLogout}
+        />
+
+        <WorkspaceContextSwitcher
+          accountContext={
+            <ConnectedAccountSwitcher
+              workspaceName={tenant?.name ?? "Workspace"}
+              providerLabel="Instagram"
+              providerIcon={<InstagramMarkIcon className="h-4 w-4" />}
+              accounts={accountOptions}
+              selectedAccountId={selectedAccountId ?? ""}
+              onSelect={(id) => handleSelectAccount(id || null)}
+              onManageAccounts={handleManageAccounts}
+              showAccountSelector={showAccountSelector}
+              accountsLoading={accountsLoading}
+              accountError={accountError}
+            />
+          }
         />
 
         {mobileAccountOpen && (
           <MobileAccountSheet
             tenant={tenant}
-            connectedAccounts={connectedAccounts}
+            account={account}
             usage={usage}
             email={session?.email}
             firstName={session?.firstName}
             lastName={session?.lastName}
             picture={session?.picture}
-            workspaceOptions={workspaceOptions}
-            currentWorkspaceId={tenantId}
-            currentWorkspaceRole={workspaceRole}
-            workspaceError={workspaceError}
-            onReloadWorkspaces={() => { void reloadWorkspaces(); }}
-            onReloadAccounts={() => { void reloadConnectedAccounts(); }}
-            onSelectWorkspace={(id) => { void handleSelectWorkspace(id); }}
-            onCreateWorkspace={handleCreateWorkspace}
-            accountOptions={accountOptions}
-            selectedAccountId={selectedAccountId}
-            accountError={accountError}
-            accountsLoading={accountsLoading}
-            onSelectAccount={handleSelectAccount}
-            onManageAccounts={handleManageAccounts}
-            showAccountSelector={showAccountSelector}
             onClose={() => setMobileAccountOpen(false)}
             onLogout={handleLogout}
           />
         )}
 
         <main className="min-w-0 flex-1 overflow-y-auto">
-          {tenantError && (
+          {tenantError && !accessDenied && (
             <div className="page">
-              <div className="banner banner-error">{tenantError}</div>
+              <div className="banner banner-error" role="alert">{tenantError}</div>
             </div>
           )}
+          {accessDenied ? (
+            <div className="page page-wide">
+              <div className="max-w-2xl rounded-xl border border-line bg-card p-6">
+                <h1 className="m-0 text-xl font-semibold text-ink">Workspace access denied</h1>
+                <p className="mt-2 text-sm leading-6 text-subtle">This URL does not grant access. Select another workspace above; only workspaces returned for your account can be opened.</p>
+              </div>
+            </div>
+          ) : (
           <TenantContext.Provider value={{
             tenant,
             error: tenantError,
             reload: () => { void reloadTenant(); },
             workspaces,
             workspaceError,
-            workspaceRole,
             reloadWorkspaces: () => { void reloadWorkspaces(); },
+            workspaceRole,
             connectedAccounts,
             accountError,
             reloadConnectedAccounts: () => { void reloadConnectedAccounts(); },
@@ -917,6 +791,7 @@ export function AppShell() {
               <Outlet />
             )}
           </TenantContext.Provider>
+          )}
         </main>
       </div>
     </div>
