@@ -25,7 +25,7 @@ import { getCapturedFacts, mergeCapturedFacts } from "../db/capturedFacts.js";
 import { qualificationToCapturedFacts } from "./leadQualification.js";
 import { recalculateLeadIntelligence } from "./leadScoring.js";
 import { getFieldDefinitionValueTypes } from "../db/fieldDefinitions.js";
-import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
+import { getDecryptedToken } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
 import { recordTokenUsage } from "../db/tokenUsage.js";
 import { sendInstagramCommentReply, sendInstagramMessage, sendInstagramPrivateReply } from "../lib/instagramSend.js";
@@ -168,8 +168,15 @@ export function createLeadEventReplyHandler(
       return { advance: true };
     }
 
-    const account = await getSoleConnectedAccount(pool, job.tenantId);
-    if (!account) return { advance: true }; // token was revoked/disconnected since the event was matched
+    // Every execution is pinned to the Instagram account that received the
+    // event. Never fall back to "the sole account in this workspace": that
+    // silently stops working for multi-account workspaces and can route a
+    // send through the wrong business identity.
+    const instagramAccountId = event.instagramAccountId ?? lead.instagramAccountId;
+    if (!instagramAccountId || lead.instagramAccountId !== instagramAccountId) {
+      return { advance: true };
+    }
+    const account = { instagramAccountId };
 
     // The 750/hour ceiling this reserves against is Meta's DM/private-reply
     // limit specifically — it does not apply to a public comment reply, so
@@ -453,7 +460,7 @@ export function createLeadEventReplyHandler(
       });
     }
 
-    const token = await getDecryptedToken(pool, keyring, job.tenantId, account.instagramAccountId);
+    const token = await getDecryptedToken(pool, keyring, job.tenantId, instagramAccountId);
     if (!token) return { advance: true }; // disconnected between the reservation above and now; the reserved slot goes unused
 
     let delivered = false;
