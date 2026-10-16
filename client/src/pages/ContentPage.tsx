@@ -28,8 +28,7 @@ function mediaPreviewLabel(mediaType: string | null): string {
 export function ContentPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
-  const { selectedAccountId, connectedAccounts } = useTenant();
-  const selectedProviderAccountId = selectedAccountId ? connectedAccounts?.find((account) => account.id === selectedAccountId)?.instagramAccountId ?? null : null;
+  const { selectedAccountId } = useTenant();
 
   const [media, setMedia] = useState<ObservedMedia[] | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -42,7 +41,7 @@ export function ContentPage() {
     if (!tenantId) return;
     let cancelled = false;
     api
-      .listObservedMedia(tenantId)
+      .listObservedMedia(tenantId, selectedAccountId)
       .then((m) => {
         if (!cancelled) {
           setMedia(m);
@@ -61,7 +60,7 @@ export function ContentPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, navigate, reloadCount]);
+  }, [tenantId, navigate, reloadCount, selectedAccountId]);
 
   useEffect(() => {
     if (!previewMedia) return;
@@ -79,17 +78,9 @@ export function ContentPage() {
 
   const sorted = useMemo(() => {
     if (!media) return null;
-    // The selected account ID is a server-provided credential-row ID; map it to
-    // the provider ID and filter only records attributed to that account. Legacy
-    // media without an account identity remains visible in "All accounts" only.
-    const accountScoped = selectedAccountId
-      ? selectedProviderAccountId
-        ? media.filter((entry) => entry.instagramAccountId === selectedProviderAccountId)
-        : []
-      : media;
-    const filtered = typeFilter === "all" ? accountScoped : accountScoped.filter((m) => m.mediaType === typeFilter);
+    const filtered = typeFilter === "all" ? media : media.filter((m) => m.mediaType === typeFilter);
     return filtered.slice().sort((a, b) => new Date(b.lastSeenAt ?? 0).getTime() - new Date(a.lastSeenAt ?? 0).getTime());
-  }, [media, selectedAccountId, selectedProviderAccountId, typeFilter]);
+  }, [media, typeFilter]);
 
   const markPreviewFailed = (mediaId: string) => {
     setFailedPreviews((current) => {
