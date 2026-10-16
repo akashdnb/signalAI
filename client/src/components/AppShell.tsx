@@ -184,6 +184,8 @@ function MobileAccountSheet({
             <span className="pill pill-ok m-0 inline-block">
               <span className="mr-1">●</span>Connected
             </span>
+          ) : account?.status === "error" ? (
+            <span className="pill pill-error m-0 inline-block">Needs attention</span>
           ) : (
             <span className="text-sm text-subtle">Instagram not connected</span>
           )}
@@ -274,6 +276,8 @@ function AccountHeader({
             <span className="pill pill-ok m-0 inline-block">
               <span className="mr-1">●</span>Connected
             </span>
+          ) : account?.status === "error" ? (
+            <span className="pill pill-error m-0 inline-block">Needs attention</span>
           ) : (
             <span className="text-xs text-subtle">Instagram not connected</span>
           )}
