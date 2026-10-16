@@ -3,9 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
-import { createLoggedInTenant, sessionHeaderFor } from "../../__tests__/helpers/auth.js";
+import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 import { findOrCreateUserByEmail } from "../../db/users.js";
-import { publishNotificationEvent } from "../../notifications/service.js";
+import { publishNotificationEvent, startNotificationDeliveryWorker } from "../../notifications/service.js";
 import { getBoss, stopBoss } from "../../queue/boss.js";
 import { ensureNotificationQueue } from "../../notifications/service.js";
 
@@ -116,8 +116,9 @@ describe("notification routes and durable event delivery", () => {
       });
       const delivery = await getPool().query("select id,status,attempts from notification_deliveries where event_id = $1 and channel = 'email'", [result.eventId]);
       expect(delivery.rows[0].status).toBe("pending"); // the provider has not been run yet, so no success is invented
-      // Exercise the provider contract directly: a 422 from the configured
-      // provider is classified as permanent failure, never delivery success.
+      // Start the real delivery worker so the row is claimed, the provider is
+      // called, and a permanent provider rejection is persisted as failed.
+      await startNotificationDeliveryWorker(boss, getPool());
       const { deliverNotificationEmail } = await import("../../notifications/providers.js");
       const providerResult = await deliverNotificationEmail({ to: user.email, subject: "Test", html: "<p>Test</p>" });
       expect(providerResult).toMatchObject({ ok: false, failureClass: "permanent", errorCode: "provider_rejected_request" });
