@@ -255,22 +255,39 @@ mcpOAuthRouter.post("/oauth/token", async (req, res) => {
   if (grantType === "refresh_token") {
     const refreshToken = typeof req.body?.refresh_token === "string" ? req.body.refresh_token : "";
     if (!refreshToken) return res.status(400).json({ error: "invalid_request" });
-    const result = await getPool().query<{
+    const oldHash = sha256(refreshToken);
+    const nextRefreshToken = randomToken();
+    const nextAccessToken = randomToken();
+    const issued = await getPool().query<{
       clientId: string;
       scopes: string[];
       resource: string;
       userId: string;
       tenantId: string;
     }>(
-      `select client_id as "clientId", scopes, resource, user_id as "userId", tenant_id as "tenantId"
-       from mcp_oauth_tokens
-       where refresh_token_hash = $1 and revoked_at is null and refresh_expires_at > now()`,
-      [sha256(refreshToken)],
+      `update mcp_oauth_tokens
+       set revoked_at = now()
+       where refresh_token_hash = $1 and client_id = $2 and revoked_at is null
+         and refresh_expires_at > now()
+       returning client_id as "clientId", scopes, resource, user_id as "userId", tenant_id as "tenantId"`,
+      [oldHash, clientId],
     );
-    const grant = result.rows[0];
+    const grant = issued.rows[0];
     if (!grant) return res.status(400).json({ error: "invalid_grant" });
-    await getPool().query(`update mcp_oauth_tokens set revoked_at = now() where refresh_token_hash = $1`, [sha256(refreshToken)]);
-    return issueTokens(res, grant.clientId, grant.scopes, grant.resource, grant.userId, grant.tenantId);
+    await getPool().query(
+      `insert into mcp_oauth_tokens(access_token_hash, refresh_token_hash, client_id, scopes, resource, user_id, tenant_id, access_expires_at, refresh_expires_at)
+       values ($1,$2,$3,$4,$5,$6,$7,now() + ($8 * interval '1 second'),now() + ($9 * interval '1 second'))`,
+      [sha256(nextAccessToken), sha256(nextRefreshToken), grant.clientId, grant.scopes, grant.resource, grant.userId, grant.tenantId, ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS],
+    );
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
+    return res.json({
+      access_token: nextAccessToken,
+      token_type: "Bearer",
+      expires_in: ACCESS_TOKEN_TTL_SECONDS,
+      refresh_token: nextRefreshToken,
+      scope: grant.scopes.join(" "),
+    });
   }
 
   return res.status(400).json({ error: "unsupported_grant_type" });
