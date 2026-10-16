@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiError, api } from "../api";
 import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole } from "../api/workspace";
-import { useTenant } from "../context/TenantContext";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
 
 function formatDate(iso: string | null): string {
@@ -13,7 +12,6 @@ function formatDate(iso: string | null): string {
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
-  const { tenant } = useTenant();
   const [role, setRole] = useState<WorkspaceRole | null>(null);
   const [loadingRole, setLoadingRole] = useState(true);
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
@@ -29,15 +27,16 @@ export function IntegrationsPage() {
       setAccounts(await workspaceApi.listConnectedAccounts(tenantId));
       setError(null);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && err.status === 401) {
         navigate("/login", { replace: true });
         return;
       }
       const status = (err as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         navigate("/login", { replace: true });
         return;
       }
+      if (status === 403) { setError("You don’t have permission to view Instagram accounts in this workspace."); return; }
       setError(err instanceof Error ? err.message : "Failed to load Instagram accounts");
     }
   }
@@ -60,7 +59,7 @@ export function IntegrationsPage() {
   }
 
   async function handleReconnect(accountId: string) {
-    if (!tenantId) return;
+    if (!tenantId || loadingRole || !(role === "owner" || role === "admin")) return;
     setReconnectingId(accountId);
     setError(null);
     try {
@@ -73,7 +72,7 @@ export function IntegrationsPage() {
   }
 
   async function handleDisconnect(accountId: string) {
-    if (!tenantId) return;
+    if (!tenantId || loadingRole || !(role === "owner" || role === "admin")) return;
     setDisconnectingId(accountId);
     setError(null);
     try {
@@ -96,7 +95,7 @@ export function IntegrationsPage() {
           <h1>Integrations</h1>
           <p className="muted">Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account.</p>
         </div>
-        {(role === "owner" || role === "admin") && <button className="btn-primary btn-small" onClick={handleConnect} disabled={loadingRole || connecting || reconnectingId !== null}>
+        {(role === "owner" || role === "admin" || loadingRole) && <button className="btn-primary btn-small" onClick={handleConnect} disabled={loadingRole || connecting || reconnectingId !== null || !(role === "owner" || role === "admin")}>
           <span className="inline-flex items-center gap-1.5">
             <InstagramMarkIcon className="h-4 w-4" />
             {connecting ? "Redirecting…" : "Add Instagram account"}
@@ -107,14 +106,14 @@ export function IntegrationsPage() {
       {error && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
           <span>{error}</span>
-          {accounts === null && <button type="button" className="link-button" onClick={() => void loadAccounts()}>Retry loading accounts</button>}
+          {accounts === null && !loadingRole && <button type="button" className="link-button" onClick={() => void loadAccounts()}>Retry loading accounts</button>}
         </div>
       )}
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">
           <h2 style={{ marginBottom: 0 }}>Instagram accounts</h2>
-          <span className="muted small">{accounts?.length ?? 0} connected</span>
+          <span className="muted small">{accounts === null ? "Checking…" : `${accounts.length} connected`}</span>
         </div>
 
         {accounts === null ? (
@@ -154,7 +153,7 @@ export function IntegrationsPage() {
                 </span>
 
                 <span className="flex shrink-0 gap-2">
-                  {role === "member" ? null : account.status === "error" ? (
+                  {role !== "owner" && role !== "admin" ? (roleLoading ? <span className="muted small">Checking permissions…</span> : null) : account.status === "error" ? (
                     <button
                       className="btn-primary btn-small"
                       onClick={() => void handleReconnect(account.id)}
@@ -181,6 +180,7 @@ export function IntegrationsPage() {
             ))}
           </div>
         )}
+        {role === "member" && <p className="muted small mt-3">You can view connection status, but only workspace owners and admins can connect, reconnect, or disconnect accounts.</p>}
       </section>
 
       <section className="card flex items-start gap-3">
