@@ -35,11 +35,16 @@ const PERIOD_NOTE: Record<ReportingPeriod, string> = {
   all: "in all time",
 };
 
-/** Real cutoff for the selected reporting period — `null` means "All time" (no filtering). */
+/**
+ * Real cutoff for the selected reporting period — `null` means "All time"
+ * (no filtering). "Last N days" is inclusive of today, so it's N-1 days
+ * back, not N (otherwise "Last 7 days" renders 8 day-slots once
+ * fillDailySeries rounds both ends down to a calendar day).
+ */
 function periodStart(period: ReportingPeriod): Date | null {
   const now = new Date();
-  if (period === "7d") return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  if (period === "30d") return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  if (period === "7d") return new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+  if (period === "30d") return new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
   if (period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
   return null;
 }
