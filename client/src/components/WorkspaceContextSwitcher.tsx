@@ -56,6 +56,14 @@ export function WorkspaceContextSwitcher({ accountContext }: { accountContext?: 
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const refresh = () => {
+      void loadWorkspaces().catch(() => undefined);
+    };
+    window.addEventListener("signalai:workspaces-updated", refresh);
+    return () => window.removeEventListener("signalai:workspaces-updated", refresh);
+  }, []);
+
   const currentWorkspace = workspaces?.find((workspace) => workspace.tenantId === tenantId) ?? null;
 
   function switchWorkspace(next: WorkspaceSummary) {
