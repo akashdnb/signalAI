@@ -73,7 +73,7 @@ mcpCapabilitiesRouter.post("/v1/capabilities/:capability", requireMcpServiceAuth
       if (idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
         throw new CapabilityInputError("Idempotency-Key must be 200 characters or fewer.");
       }
-      const result = await invokeWriteCapability(
+        const result = await invokeWriteCapability(
         capability, tenantId, principalId, clientId, correlationId, idempotencyKey, req.body ?? {},
       );
       return res.status(200).json({ ...result, correlationId });
