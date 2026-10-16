@@ -40,6 +40,7 @@ export function TeamPage() {
   useTenant();
   const [role, setRole] = useState<WorkspaceRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
+  const [roleError, setRoleError] = useState<string | null>(null);
   const [invitationsForbidden, setInvitationsForbidden] = useState(false);
   const [membersLoading, setMembersLoading] = useState(true);
   const [membersError, setMembersError] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export function TeamPage() {
     setMembersLoading(true);
     setInvitationsLoading(true);
     setRoleLoading(true);
+    setRoleError(null);
     setError(null);
     const memberRequest = workspaceApi.listMembers(tenantId)
       .then((nextMembers) => {
@@ -77,7 +79,7 @@ export function TeamPage() {
 
     const workspaceRequest = workspaceApi.listWorkspaces()
       .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))
-      .catch(() => setRole(null))
+      .catch((err) => { setRole(null); setRoleError(err instanceof Error ? err.message : "Could not verify your workspace role."); })
       .finally(() => setRoleLoading(false));
 
     const invitationRequest = workspaceApi.listInvitations(tenantId)
@@ -193,6 +195,7 @@ export function TeamPage() {
       <p className="muted">Everyone with access to this workspace{role ? ` · Your role: ${formatRole(role)}` : ""}.</p>
 
       {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {roleError && <div className="banner banner-error" role="alert">Your workspace role could not be verified. Management actions stay unavailable until access can be checked. <button type="button" className="link-button" onClick={() => void load()}>Retry</button></div>}
 
       <section className="card">
         <div className="flex items-center justify-between gap-3">
