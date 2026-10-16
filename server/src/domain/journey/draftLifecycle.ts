@@ -3,6 +3,7 @@ import {
   createCampaignWithClient,
   type Campaign,
 } from "../../db/campaigns.js";
+import { listMilestonesWithClient } from "../../db/milestones.js";
 import {
   getBuilderGraphWithClient,
   saveBuilderGraphWithClient,
@@ -10,7 +11,6 @@ import {
   type JourneyEdge,
   type JourneyNode,
 } from "../../db/journeyGraph.js";
-import { listMilestonesWithClient } from "../../db/milestones.js";
 import { validateJourneyGraph } from "./validateJourney.js";
 
 export type DraftLifecycleErrorCode =
