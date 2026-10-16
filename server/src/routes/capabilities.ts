@@ -62,8 +62,11 @@ export function capabilitiesRouter(companyCapability = new CompanyCapability(new
   // Client-facing MCP read boundary. MCP never talks to the database directly;
   // all tenant-scoped reads are executed here with the same service-auth and
   // tenant context used by the rest of the capability layer.
-  router.post("/v1/capabilities/:capability:invoke", async (req, res) => {
-    const capability = req.params.capability;
+  router.post("/v1/capabilities/:capability", async (req, res) => {
+    const rawCapability = req.params.capability;
+    const capability = rawCapability.endsWith(":invoke")
+      ? rawCapability.slice(0, -":invoke".length)
+      : "";
     const tenantId = req.capabilityContext!.tenantId;
 
     if (!READ_CAPABILITIES.has(capability)) {
