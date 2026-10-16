@@ -151,6 +151,7 @@ type WorkspaceContextControls = {
   currentWorkspaceRole: WorkspaceRole | null;
   workspaceError: string | null;
   onReloadWorkspaces: () => void;
+  onReloadAccounts: () => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: (name: string, description: string) => Promise<WorkspaceSwitcherOption>;
   connectedAccounts: ConnectedInstagramAccount[] | null;
@@ -184,6 +185,7 @@ function MobileAccountSheet({
   currentWorkspaceRole,
   workspaceError,
   onReloadWorkspaces,
+  onReloadAccounts,
   onSelectWorkspace,
   onCreateWorkspace,
   accountOptions,
@@ -836,12 +838,13 @@ export function AppShell() {
           currentWorkspaceRole={workspaceRole}
           workspaceError={workspaceError}
           onReloadWorkspaces={() => { void reloadWorkspaces(); }}
+          onReloadAccounts={() => { void reloadConnectedAccounts(); }}
           onSelectWorkspace={(id) => { void handleSelectWorkspace(id); }}
           onCreateWorkspace={handleCreateWorkspace}
           accountOptions={accountOptions}
           selectedAccountId={selectedAccountId}
           accountError={accountError}
-          onReloadAccounts={() => { void reloadConnectedAccounts(); }}
+          onReloadAccounts={onReloadAccounts}
           accountsLoading={accountsLoading}
           onSelectAccount={handleSelectAccount}
           onManageAccounts={handleManageAccounts}
@@ -863,6 +866,7 @@ export function AppShell() {
             currentWorkspaceRole={workspaceRole}
             workspaceError={workspaceError}
             onReloadWorkspaces={() => { void reloadWorkspaces(); }}
+            onReloadAccounts={() => { void reloadConnectedAccounts(); }}
             onSelectWorkspace={(id) => { void handleSelectWorkspace(id); }}
             onCreateWorkspace={handleCreateWorkspace}
             accountOptions={accountOptions}
