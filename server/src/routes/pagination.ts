@@ -111,22 +111,22 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   const { stage, ownerUserId, q, tagId, handoffStatus, unread, from, to, sort = "activity_desc", qualification } = query;
 
   if (stage !== undefined && !VALID_PIPELINE_STAGES.includes(stage as PipelineStage)) {
-    return res.status(400).json({ error: \`stage must be one of \${VALID_PIPELINE_STAGES.join(", ")}\` });
+    return res.status(400).json({ error: `stage must be one of ${VALID_PIPELINE_STAGES.join(", ")}` });
   }
   if (handoffStatus !== undefined && !VALID_HANDOFF_STATUSES.includes(handoffStatus as HandoffStatus)) {
-    return res.status(400).json({ error: \`handoffStatus must be one of \${VALID_HANDOFF_STATUSES.join(", ")}\` });
+    return res.status(400).json({ error: `handoffStatus must be one of ${VALID_HANDOFF_STATUSES.join(", ")}` });
   }
 
   const validSorts = ["activity_desc", "activity_asc", "created_desc", "created_asc", "stage_asc", "stage_desc", "username_asc", "username_desc"] as const;
   if (typeof sort !== "string" || !validSorts.includes(sort as (typeof validSorts)[number])) {
-    return res.status(400).json({ error: \`sort must be one of \${validSorts.join(", ")}\` });
+    return res.status(400).json({ error: `sort must be one of ${validSorts.join(", ")}` });
   }
   if (qualification !== undefined && qualification !== "qualified" && qualification !== "unqualified") {
     return res.status(400).json({ error: "qualification must be qualified or unqualified" });
   }
   const validDate = (value: unknown): value is string => {
     if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-    const parsed = new Date(\`\${value}T00:00:00.000Z\`);
+    const parsed = new Date(`${value}T00:00:00.000Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
   };
   if (from !== undefined && !validDate(from)) {
@@ -148,41 +148,41 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
 
   if (stage) {
     params.push(stage);
-    conditions.push(\`l.pipeline_stage = $\${params.length}\`);
+    conditions.push(`l.pipeline_stage = $${params.length}`);
   }
   if (typeof ownerUserId === "string" && ownerUserId) {
     params.push(ownerUserId);
-    conditions.push(\`l.owner_user_id = $\${params.length}\`);
+    conditions.push(`l.owner_user_id = $${params.length}`);
   }
   if (typeof tagId === "string" && tagId) {
     params.push(tagId);
-    conditions.push(\`exists (
+    conditions.push(`exists (
       select 1 from lead_tags lt
       join tags t on t.id = lt.tag_id and t.tenant_id = lt.tenant_id
-      where lt.tenant_id = l.tenant_id and lt.lead_id = l.id and lt.tag_id = $\${params.length}
-    )\`);
+      where lt.tenant_id = l.tenant_id and lt.lead_id = l.id and lt.tag_id = $${params.length}
+    )`);
   }
   if (typeof q === "string" && q.trim()) {
     // Literal substring search across active identity PII and captured facts.
     // strpos avoids SQL wildcard interpretation of '%' and '_' from user input.
     params.push(q.trim().slice(0, 200).toLocaleLowerCase("en-US"));
-    const p = \`$\${params.length}\`;
-    conditions.push(\`(
+    const p = `$${params.length}`;
+    conditions.push(`(
       exists (
         select 1 from lead_pii p2
         where p2.tenant_id = l.tenant_id and p2.lead_id = l.id
-          and p2.deleted_at is null and strpos(lower(coalesce(p2.username, '')), \${p}) > 0
+          and p2.deleted_at is null and strpos(lower(coalesce(p2.username, '')), ${p}) > 0
       )
       or exists (
         select 1 from lead_captured_facts cf
         where cf.tenant_id = l.tenant_id and cf.lead_id = l.id and cf.deleted_at is null
-          and strpos(lower(cf.facts::text), \${p}) > 0
+          and strpos(lower(cf.facts::text), ${p}) > 0
       )
-    )\`);
+    )`);
   }
   if (handoffStatus) {
     params.push(handoffStatus);
-    conditions.push(\`l.handoff_status = $\${params.length}\`);
+    conditions.push(`l.handoff_status = $${params.length}`);
   }
   if (unread === "true") {
     conditions.push("l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)");
@@ -193,15 +193,15 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
   if (qualification === "unqualified") conditions.push("l.pipeline_stage <> 'qualified'");
   if (validDate(from)) {
     params.push(from);
-    conditions.push(\`coalesce(l.last_inbound_at, l.created_at) >= $\${params.length}::date\`);
+    conditions.push(`coalesce(l.last_inbound_at, l.created_at) >= $${params.length}::date`);
   }
   if (validDate(to)) {
     params.push(to);
-    conditions.push(\`coalesce(l.last_inbound_at, l.created_at) < ($\${params.length}::date + interval '1 day')\`);
+    conditions.push(`coalesce(l.last_inbound_at, l.created_at) < ($${params.length}::date + interval '1 day')`);
   }
 
   const where = conditions.join(" and ");
-  const countResult = await pool.query<{ count: string }>(\`select count(*)::int as count from leads l where \${where}\`, params);
+  const countResult = await pool.query<{ count: string }>(`select count(*)::int as count from leads l where ${where}`, params);
   const total = Number(countResult.rows[0]?.count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(requestedPage, totalPages);
@@ -223,7 +223,7 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
     unread: boolean; active_milestone_id: string | null; last_inbound_at: Date | null; window_open_until: Date | null; last_dm_at: Date | null; created_at: Date;
     pipeline_stage: PipelineStage; owner_user_id: string | null; handoff_status: HandoffStatus;
   }>(
-    \`select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, last_dm.last_dm_at, l.created_at, l.pipeline_stage, l.owner_user_id, l.handoff_status,
+    `select l.id, l.instagram_user_id, l.active_milestone_id, l.last_inbound_at, l.window_open_until, last_dm.last_dm_at, l.created_at, l.pipeline_stage, l.owner_user_id, l.handoff_status,
             p.username, e.event_type as last_event_type, coalesce(pii.comment_text, pii.dm_text) as last_message_preview,
             (l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)) as unread
      from leads l
@@ -246,9 +246,9 @@ paginationRouter.get("/tenants/:tenantId/leads", async (req, res) => {
        select comment_text, dm_text from lead_pii
        where tenant_id = l.tenant_id and lead_event_id = e.id and deleted_at is null
      ) pii on true
-     where \${where}
-     order by \${orderBy}
-     limit $\${dataParams.length - 1} offset $\${dataParams.length}\`,
+     where ${where}
+     order by ${orderBy}
+     limit $${dataParams.length - 1} offset $${dataParams.length}`,
     dataParams,
   );
 
