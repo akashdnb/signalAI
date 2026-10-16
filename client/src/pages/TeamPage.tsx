@@ -37,8 +37,9 @@ function formatDate(iso: string): string {
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
-  const { tenant } = useTenant();
+  useTenant();
   const [role, setRole] = useState<WorkspaceRole | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
   const [invitationsForbidden, setInvitationsForbidden] = useState(false);
   const [membersLoading, setMembersLoading] = useState(true);
   const [membersError, setMembersError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export function TeamPage() {
     if (!tenantId) return;
     setMembersLoading(true);
     setInvitationsLoading(true);
+    setRoleLoading(true);
     setError(null);
     const memberRequest = workspaceApi.listMembers(tenantId)
       .then((nextMembers) => {
@@ -75,7 +77,8 @@ export function TeamPage() {
 
     const workspaceRequest = workspaceApi.listWorkspaces()
       .then((items) => setRole(items.find((item) => item.tenantId === tenantId)?.role ?? null))
-      .catch(() => setRole(null));
+      .catch(() => setRole(null))
+      .finally(() => setRoleLoading(false));
 
     const invitationRequest = workspaceApi.listInvitations(tenantId)
       .then((nextInvitations) => {
@@ -197,19 +200,20 @@ export function TeamPage() {
             <h2 style={{ marginBottom: 0 }}>Members</h2>
             <p className="muted small mt-1 mb-0">Owners can manage billing and workspace access. Admins can manage members, accounts and automations. Members can work with inbox, leads and automations.</p>
           </div>
-          <button
+          {(canManageMembers || roleLoading) && <button
             type="button"
             className="btn-secondary btn-small"
+            disabled={roleLoading || !canManageMembers}
             onClick={() => setInviting((value) => !value)}
           >
             <span className="inline-flex items-center gap-1.5">
               <UserPlusIcon className="h-4 w-4" />
               {inviting ? "Cancel" : "Invite teammate"}
             </span>
-          </button>
+          </button>}
         </div>
 
-        {inviting && (
+        {inviting && canManageMembers && (
           <form onSubmit={handleInvite} className="inline-form mt-4">
             <input
               type="email"
@@ -228,8 +232,10 @@ export function TeamPage() {
           </form>
         )}
 
-        {members === null ? (
-          <p className="muted">Loading team…</p>
+        {membersLoading ? (
+          <p className="muted" role="status">Loading team…</p>
+        ) : membersError ? (
+          <div className="banner banner-error" role="alert">{membersError} <button type="button" className="link-button" onClick={() => void load()}>Retry</button></div>
         ) : members.length === 0 ? (
           <p className="muted">No members found.</p>
         ) : (
@@ -247,6 +253,8 @@ export function TeamPage() {
                   </span>
                   {isOwner ? (
                     <span className="pill pill-ok" style={{ marginLeft: 0 }}>Owner</span>
+                  ) : !canManageMembers ? (
+                    <span className="pill" style={{ marginLeft: 0 }}>{formatRole(member.role)}</span>
                   ) : (
                     <span className="inline-flex items-center gap-2">
                       <select
