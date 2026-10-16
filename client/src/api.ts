@@ -194,6 +194,44 @@ export interface UserProfile {
   createdAt: string;
 }
 
+
+export type NotificationSeverity = "info" | "success" | "warning" | "critical";
+export type NotificationChannel = "email" | "in_app";
+export interface NotificationPreferenceChannel {
+  type: NotificationChannel;
+  label: string;
+  description: string;
+  available: boolean;
+  reason: string | null;
+  enabled: boolean;
+}
+export interface NotificationPreferenceEvent {
+  type: string;
+  label: string;
+  description: string;
+  severity: NotificationSeverity;
+  channels: NotificationPreferenceChannel[];
+}
+export interface NotificationPreferences {
+  events: NotificationPreferenceEvent[];
+  recipient: { email: string };
+}
+export interface InAppNotification {
+  id: string;
+  eventType: string;
+  title: string;
+  message: string;
+  severity: NotificationSeverity;
+  entityType: string | null;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+export interface NotificationInbox {
+  notifications: InAppNotification[];
+  unreadCount: number;
+}
+
 export interface KnowledgeBaseDocumentPreview {
   documentId: string;
   filename: string;
@@ -876,6 +914,21 @@ export const api = {
       body: JSON.stringify({ tier }),
     }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
+
+
+  getNotificationPreferences: (tenantId: string) =>
+    request<NotificationPreferences>(`/tenants/${tenantId}/notifications/preferences`),
+  updateNotificationPreferences: (tenantId: string, preferences: Array<{ eventType: string; channel: NotificationChannel; enabled: boolean }>) =>
+    request<{ saved: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/preferences`, {
+      method: "PUT",
+      body: JSON.stringify({ preferences }),
+    }),
+  getNotifications: (tenantId: string, limit = 10) =>
+    request<NotificationInbox>(`/tenants/${tenantId}/notifications?limit=${limit}`),
+  markNotificationRead: (tenantId: string, notificationId: string) =>
+    request<{ read: boolean }>(`/tenants/${tenantId}/notifications/${notificationId}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: (tenantId: string) =>
+    request<{ read: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/read-all`, { method: "POST" }),
 
   getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
   updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>

@@ -27,13 +27,13 @@ describe("profile API application registration", () => {
     const { authHeader } = await createLoggedInTenant(getPool(), SESSION_SECRET, "profile-app-mounting");
     const app = createApp();
 
-    const read = await request(app).get("/me/profile").set("Authorization", authHeader);
+    const read = await request(app).get("/me/profile").set(authHeader);
     expect(read.status).toBe(200);
     expect(read.body.profile).toMatchObject({ email: expect.any(String) });
 
     const update = await request(app)
       .patch("/me/profile")
-      .set("Authorization", authHeader)
+      .set(authHeader)
       .send({ firstName: "Mounted" });
     expect(update.status).toBe(200);
     expect(update.body.profile.firstName).toBe("Mounted");

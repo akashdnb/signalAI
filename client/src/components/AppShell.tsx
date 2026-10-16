@@ -12,6 +12,7 @@ import {
   type UsageSummary,
 } from "../api";
 import { BottomSheet } from "./BottomSheet";
+import { NotificationBell } from "./NotificationBell";
 import { TenantContext } from "../context/TenantContext";
 import { WorkspaceContextSwitcher } from "./WorkspaceContextSwitcher";
 import { deriveDisplayName } from "../lib/leadFormatting";
@@ -21,7 +22,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import {
   AnalyticsIcon,
   AutomationIcon,
-  BellIcon,
   BookIcon,
   BroadcastIcon,
   ChevronDownIcon,
@@ -300,15 +300,8 @@ function AccountHeader({
 
         <ThemeToggle />
 
-        <button
-          type="button"
-          aria-label="Notifications (coming soon)"
-          title="Notifications are not available yet"
-          disabled
-          className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg text-subtle opacity-50"
-        >
-          <BellIcon className="h-4.5 w-4.5" />
-        </button>
+{/* Notification inbox lives in this workspace; opening it fetches only the signed-in user's records. */}
+        <NotificationBell tenantId={tenant?.id ?? ""} />
 
         <div className="relative">
           <button
