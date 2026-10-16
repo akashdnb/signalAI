@@ -247,7 +247,7 @@ test.describe("automation reliability release gates", () => {
     });
 
     await page.getByRole("button", { name: "Preview" }).click();
-    await expect(page.getByRole("dialog", { name: "Preview" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Preview conversation" })).toBeVisible();
     await page.getByRole("button", { name: "Close" }).click();
 
     await page.getByRole("button", { name: "Sample walkthrough" }).click();
