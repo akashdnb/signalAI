@@ -66,10 +66,10 @@ mcpCapabilitiesRouter.post("/v1/capabilities/:capability", requireMcpServiceAuth
   }
   try {
     if (WRITE_CAPABILITIES.has(capability)) {
-      enforceWriteRateLimit(req, tenantId, res);
       const principalId = requireHeader(req, "x-signalai-principal-id");
       const clientId = requireHeader(req, "x-signalai-client-id");
       const idempotencyKey = requireHeader(req, "idempotency-key");
+      enforceWriteRateLimit(req, tenantId, res);
       if (idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
         throw new CapabilityInputError("Idempotency-Key must be 200 characters or fewer.");
       }
