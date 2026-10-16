@@ -44,6 +44,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export type WorkspaceRole = "owner" | "admin" | "member";
 
+export interface WorkspaceSummary {
+  tenantId: string;
+  name: string;
+  description: string | null;
+  role: WorkspaceRole;
+}
+
+export interface CreateWorkspaceInput {
+  name: string;
+  description?: string;
+}
+
 export interface WorkspaceMember {
   userId: string;
   email: string;
@@ -82,6 +94,21 @@ export interface JourneyAccountBinding {
 }
 
 export const workspaceApi = {
+  listWorkspaces: () =>
+    request<{ workspaces: WorkspaceSummary[] }>("/me/workspaces").then((r) => r.workspaces),
+
+  createWorkspace: (input: CreateWorkspaceInput) =>
+    request<{ workspace: WorkspaceSummary }>("/workspaces", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }).then((r) => r.workspace),
+
+  updateWorkspace: (tenantId: string, updates: { name?: string; description?: string | null }) =>
+    request<{ workspace: WorkspaceSummary }>(`/tenants/${tenantId}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }).then((r) => r.workspace),
+
   listMembers: (tenantId: string) =>
     request<WorkspaceMember[]>(`/tenants/${tenantId}/members`),
 
