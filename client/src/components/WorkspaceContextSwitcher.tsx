@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Button, EmptyState, ErrorState, Field, LoadingState, TextInput } from "./ui";
+import { Button } from "./ui/Button";
+import { EmptyState } from "./ui/EmptyState";
+import { ErrorState } from "./ui/ErrorState";
+import { Field, TextInput } from "./ui/Field";
+import { LoadingState } from "./ui/LoadingState";
 import { workspaceApi, type WorkspaceRole, type WorkspaceSummary } from "../api/workspace";
 import { loadSession, saveSession } from "../api";
 import { ChevronDownIcon } from "./icons";
@@ -53,7 +57,7 @@ export function WorkspaceContextSwitcher() {
   }, []);
 
   const currentWorkspace = workspaces?.find((workspace) => workspace.tenantId === tenantId) ?? null;
-  const canCreate = currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin";
+  const canEditWorkspace = currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin";
 
   function switchWorkspace(next: WorkspaceSummary) {
     if (next.tenantId === tenantId) {
