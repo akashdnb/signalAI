@@ -415,18 +415,25 @@ describe("leads routes (Phase 2A)", () => {
 
   it("GET notes rejects a lead id outside the authorized tenant", async () => {
     const pool = getPool();
-    const { tenant: tenantA } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
+    const { tenant: tenantA, authHeader: authA } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-a");
     const { tenant: tenantB, authHeader: authB } = await createLoggedInTenant(pool, SESSION_SECRET, "creator-b");
     const leadA = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "ig-user-a");
     await request(createApp())
       .post(`/tenants/${tenantA.id}/leads/${leadA.id}/notes`)
-      .set((await createLoggedInTenant(pool, SESSION_SECRET, "creator-a")).authHeader)
+      .set(authA)
       .send({ body: "Private note" });
 
-    const res = await request(createApp())
+    const app = createApp();
+    const crossTenant = await request(app)
       .get(`/tenants/${tenantB.id}/leads/${leadA.id}/notes`)
       .set(authB);
-    expect(res.status).toBe(404);
+    expect(crossTenant.status).toBe(404);
+
+    // User A also cannot request tenant B's route by changing the tenant ID.
+    const crossUser = await request(app)
+      .get(`/tenants/${tenantB.id}/leads/${leadA.id}/notes`)
+      .set(authA);
+    expect([401, 403]).toContain(crossUser.status);
   });
 
   it("GET leads filters and sorts on the server, including captured facts", async () => {
