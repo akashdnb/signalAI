@@ -121,6 +121,16 @@ mcpOAuthRouter.get("/.well-known/oauth-authorization-server", (_req, res) => {
   return res.json(oauthMetadata());
 });
 
+mcpOAuthRouter.get("/.well-known/oauth-protected-resource/mcp", (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=300");
+  return res.json({
+    resource: resourceUrl(),
+    authorization_servers: [issuerUrl()],
+    scopes_supported: [...MCP_SUPPORTED_SCOPES],
+    bearer_methods_supported: ["header"],
+  });
+});
+
 mcpOAuthRouter.get("/.well-known/openid-configuration", (_req, res) => {
   res.setHeader("Cache-Control", "public, max-age=300");
   return res.json({
