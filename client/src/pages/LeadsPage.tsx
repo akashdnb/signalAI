@@ -22,6 +22,8 @@ export function LeadsPage() {
   const [members, setMembers] = useState<TenantMember[] | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<PipelineStage | "">("");
+  const [tags, setTags] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [tagFilter, setTagFilter] = useState("");
   const [handoffFilter, setHandoffFilter] = useState<HandoffStatus | "">("");
   const [qualificationFilter, setQualificationFilter] = useState<"qualified" | "unqualified" | "">("");
   const [activityFrom, setActivityFrom] = useState("");
@@ -34,11 +36,17 @@ export function LeadsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [stageFilter, handoffFilter, qualificationFilter, activityFrom, activityTo, sort, search]);
+  }, [stageFilter, handoffFilter, qualificationFilter, tagFilter, activityFrom, activityTo, sort, search]);
 
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
+    api.listTenantTags(tenantId).then((result) => {
+      if (cancelled) return;
+      setTags(result.map((tag) => ({ id: tag.id, name: tag.name })));
+    }).catch(() => {
+      if (!cancelled) setTags(null);
+    });
     api.listMembers(tenantId).then((result) => {
       if (cancelled) return;
       setMembers(result);
@@ -63,6 +71,7 @@ export function LeadsPage() {
           stage: stageFilter || undefined,
           handoffStatus: handoffFilter || undefined,
           qualification: qualificationFilter || undefined,
+          tagId: tagFilter || undefined,
           from: activityFrom || undefined,
           to: activityTo || undefined,
           sort,
@@ -85,7 +94,7 @@ export function LeadsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, stageFilter, handoffFilter, qualificationFilter, activityFrom, activityTo, sort, search, page, reloadCount, navigate]);
+  }, [tenantId, stageFilter, handoffFilter, qualificationFilter, tagFilter, activityFrom, activityTo, sort, search, page, reloadCount, navigate]);
 
   if (!tenantId) return null;
 
@@ -119,6 +128,13 @@ export function LeadsPage() {
             <option value="qualified">Qualified</option>
             <option value="unqualified">Not qualified</option>
           </select>
+          {tags && tags.length > 0 && <>
+            <label className="sr-only" htmlFor="leads-tag-filter">Tag</label>
+            <select id="leads-tag-filter" aria-label="Lead tag" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+              <option value="">All tags</option>
+              {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+            </select>
+          </>}
           <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
           <select id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
             {HANDOFF_FILTERS.map((h) => (
@@ -207,7 +223,7 @@ export function LeadsPage() {
             </div>
             {pageData && (
               <p className="muted small mt-3" role="status">
-                Showing {pageData.items.length} of {pageData.total.toLocaleString()} leads{stageFilter || handoffFilter || qualificationFilter || activityFrom || activityTo || search.trim() ? " matching the current filters" : ""}.
+                Showing {pageData.items.length} of {pageData.total.toLocaleString()} leads{stageFilter || handoffFilter || qualificationFilter || tagFilter || activityFrom || activityTo || search.trim() ? " matching the current filters" : ""}.
               </p>
             )}
             {pageData && (
