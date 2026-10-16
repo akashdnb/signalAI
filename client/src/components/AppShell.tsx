@@ -5,6 +5,7 @@ import {
   api,
   clearSession,
   loadSession,
+  saveSession,
   type AccountHealth,
   type BillingSummary,
   type TenantSummary,
@@ -12,6 +13,7 @@ import {
 } from "../api";
 import { BottomSheet } from "./BottomSheet";
 import { TenantContext } from "../context/TenantContext";
+import { WorkspaceContextSwitcher } from "./WorkspaceContextSwitcher";
 import { deriveDisplayName } from "../lib/leadFormatting";
 import { Logo } from "./Logo";
 import { OnboardingWizard } from "./OnboardingWizard";
@@ -362,6 +364,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [account, setAccount] = useState<AccountHealth | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [billing, setBilling] = useState<BillingSummary | null>(null);
@@ -381,7 +384,7 @@ export function AppShell() {
   // simplification rather than a persisted step field.
   const [wizardLatchedOpen, setWizardLatchedOpen] = useState(false);
   const session = loadSession();
-  const sessionValid = Boolean(tenantId && session && session.tenantId === tenantId);
+  const sessionValid = Boolean(tenantId && session);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
@@ -462,12 +465,25 @@ export function AppShell() {
       const t = await api.getTenant(tenantId);
       setTenant(t);
       setTenantError(null);
+      setAccessDenied(false);
+      const activeSession = loadSession();
+      if (activeSession && activeSession.tenantId !== tenantId) {
+        saveSession({ ...activeSession, tenantId });
+      }
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
         navigate("/login", { replace: true });
         return;
       }
-      setTenantError(err instanceof Error ? err.message : "Failed to load tenant");
+      if (err instanceof ApiError && err.status === 403) {
+        setTenant(null);
+        setAccessDenied(true);
+        setTenantError("You don’t have access to this workspace. Choose a workspace you belong to.");
+        return;
+      }
+      setAccessDenied(false);
+      setTenantError(err instanceof Error ? err.message : "Failed to load workspace");
     }
   }
 
@@ -601,6 +617,8 @@ export function AppShell() {
           onLogout={handleLogout}
         />
 
+        <WorkspaceContextSwitcher />
+
         {mobileAccountOpen && (
           <MobileAccountSheet
             tenant={tenant}
@@ -616,11 +634,19 @@ export function AppShell() {
         )}
 
         <main className="min-w-0 flex-1 overflow-y-auto">
-          {tenantError && (
+          {tenantError && !accessDenied && (
             <div className="page">
-              <div className="banner banner-error">{tenantError}</div>
+              <div className="banner banner-error" role="alert">{tenantError}</div>
             </div>
           )}
+          {accessDenied ? (
+            <div className="page page-wide">
+              <div className="max-w-2xl rounded-xl border border-line bg-card p-6">
+                <h1 className="m-0 text-xl font-semibold text-ink">Workspace access denied</h1>
+                <p className="mt-2 text-sm leading-6 text-subtle">This URL does not grant access. Select another workspace above; only workspaces returned for your account can be opened.</p>
+              </div>
+            </div>
+          ) : (
           <TenantContext.Provider value={{ tenant, error: tenantError, reload: reloadTenant }}>
             {showWizard ? (
               <OnboardingWizard
@@ -635,6 +661,7 @@ export function AppShell() {
               <Outlet />
             )}
           </TenantContext.Provider>
+          )}
         </main>
       </div>
     </div>
