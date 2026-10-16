@@ -133,39 +133,40 @@ export function knowledgeBaseRouter(embeddingProvider: EmbeddingProvider | null)
       upload.single("file")(req, res, (err: unknown) => {
         if (err && typeof err === "object" && "code" in err && err.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ error: "file is too large; the maximum upload size is 10 MB" });
-        }
+            }
         if (err) return next(err);
         return next();
-      });
+          });
     },
     async (req, res) => {
-    if (!embeddingProvider) {
-      return res.status(503).json({ error: "the knowledge base is not configured on this server" });
+      if (!embeddingProvider) {
+        return res.status(503).json({ error: "the knowledge base is not configured on this server" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: "no file uploaded — expected multipart field 'file'" });
     }
-    if (!req.file) {
-      return res.status(400).json({ error: "no file uploaded — expected multipart field 'file'" });
-    }
-    if (!isSupportedContentType(req.file.mimetype)) {
+      if (!isSupportedContentType(req.file.mimetype)) {
       return res.status(400).json({
-        error: `unsupported file type: ${req.file.mimetype} — supported: application/pdf, text/plain, text/markdown`,
+          error: `unsupported file type: ${req.file.mimetype} — supported: application/pdf, text/plain, text/markdown`,
       });
     }
 
-    try {
-      const document = await ingestKnowledgeBaseDocument(getPool(), embeddingProvider, {
-        tenantId: req.params.tenantId!,
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-        buffer: req.file.buffer,
+      try {
+        const document = await ingestKnowledgeBaseDocument(getPool(), embeddingProvider, {
+          tenantId: req.params.tenantId!,
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
+          buffer: req.file.buffer,
       });
-      const { storageKey: _storageKey, ...safeDocument } = document;
-      return res.status(201).json({ document: safeDocument });
-    } catch (err) {
-      console.error("Knowledge base ingestion failed to start:", err);
-      Sentry.captureException(err);
-      return res.status(502).json({ error: "failed to ingest the uploaded document" });
+        const { storageKey: _storageKey, ...safeDocument } = document;
+        return res.status(201).json({ document: safeDocument });
+      } catch (err) {
+        console.error("Knowledge base ingestion failed to start:", err);
+        Sentry.captureException(err);
+        return res.status(502).json({ error: "failed to ingest the uploaded document" });
     }
-    });
+    },
+  );
 
   router.delete("/tenants/:tenantId/knowledge-base/:documentId", async (req, res) => {
     const deleted = await deleteDocument(getPool(), req.params.tenantId!, req.params.documentId!);
