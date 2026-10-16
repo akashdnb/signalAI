@@ -136,6 +136,8 @@ router.get("/oauth/authorize", async (req, res) => {
   if (responseType !== "code") return errorRedirect(res, redirectUri, "unsupported_response_type", state);
   if (codeChallengeMethod !== "S256" || codeChallenge.length < 43) return errorRedirect(res, redirectUri, "invalid_request", state);
   const scopes = scopeText.split(/\s+/).filter(Boolean);
+  // Legacy coarse scopes and granular automation scopes are both supported.
+  // Reject malformed, duplicated, and unknown scopes before issuing a code.
   if (!scopes.length || scopes.some((scope) => !SUPPORTED_SCOPE_SET.has(scope)) || new Set(scopes).size !== scopes.length) {
     return errorRedirect(res, redirectUri, "invalid_scope", state);
   }
