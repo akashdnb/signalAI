@@ -117,8 +117,6 @@ export function InboxPage() {
         accountId: selectedAccountId || undefined,
       });
       if (requestId !== latestListRequestRef.current) return;
-      // Keep the local read state for the actively selected lead if a list request
-      // started before the user's explicit selection resolves after it.
       const activeLeadId = selectedLeadIdRef.current;
       const items = activeLeadId
         ? result.items.map((lead) =>
@@ -161,9 +159,6 @@ export function InboxPage() {
   reloadLeadsRef.current = reloadLeads;
   useEffect(() => {
     const interval = setInterval(() => {
-      // Don't let list polling reorder the selected conversation out of the
-      // current page while a user is actively reading it. Refresh the selected
-      // lead detail instead so new inbound DMs update the available reply window.
       if (!selectedLeadId) {
         reloadLeadsRef.current();
         return;
@@ -206,13 +201,13 @@ export function InboxPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load tags"));
   }, [tenantId, selectedLeadId]);
 
-  /** Total conversation count, independent of the active tab — matches the preview's "All" tab count badge. */
+  /** Total conversation count, independent of the active tab and scoped to the selected account when one is active. */
   useEffect(() => {
     if (!tenantId) return;
-    getLeadsPage(tenantId, 1, 1, {}).then((result) => setAllCount(result.total)).catch(() => {
+    getLeadsPage(tenantId, 1, 1, { accountId: selectedAccountId || undefined }).then((result) => setAllCount(result.total)).catch(() => {
       // Non-critical — the All-tab count badge just stays hidden.
     });
-  }, [tenantId, reloadCount]);
+  }, [tenantId, selectedAccountId, reloadCount]);
 
   function handleSelectLead(lead: LeadListItem) {
     if (!tenantId) return;
