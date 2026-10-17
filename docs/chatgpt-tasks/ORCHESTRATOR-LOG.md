@@ -256,3 +256,11 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - No branch, PR, or code change resulted from this audit.
 - `GAPS-2026-10-17-part2` still labels Results/Leads **OPEN**, but this audit is stale relative to merged PR #108.
 - No production deploy or `main` write occurred.
+
+## 2026-10-17 16:12 IST — Delegated Settings parity source-freshness audit accepted and completed
+
+- Delegated Settings parity source-freshness audit was **accepted and completed**. Profile, Notifications, Appearance, Plan & billing, AI behavior, Forbidden topics, Team & access, and General were judged stale relative to already-merged PRs and the current foundation source.
+- The only real remaining source gap found was **Lead fields**.
+- PR #118 changed only `client/src/components/FieldDefinitionsPanel.tsx` with **5 additions / 3 deletions**, aligning the schema hierarchy to **Label / Technical key / Type / Used for**, with truthful unsupported-usage text and no API, data, or persistence changes.
+- PR #118 was squash-merged as `9db6377024314185d9b155e96d2737e1cf7c928d` on `feat/preview-to-production-foundation`.
+- No production deploy occurred and no write was made to `main`.
