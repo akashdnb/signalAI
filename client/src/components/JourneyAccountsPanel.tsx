@@ -8,6 +8,57 @@ export type JourneyAccountReadiness = {
   unavailableAssignedCount: number;
 };
 
+const initialReadiness: JourneyAccountReadiness = {
+  status: "loading",
+  healthyAssignedCount: 0,
+  unavailableAssignedCount: 0,
+};
+
+const readinessSnapshots = new Map<string, JourneyAccountReadiness>();
+const readinessListeners = new Map<string, Set<() => void>>();
+
+function readinessKey(tenantId: string, campaignId: string): string {
+  return `${tenantId}:${campaignId}`;
+}
+
+export function getJourneyAccountReadiness(tenantId: string, campaignId: string): JourneyAccountReadiness {
+  return readinessSnapshots.get(readinessKey(tenantId, campaignId)) ?? initialReadiness;
+}
+
+export function subscribeJourneyAccountReadiness(
+  tenantId: string,
+  campaignId: string,
+  listener: () => void,
+): () => void {
+  const key = readinessKey(tenantId, campaignId);
+  const listeners = readinessListeners.get(key) ?? new Set<() => void>();
+  listeners.add(listener);
+  readinessListeners.set(key, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) readinessListeners.delete(key);
+  };
+}
+
+function publishJourneyAccountReadiness(
+  tenantId: string,
+  campaignId: string,
+  readiness: JourneyAccountReadiness,
+): void {
+  const key = readinessKey(tenantId, campaignId);
+  const previous = readinessSnapshots.get(key);
+  if (
+    previous?.status === readiness.status &&
+    previous.healthyAssignedCount === readiness.healthyAssignedCount &&
+    previous.unavailableAssignedCount === readiness.unavailableAssignedCount
+  ) {
+    return;
+  }
+
+  readinessSnapshots.set(key, readiness);
+  readinessListeners.get(key)?.forEach((listener) => listener());
+}
+
 interface Props {
   tenantId: string;
   campaignId: string;
@@ -71,12 +122,14 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
   const healthyAccounts = accounts.filter((account) => account.status === "healthy");
 
   useEffect(() => {
-    onReadinessChange?.({
+    const readiness: JourneyAccountReadiness = {
       status: loading ? "loading" : error ? "error" : "ready",
       healthyAssignedCount,
       unavailableAssignedCount,
-    });
-  }, [loading, error, healthyAssignedCount, unavailableAssignedCount, onReadinessChange]);
+    };
+    onReadinessChange?.(readiness);
+    publishJourneyAccountReadiness(tenantId, campaignId, readiness);
+  }, [loading, error, healthyAssignedCount, unavailableAssignedCount, onReadinessChange, tenantId, campaignId]);
 
   return (
     <section className="journey-account-panel card" style={{ marginBottom: "0.75rem" }}>
