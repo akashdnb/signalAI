@@ -460,7 +460,7 @@
   background: var(--bg);
 }
 
-.page-knowledge .knowledge-base-panel > section:last-child {
+.page-knowledge .knowledge-base-panel > section:last-child:not(.knowledge-sources) {
   order: 2;
   margin-top: 0;
   border-top-color: var(--border);
