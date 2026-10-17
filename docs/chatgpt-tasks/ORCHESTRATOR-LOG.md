@@ -333,3 +333,17 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - Reviewed completed delegated findings and current PR metadata through GitHub; confirmed current production Inbox source semantics and PR #103 patch.
 - BrowserMCP did not permit setting the viewport to 390/768/1024px, so those checks are explicitly outstanding.
 - No application changes, PR merges, deployments or `main` writes were made by this log update.
+
+
+## 2026-10-17 — Current branch movement verification
+
+**Timestamp:** 2026-10-17 (Asia/Kolkata)
+
+- Foundation has advanced again to `78c47a65e036183d07464cefd8f617e2fe00e277`. Do not rely on older base SHAs recorded in open PR metadata; compare every child branch against the live foundation ref immediately before review or merge.
+- PR #102 (this docs-only log branch) and PR #103 (Inbox selection reset) are both open and unmerged. Their PR metadata still records older base SHAs (`c53c12ba...` and `46d779dc...`, respectively), so they must be refreshed/reconciled safely before they are considered current. Do not force-update either branch without inspecting its latest head and doing a deliberate source-of-truth reconciliation.
+- PR #101 remains open/unmerged with base `eaf50af2...`; its earlier QA review remains applicable until it is refreshed and re-verified.
+- No merge, deployment, or `main` write was performed.
+
+### Delegation rule reaffirmed
+
+For each remaining independent area, spin up a separate scoped ChatGPT session, including small copy/style fixes and discrete test/QA tasks. Assign a single write scope per session, require exact branch/PR references and honest verification notes, then validate the persisted GitHub diff independently. Do not infer completion from a session's progress narration alone.
