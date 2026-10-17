@@ -47,6 +47,24 @@ export function formatLastContactVia(lastEventType: string | null): string {
   return "—";
 }
 
+/** Convert raw Instagram media URLs in lead snippets to concise semantic labels while retaining the exact source in the title. */
+export function formatLeadMessagePreview(preview: string | null | undefined): { label: string; title?: string } | null {
+  const value = preview?.trim();
+  if (!value) return null;
+
+  if (/https?:\/\/(?:www\.)?instagram\.com\/reel\//i.test(value)) {
+    return { label: "Shared Instagram reel", title: value };
+  }
+  if (/https?:\/\/(?:www\.)?instagram\.com\/(?:p|tv)\//i.test(value)) {
+    return { label: "Shared Instagram post", title: value };
+  }
+  if (/https?:\/\/lookaside\.fbsbx\.com\/ig_messaging_cdn\//i.test(value)) {
+    return { label: "Shared Instagram media", title: value };
+  }
+
+  return { label: value, title: value };
+}
+
 /** Explain how much of the Instagram messaging window remains, with the exact expiry available as the title. */
 export function formatMessagingWindow(windowOpenUntil: string | null | undefined): { label: string; title?: string; open: boolean } {
   if (!windowOpenUntil) return { label: "Closed", open: false };

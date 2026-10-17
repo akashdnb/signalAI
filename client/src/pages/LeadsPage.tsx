@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApiError, api, type HandoffStatus, type LeadListItem, type PipelineStage, type TenantMember } from "../api";
 import { getLeadsPage, type PaginatedResponse } from "../api/pagination";
 import { Pagination } from "../components/Pagination";
-import { PIPELINE_STAGES, formatLastContactVia, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
+import { PIPELINE_STAGES, formatLastContactVia, formatLeadMessagePreview, formatMessagingWindow, formatRelativeTime, handoffLabel, leadDisplayName } from "../lib/leadFormatting";
 import { useTenant } from "../context/TenantContext";
 
 const HANDOFF_FILTERS: { value: HandoffStatus | ""; label: string }[] = [
@@ -150,6 +150,7 @@ export function LeadsPage() {
                   {leads.map((lead) => {
                     const messagingWindow = formatMessagingWindow(lead.windowOpenUntil);
                     const handoff = handoffLabel(lead.handoffStatus);
+                    const messagePreview = formatLeadMessagePreview(lead.lastMessagePreview);
                     return (
                       <tr key={lead.id}>
                         <td>
@@ -179,7 +180,7 @@ export function LeadsPage() {
                         <td>
                           <span className="inline-flex max-w-[280px] flex-col align-top">
                             <time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time>
-                            {lead.lastMessagePreview && <small className="truncate text-subtle" title={lead.lastMessagePreview}>{lead.lastMessagePreview}</small>}
+                            {messagePreview && <small className="truncate text-subtle" title={messagePreview.title}>{messagePreview.label}</small>}
                           </span>
                         </td>
                         <td>{formatLastContactVia(lead.lastEventType)}</td>
