@@ -87,6 +87,77 @@ aside[aria-label="Primary navigation"] + div > header + header {
   aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child {
     padding: 0 8px;
   }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child {
+    position: relative;
+    width: 46px;
+    min-width: 46px;
+    height: 42px;
+    flex: 0 0 46px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 120ms ease;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child > span:first-child > svg {
+    width: 24px;
+    height: 24px;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child > svg:last-child {
+    position: absolute;
+    inset: 0;
+    display: none;
+    width: 19px;
+    height: 19px;
+    margin: auto;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child:hover > span:first-child,
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child:focus-visible > span:first-child {
+    opacity: 0;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child:hover > svg:last-child,
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child:focus-visible > svg:last-child {
+    display: block;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > a,
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > span {
+    width: 46px;
+    min-width: 46px;
+    height: 42px;
+    min-height: 42px;
+    margin-inline: auto;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > a > svg,
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > span > svg {
+    width: 18px;
+    height: 18px;
+  }
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > a > span.bg-err-ink {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    display: inline-flex;
+    min-width: 17px;
+    height: 17px;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    border: 1px solid var(--card-bg);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 0 3px;
+    font-size: 11px;
+    line-height: 1;
+  }
   aside[aria-label="Primary navigation"][data-collapsed="true"] > nav > ul > li > a[aria-current="page"]::before {
     display: none;
   }
@@ -103,5 +174,8 @@ aside[aria-label="Primary navigation"] + div > header + header {
 }
 @media (prefers-reduced-motion: reduce) {
   aside[aria-label="Primary navigation"] > nav > ul > li > a,
-  aside[aria-label="Primary navigation"] > nav > ul > li > span { transition: none; }
+  aside[aria-label="Primary navigation"] > nav > ul > li > span,
+  aside[aria-label="Primary navigation"][data-collapsed="true"] > div:first-child > button:first-child > span:first-child {
+    transition: none;
+  }
 }
