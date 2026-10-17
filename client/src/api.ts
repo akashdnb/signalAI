@@ -635,6 +635,27 @@ export interface AvailableTier extends PlanQuotas {
   label: string;
 }
 
+export interface BillingSummary {
+  billingStatus: "none" | "active" | "canceled";
+  billingConfigured: boolean;
+  planTier: PlanTier;
+  planTierLabel: string;
+  quotas: PlanQuotas;
+  trialEndsAt: string | null;
+  availableTiers: AvailableTier[];
+}
+
+export interface UsageSummary {
+  planTier: PlanTier;
+  planTierLabel: string;
+  cycleStart: string;
+  trialEndsAt: string | null;
+  isTrialExpired: boolean;
+  isEntitled: boolean;
+  tokens: { used: number; allowance: number; overage: number; estimatedOverageCostUsd: number; nearingLimit: boolean };
+  dms: { sent: number; allowance: number; nearingLimit: boolean };
+}
+
 export type KnowledgeBaseDocumentStatus = "processing" | "ready" | "failed";
 
 export interface KnowledgeBaseDocument {
@@ -663,9 +684,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ industry }),
     }),
+  // Identity Refactor U4/U6: connecting Instagram is authenticated (the
+  // caller's session must be a member of tenantId) and is reached via a
+  // top-level navigation, which can't carry an Authorization header — this
+  // authenticated JSON call mints a short-lived one-time link first, and
+  // the caller navigates the browser to the URL it returns.
   startInstagramConnect: (tenantId: string) =>
     request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, { method: "POST" }),
   getAccountHealth: (tenantId: string) => request<AccountHealth>(`/tenants/${tenantId}/account`),
+  /** Drops the stored Instagram token — replies stop immediately; leads and their history are kept. */
   disconnectInstagram: (tenantId: string) =>
     request<AccountHealth>(`/tenants/${tenantId}/account`, { method: "DELETE" }),
   getLeads: (
@@ -705,12 +732,16 @@ export const api = {
     }),
   getCapturedFacts: (tenantId: string, leadId: string) =>
     request<{ facts: Record<string, string> }>(`/tenants/${tenantId}/leads/${leadId}/captured-facts`).then((r) => r.facts),
+
+  // Phase 2C Lead Intelligence
   getLeadIntelligence: (tenantId: string, leadId: string) =>
     request<LeadIntelligence | null>(`/tenants/${tenantId}/leads/${leadId}/intelligence`),
   getLeadIntelligenceHistory: (tenantId: string, leadId: string) =>
     request<LeadIntelligenceHistoryEntry[]>(`/tenants/${tenantId}/leads/${leadId}/intelligence/history`),
   recalculateLeadIntelligence: (tenantId: string, leadId: string) =>
     request<LeadIntelligence>(`/tenants/${tenantId}/leads/${leadId}/intelligence/recalculate`, { method: "POST" }),
+
+  // SLICE C: tenant-configurable custom lead scoring rules
   listScoringRules: (tenantId: string) =>
     request<{ rules: ScoringRule[] }>(`/tenants/${tenantId}/scoring-rules`).then((r) => r.rules),
   createScoringRule: (tenantId: string, input: { name: string; definition: ScoringRuleDefinition; points: number; enabled?: boolean }) =>
@@ -727,63 +758,231 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(updates),
     }).then((r) => r.rule),
-  deleteScoringRule: (tenantId: string, id: string) => request<void>(`/tenants/${tenantId}/scoring-rules/${id}`, { method: "DELETE" }),
+  deleteScoringRule: (tenantId: string, id: string) =>
+    request<void>(`/tenants/${tenantId}/scoring-rules/${id}`, { method: "DELETE" }),
+
   listMembers: (tenantId: string) => request<TenantMember[]>(`/tenants/${tenantId}/members`),
+
   listLeadNotes: (tenantId: string, leadId: string) => request<LeadNote[]>(`/tenants/${tenantId}/leads/${leadId}/notes`),
   addLeadNote: (tenantId: string, leadId: string, body: string) =>
-    request<LeadNote>(`/tenants/${tenantId}/leads/${leadId}/notes`, { method: "POST", body: JSON.stringify({ body })),
+    request<LeadNote>(`/tenants/${tenantId}/leads/${leadId}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+
   listTenantTags: (tenantId: string) => request<Tag[]>(`/tenants/${tenantId}/tags`),
   listLeadTags: (tenantId: string, leadId: string) => request<LeadTag[]>(`/tenants/${tenantId}/leads/${leadId}/tags`),
-  addLeadTag: (tenantId: string, leadId: string, name: string) => request<Tag>(`/tenants/${tenantId}/leads/${leadId}/tags`, { method: "POST", body: JSON.stringify({ name }) }),
-  removeLeadTag: (tenantId: string, leadId: string, tagId: string) => request<void>(`/tenants/${tenantId}/leads/${leadId}/tags/${tagId}`, { method: "DELETE" }),
+  addLeadTag: (tenantId: string, leadId: string, name: string) =>
+    request<Tag>(`/tenants/${tenantId}/leads/${leadId}/tags`, { method: "POST", body: JSON.stringify({ name }) }),
+  removeLeadTag: (tenantId: string, leadId: string, tagId: string) =>
+    request<void>(`/tenants/${tenantId}/leads/${leadId}/tags/${tagId}`, { method: "DELETE" }),
+
   listLeadDeals: (tenantId: string, leadId: string) => request<Deal[]>(`/tenants/${tenantId}/leads/${leadId}/deals`),
   createLeadDeal: (tenantId: string, leadId: string, value: number | null, currency?: string) =>
-    request<Deal>(`/tenants/${tenantId}/leads/${leadId}/deals`, { method: "POST", body: JSON.stringify({ value, currency }) }),
-  updateDealStage: (tenantId: string, dealId: string, stage: DealStage) => request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
+    request<Deal>(`/tenants/${tenantId}/leads/${leadId}/deals`, {
+      method: "POST",
+      body: JSON.stringify({ value, currency }),
+    }),
+  updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
+    request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
+
   getTopPosts: (tenantId: string, accountId?: string | null) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getTopKeywords: (tenantId: string, accountId?: string | null) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
   getFunnel: (tenantId: string, accountId?: string | null) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getRevenue: (tenantId: string, accountId?: string | null) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getConversationsTimeseries: (tenantId: string, accountId?: string | null) => request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getDropoff: (tenantId: string, campaignId: string) => request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
-  getCampaignAnalytics: (tenantId: string, campaignId: string) => request<CampaignAnalytics>(`/tenants/${tenantId}/campaigns/${campaignId}/analytics`),
+  getConversationsTimeseries: (tenantId: string) =>
+    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
+  getDropoff: (tenantId: string, campaignId: string) =>
+    request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
+  getCampaignAnalytics: (tenantId: string, campaignId: string) =>
+    request<CampaignAnalytics>(`/tenants/${tenantId}/campaigns/${campaignId}/analytics`),
+
   listCampaigns: (tenantId: string) => request<Campaign[]>(`/tenants/${tenantId}/campaigns`),
-  getCampaign: (tenantId: string, campaignId: string) => request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}`),
-  deleteDraftCampaign: (tenantId: string, campaignId: string) => request<void>(`/tenants/${tenantId}/campaigns/${campaignId}`, { method: "DELETE" }),
-  createCampaign: (tenantId: string, name: string, keywords: string[], options?: { enabled?: boolean }) => request<Campaign>(`/tenants/${tenantId}/campaigns`, { method: "POST", body: JSON.stringify({ name, keywords, ...(options?.enabled === undefined ? {} : { enabled: options.enabled }) }) }),
-  setCampaignEnabled: (tenantId: string, campaignId: string, enabled: boolean) => request<{ id: string; enabled: boolean }>(`/tenants/${tenantId}/campaigns/${campaignId}/enabled`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+  getCampaign: (tenantId: string, campaignId: string) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}`),
+  deleteDraftCampaign: (tenantId: string, campaignId: string) =>
+    request<void>(`/tenants/${tenantId}/campaigns/${campaignId}`, { method: "DELETE" }),
+  createCampaign: (tenantId: string, name: string, keywords: string[], options?: { enabled?: boolean }) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns`, {
+      method: "POST",
+      body: JSON.stringify({ name, keywords, ...(options?.enabled === undefined ? {} : { enabled: options.enabled }) }),
+    }),
+  setCampaignEnabled: (tenantId: string, campaignId: string, enabled: boolean) =>
+    request<{ id: string; enabled: boolean }>(`/tenants/${tenantId}/campaigns/${campaignId}/enabled`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }),
   updateReplyConfig: (
     tenantId: string,
     campaignId: string,
-    updates: { replyMode?: "rule_based" | "ai_generated"; ctaLink?: string | null; defaultReplyTemplate?: string; replyChannel?: ReplyChannel; triggerSource?: TriggerSource; tone?: CampaignTone; language?: CampaignLanguage; useKnowledgeBase?: boolean; keywords?: string[]; name?: string; description?: string | null },
-  ) => request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, { method: "PATCH", body: JSON.stringify(updates) }),
-  preview: (tenantId: string, campaignId: string, sampleText: string, sampleUsername?: string) => request<PreviewResult>(`/tenants/${tenantId}/campaigns/${campaignId}/preview`, { method: "POST", body: JSON.stringify({ sampleText, sampleUsername }) }),
+    updates: {
+      replyMode?: "rule_based" | "ai_generated";
+      ctaLink?: string | null;
+      defaultReplyTemplate?: string;
+      replyChannel?: ReplyChannel;
+      triggerSource?: TriggerSource;
+      tone?: CampaignTone;
+      language?: CampaignLanguage;
+      useKnowledgeBase?: boolean;
+      keywords?: string[];
+      name?: string;
+      description?: string | null;
+    },
+  ) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-config`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+  preview: (tenantId: string, campaignId: string, sampleText: string, sampleUsername?: string) =>
+    request<PreviewResult>(`/tenants/${tenantId}/campaigns/${campaignId}/preview`, {
+      method: "POST",
+      body: JSON.stringify({ sampleText, sampleUsername }),
+    }),
+
+  // Backs the campaign editor's post-targeting picker: posts this tenant
+  // has actually received a comment on, derived from ingested events
+  // rather than a Graph API media-listing call.
   listObservedMedia: (tenantId: string, accountId?: string | null) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  addKnownMediaByUrl: (tenantId: string, url: string) => request<ObservedMedia>(`/tenants/${tenantId}/known-media`, { method: "POST", body: JSON.stringify({ url }) }),
-  setCampaignTargetMedia: (tenantId: string, campaignId: string, targetMediaIds: string[]) => request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/target-media`, { method: "PUT", body: JSON.stringify({ targetMediaIds }) }),
-  setCampaignReplyTemplates: (tenantId: string, campaignId: string, replyTemplates: string[]) => request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-templates`, { method: "PUT", body: JSON.stringify({ replyTemplates }) }),
-  listMilestones: (tenantId: string, campaignId: string) => request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`),
-  setMilestones: (tenantId: string, campaignId: string, milestones: Array<{ goalDescription: string; captureFields?: string[] }>, oldIndexToNewIndex?: Array<number | null>) => request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`, { method: "PUT", body: JSON.stringify({ milestones, oldIndexToNewIndex }) }),
-  getBuilderGraph: (tenantId: string, campaignId: string) => request<BuilderGraph>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`),
-  saveBuilderGraph: (tenantId: string, campaignId: string, graph: { expectedVersion: number; nodes: JourneyNode[]; edges: JourneyEdge[]; milestones?: Array<{ id: string; goalDescription: string; captureFields: string[] }> }) => request<BuilderGraphSaveResult>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`, { method: "PUT", body: JSON.stringify(graph) }),
-  publishJourney: (tenantId: string, campaignId: string, expectedBuilderVersion: number) => request<PublishedJourney>(`/tenants/${tenantId}/campaigns/${campaignId}/journey/publish`, { method: "POST", body: JSON.stringify({ expectedBuilderVersion }) }),
-  getLatestPublishedJourney: (tenantId: string, campaignId: string) => request<PublishedJourney | null>(`/tenants/${tenantId}/campaigns/${campaignId}/journey/published`),
+  // Resolves a pasted post/Reel URL against the connected account's own
+  // media and adds it as a known post — usable for targeting even before
+  // any comment on it has arrived.
+  addKnownMediaByUrl: (tenantId: string, url: string) =>
+    request<ObservedMedia>(`/tenants/${tenantId}/known-media`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  setCampaignTargetMedia: (tenantId: string, campaignId: string, targetMediaIds: string[]) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/target-media`, {
+      method: "PUT",
+      body: JSON.stringify({ targetMediaIds }),
+    }),
+  setCampaignReplyTemplates: (tenantId: string, campaignId: string, replyTemplates: string[]) =>
+    request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}/reply-templates`, {
+      method: "PUT",
+      body: JSON.stringify({ replyTemplates }),
+    }),
+
+  listMilestones: (tenantId: string, campaignId: string) =>
+    request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`),
+  setMilestones: (
+    tenantId: string,
+    campaignId: string,
+    milestones: Array<{ goalDescription: string; captureFields?: string[] }>,
+    oldIndexToNewIndex?: Array<number | null>,
+  ) =>
+    request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`, {
+      method: "PUT",
+      body: JSON.stringify({ milestones, oldIndexToNewIndex }),
+    }),
+  getBuilderGraph: (tenantId: string, campaignId: string) =>
+    request<BuilderGraph>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`),
+  saveBuilderGraph: (
+    tenantId: string,
+    campaignId: string,
+    graph: {
+      expectedVersion: number;
+      nodes: JourneyNode[];
+      edges: JourneyEdge[];
+      milestones?: Array<{ id: string; goalDescription: string; captureFields: string[] }>;
+    },
+  ) =>
+    request<BuilderGraphSaveResult>(`/tenants/${tenantId}/campaigns/${campaignId}/builder`, {
+      method: "PUT",
+      body: JSON.stringify(graph),
+    }),
+
+  publishJourney: (
+    tenantId: string,
+    campaignId: string,
+    expectedBuilderVersion: number,
+  ) =>
+    request<PublishedJourney>(
+      `/tenants/${tenantId}/campaigns/${campaignId}/journey/publish`,
+      {
+        method: "POST",
+        body: JSON.stringify({ expectedBuilderVersion }),
+      },
+    ),
+
+  getLatestPublishedJourney: (
+    tenantId: string,
+    campaignId: string,
+  ) =>
+    request<PublishedJourney | null>(
+      `/tenants/${tenantId}/campaigns/${campaignId}/journey/published`,
+    ),
+
   getBilling: (tenantId: string) => request<BillingSummary>(`/tenants/${tenantId}/billing`),
-  startCheckout: (tenantId: string, tier: PlanTier = "starter") => request<{ url: string }>(`/tenants/${tenantId}/billing/checkout`, { method: "POST", body: JSON.stringify({ tier }) }),
+  startCheckout: (tenantId: string, tier: PlanTier = "starter") =>
+    request<{ url: string }>(`/tenants/${tenantId}/billing/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
-  getNotificationPreferences: (tenantId: string) => request<NotificationPreferences>(`/tenants/${tenantId}/notifications/preferences`),
-  updateNotificationPreferences: (tenantId: string, preferences: Array<{ eventType: string; channel: NotificationChannel; enabled: boolean }>) => request<{ saved: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/preferences`, { method: "PUT", body: JSON.stringify({ preferences }) }),
-  getNotifications: (tenantId: string, limit = 10) => request<NotificationInbox>(`/tenants/${tenantId}/notifications?limit=${limit}`),
-  markNotificationRead: (tenantId: string, notificationId: string) => request<{ read: boolean }>(`/tenants/${tenantId}/notifications/${notificationId}/read`, { method: "PATCH" }),
-  markAllNotificationsRead: (tenantId: string) => request<{ read: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/read-all`, { method: "POST" }),
+
+
+  getNotificationPreferences: (tenantId: string) =>
+    request<NotificationPreferences>(`/tenants/${tenantId}/notifications/preferences`),
+  updateNotificationPreferences: (tenantId: string, preferences: Array<{ eventType: string; channel: NotificationChannel; enabled: boolean }>) =>
+    request<{ saved: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/preferences`, {
+      method: "PUT",
+      body: JSON.stringify({ preferences }),
+    }),
+  getNotifications: (tenantId: string, limit = 10) =>
+    request<NotificationInbox>(`/tenants/${tenantId}/notifications?limit=${limit}`),
+  markNotificationRead: (tenantId: string, notificationId: string) =>
+    request<{ read: boolean }>(`/tenants/${tenantId}/notifications/${notificationId}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: (tenantId: string) =>
+    request<{ read: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/read-all`, { method: "POST" }),
+
   getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
-  updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) => request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
-  listKnowledgeBaseDocuments: (tenantId: string) => request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
-  getKnowledgeBaseDocument: (tenantId: string, documentId: string) => request<{ document: Omit<KnowledgeBaseDocument, "storageKey"> }>(`/tenants/${tenantId}/knowledge-base/${documentId}`).then((r) => r.document),
-  previewKnowledgeBaseDocument: (tenantId: string, documentId: string) => request<KnowledgeBaseDocumentPreview>(`/tenants/${tenantId}/knowledge-base/${documentId}/preview`),
-  uploadKnowledgeBaseDocument: (tenantId: string, file: File) => { const formData = new FormData(); formData.append("file", file); return requestMultipart<{ document: KnowledgeBaseDocument }>(`/tenants/${tenantId}/knowledge-base`, formData).then((r) => r.document); },
-  deleteKnowledgeBaseDocument: (tenantId: string, documentId: string) => request<void>(`/tenants/${tenantId}/knowledge-base/${documentId}`, { method: "DELETE" }),
-  getGuardrailsConfig: (tenantId: string) => request<GuardrailsConfig>(`/tenants/${tenantId}/guardrails-config`),
-  updateGuardrailsConfig: (tenantId: string, updates: Partial<Pick<GuardrailsConfig, "brandVoice" | "forbiddenTopics" | "escalationTriggers">>) => request<GuardrailsConfig>(`/tenants/${tenantId}/guardrails-config`, { method: "PATCH", body: JSON.stringify(updates) }),
+  updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
+    request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+
+  listKnowledgeBaseDocuments: (tenantId: string) =>
+    request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
+  getKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<{ document: Omit<KnowledgeBaseDocument, "storageKey"> }>(`/tenants/${tenantId}/knowledge-base/${documentId}`).then((r) => r.document),
+  previewKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<KnowledgeBaseDocumentPreview>(`/tenants/${tenantId}/knowledge-base/${documentId}/preview`),
+  retrieveKnowledgeBase: (tenantId: string, query: string, limit = 5) =>
+    request<KnowledgeRetrievalResponse>(`/tenants/${tenantId}/knowledge-base/retrieval`, {
+      method: "POST",
+      body: JSON.stringify({ query, limit }),
+    }),
+  uploadKnowledgeBaseDocument: (tenantId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return requestMultipart<{ document: KnowledgeBaseDocument }>(`/tenants/${tenantId}/knowledge-base`, formData).then(
+      (r) => r.document,
+    );
+  },
+  deleteKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<void>(`/tenants/${tenantId}/knowledge-base/${documentId}`, { method: "DELETE" }),
+
+  getGuardrailsConfig: (tenantId: string) =>
+    request<{ config: GuardrailsConfig }>(`/tenants/${tenantId}/guardrails-config`).then((r) => r.config),
+  updateGuardrailsConfig: (
+    tenantId: string,
+    updates: { brandVoice: string | null; forbiddenTopics: string[]; escalationTriggers: string[] },
+  ) =>
+    request<{ config: GuardrailsConfig }>(`/tenants/${tenantId}/guardrails-config`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    }).then((r) => r.config),
+
+  listFieldDefinitions: (tenantId: string) =>
+    request<{ fieldDefinitions: FieldDefinition[] }>(`/tenants/${tenantId}/field-definitions`).then(
+      (r) => r.fieldDefinitions,
+    ),
+  createFieldDefinition: (tenantId: string, input: { fieldKey: string; label: string; valueType: FieldDefinitionValueType }) =>
+    request<{ fieldDefinition: FieldDefinition }>(`/tenants/${tenantId}/field-definitions`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }).then((r) => r.fieldDefinition),
+  updateFieldDefinition: (tenantId: string, id: string, updates: { label?: string; valueType?: FieldDefinitionValueType }) =>
+    request<{ fieldDefinition: FieldDefinition }>(`/tenants/${tenantId}/field-definitions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }).then((r) => r.fieldDefinition),
+  deleteFieldDefinition: (tenantId: string, id: string) =>
+    request<void>(`/tenants/${tenantId}/field-definitions/${id}`, { method: "DELETE" }),
 };
