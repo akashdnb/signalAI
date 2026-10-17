@@ -36,14 +36,14 @@ const PERIOD_NOTE: Record<ReportingPeriod, string> = {
 
 /**
  * Real cutoff for the selected reporting period — `null` means "All time"
- * (no filtering). "Last N days" is inclusive of today, so it's N-1 days
- * back, not N (otherwise "Last 7 days" renders 8 day-slots once
- * fillDailySeries rounds both ends down to a calendar day).
+ * (no filtering). "Last N days" is inclusive of today, so start at the
+ * beginning of the N-day calendar window. This keeps the data filter aligned
+ * with fillDailySeries, which renders whole calendar-day slots.
  */
 function periodStart(period: ReportingPeriod): Date | null {
   const now = new Date();
-  if (period === "7d") return new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-  if (period === "30d") return new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+  if (period === "7d") return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  if (period === "30d") return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
   if (period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
   return null;
 }
