@@ -684,9 +684,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ industry }),
     }),
+  // Identity Refactor U4/U6: connecting Instagram is authenticated (the
+  // caller's session must be a member of tenantId) and is reached via a
+  // top-level navigation, which can't carry an Authorization header — this
+  // authenticated JSON call mints a short-lived one-time link first, and
+  // the caller navigates the browser to the URL it returns.
   startInstagramConnect: (tenantId: string) =>
     request<{ url: string }>(`/tenants/${tenantId}/instagram/connect-link`, { method: "POST" }),
   getAccountHealth: (tenantId: string) => request<AccountHealth>(`/tenants/${tenantId}/account`),
+  /** Drops the stored Instagram token — replies stop immediately; leads and their history are kept. */
   disconnectInstagram: (tenantId: string) =>
     request<AccountHealth>(`/tenants/${tenantId}/account`, { method: "DELETE" }),
   getLeads: (
@@ -726,12 +732,16 @@ export const api = {
     }),
   getCapturedFacts: (tenantId: string, leadId: string) =>
     request<{ facts: Record<string, string> }>(`/tenants/${tenantId}/leads/${leadId}/captured-facts`).then((r) => r.facts),
+
+  // Phase 2C Lead Intelligence
   getLeadIntelligence: (tenantId: string, leadId: string) =>
     request<LeadIntelligence | null>(`/tenants/${tenantId}/leads/${leadId}/intelligence`),
   getLeadIntelligenceHistory: (tenantId: string, leadId: string) =>
     request<LeadIntelligenceHistoryEntry[]>(`/tenants/${tenantId}/leads/${leadId}/intelligence/history`),
   recalculateLeadIntelligence: (tenantId: string, leadId: string) =>
     request<LeadIntelligence>(`/tenants/${tenantId}/leads/${leadId}/intelligence/recalculate`, { method: "POST" }),
+
+  // SLICE C: tenant-configurable custom lead scoring rules
   listScoringRules: (tenantId: string) =>
     request<{ rules: ScoringRule[] }>(`/tenants/${tenantId}/scoring-rules`).then((r) => r.rules),
   createScoringRule: (tenantId: string, input: { name: string; definition: ScoringRuleDefinition; points: number; enabled?: boolean }) =>
@@ -750,16 +760,20 @@ export const api = {
     }).then((r) => r.rule),
   deleteScoringRule: (tenantId: string, id: string) =>
     request<void>(`/tenants/${tenantId}/scoring-rules/${id}`, { method: "DELETE" }),
+
   listMembers: (tenantId: string) => request<TenantMember[]>(`/tenants/${tenantId}/members`),
+
   listLeadNotes: (tenantId: string, leadId: string) => request<LeadNote[]>(`/tenants/${tenantId}/leads/${leadId}/notes`),
   addLeadNote: (tenantId: string, leadId: string, body: string) =>
     request<LeadNote>(`/tenants/${tenantId}/leads/${leadId}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+
   listTenantTags: (tenantId: string) => request<Tag[]>(`/tenants/${tenantId}/tags`),
   listLeadTags: (tenantId: string, leadId: string) => request<LeadTag[]>(`/tenants/${tenantId}/leads/${leadId}/tags`),
   addLeadTag: (tenantId: string, leadId: string, name: string) =>
     request<Tag>(`/tenants/${tenantId}/leads/${leadId}/tags`, { method: "POST", body: JSON.stringify({ name }) }),
   removeLeadTag: (tenantId: string, leadId: string, tagId: string) =>
     request<void>(`/tenants/${tenantId}/leads/${leadId}/tags/${tagId}`, { method: "DELETE" }),
+
   listLeadDeals: (tenantId: string, leadId: string) => request<Deal[]>(`/tenants/${tenantId}/leads/${leadId}/deals`),
   createLeadDeal: (tenantId: string, leadId: string, value: number | null, currency?: string) =>
     request<Deal>(`/tenants/${tenantId}/leads/${leadId}/deals`, {
@@ -768,6 +782,7 @@ export const api = {
     }),
   updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
     request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
+
   getTopPosts: (tenantId: string, accountId?: string | null) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getTopKeywords: (tenantId: string, accountId?: string | null) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
@@ -779,6 +794,7 @@ export const api = {
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
   getCampaignAnalytics: (tenantId: string, campaignId: string) =>
     request<CampaignAnalytics>(`/tenants/${tenantId}/campaigns/${campaignId}/analytics`),
+
   listCampaigns: (tenantId: string) => request<Campaign[]>(`/tenants/${tenantId}/campaigns`),
   getCampaign: (tenantId: string, campaignId: string) =>
     request<Campaign>(`/tenants/${tenantId}/campaigns/${campaignId}`),
@@ -820,7 +836,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ sampleText, sampleUsername }),
     }),
+
+  // Backs the campaign editor's post-targeting picker: posts this tenant
+  // has actually received a comment on, derived from ingested events
+  // rather than a Graph API media-listing call.
   listObservedMedia: (tenantId: string, accountId?: string | null) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  // Resolves a pasted post/Reel URL against the connected account's own
+  // media and adds it as a known post — usable for targeting even before
+  // any comment on it has arrived.
   addKnownMediaByUrl: (tenantId: string, url: string) =>
     request<ObservedMedia>(`/tenants/${tenantId}/known-media`, {
       method: "POST",
@@ -836,6 +859,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ replyTemplates }),
     }),
+
   listMilestones: (tenantId: string, campaignId: string) =>
     request<Milestone[]>(`/tenants/${tenantId}/campaigns/${campaignId}/milestones`),
   setMilestones: (
@@ -864,6 +888,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(graph),
     }),
+
   publishJourney: (
     tenantId: string,
     campaignId: string,
@@ -876,6 +901,7 @@ export const api = {
         body: JSON.stringify({ expectedBuilderVersion }),
       },
     ),
+
   getLatestPublishedJourney: (
     tenantId: string,
     campaignId: string,
@@ -883,6 +909,7 @@ export const api = {
     request<PublishedJourney | null>(
       `/tenants/${tenantId}/campaigns/${campaignId}/journey/published`,
     ),
+
   getBilling: (tenantId: string) => request<BillingSummary>(`/tenants/${tenantId}/billing`),
   startCheckout: (tenantId: string, tier: PlanTier = "starter") =>
     request<{ url: string }>(`/tenants/${tenantId}/billing/checkout`, {
@@ -890,6 +917,8 @@ export const api = {
       body: JSON.stringify({ tier }),
     }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
+
+
   getNotificationPreferences: (tenantId: string) =>
     request<NotificationPreferences>(`/tenants/${tenantId}/notifications/preferences`),
   updateNotificationPreferences: (tenantId: string, preferences: Array<{ eventType: string; channel: NotificationChannel; enabled: boolean }>) =>
@@ -903,9 +932,11 @@ export const api = {
     request<{ read: boolean }>(`/tenants/${tenantId}/notifications/${notificationId}/read`, { method: "PATCH" }),
   markAllNotificationsRead: (tenantId: string) =>
     request<{ read: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/read-all`, { method: "POST" }),
+
   getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
   updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
-    request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+    request<{ profile: UserProfile }>(`/me/profile`, { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+
   listKnowledgeBaseDocuments: (tenantId: string) =>
     request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
   getKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
@@ -926,6 +957,7 @@ export const api = {
   },
   deleteKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
     request<void>(`/tenants/${tenantId}/knowledge-base/${documentId}`, { method: "DELETE" }),
+
   getGuardrailsConfig: (tenantId: string) =>
     request<{ config: GuardrailsConfig }>(`/tenants/${tenantId}/guardrails-config`).then((r) => r.config),
   updateGuardrailsConfig: (
@@ -936,6 +968,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(updates),
     }).then((r) => r.config),
+
   listFieldDefinitions: (tenantId: string) =>
     request<{ fieldDefinitions: FieldDefinition[] }>(`/tenants/${tenantId}/field-definitions`).then(
       (r) => r.fieldDefinitions,
