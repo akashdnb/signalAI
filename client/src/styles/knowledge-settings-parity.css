@@ -362,24 +362,7 @@
   gap: 14px;
 }
 
-.page-knowledge .knowledge-base-panel > section:first-child {
-  order: 3;
-  margin-top: 0;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--card-bg);
-  padding: 18px 20px;
-}
-
-.page-knowledge .knowledge-base-panel > section:first-child h3 {
-  margin: 0;
-  font-size: 18px;
-  line-height: 26px;
-  font-weight: 700;
-}
-
 .page-knowledge .knowledge-base-panel .knowledge-sources {
-  order: 1;
   margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -461,9 +444,18 @@
 }
 
 .page-knowledge .knowledge-base-panel > section:last-child:not(.knowledge-sources) {
-  order: 2;
   margin-top: 0;
-  border-top-color: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  padding: 18px 20px;
+}
+
+.page-knowledge .knowledge-base-panel > section:last-child:not(.knowledge-sources) h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {
@@ -512,7 +504,7 @@
   .settings-notification-list,
   .settings-notification-recipient,
   .page-knowledge .knowledge-base-panel .knowledge-sources,
-  .page-knowledge .knowledge-base-panel > section:first-child {
+  .page-knowledge .knowledge-base-panel > section:last-child:not(.knowledge-sources) {
     padding-left: 14px;
     padding-right: 14px;
   }
