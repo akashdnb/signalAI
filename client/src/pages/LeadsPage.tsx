@@ -39,6 +39,7 @@ export function LeadsPage() {
   useEffect(() => { if (!tenantId) return; let cancelled = false; api.listMembers(tenantId).then((result) => { if (cancelled) return; setMembers(result); setMembersError(null); }).catch((err) => { if (cancelled) return; if (err instanceof ApiError && (err.status === 401)) { navigate("/login", { replace: true }); return; } setMembersError(err instanceof Error ? err.message : "Owner details are unavailable."); }); return () => { cancelled = true; }; }, [tenantId, navigate]);
   useEffect(() => { if (!tenantId) return; let cancelled = false; async function load() { try { const result = await getLeadsPage(tenantId!, page, PAGE_SIZE, { stage: stageFilter || undefined, handoffStatus: handoffFilter || undefined, qualification: qualificationFilter || undefined, from: activityFrom || undefined, to: activityTo || undefined, sort, q: search.trim() || undefined, sourceMediaId: sourceFilter, accountId: selectedAccountId || undefined }); if (cancelled) return; setPageData(result); if (result.page !== page) setPage(result.page); setError(null); } catch (err) { if (cancelled) return; if (err instanceof ApiError && (err.status === 401)) { navigate("/login", { replace: true }); return; } setError(err instanceof Error ? err.message : "Failed to load leads"); } } load(); return () => { cancelled = true; }; }, [tenantId, stageFilter, handoffFilter, qualificationFilter, activityFrom, activityTo, sort, search, sourceFilter, selectedAccountId, page, reloadCount, navigate]);
   if (!tenantId) return null;
+
   const leads = pageData?.items ?? null;
 
   function clearSourceFilter() {
@@ -50,7 +51,7 @@ export function LeadsPage() {
   const hasActiveFilters = Boolean(stageFilter || handoffFilter || qualificationFilter || activityFrom || activityTo || search.trim() || sourceFilter);
 
   return (
-    <div className="page page-wide">
+    <div className="page page-wide page-leads">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Pipeline</p>
@@ -78,7 +79,7 @@ export function LeadsPage() {
       )}
 
       <section className="card" aria-label="Lead pipeline">
-        <div className="mb-4 flex flex-wrap items-end gap-2 border-b border-line pb-4">
+        <div className="filter-row mb-4 flex flex-wrap items-end gap-2 border-b border-line pb-4">
           <label className="sr-only" htmlFor="leads-stage-filter">Pipeline stage</label>
           <select className="!mt-0 w-auto min-w-[150px]" id="leads-stage-filter" aria-label="Pipeline stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value as PipelineStage | "")}>
             <option value="">All stages</option>

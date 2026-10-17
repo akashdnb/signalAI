@@ -1,0 +1,82 @@
+/* Focused production parity refinements derived from the live Precision Operations reference.
+ * Uses existing production classes/tokens only; never imports or copies preview `.po-*` rules.
+ */
+
+/* The foundation AppShell already defaults to the preview's collapsed 80px desktop rail.
+   Keep that geometry explicit here so later shell utility changes cannot expand it on desktop. */
+@media (min-width: 768px) {
+  aside[aria-label="Primary navigation"][data-collapsed="true"] {
+    width: 80px;
+    flex-basis: 80px;
+  }
+}
+
+/* Overview: keep the real reporting controls and data, but remove the legacy vertical slack
+   between the page heading, period control, and first data surface. */
+.page-overview .overview-header { margin-bottom: 0.75rem; }
+.page-overview .overview-toolbar { margin-bottom: 1rem; }
+.page-overview .overview-metrics { margin-bottom: 0.875rem; }
+.page-overview .overview-grid { gap: 0.875rem; }
+
+/* Leads: the JSX owns the richer production filter set; this only restores the production
+   filter-row hook consumed by the retained parity CSS. */
+.page-leads > .card .filter-row { flex-wrap: wrap; }
+.page-leads > .card .filter-row > select,
+.page-leads > .card .filter-row > input { flex: 0 0 auto; }
+.page-leads > .card .filter-row > label:last-child { min-width: min(100%, 280px); }
+
+/* Lead detail: match the preview's compact title/tabs rhythm without hiding or replacing
+   any real production controls, intelligence, deals, notes, or captured facts. */
+.page-lead-detail > header > div:first-child > div:first-child {
+  display: none;
+}
+.page-lead-detail > header { margin-bottom: 1rem; }
+.page-lead-detail .lead-detail-tabs {
+  margin-top: -0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.page-lead-detail .lead-detail-tab {
+  min-height: 44px;
+  padding: 0.7rem 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+}
+.page-lead-detail .lead-detail-tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* Automation list: keep the live API/filter/status model, while matching the preview's
+   deliberate list density and concrete copy. */
+.page-automation > div:first-child h1 {
+  font-size: clamp(1.8rem, 2.4vw, 2rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+.page-automation > div:first-child p {
+  max-width: 760px;
+}
+.page-automation #automation-tabpanel > section > div:first-child {
+  gap: 1rem;
+}
+.page-automation #automation-tabpanel > section > div:first-child h2 {
+  font-size: 1.125rem;
+  line-height: 1.3;
+}
+.page-automation #automation-tabpanel > section > div:nth-child(2) {
+  margin-top: 0.9rem;
+}
+
+@media (max-width: 760px) {
+  .page-leads > .card .filter-row > label:last-child { width: 100%; }
+  .page-lead-detail .lead-detail-tabs { overflow-x: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-lead-detail *, .page-overview *, .page-leads *, .page-automation * {
+    scroll-behavior: auto;
+  }
+}

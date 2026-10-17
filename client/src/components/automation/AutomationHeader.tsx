@@ -4,7 +4,7 @@ export function AutomationHeader() {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="m-0 text-[26px] font-bold leading-[1.12] tracking-[-0.025em] text-ink">Automation</h1>
+        <h1 className="m-0 text-[32px] font-bold leading-[1.12] tracking-[-0.03em] text-ink">Automation</h1>
         <p className="muted m-0 mt-1 max-w-2xl text-[14px] leading-5">
           Turn Instagram conversations into qualified leads without building a complicated flow.
         </p>

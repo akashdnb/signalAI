@@ -99,6 +99,9 @@ export function AutomationPage() {
           <AutomationTemplates onUse={handleUseTemplate} />
         ) : (
           <>
+            <p className="automation-list-description muted m-0 mt-3 text-sm leading-6">
+              Choose a journey to edit its trigger, reply behavior, and lead capture.
+            </p>
             <div className="automation-outcome-card">
               <div className="automation-outcome-copy">
                 <p className="automation-eyebrow">Start with the outcome you want</p>
