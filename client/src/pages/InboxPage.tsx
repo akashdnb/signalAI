@@ -79,6 +79,9 @@ export function InboxPage() {
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
   const selectedLeadIdRef = useRef(selectedLeadId);
   selectedLeadIdRef.current = selectedLeadId;
+  const inboxContextSignature = `${tenantId ?? ""}|${selectedAccountId ?? ""}|${tab}|${search.trim()}|${page}`;
+  const inboxContextSignatureRef = useRef(inboxContextSignature);
+  inboxContextSignatureRef.current = inboxContextSignature;
   const standardMessagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
   const humanAgentWindowOpen = !!selectedLead?.humanAgentWindowUntil && Date.parse(selectedLead.humanAgentWindowUntil) > Date.now();
   const humanAgentOnly = !standardMessagingWindowOpen && humanAgentWindowOpen;
@@ -166,8 +169,10 @@ export function InboxPage() {
         return;
       }
       if (!tenantId) return;
+      const pollContextSignature = inboxContextSignatureRef.current;
       api.getLead(tenantId, selectedLeadId).then((fresh) => {
         if (selectedLeadIdRef.current !== selectedLeadId) return;
+        if (inboxContextSignatureRef.current !== pollContextSignature) return;
         if (fresh.lastInboundAt !== selectedLastInboundAtRef.current) {
           selectedLastInboundAtRef.current = fresh.lastInboundAt;
           setThreadRefreshToken((token) => token + 1);
