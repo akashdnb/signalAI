@@ -943,18 +943,20 @@ export function JourneyBuilder({
                 campaign={campaign}
                 onChanged={onChanged}
                 onDirtyChange={setDetailsDirty}
+                afterTrigger={
+                  <section className="journey-setup-account-section" aria-labelledby="journey-setup-account-title">
+                    <div className="journey-setup-account-heading">
+                      <h2 id="journey-setup-account-title">Instagram account</h2>
+                      <p className="muted">Assign this reusable journey to healthy accounts that should run it.</p>
+                    </div>
+                    <JourneyAccountsPanel
+                      tenantId={tenantId}
+                      campaignId={campaign.id}
+                      onReadinessChange={undefined}
+                    />
+                  </section>
+                }
               />
-              <section className="journey-setup-account-section" aria-labelledby="journey-setup-account-title">
-                <div className="journey-setup-account-heading">
-                  <h2 id="journey-setup-account-title">Instagram account</h2>
-                  <p className="muted">Assign this reusable journey to healthy accounts that should run it.</p>
-                </div>
-                <JourneyAccountsPanel
-                  tenantId={tenantId}
-                  campaignId={campaign.id}
-                  onReadinessChange={undefined}
-                />
-              </section>
             </div>
           )}
 
