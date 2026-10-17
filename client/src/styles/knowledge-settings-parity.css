@@ -357,9 +357,14 @@
 
 .page-knowledge .knowledge-base-panel {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .page-knowledge .knowledge-base-panel > section:first-child {
+  order: 3;
+  margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card-bg);
@@ -374,7 +379,8 @@
 }
 
 .page-knowledge .knowledge-base-panel .knowledge-sources {
-  margin-top: 14px;
+  order: 1;
+  margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card-bg);
@@ -454,7 +460,9 @@
   background: var(--bg);
 }
 
-.page-knowledge .knowledge-base-panel > section:last-child {
+.page-knowledge .knowledge-base-panel > section:last-child:not(.knowledge-sources) {
+  order: 2;
+  margin-top: 0;
   border-top-color: var(--border);
 }
 
