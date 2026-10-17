@@ -18,14 +18,16 @@
 .page-journey-builder .automation-builder [role="tab"][aria-selected="true"] { color: var(--text); }
 .page-journey-builder .automation-builder > .relative.flex.min-h-0.min-w-0.flex-1 { background: var(--bg); }
 .page-journey-builder .automation-builder .react-flow__pane { cursor: default; }
-.page-journey-builder .automation-builder .react-flow__node { outline: none; }
-.page-journey-builder .automation-builder .react-flow__node [role="button"] { box-shadow: 0 3px 12px rgb(15 23 42 / 5%); transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease; }
+.page-journey-builder .automation-builder .react-flow__node { width: 430px !important; outline: none; }
+.page-journey-builder .automation-builder .react-flow__node [role="button"] { min-height: 96px; box-shadow: 0 3px 12px rgb(15 23 42 / 5%); transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease; }
 .page-journey-builder .automation-builder .react-flow__node [role="button"][aria-pressed="true"] { border-color: var(--accent); background: var(--pill-bg); box-shadow: 0 0 0 1px var(--accent), 0 4px 14px rgb(15 23 42 / 7%); }
 .page-journey-builder .automation-builder .react-flow__node [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .page-journey-builder .automation-builder .react-flow__edge-path { stroke: var(--text-muted); stroke-width: 1.7; }
 .page-journey-builder .automation-builder .react-flow__arrowhead { fill: var(--text-muted); }
 .page-journey-builder .automation-builder .react-flow__background pattern circle { fill: var(--border); }
 .page-journey-builder .automation-builder .builder-palette-toggle { min-height: 48px; border-color: var(--border); }
+.page-journey-builder .automation-builder .builder-palette-toggle .flex-1 { font-size: 0; }
+.page-journey-builder .automation-builder .builder-palette-toggle .flex-1::after { content: "Add a step"; font-size: 13px; }
 .page-journey-builder .automation-builder .absolute.left-4.top-4.z-20 { width: 214px; border-radius: 10px; border-color: var(--border); box-shadow: 0 6px 18px rgb(15 23 42 / 7%); }
 .page-journey-builder .automation-builder .absolute.left-4.top-4.z-20 .min-h-10 { min-height: 40px; }
 .page-journey-builder .automation-builder .react-flow__controls,
@@ -33,6 +35,31 @@
 .page-journey-builder .automation-builder .react-flow__controls-button { width: 32px; height: 32px; border-color: var(--border); background: var(--card-bg); color: var(--text); }
 .page-journey-builder .automation-builder .react-flow__controls-button:hover { background: var(--pill-bg); }
 .page-journey-builder .automation-builder .react-flow__minimap-mask { fill: color-mix(in srgb, var(--bg) 60%, transparent); }
+
+/* Setup: keep every production control, but use the preview's numbered, open,
+ * section-based rhythm instead of a stack of equally weighted cards. */
+.page-journey-builder > .journey-account-panel { margin-bottom: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); box-shadow: none; padding: 1.25rem; }
+.page-journey-builder > .journey-account-panel h2::before { content: "03 INSTAGRAM ACCOUNT"; display: block; margin-bottom: 0.45rem; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; }
+.page-journey-builder > .journey-account-panel h2 { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.page-journey-builder > .card { margin-bottom: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); box-shadow: none; }
+.page-journey-builder > .card h2 { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.page-journey-builder > .card .pill { font-size: 12px; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] { display: flex; flex-direction: column; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .mb-5 { order: 2; margin-bottom: 0; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .campaign-editor-page { order: 1; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .campaign-editor-page { counter-reset: setup-section; max-width: 1000px; margin-inline: auto; padding: 1.25rem 1.25rem 1.5rem; gap: 1rem; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card { counter-increment: setup-section; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; padding: 1.25rem 0; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card:first-child { border-top: 0; padding-top: 0.25rem; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card-trigger { min-height: 40px; margin-bottom: 0; padding: 0; font-size: 18px; line-height: 1.35; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card-trigger::before { display: inline-flex; align-items: center; justify-content: center; width: 31px; height: 22px; margin-right: 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); content: counter(setup-section, decimal-leading-zero); font-size: 11px; font-weight: 600; vertical-align: middle; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card-content { margin-top: 0.75rem; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card input:not([type="checkbox"]):not([type="radio"]),
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card textarea,
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card select { border-radius: 8px; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card .card { border-radius: 10px; box-shadow: none; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .mb-5 { max-width: 1000px; width: 100%; margin-inline: auto; padding: 0 1.25rem 1.5rem; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .mb-5 section { border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 1.25rem 0 0; background: transparent; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .mb-5 h2::before { content: "READINESS CHECK"; display: block; margin-bottom: 0.45rem; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; }
 
 /* Results + Leads tabs: mirror the preview's information hierarchy while using production data. */
 .page-journey-builder .builder-results-panel,
@@ -51,7 +78,7 @@
 .page-journey-builder .builder-results-overview-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); gap: 0.75rem; }
 .page-journey-builder .builder-results-panel-surface { min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
 .page-journey-builder .builder-results-panel-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
-.page-journey-builder .builder-results-panel-title h3 { margin: 0; color: var(--text); font-size: 0.95rem; font-weight: 650; }
+.page-journey-builder .builder-results-panel-title h3 { margin: 0; color: var(--text); font-size: 0.95rem; font-weight: 600; }
 .page-journey-builder .builder-results-panel-title p:not(.overview-eyebrow) { margin: 0.2rem 0 0; color: var(--text-muted); font-size: 0.72rem; line-height: 1.45; }
 .page-journey-builder .builder-results-production-label { display: inline-flex; align-items: center; min-height: 28px; padding: 0 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: var(--pill-bg); color: var(--text-muted); font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
 .page-journey-builder .builder-leads-toolbar { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
@@ -76,6 +103,7 @@
   .page-journey-builder > .automation-builder > .relative.border-b { padding-inline: 0.75rem; }
   .page-journey-builder .automation-builder [role="tablist"] { gap: 1.25rem; overflow-x: auto; overscroll-behavior-x: contain; }
   .page-journey-builder .automation-builder [role="tab"] { flex: 0 0 auto; }
+  .page-journey-builder .automation-builder .react-flow__node { width: min(430px, calc(100vw - 24px)) !important; }
   .page-journey-builder .builder-results-panel, .page-journey-builder .builder-leads-panel { padding: 0.75rem; }
   .page-journey-builder .builder-results-metric-row, .page-journey-builder .builder-leads-metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page-journey-builder .builder-results-overview-grid { grid-template-columns: 1fr; }
@@ -84,6 +112,8 @@
   .page-journey-builder .builder-leads-table-wrap { display: none; }
   .page-journey-builder .builder-leads-mobile { display: flex; }
   .page-journey-builder .builder-results-production-label { flex: 0 0 auto; }
+  .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .campaign-editor-page { padding-inline: 0.75rem; }
+  .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .mb-5 { padding-inline: 0.75rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .page-journey-builder .automation-builder .react-flow__node [role="button"] { transition: none; }

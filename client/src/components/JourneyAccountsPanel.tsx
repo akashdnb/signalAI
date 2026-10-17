@@ -79,7 +79,7 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
   }, [loading, error, healthyAssignedCount, unavailableAssignedCount, onReadinessChange]);
 
   return (
-    <section className="card" style={{ marginBottom: "0.75rem" }}>
+    <section className="journey-account-panel card" style={{ marginBottom: "0.75rem" }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 style={{ marginBottom: 2 }}>Connected Instagram accounts</h2>
