@@ -87,3 +87,62 @@ input, select, textarea { max-width: 100%; }
   .page-wide:has(.integration-accounts) .integration-account-row { grid-template-columns: 1fr; display: grid; }
   .page-wide:has(.integration-accounts) .integration-account-actions { justify-content: flex-start; flex-wrap: wrap; }
 }
+
+/* Inbox parity: preserve the production three-pane workflow while matching the preview's scan-first hierarchy. */
+.page.page-workspace > h1 { margin: 0; font-size: 2rem; line-height: 1.2; letter-spacing: -.035em; }
+.page.page-workspace > .inbox-subtitle { max-width: 720px; margin: .4rem 0 1rem; line-height: 1.5; }
+.page.page-workspace > .banner { margin-bottom: .9rem; }
+.page.page-workspace > div:last-child { display: grid; grid-template-columns: 320px minmax(0, 1fr) 288px; height: min(75vh, 760px); min-height: 560px; overflow: hidden; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); }
+.page.page-workspace > div:last-child > :first-child,
+.page.page-workspace > div:last-child > :nth-child(2) { min-width: 0; }
+.page.page-workspace > div:last-child > :first-child { width: auto; border-right: 1px solid var(--border); }
+.page.page-workspace > div:last-child > :nth-child(2) { width: auto; border-right: 1px solid var(--border); }
+.page.page-workspace > div:last-child > :last-child { width: auto; }
+.page.page-workspace .inbox-conversation { min-height: 76px; padding: .8rem .9rem; gap: .75rem; }
+.page.page-workspace .inbox-conversation:hover { background: var(--pill-bg); }
+.page.page-workspace .inbox-conversation-selected { background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)); box-shadow: inset 3px 0 0 var(--accent); }
+.page.page-workspace .inbox-conversation-first { gap: .75rem; }
+.page.page-workspace .inbox-conversation-first strong { font-size: .9rem; }
+.page.page-workspace .inbox-conversation-first small { font-size: .7rem; color: var(--text-muted); white-space: nowrap; }
+.page.page-workspace .inbox-conversation-preview { margin-top: .3rem; font-size: .78rem; line-height: 1.4; }
+.page.page-workspace .inbox-conversation-bottom { margin-top: .4rem; }
+.page.page-workspace .inbox-tab-count { min-width: 1.25rem; padding: 0 .25rem; border-radius: 999px; background: var(--pill-bg); font-size: .68rem; line-height: 1.25rem; text-align: center; }
+.page.page-workspace .inbox-thread-header { min-height: 68px; padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.page.page-workspace .inbox-thread-header-identity strong { font-size: .95rem; }
+.page.page-workspace .inbox-thread-header-identity span { font-size: .72rem; color: var(--text-muted); }
+.page.page-workspace .inbox-post-context { margin-bottom: .75rem; padding: .65rem .75rem; border: 1px solid var(--border); border-radius: 10px; background: var(--pill-bg); }
+.page.page-workspace .inbox-post-context-text strong { font-size: .75rem; }
+.page.page-workspace .inbox-post-context-text small { font-size: .7rem; line-height: 1.35; }
+.page.page-workspace .thread-messages { display: flex; flex-direction: column; gap: .65rem; padding: .25rem .15rem 1rem; }
+.page.page-workspace .thread-message { max-width: min(78%, 520px); padding: .65rem .8rem; border: 1px solid var(--border); border-radius: 12px; font-size: .86rem; line-height: 1.5; }
+.page.page-workspace .thread-message-incoming { align-self: flex-start; background: var(--card-bg); border-top-left-radius: 5px; }
+.page.page-workspace .thread-message-outgoing { align-self: flex-end; background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)); border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); border-top-right-radius: 5px; }
+.page.page-workspace .thread-message small { display: block; margin-top: .3rem; color: var(--text-muted); font-size: .6875rem; }
+.page.page-workspace .inbox-details { padding: 1rem; }
+.page.page-workspace .inbox-details h3 { margin: .25rem 0 .15rem; font-size: 1rem; }
+.page.page-workspace .inbox-eyebrow { font-size: .6875rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.page.page-workspace .inbox-detail-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .7rem; padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.page.page-workspace .inbox-detail-row > span { color: var(--text-muted); font-size: .75rem; }
+.page.page-workspace .inbox-detail-row > strong { font-size: .76rem; text-align: right; }
+.page.page-workspace .inbox-detail-row select { min-height: 36px; font-size: .78rem; }
+.page.page-workspace .inbox-full-width { width: 100%; margin-top: .8rem; }
+.page.page-workspace .inbox-details .tag-chip { margin-top: .25rem; }
+.page.page-workspace .inbox-details > p:last-child { margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--border); font-size: .8rem; }
+.page.page-workspace .inbox-details a { font-weight: 600; }
+.page.page-workspace > div:last-child > :first-child > .flex.flex-wrap { padding: .75rem; background: var(--card-bg); }
+.page.page-workspace > div:last-child > :first-child > .p-3.pt-0 { padding: .6rem .75rem .75rem; }
+.page.page-workspace > div:last-child > :first-child > .p-3.pt-0 input { min-height: 38px; background: var(--pill-bg); border-color: var(--border); }
+.page.page-workspace > div:last-child > :nth-child(2) > div > .border-t { background: var(--card-bg); }
+.page.page-workspace > div:last-child > :nth-child(2) .inline-form { align-items: flex-end; }
+.page.page-workspace > div:last-child > :nth-child(2) textarea { min-height: 64px; border-radius: 10px; }
+.page.page-workspace > div:last-child > :nth-child(2) .inbox-ai-composer { padding: .75rem; border: 1px solid var(--border); border-radius: 10px; background: var(--pill-bg); }
+.page.page-workspace > div:last-child > :nth-child(2) .inbox-ai-composer .btn-primary { margin-top: .2rem; }
+
+@media (max-width: 1100px) {
+  .page.page-workspace > div:last-child { grid-template-columns: 285px minmax(0, 1fr) 250px; }
+}
+@media (max-width: 760px) {
+  .page.page-workspace > div:last-child { display: flex; height: auto; min-height: 0; overflow: visible; border-radius: 12px; }
+  .page.page-workspace .thread-message { max-width: 88%; }
+  .page.page-workspace .inbox-thread-header { min-height: 60px; }
+}
