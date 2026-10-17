@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiError, api, type Campaign } from "../api";
-import {
-  JourneyAccountsPanel,
-  type JourneyAccountReadiness,
-} from "../components/JourneyAccountsPanel";
+import { workspaceApi } from "../api/workspace";
+import type { JourneyAccountReadiness } from "../components/JourneyAccountsPanel";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
 import "../styles/journey-builder-parity.css";
 
@@ -57,11 +55,41 @@ export function JourneyBuilderPage() {
   }, [tenantId, campaignId]);
 
   useEffect(() => {
+    if (!tenantId || !campaignId) return;
+    let cancelled = false;
     setAccountReadiness({
       status: "loading",
       healthyAssignedCount: 0,
       unavailableAssignedCount: 0,
     });
+    Promise.all([
+      workspaceApi.listConnectedAccounts(tenantId),
+      workspaceApi.listJourneyAccounts(tenantId, campaignId),
+    ]).then(([accounts, bindings]) => {
+      if (cancelled) return;
+      const healthyAccountIds = new Set(
+        accounts.filter((account) => account.status === "healthy").map((account) => account.id),
+      );
+      const assignedCount = bindings.filter((binding) => binding.enabled).length;
+      const healthyAssignedCount = bindings.filter(
+        (binding) => binding.enabled && healthyAccountIds.has(binding.accountId),
+      ).length;
+      setAccountReadiness({
+        status: "ready",
+        healthyAssignedCount,
+        unavailableAssignedCount: assignedCount - healthyAssignedCount,
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      setAccountReadiness({
+        status: "error",
+        healthyAssignedCount: 0,
+        unavailableAssignedCount: 0,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [tenantId, campaignId]);
 
   useEffect(() => {
@@ -96,15 +124,11 @@ export function JourneyBuilderPage() {
 
   return (
     <div className="page-journey-builder flex min-h-[calc(100vh-56px)] flex-col px-3 py-3 md:px-4 md:py-3">
-      <JourneyAccountsPanel
-        tenantId={tenantId}
-        campaignId={campaignId}
-        onReadinessChange={handleAccountReadinessChange}
-      />
       <JourneyBuilder
         tenantId={tenantId}
         campaign={campaign}
         accountReadiness={accountReadiness}
+        onAccountReadinessChange={handleAccountReadinessChange}
         startOnSetup={startOnSetup}
         onChanged={refreshCampaign}
         onBack={() => navigate(`/dashboard/${tenantId}/automation`)}
