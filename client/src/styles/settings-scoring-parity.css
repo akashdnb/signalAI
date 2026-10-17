@@ -27,7 +27,7 @@
   width: 100%;
   margin: 0 0 18px;
   border-collapse: separate;
-  border-spacing: 0 8px;
+  border-spacing: 0 6px;
 }
 
 .settings-page .scoring-rules-panel .card > .table thead th {
@@ -40,11 +40,23 @@
   text-transform: uppercase;
 }
 
+.settings-page .scoring-rules-panel .card > .table thead th:nth-child(1) {
+  width: 34%;
+}
+
+.settings-page .scoring-rules-panel .card > .table thead th:nth-child(2) {
+  width: 32%;
+}
+
+.settings-page .scoring-rules-panel .card > .table thead th:nth-child(3) {
+  width: 12%;
+}
+
 .settings-page .scoring-rules-panel .card > .table tbody td {
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   background: var(--card-bg);
-  padding: 12px;
+  padding: 11px 12px;
   vertical-align: middle;
 }
 
@@ -58,10 +70,35 @@
   border-radius: 0 10px 10px 0;
 }
 
+.settings-page .scoring-rules-panel .card > .table tbody td:nth-child(1) {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-page .scoring-rules-panel .card > .table tbody td:nth-child(2) {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-page .scoring-rules-panel .card > .table tbody td:nth-child(3) {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settings-page .scoring-rules-panel .card > .table tbody td:nth-child(4),
+.settings-page .scoring-rules-panel .card > .table tbody td:nth-child(5) {
+  width: 1%;
+  white-space: nowrap;
+}
+
 .settings-page .scoring-rules-panel .card > .field-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 16px;
+  gap: 12px 16px;
   margin-top: 18px !important;
   padding-top: 18px;
   border-top: 1px solid var(--border);
@@ -85,6 +122,21 @@
   align-self: end;
   justify-self: start;
   min-height: 40px;
+}
+
+@media (max-width: 760px) {
+  .settings-page .scoring-rules-panel .card > .table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .settings-page .scoring-rules-panel .card > .table thead,
+  .settings-page .scoring-rules-panel .card > .table tbody {
+    display: table;
+    width: 100%;
+    min-width: 720px;
+    table-layout: fixed;
+  }
 }
 
 @media (max-width: 640px) {
