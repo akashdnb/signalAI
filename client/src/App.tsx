@@ -112,12 +112,12 @@ function LeadDetailRoute() {
   const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const isUuid = !!leadId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(leadId);
+  const isUuid = !!leadId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
 
   useEffect(() => {
     if (!tenantId || !leadId || isUuid) return;
     let cancelled = false;
-    const username = decodeURIComponent(leadId).replace(/^@/, "").trim().toLowerCase();
+    const username = leadId.replace(/^@/, "").trim().toLowerCase();
 
     api.getLeads(tenantId, { q: username })
       .then((leads) => {
