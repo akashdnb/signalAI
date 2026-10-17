@@ -74,7 +74,7 @@ input, select, textarea { max-width: 100%; }
 .page-wide:has(.integration-accounts) .integration-account-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 1rem; padding: 1.15rem 1.25rem; }
 .page-wide:has(.integration-accounts) .integration-account-row + .integration-account-row { border-top: 1px solid var(--surface-divider); }
 .page-wide:has(.integration-accounts) .integration-account-actions { align-self: start; }
-.page-wide:has(.integration-accounts) .integration-account-row details summary { color: var(--accent); font-weight: 650; }
+.page-wide:has(.integration-accounts) .integration-account-row details summary { color: var(--accent); font-weight: 600; }
 .page-wide:has(.integration-accounts) .integration-empty-state { margin: 1rem 1.25rem 1.25rem; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface-muted); padding: 1rem; }
 .page-wide:has(.integration-accounts) > .card:not(.integration-accounts) { display: flex; align-items: flex-start; }
 
