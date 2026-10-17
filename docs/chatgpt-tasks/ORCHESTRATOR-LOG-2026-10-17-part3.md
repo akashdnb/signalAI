@@ -11,3 +11,11 @@ Continuation of `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md` and `ORCHESTRATOR-LOG-2
 - Checked current open PRs through GitHub. The legacy workspace-context PR #76 remains based on `main` and is not a clean current-foundation candidate; no other open agent PR was identified as safe to merge into foundation during this pass.
 - A repository-guideline review also identified that `journey-builder-parity.css` contains three `font-size: 0.68rem` declarations, which are below the documented 11px minimum. No modification was made in this pass because the available GitHub write API requires replacing the full CSS blob and the exact current blob was not safely reconstructed for a one-byte-scope-preserving update. This remains a concrete follow-up candidate rather than an unverified edit.
 - No production deployment was triggered and `main` was not modified. Current foundation application head remains `3e0c7ff8eab9fba0152177b43d0c07f0409937bf`.
+
+## 2026-10-17 20:38 IST — Journey typography floor fixed and squash-merged
+
+- Retried scoped delegation in a new ChatGPT tab for the precise Journey Builder typography finding. The composer again silently failed to retain the brief after the retry, so the targeted fix was completed directly as instructed; the opened delegation tab was not a user-owned tab and was not left open for continued work.
+- Re-read `client/src/styles/journey-builder-parity.css` from the current foundation and verified the exact three below-floor declarations: Results metric small text, Results production label, and Leads table header were all `font-size: 0.68rem` (~10.88px), below the documented 11px minimum.
+- Created/used child branch `task/journey-typography-floor-current` from the then-current foundation head, made only those three value replacements to `11px`, and verified the resulting PR diff was exactly 3 additions / 3 deletions in that single CSS file. No `.po-*`/`--po-*` contamination, behavior, API, permission, or responsive-state changes were introduced.
+- PR #129 was squash-merged into `feat/preview-to-production-foundation` as commit `da634eaa90bccae576c3c4a01a9e45b29fab5b5d`. PR #128 was the earlier stale-base attempt and was closed unmerged before recreating PR #129 from the current foundation head.
+- No production deployment was triggered and `main` was not modified.
