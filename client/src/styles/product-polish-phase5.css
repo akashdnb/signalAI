@@ -117,10 +117,10 @@ input, select, textarea { max-width: 100%; }
 .page.page-workspace .thread-message { max-width: min(78%, 520px); padding: .65rem .8rem; border: 1px solid var(--border); border-radius: 12px; font-size: .86rem; line-height: 1.5; }
 .page.page-workspace .thread-message-incoming { align-self: flex-start; background: var(--card-bg); border-top-left-radius: 5px; }
 .page.page-workspace .thread-message-outgoing { align-self: flex-end; background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)); border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); border-top-right-radius: 5px; }
-.page.page-workspace .thread-message small { display: block; margin-top: .3rem; color: var(--text-muted); font-size: .67rem; }
+.page.page-workspace .thread-message small { display: block; margin-top: .3rem; color: var(--text-muted); font-size: .6875rem; }
 .page.page-workspace .inbox-details { padding: 1rem; }
 .page.page-workspace .inbox-details h3 { margin: .25rem 0 .15rem; font-size: 1rem; }
-.page.page-workspace .inbox-eyebrow { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.page.page-workspace .inbox-eyebrow { font-size: .6875rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
 .page.page-workspace .inbox-detail-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .7rem; padding: .7rem 0; border-bottom: 1px solid var(--border); }
 .page.page-workspace .inbox-detail-row > span { color: var(--text-muted); font-size: .75rem; }
 .page.page-workspace .inbox-detail-row > strong { font-size: .76rem; text-align: right; }
