@@ -39,6 +39,7 @@
 /* Setup: keep every production control, but use the preview's numbered, open,
  * section-based rhythm instead of a stack of equally weighted cards. */
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .journey-setup-account-section { counter-increment: setup-section; max-width: 1000px; width: 100%; margin-inline: auto; padding: 1.25rem 1.25rem 1.5rem; border-top: 1px solid var(--border); }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] { counter-reset: setup-section; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .journey-setup-account-heading h2 { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .journey-setup-account-heading h2::before { display: inline-flex; align-items: center; justify-content: center; width: 31px; height: 22px; margin-right: 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); content: counter(setup-section, decimal-leading-zero); font-size: 11px; font-weight: 600; vertical-align: middle; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .journey-setup-account-heading p { margin: 0.4rem 0 0 41px; font-size: 13px; }
@@ -50,7 +51,7 @@
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] { display: flex; flex-direction: column; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .mb-5 { order: 2; margin-bottom: 0; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] > .campaign-editor-page { order: 1; }
-.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .campaign-editor-page { counter-reset: setup-section; max-width: 1000px; margin-inline: auto; padding: 1.25rem 1.25rem 1.5rem; gap: 1rem; }
+.page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .campaign-editor-page { max-width: 1000px; margin-inline: auto; padding: 1.25rem 1.25rem 1.5rem; gap: 1rem; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card { counter-increment: setup-section; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; padding: 1.25rem 0; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card:first-child { border-top: 0; padding-top: 0.25rem; }
 .page-journey-builder #journey-tabpanel[aria-labelledby="journey-tab-details"] .accordion-card-trigger { min-height: 40px; margin-bottom: 0; padding: 0; font-size: 18px; line-height: 1.35; }
