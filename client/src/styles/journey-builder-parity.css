@@ -74,20 +74,20 @@
 .page-journey-builder .builder-leads-metric span { display: block; color: var(--text-muted); font-size: 0.72rem; font-weight: 600; }
 .page-journey-builder .builder-results-metric strong,
 .page-journey-builder .builder-leads-metric strong { display: block; margin-top: 0.3rem; color: var(--text); font-size: 1.3rem; letter-spacing: -0.02em; }
-.page-journey-builder .builder-results-metric small { display: block; margin-top: 0.2rem; color: var(--text-muted); font-size: 0.68rem; }
+.page-journey-builder .builder-results-metric small { display: block; margin-top: 0.2rem; color: var(--text-muted); font-size: 11px; }
 .page-journey-builder .builder-results-overview-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); gap: 0.75rem; }
 .page-journey-builder .builder-results-panel-surface { min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
 .page-journey-builder .builder-results-panel-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
 .page-journey-builder .builder-results-panel-title h3 { margin: 0; color: var(--text); font-size: 0.95rem; font-weight: 600; }
 .page-journey-builder .builder-results-panel-title p:not(.overview-eyebrow) { margin: 0.2rem 0 0; color: var(--text-muted); font-size: 0.72rem; line-height: 1.45; }
-.page-journey-builder .builder-results-production-label { display: inline-flex; align-items: center; min-height: 28px; padding: 0 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: var(--pill-bg); color: var(--text-muted); font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
+.page-journey-builder .builder-results-production-label { display: inline-flex; align-items: center; min-height: 28px; padding: 0 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: var(--pill-bg); color: var(--text-muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
 .page-journey-builder .builder-leads-toolbar { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
 .page-journey-builder .builder-leads-search { display: flex; align-items: center; gap: 0.45rem; min-width: 240px; flex: 1; padding: 0 0.65rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
 .page-journey-builder .builder-leads-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; }
 .page-journey-builder .builder-leads-count { color: var(--text-muted); font-size: 0.72rem; white-space: nowrap; }
 .page-journey-builder .builder-leads-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
 .page-journey-builder .builder-leads-table { min-width: 900px; margin: 0; }
-.page-journey-builder .builder-leads-table th { background: var(--pill-bg); color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.page-journey-builder .builder-leads-table th { background: var(--pill-bg); color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .page-journey-builder .builder-leads-table td { vertical-align: middle; font-size: 0.78rem; }
 .page-journey-builder .builder-lead-card { padding: 0.9rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
 .page-journey-builder .builder-leads-mobile { display: none; flex-direction: column; gap: 0.65rem; }
