@@ -83,3 +83,10 @@ Continuation of `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md` because the original lo
 - PR #125 was created from an intermediate foundation head and became stale when the foundation advanced; it was closed unmerged. The identical one-line fix was recreated directly from current foundation on `task/login-background-parity-current-v2` as PR #126.
 - PR #126 was source-reviewed via GitHub compare: exactly one file changed (`client/src/pages/LoginPage.tsx`), one addition/one deletion. It was squash-merged into `feat/preview-to-production-foundation` as `09d31146d1222539e4afcaa7bf53bff8abdf6449`.
 - No `main` write and no production deployment occurred. Rendered validation remains pending because production is still pinned to the older deployment with auto-deploy OFF.
+
+## 2026-10-17 20:05 IST — AppShell typography-floor fix
+
+- Re-read the current foundation `AppShell.tsx` and found one concrete repository-guideline violation in the production shell: the disabled-nav `Soon` badge used `text-[10px]`, below the documented 11px minimum.
+- The fix was limited to one textual replacement in `client/src/components/AppShell.tsx`: `text-[10px]` → `text-[11px]`. Navigation routes, workspace/account context, permissions, responsive behavior, collapse state, loading/error semantics, and copy were unchanged.
+- Created `task/appshell-typography-floor-current` directly from the current foundation. GitHub compare showed exactly one file changed, one addition/one deletion. PR #127 was opened and squash-merged into `feat/preview-to-production-foundation` as `35124ff3bc89cb5b8e2661237e21f62ea0c4d3e8`.
+- No `main` write and no production deployment occurred. Rendered validation remains pending because production is still pinned to the older deployment with auto-deploy OFF.
