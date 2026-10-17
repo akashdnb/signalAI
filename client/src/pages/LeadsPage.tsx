@@ -87,32 +87,11 @@ export function LeadsPage() {
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
-          <label className="sr-only" htmlFor="leads-qualification-filter">Qualification</label>
-          <select className="!mt-0 w-auto min-w-[160px]" id="leads-qualification-filter" aria-label="Qualification" value={qualificationFilter} onChange={(e) => setQualificationFilter(e.target.value as "qualified" | "unqualified" | "")}>
-            <option value="">All qualification</option>
-            <option value="qualified">Qualified</option>
-            <option value="unqualified">Not qualified</option>
-          </select>
           <label className="sr-only" htmlFor="leads-handoff-filter">Handoff status</label>
           <select className="!mt-0 w-auto min-w-[160px]" id="leads-handoff-filter" aria-label="Handoff status" value={handoffFilter} onChange={(e) => setHandoffFilter(e.target.value as HandoffStatus | "")}>
             {HANDOFF_FILTERS.map((h) => (
               <option key={h.value} value={h.value}>{h.label}</option>
             ))}
-          </select>
-          <label className="sr-only" htmlFor="leads-activity-from">Activity from</label>
-          <input className="!mt-0 w-auto" id="leads-activity-from" type="date" aria-label="Activity from" value={activityFrom} max={activityTo || undefined} onChange={(e) => setActivityFrom(e.target.value)} />
-          <label className="sr-only" htmlFor="leads-activity-to">Activity to</label>
-          <input className="!mt-0 w-auto" id="leads-activity-to" type="date" aria-label="Activity to" min={activityFrom || undefined} value={activityTo} onChange={(e) => setActivityTo(e.target.value)} />
-          <label className="sr-only" htmlFor="leads-sort">Sort leads</label>
-          <select className="!mt-0 w-auto min-w-[170px]" id="leads-sort" aria-label="Sort leads" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="activity_desc">Most recent activity</option>
-            <option value="activity_asc">Oldest activity</option>
-            <option value="created_desc">Newest leads</option>
-            <option value="created_asc">Oldest leads</option>
-            <option value="stage_asc">Stage A–Z</option>
-            <option value="stage_desc">Stage Z–A</option>
-            <option value="username_asc">Username A–Z</option>
-            <option value="username_desc">Username Z–A</option>
           </select>
           <label className="w-full sm:ml-auto sm:max-w-xs">
             <span className="sr-only">Search leads by username or captured details</span>
@@ -125,6 +104,32 @@ export function LeadsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
+          <details className="w-full">
+            <summary className="cursor-pointer text-sm font-semibold text-subtle">More filters</summary>
+            <div className="mt-2 flex flex-wrap items-end gap-2">
+              <label className="sr-only" htmlFor="leads-qualification-filter">Qualification</label>
+              <select className="!mt-0 w-auto min-w-[160px]" id="leads-qualification-filter" aria-label="Qualification" value={qualificationFilter} onChange={(e) => setQualificationFilter(e.target.value as "qualified" | "unqualified" | "")}>
+                <option value="">All qualification</option>
+                <option value="qualified">Qualified</option>
+                <option value="unqualified">Not qualified</option>
+              </select>
+              <label className="sr-only" htmlFor="leads-activity-from">Activity from</label>
+              <input className="!mt-0 w-auto" id="leads-activity-from" type="date" aria-label="Activity from" value={activityFrom} max={activityTo || undefined} onChange={(e) => setActivityFrom(e.target.value)} />
+              <label className="sr-only" htmlFor="leads-activity-to">Activity to</label>
+              <input className="!mt-0 w-auto" id="leads-activity-to" type="date" aria-label="Activity to" min={activityFrom || undefined} value={activityTo} onChange={(e) => setActivityTo(e.target.value)} />
+              <label className="sr-only" htmlFor="leads-sort">Sort leads</label>
+              <select className="!mt-0 w-auto min-w-[170px]" id="leads-sort" aria-label="Sort leads" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+                <option value="activity_desc">Most recent activity</option>
+                <option value="activity_asc">Oldest activity</option>
+                <option value="created_desc">Newest leads</option>
+                <option value="created_asc">Oldest leads</option>
+                <option value="stage_asc">Stage A–Z</option>
+                <option value="stage_desc">Stage Z–A</option>
+                <option value="username_asc">Username A–Z</option>
+                <option value="username_desc">Username Z–A</option>
+              </select>
+            </div>
+          </details>
         </div>
 
         {leads === null ? (
