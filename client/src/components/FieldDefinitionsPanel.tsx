@@ -74,10 +74,10 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <section className="card">
+    <section className="card settings-fields-panel">
       <h2>Lead fields</h2>
       <p className="muted small">
-        Reusable typed fields that automations can capture, such as email, phone, country, or buying intent. The key is an internal identifier; the label is what your team sees.
+        Use business-friendly labels; keep technical keys secondary. These reusable typed fields can be captured by automations.
       </p>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {definitions === null ? (
@@ -87,14 +87,13 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
           {definitions.length === 0 ? (
             <p className="muted">No captured fields yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table min-w-[700px]">
+            <div className="overflow-x-auto settings-fields-table-wrap">
+              <table className="table settings-fields-table">
                 <thead>
                   <tr>
                     <th>Label</th>
                     <th>Technical key</th>
                     <th>Type</th>
-                    <th>Used for</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -104,7 +103,6 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
                       <td><strong>{d.label}</strong></td>
                       <td><code>{d.fieldKey}</code></td>
                       <td>{VALUE_TYPES.find((t) => t.value === d.valueType)?.label ?? d.valueType}</td>
-                      <td><span className="muted small">Not reported by the field-definition API</span></td>
                       <td>
                         <button type="button" className="btn-secondary btn-small" onClick={() => void handleDelete(d.id)}>
                           Remove
@@ -117,20 +115,20 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
             </div>
           )}
 
-          <form onSubmit={handleCreate} className="inline-form" style={{ marginTop: "1rem" }}>
-            <input
-              type="text"
-              aria-label="Internal field key"
-              placeholder="Internal key, e.g. email"
-              value={newKey}
-              onChange={(e) => setNewKey(e.target.value)}
-            />
+          <form onSubmit={handleCreate} className="inline-form settings-fields-form" style={{ marginTop: "1rem" }}>
             <input
               type="text"
               aria-label="Field label"
               placeholder="Label, e.g. Email address"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
+            />
+            <input
+              type="text"
+              aria-label="Internal field key"
+              placeholder="Internal key, e.g. email"
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
             />
             <select aria-label="Field type" value={newType} onChange={(e) => setNewType(e.target.value as FieldDefinitionValueType)}>
               {VALUE_TYPES.map((t) => (
