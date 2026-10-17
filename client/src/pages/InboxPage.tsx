@@ -114,9 +114,17 @@ export function InboxPage() {
         accountId: selectedAccountId || undefined,
       });
       if (requestId !== latestListRequestRef.current) return;
-      setPageData(result);
+      // Keep the local read state for the actively selected lead if a list request
+      // started before the user's explicit selection resolves after it.
+      const activeLeadId = selectedLeadIdRef.current;
+      const items = activeLeadId
+        ? result.items.map((lead) =>
+            lead.id === activeLeadId ? { ...lead, unread: false } : lead,
+          )
+        : result.items;
+      setPageData({ ...result, items });
       if (result.page !== page) setPage(result.page);
-      if (selectedLeadIdRef.current && !result.items.some((lead) => lead.id === selectedLeadIdRef.current)) {
+      if (activeLeadId && !result.items.some((lead) => lead.id === activeLeadId)) {
         clearSelectedLead();
       }
       setError(null);
