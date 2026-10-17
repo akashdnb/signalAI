@@ -1,0 +1,103 @@
+.settings-page .scoring-rules-panel .card {
+  overflow: visible;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: none;
+  padding: 20px;
+}
+
+.settings-page .scoring-rules-panel .card > h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
+}
+
+.settings-page .scoring-rules-panel .card > p {
+  max-width: 760px;
+  margin: 4px 0 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.settings-page .scoring-rules-panel .card > .table {
+  width: 100%;
+  margin: 0 0 18px;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.settings-page .scoring-rules-panel .card > .table thead th {
+  padding: 0 12px 2px;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.settings-page .scoring-rules-panel .card > .table tbody td {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--card-bg);
+  padding: 12px;
+  vertical-align: middle;
+}
+
+.settings-page .scoring-rules-panel .card > .table tbody td:first-child {
+  border-left: 1px solid var(--border);
+  border-radius: 10px 0 0 10px;
+}
+
+.settings-page .scoring-rules-panel .card > .table tbody td:last-child {
+  border-right: 1px solid var(--border);
+  border-radius: 0 10px 10px 0;
+}
+
+.settings-page .scoring-rules-panel .card > .field-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  margin-top: 18px !important;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-page .scoring-rules-panel .card > .field-group > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-page .scoring-rules-panel .card > .field-group > label input,
+.settings-page .scoring-rules-panel .card > .field-group > label select {
+  width: 100%;
+}
+
+.settings-page .scoring-rules-panel .card > .field-group > .btn-primary {
+  align-self: end;
+  justify-self: start;
+  min-height: 40px;
+}
+
+@media (max-width: 640px) {
+  .settings-page .scoring-rules-panel .card {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .settings-page .scoring-rules-panel .card > .field-group {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .scoring-rules-panel .card > .field-group > .btn-primary {
+    justify-self: stretch;
+  }
+}
