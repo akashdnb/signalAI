@@ -27,6 +27,7 @@ import { journeyRuntimeRouter } from "./routes/journeyRuntime.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
+import { resolveLeadParam } from "./middleware/resolveLeadParam.js";
 import { profileRouter } from "./routes/profile.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
@@ -122,6 +123,7 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
 
   app.use(profileRouter);
   app.use(notificationsRouter);
+  leadsRouter.param("leadId", resolveLeadParam);
   app.use(leadsRouter);
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);
