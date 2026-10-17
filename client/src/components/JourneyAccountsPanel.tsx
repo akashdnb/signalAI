@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { workspaceApi, type ConnectedInstagramAccount, type JourneyAccountBinding } from "../api/workspace";
 import { useTenant } from "../context/TenantContext";
 
@@ -23,25 +23,50 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const requestSequenceRef = useRef(0);
+  const currentScopeRef = useRef(`${tenantId}:${campaignId}`);
+  const loadedScopeRef = useRef<string | null>(null);
+
   async function load() {
+    const scope = `${tenantId}:${campaignId}`;
+    if (currentScopeRef.current !== scope) return;
+    const requestId = ++requestSequenceRef.current;
     setLoading(true);
+    setError(null);
     try {
       const [nextAccounts, nextBindings] = await Promise.all([
         workspaceApi.listConnectedAccounts(tenantId),
         workspaceApi.listJourneyAccounts(tenantId, campaignId),
       ]);
+      if (requestId !== requestSequenceRef.current || currentScopeRef.current !== scope) return;
+      loadedScopeRef.current = scope;
       setAccounts(nextAccounts);
       setBindings(nextBindings);
-      setError(null);
     } catch (err) {
+      if (requestId !== requestSequenceRef.current || currentScopeRef.current !== scope) return;
+      loadedScopeRef.current = scope;
       setError(err instanceof Error ? err.message : "Failed to load connected accounts");
     } finally {
-      setLoading(false);
+      if (requestId === requestSequenceRef.current && currentScopeRef.current === scope) {
+        setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
+    const scope = `${tenantId}:${campaignId}`;
+    currentScopeRef.current = scope;
+    loadedScopeRef.current = null;
+    setAccounts([]);
+    setBindings([]);
+    setSavingId(null);
+    setError(null);
+    setLoading(true);
     void load();
+    return () => {
+      currentScopeRef.current = "";
+      requestSequenceRef.current += 1;
+    };
   }, [tenantId, campaignId]);
 
   async function toggle(account: ConnectedInstagramAccount) {
@@ -71,12 +96,15 @@ export function JourneyAccountsPanel({ tenantId, campaignId, onReadinessChange }
   const healthyAccounts = accounts.filter((account) => account.status === "healthy");
 
   useEffect(() => {
-    onReadinessChange?.({
-      status: loading ? "loading" : error ? "error" : "ready",
-      healthyAssignedCount,
-      unavailableAssignedCount,
-    });
-  }, [loading, error, healthyAssignedCount, unavailableAssignedCount, onReadinessChange]);
+    const scope = `${tenantId}:${campaignId}`;
+    const scopeLoaded = loadedScopeRef.current === scope;
+    const readiness: JourneyAccountReadiness = {
+      status: !scopeLoaded || loading ? "loading" : error ? "error" : "ready",
+      healthyAssignedCount: scopeLoaded && !loading ? healthyAssignedCount : 0,
+      unavailableAssignedCount: scopeLoaded && !loading ? unavailableAssignedCount : 0,
+    };
+    onReadinessChange?.(readiness);
+  }, [loading, error, healthyAssignedCount, unavailableAssignedCount, onReadinessChange, tenantId, campaignId]);
 
   return (
     <section className="journey-account-panel card" style={{ marginBottom: "0.75rem" }}>
