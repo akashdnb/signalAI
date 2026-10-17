@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Campaign, type LeadListItem, type Milestone, type PipelineStage, type TenantMember } from "../../api";
 import { formatRelativeTime, handoffLabel, PIPELINE_STAGES } from "../../lib/leadFormatting";
@@ -9,15 +9,14 @@ function StatTile({ value, label }: { value: string | number; label: string }) {
 
 export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign: Campaign }) {
   const [leads, setLeads] = useState<LeadListItem[] | null>(null); const [milestones, setMilestones] = useState<Milestone[]>([]); const [members, setMembers] = useState<TenantMember[]>([]); const [error, setError] = useState<string | null>(null); const [search, setSearch] = useState(""); const [statusFilter, setStatusFilter] = useState<PipelineStage | "all">("all"); const [page, setPage] = useState(0); const [capturedByLead, setCapturedByLead] = useState<Record<string, Record<string, string>>>({}); const [savingOwnerFor, setSavingOwnerFor] = useState<string | null>(null);
-  async function reload() { try { const [ms, allLeads, mem] = await Promise.all([api.listMilestones(tenantId, campaign.id), api.getLeads(tenantId), api.listMembers(tenantId)]); const milestoneIds = new Set(ms.map((m) => m.id)); setMilestones(ms); setMembers(mem); setLeads(allLeads.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId))); } catch (err) { setError(err instanceof Error ? err.message : "Failed to load leads"); } }
-  useEffect(() => { void reload(); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, campaign.id]);
+  const reload = useCallback(async () => { try { const [ms, allLeads, mem] = await Promise.all([api.listMilestones(tenantId, campaign.id), api.getLeads(tenantId), api.listMembers(tenantId)]); const milestoneIds = new Set(ms.map((m) => m.id)); setMilestones(ms); setMembers(mem); setLeads(allLeads.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId))); setError(null); } catch (err) { setError(err instanceof Error ? err.message : "Failed to load leads"); } }, [tenantId, campaign.id]);
+  useEffect(() => { void reload(); }, [reload]);
   const filtered = useMemo(() => { if (!leads) return null; const q = search.trim().toLowerCase(); return leads.filter((l) => (statusFilter === "all" || l.pipelineStage === statusFilter) && (!q || (l.username ?? "").toLowerCase().includes(q))); }, [leads, search, statusFilter]);
   const pageItems = useMemo(() => filtered ? filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE) : [], [filtered, page]);
   useEffect(() => { let cancelled = false; async function loadCapturedFacts() { const missing = pageItems.filter((l) => !(l.id in capturedByLead)); if (!missing.length) return; const entries = await Promise.all(missing.map(async (l) => [l.id, await api.getCapturedFacts(tenantId, l.id).catch(() => ({}))] as const)); if (cancelled) return; setCapturedByLead((prev) => { const next = { ...prev }; for (const [id, facts] of entries) next[id] = facts; return next; }); } void loadCapturedFacts(); return () => { cancelled = true; }; // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageItems, tenantId]);
   async function handleOwnerChange(leadId: string, ownerUserId: string) { setSavingOwnerFor(leadId); try { await api.updateLead(tenantId, leadId, { ownerUserId: ownerUserId || null }); await reload(); } catch (err) { setError(err instanceof Error ? err.message : "Failed to reassign lead"); } finally { setSavingOwnerFor(null); } }
-  if (error) return <ErrorState title="Couldn't load automation leads" description={error} action={<Button variant="secondary" onClick={() => setError(null)}>Retry</Button>} />;
+  if (error) return <ErrorState title="Couldn't load automation leads" description={error} action={<Button variant="secondary" onClick={() => void reload()}>Retry</Button>} />;
   if (!leads || !filtered) return <LoadingState label="Loading automation leads" description="Checking the current goal-linked leads and owners." />;
   const totalCount = leads.length; const qualifiedCount = leads.filter((l) => ["qualified", "meeting_scheduled", "won"].includes(l.pipelineStage)).length; const meetingCount = leads.filter((l) => ["meeting_scheduled", "won"].includes(l.pipelineStage)).length; const wonCount = leads.filter((l) => l.pipelineStage === "won").length; const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = pageItems.map((lead) => ({ lead, milestone: milestones.find((m) => m.id === lead.activeMilestoneId), facts: capturedByLead[lead.id], stage: PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage), handoff: handoffLabel(lead.handoffStatus) }));
