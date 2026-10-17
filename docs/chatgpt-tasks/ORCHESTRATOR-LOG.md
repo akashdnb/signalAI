@@ -225,3 +225,46 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - Branch `task/log-agent-audit` was aligned to the exact current foundation head before the log update.
 - This change is docs-only: `docs/chatgpt-tasks/ORCHESTRATOR-LOG.md`.
 - No app changes, merge, deployment, or `main` changes were made.
+
+## 2026-10-17 — Real local three-way reconciliation completed (PR #100)
+
+**Timestamp:** 2026-10-17 (Asia/Kolkata)
+
+### Outcome
+
+- Performed the real local Git checkout + semantic three-way reconciliation that every prior GitHub-API-only attempt (PR #95, temp POC #97, and the several audit entries above) said was required and could not perform itself.
+- Foundation base `3897dff7d08bb31413af8843fc044b25f4795e57`, main `f81a47e5ffc10b0da35bd12897c5fa997778e5e2`, merge-base `dbc787a797105e3a8a16515099dfb78339f57ed2` — matches the divergence stats already recorded above (33/117 commits, 136 files, +18,625/-1,611) exactly.
+- Created disposable branch `task/reconcile-current-main-into-foundation` from current foundation HEAD, ran a real `git merge --no-ff origin/main`, and resolved all 14 real content conflicts by hand (client/src/App.tsx, AppShell.tsx, index.css, main.tsx, KnowledgeBasePanel.tsx, automation/AnalyticsPanel.tsx, automation/JourneyBuilder.tsx, pages/AnalyticsPage.tsx, DashboardPage.tsx, InboxPage.tsx, IntegrationsPage.tsx, LeadsPage.tsx, SettingsPage.tsx, TeamPage.tsx). The remaining ~122 of 136 changed files merged without conflict.
+- Opened **PR #100**, `task/reconcile-current-main-into-foundation` → `feat/preview-to-production-foundation`. **Not merged.** `main` and foundation were not written to directly.
+
+### What main-side functionality this recovered
+
+Workspace/multi-account switching and `selectedAccountId` scoping (Leads/Inbox/Analytics), Leads CRM qualification/date/sort filters and the Analytics→Leads source-media deep link, real Notifications (replacing two non-functional "visual shell" settings mockups that this reconciliation found and fixed in `SettingsProfilePage`/`SettingsNotificationsPage`), Team role-gating and the editable workspace-settings card, Integrations role-gating, Inbox lead tags (foundation's own merge of this file left a dangling `setTags(null)` call referencing no declared state — a `ReferenceError` on first render — fixed by restoring the full feature rather than deleting the call), a funnel analytics correctness fix (server-computed `stageCounts`/`unmappedLeadCount`), and the MCP/OAuth/notifications backend plus its migrations, now wired into `app.ts`.
+
+### CSS / preview-token audit result
+
+Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one file pair (`ConnectedAccountSwitcher.tsx`/`.css`, added by main) that references the preview namespace, but traced it to a `previewOnly`-gated code path `AppShell` never activates — the production render path uses canonical tokens only. No preview CSS or token was copied into a reachable production path. The `## NEEDS DECISION` above (retire vs. keep the production-bundled preview route) was left untouched, as instructed — still open.
+
+### Validation (full detail in PR #100's description)
+
+- Client build/typecheck: PASS. Client lint: PASS (pre-existing warnings only).
+- Server build/typecheck: PASS.
+- Server `migrate:up` and the full vitest suite were run against a disposable `pgvector/pgvector:pg16` Docker container created for this task (never against the shared dev database) — `migrate:up` passed cleanly, including the same-timestamp migration pair noted below. Test suite: 1003/1010 passed; 7 failures in `webhooks.test.ts`/`auth.test.ts`/`mediaMetadata.test.ts` were verified — by running the identical 3 files against a pristine `origin/main` checkout with the same container — to be pre-existing on `main` today and unrelated to this reconciliation.
+
+### Known pre-existing issue, flagged not fixed
+
+`1792108804000_lead-operations-search-and-indexes.sql` and `1792108804000_notification_system.sql` share an identical timestamp prefix (both from main; previously flagged above). Confirmed no cross-dependency and both idempotent; applied cleanly in filename-sort order against the fresh container in this task. Left unrenumbered — renumbering an already-named migration is a product/ops call, not this task's to make.
+
+### Remaining blockers
+
+1. The 7 pre-existing test failures above need a real fix from whoever owns that code (independent of this PR).
+2. Rendered browser QA (light/dark × 390/768/1024/1440 against the live preview) was not performed — no running dev server in this pass.
+3. The `## NEEDS DECISION` above remains open.
+4. Product/ops call on the same-timestamp migration pair.
+5. PRs #93/#94 remain open and unmerged; checked their changed files against this branch — no overlap with anything this reconciliation touched, so both stay cleanly rebasable onto this branch or onto foundation after it merges. Not reapplied here.
+
+### Verification
+
+- Read this log in full before appending; no prior entries were edited or removed.
+- Branch/commit/PR references above are exact (`task/reconcile-current-main-into-foundation`, commit `95c330f`, PR #100).
+- No merge into foundation or `main`, and no deployment, occurred.
