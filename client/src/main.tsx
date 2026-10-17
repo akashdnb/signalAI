@@ -5,6 +5,7 @@ import "./index.css";
 import "./styles/precision-operations-production.css";
 import "./styles/precision-operations-workflows.css";
 import "./precision-operations-audit-fixes.css";
+import "./styles/knowledge-settings-parity.css";
 import "@xyflow/react/dist/style.css";
 import App from "./App.tsx";
 
