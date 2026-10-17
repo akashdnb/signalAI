@@ -300,3 +300,36 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - Read current `AGENTS.md`, `DESIGN.md`, `client/src/components/ui/README.md`, and this log before updating.
 - Confirmed PR metadata for #93, #94, #100 and #101 via GitHub connector; checked current live browser tabs and the two delegated session prompts.
 - No app source changes, PR merge, `main` writes, or Render deploy performed by this log update.
+
+
+## 2026-10-17 — Delegated parity findings and remaining PR gates
+
+**Timestamp:** 2026-10-17 (Asia/Kolkata)
+
+### Delegated outputs
+
+- **Inbox parity audit** (read-only session “Inbox Parity Audit Findings”): preview auto-selects a sample conversation; production deliberately leaves selection empty. Production's explicit selection handler calls `api.markLeadRead` for unread leads, so auto-selecting the first real conversation on load is unsafe. Production uses server search/filter semantics, `PAGE_SIZE = 20` (24 real conversations observed, 20 on page one and 4 on page two), and 15-second polling. Preview data and selection are local/sample-only and must not replace production API behavior. Desktop light/dark views were inspected; BrowserMCP offers no viewport-resize control, so 390/768/1024px results remain unverified.
+- **Inbox implementation plan** (read-only session “Inbox parity implementation plan”): keep explicit selection semantics; after new server results resolve, preserve the selected ID only if it remains in the current page/result set. Otherwise clear selected conversation, thread/draft/tag/lead context. Never auto-select another conversation and do not invoke `markLeadRead` from loading/filter/account-switch/polling effects.
+- **PR #101 review** (read-only session “PR QA Plan Review”): disposition is **BLOCKED / NOT MERGE-READY**. The nine-file retirement is directionally consistent with the approved decision to retire the production-bundled preview and keep the standalone preview service. Remaining gaps: PR branch is behind the then-current foundation (base recorded as `eaf50af2...` while target advanced), no build/lint/CI evidence, and `WorkspaceSettingsPreviewPage.tsx` may still link to `?preview=precision-operations`. Rebase/refresh, inspect that surviving navigation, run build/lint/static reference checks, and browser-verify normal production routes plus the separate preview before merge. Full screen/theme/responsive parity remains a separate release gate.
+- **Inbox implementation session** created PR #103 (`task/inbox-selection-reset-parity` → foundation), one changed file, `client/src/pages/InboxPage.tsx` (+17/-4). The patch adds a list-request sequence guard and clears selection/context if the latest page result no longer contains the selected ID. Build/lint/tests and all responsive widths are not claimed. Before landing, reconcile the patch with PR #100's separate branch: that branch, not foundation, contains the selected-account-scoped requests and recovered lead-tags/full-profile panel. Do not lose those functions when integrating the narrow selection fix.
+- The implementation-plan session also flagged additional parity topics in AppShell, Analytics, Team, Journey Builder Setup, Leads, Content, and Integrations. These remain delegated audit observations until independently re-verified against current refs.
+
+### Current PR gate
+
+- PR #101: open/unmerged; refresh from current foundation, resolve the surviving preview-navigation question, run missing checks.
+- PR #102: open/unmerged; append-only log state/delegation correction.
+- PR #103: open/unmerged; review and reconcile against PR #100's separate production-functionality branch, then run the required build/tests.
+- PR #100 merged into `task/reconcile-current-main-into-foundation`, not into foundation. Recovered workspace/account/notification/Inbox functionality is not presumed to be on foundation until deliberately integrated.
+- PRs #93 and #94 are merged into foundation.
+
+### Delegation and safety requirements
+
+- Keep delegating independent audits, implementation, tests and even small copy/fix tasks to distinct ChatGPT sessions. Each session gets a bounded scope, explicit source/branch constraints, anti-AI guidance, and a request to report exact refs/verification status.
+- Never overlap write scopes. Independently check the GitHub diff after an agent reports success; session progress text alone is not proof of a persisted change.
+- Keep all PRs unmerged until their stated gates pass. Use squash-and-merge only if later approved. Never touch `main` or deploy production without a separate explicit instruction.
+
+### Verification
+
+- Reviewed completed delegated findings and current PR metadata through GitHub; confirmed current production Inbox source semantics and PR #103 patch.
+- BrowserMCP did not permit setting the viewport to 390/768/1024px, so those checks are explicitly outstanding.
+- No application changes, PR merges, deployments or `main` writes were made by this log update.
