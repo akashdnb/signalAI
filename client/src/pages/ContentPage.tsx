@@ -27,6 +27,12 @@ function formatRelative(iso: string | null): string {
   return new Date(iso).toLocaleDateString();
 }
 
+function formatSyncStatus(item: ObservedMedia): string {
+  const fetchedAt = (item as ObservedMedia & { fetchedAt?: string | null }).fetchedAt ?? null;
+  if (!fetchedAt) return "Sync pending";
+  return `Synced ${formatRelative(fetchedAt)}`;
+}
+
 function mediaPreviewLabel(mediaType: string | null): string {
   if (mediaType === "VIDEO") return "Video preview";
   if (mediaType === "CAROUSEL_ALBUM") return "Carousel preview";
@@ -212,6 +218,7 @@ export function ContentPage() {
                       <div className="content-card-meta">
                         <span className="pill" style={{ marginLeft: 0 }}>{TYPE_LABEL[item.mediaType ?? ""] ?? "Instagram post"}</span>
                         <span>{formatRelative(item.lastSeenAt ?? item.postedAt)}</span>
+                        <span>{formatSyncStatus(item)}</span>
                       </div>
                       <p className="content-caption" title={item.caption ?? undefined}>
                         {item.caption || <span className="text-subtle">No caption</span>}
@@ -264,6 +271,8 @@ export function ContentPage() {
                 <span>{TYPE_LABEL[previewMedia.mediaType ?? ""] ?? "Instagram"}</span>
                 <span>·</span>
                 <span>{formatRelative(previewMedia.lastSeenAt ?? previewMedia.postedAt)}</span>
+                <span>·</span>
+                <span>{formatSyncStatus(previewMedia)}</span>
               </div>
               <p>{previewMedia.caption || "No caption"}</p>
               {previewMedia.commentCount > 0 && <Link className="link-button" to={`/dashboard/${tenantId}/leads?sourceMediaId=${encodeURIComponent(previewMedia.mediaId)}`} onClick={() => setPreviewMedia(null)}>Review linked leads →</Link>}
