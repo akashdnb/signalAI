@@ -69,9 +69,35 @@ export function LeadDetailPage() {
   async function loadAll() {
     if (!tenantId || !leadId) return;
     const requestId = ++detailRequestRef.current;
-    const [l, n, tg, d, m, cf, fd] = await Promise.all([api.getLead(tenantId, leadId), api.listLeadNotes(tenantId, leadId), api.listLeadTags(tenantId, leadId), api.listLeadDeals(tenantId, leadId), api.listMembers(tenantId), api.getCapturedFacts(tenantId, leadId), api.listFieldDefinitions(tenantId)]);
+    const [leadResult, notesResult, tagsResult, dealsResult, membersResult, factsResult, fieldsResult] =
+      await Promise.allSettled([
+        api.getLead(tenantId, leadId),
+        api.listLeadNotes(tenantId, leadId),
+        api.listLeadTags(tenantId, leadId),
+        api.listLeadDeals(tenantId, leadId),
+        api.listMembers(tenantId),
+        api.getCapturedFacts(tenantId, leadId),
+        api.listFieldDefinitions(tenantId),
+      ]);
+
     if (requestId !== detailRequestRef.current) return;
-    setLead(l); setNotes(n); setTags(tg); setDeals(d); setMembers(m); setCapturedFacts(cf); setFieldDefinitions(fd); setError(null);
+    if (leadResult.status === "rejected") throw leadResult.reason;
+
+    // Auxiliary sections can fail independently; a notes or tags outage must
+    // not keep the core live lead profile from rendering.
+    setLead(leadResult.value);
+    setNotes(notesResult.status === "fulfilled" ? notesResult.value : null);
+    setTags(tagsResult.status === "fulfilled" ? tagsResult.value : null);
+    setDeals(dealsResult.status === "fulfilled" ? dealsResult.value : null);
+    setMembers(membersResult.status === "fulfilled" ? membersResult.value : null);
+    setCapturedFacts(factsResult.status === "fulfilled" ? factsResult.value : null);
+    setFieldDefinitions(fieldsResult.status === "fulfilled" ? fieldsResult.value : null);
+
+    const auxiliaryFailures = [notesResult, tagsResult, dealsResult, membersResult, factsResult, fieldsResult]
+      .filter((result) => result.status === "rejected");
+    setError(auxiliaryFailures.length > 0
+      ? "Some lead details could not be loaded. The available profile data is shown; retry to load the missing details."
+      : null);
   }
   async function loadIntelligence() {
     if (!tenantId || !leadId) return;
