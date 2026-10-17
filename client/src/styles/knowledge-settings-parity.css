@@ -1,0 +1,516 @@
+/* Focused parity layer for Knowledge and Settings. It uses the shared SignalAI tokens only. */
+
+.settings-page .page-header,
+.page-knowledge .page-header {
+  margin-bottom: 22px;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-nav {
+  padding: 14px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+}
+
+.settings-nav-group-label,
+.settings-eyebrow {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.settings-nav-group-label {
+  padding: 4px 10px 7px;
+}
+
+.settings-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-nav-link {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.settings-nav-link:hover {
+  background: var(--pill-bg);
+  color: var(--text);
+}
+
+.settings-nav-link.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.settings-nav-divider {
+  height: 1px;
+  margin: 12px 0;
+  background: var(--border);
+}
+
+.settings-content {
+  min-width: 0;
+}
+
+.settings-panel {
+  overflow: visible;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: none;
+}
+
+.settings-panel-header {
+  display: flex;
+  min-height: 76px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--border);
+  padding: 18px 20px 14px;
+}
+
+.settings-panel-header h2 {
+  margin: 2px 0 2px;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
+}
+
+.settings-panel-header p {
+  margin: 0;
+}
+
+.settings-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 20px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.settings-profile-avatar {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.settings-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 900px;
+  padding: 18px 20px 20px;
+}
+
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.settings-form input[readonly] {
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.settings-appearance-section {
+  padding: 18px 20px 0;
+}
+
+.settings-appearance-section:last-child {
+  padding-bottom: 20px;
+}
+
+.settings-appearance-section h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.settings-appearance-section > p {
+  margin: 2px 0 0;
+}
+
+.settings-theme-grid,
+.settings-palette-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.settings-theme-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-palette-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-choice-card,
+.settings-palette-card {
+  position: relative;
+  display: grid;
+  min-height: 64px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-choice-card:hover,
+.settings-palette-card:hover {
+  border-color: var(--line-strong);
+  background: var(--bg);
+}
+
+.settings-choice-card.is-selected,
+.settings-palette-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.settings-choice-icon {
+  display: grid;
+  width: 42px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.settings-choice-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-choice-title,
+.settings-choice-description {
+  display: block;
+}
+
+.settings-choice-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-choice-description {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-choice-check {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.settings-palette-swatches {
+  display: flex;
+  width: 42px;
+  height: 26px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.settings-palette-swatches span {
+  flex: 1;
+}
+
+.settings-notification-recipient {
+  margin: 0;
+  padding: 14px 20px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.settings-notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px 0;
+}
+
+.settings-notification-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr);
+  gap: 18px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.settings-notification-row h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-notification-row p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-notification-channels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settings-notification-toggle,
+.settings-notification-unavailable {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.settings-notification-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.settings-notification-toggle span,
+.settings-notification-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-notification-toggle strong,
+.settings-notification-unavailable strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.settings-notification-toggle small,
+.settings-notification-unavailable small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.page-knowledge .knowledge-grounding-note {
+  margin: 0 0 16px;
+}
+
+.page-knowledge .knowledge-base-panel {
+  min-width: 0;
+}
+
+.page-knowledge .knowledge-base-panel > section:first-child {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  padding: 18px 20px;
+}
+
+.page-knowledge .knowledge-base-panel > section:first-child h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-sources {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  padding: 18px 20px;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-sources > header {
+  align-items: flex-start;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-upload-actions .btn-primary {
+  min-height: 40px;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-table-scroll {
+  overflow-x: auto;
+  border: 0;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table thead th {
+  padding: 0 12px 2px;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table tbody tr {
+  background: var(--card-bg);
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table tbody td {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 12px;
+  vertical-align: middle;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table tbody td:first-child {
+  border-left: 1px solid var(--border);
+  border-radius: 10px 0 0 10px;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table tbody td:last-child {
+  border-right: 1px solid var(--border);
+  border-radius: 0 10px 10px 0;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-table tbody tr:hover td {
+  background: var(--bg);
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-name {
+  display: block;
+  max-width: 30rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-source-error {
+  max-width: 24rem;
+  color: var(--error-text);
+}
+
+.page-knowledge .knowledge-base-panel .knowledge-empty-state {
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.page-knowledge .knowledge-base-panel > section:last-child {
+  border-top-color: var(--border);
+}
+
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 8px;
+  }
+
+  .settings-nav-group-label {
+    grid-column: 1 / -1;
+  }
+
+  .settings-nav-divider {
+    grid-column: 1 / -1;
+    margin: 6px 0;
+  }
+
+  .settings-form-grid,
+  .settings-theme-grid,
+  .settings-palette-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-notification-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-notification-channels {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel-header,
+  .settings-form,
+  .settings-appearance-section,
+  .settings-notification-list,
+  .settings-notification-recipient,
+  .page-knowledge .knowledge-base-panel .knowledge-sources,
+  .page-knowledge .knowledge-base-panel > section:first-child {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .settings-profile-summary {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}

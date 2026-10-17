@@ -68,9 +68,14 @@ export function SettingsNotificationsPage() {
   if (!tenantId) return null;
 
   return (
-    <section className="card">
-      <h2>Notifications</h2>
-      <p className="muted small">Choose which SignalAI events appear in your inbox and which should be emailed to your sign-in address.</p>
+    <section className="card settings-panel settings-notifications-panel">
+      <div className="settings-panel-header">
+        <div>
+          <div className="settings-eyebrow">PERSONAL PREFERENCES</div>
+          <h2>Notifications</h2>
+          <p className="muted small">Choose which updates are important enough to bring to your attention.</p>
+        </div>
+      </div>
 
       {loading ? (
         <p className="mt-4 muted small" role="status">Loading notification preferences…</p>
@@ -78,53 +83,45 @@ export function SettingsNotificationsPage() {
         <div className="mt-4 banner banner-error" role="alert">{error}</div>
       ) : (
         <>
-          <p className="mt-4 muted small">Email recipient: {emailAddress}. In-app notifications are enabled by default. Email settings are saved for this workspace and your account.</p>
-          <div className="mt-3 w-full overflow-x-auto">
-            <table className="w-full min-w-[36rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-subtle">
-                  <th className="py-3 pr-4 font-medium">Event</th>
-                  <th className="px-3 py-3 font-medium">In-app</th>
-                  <th className="px-3 py-3 font-medium">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((event) => (
-                  <tr key={event.type} className="border-b border-line last:border-b-0">
-                    <th scope="row" className="py-3 pr-4 text-left align-top font-medium text-ink">
-                      {event.label}
-                      <p className="mt-1 max-w-xl text-xs font-normal leading-5 text-subtle">{event.description}</p>
-                    </th>
-                    {(["in_app", "email"] as NotificationChannel[]).map((channelType) => {
-                      const channel = event.channels.find((item) => item.type === channelType)!;
-                      return (
-                        <td key={channelType} className="px-3 py-3 align-top">
-                          {channel.available ? (
-                            <label className="inline-flex min-h-8 items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={channel.enabled}
-                                disabled={saving}
-                                onChange={(eventChange) => toggle(event.type, channelType, eventChange.target.checked)}
-                                aria-label={`${channel.label} for ${event.label}`}
-                                className="h-4 w-4 accent-accent"
-                              />
-                              <span className="text-xs text-subtle">{channel.enabled ? "On" : "Off"}</span>
-                            </label>
-                          ) : (
-                            <span className="block max-w-44 text-xs text-subtle" title={channel.reason ?? undefined}>
-                              Unavailable
-                              <span className="mt-1 block leading-5">{channel.reason}</span>
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <p className="settings-notification-recipient">Email notifications go to <strong>{emailAddress}</strong>. Each event keeps its real in-app and email availability from the workspace API.</p>
+
+          <div className="settings-notification-list">
+            {events.map((event) => (
+              <article className="settings-notification-row" key={event.type}>
+                <div className="min-w-0">
+                  <h3>{event.label}</h3>
+                  <p>{event.description}</p>
+                </div>
+                <div className="settings-notification-channels" aria-label={`${event.label} channels`}>
+                  {(["in_app", "email"] as NotificationChannel[]).map((channelType) => {
+                    const channel = event.channels.find((item) => item.type === channelType);
+                    if (!channel) return null;
+                    return channel.available ? (
+                      <label className="settings-notification-toggle" key={channelType}>
+                        <input
+                          type="checkbox"
+                          checked={channel.enabled}
+                          disabled={saving}
+                          onChange={(eventChange) => toggle(event.type, channelType, eventChange.target.checked)}
+                          aria-label={`${channel.label} for ${event.label}`}
+                        />
+                        <span>
+                          <strong>{channel.label}</strong>
+                          <small>{channel.enabled ? "On" : "Off"}</small>
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="settings-notification-unavailable" key={channelType} title={channel.reason ?? undefined}>
+                        <strong>{channel.label}</strong>
+                        <small>Unavailable{channel.reason ? ` · ${channel.reason}` : ""}</small>
+                      </span>
+                    );
+                  })}
+                </div>
+              </article>
+            ))}
           </div>
+
           {error && <p className="mt-3 text-sm text-err-ink" role="alert">{error}</p>}
           {saved && <p className="mt-3 text-sm text-ok-ink" role="status">Notification preferences saved.</p>}
           <div className="mt-4">
