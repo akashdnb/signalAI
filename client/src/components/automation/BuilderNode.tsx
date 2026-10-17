@@ -77,7 +77,7 @@ export function BuilderNode({
 
           <div className="min-w-0 flex-1">
             {eyebrow && (
-              <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-subtle">
+              <div className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">
                 {eyebrow}
               </div>
             )}
