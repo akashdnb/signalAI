@@ -1,0 +1,243 @@
+/* Team & access parity: visual hierarchy only. All member, invitation, role and workspace actions remain production-backed. */
+.page-team {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.page-team > .banner { order: 0; margin: 0; }
+.page-team > section[aria-labelledby="team-members-title"] { order: 1; }
+.page-team > section[aria-labelledby="team-workspace-settings-title"] { order: 2; }
+.page-team > section[aria-labelledby="pending-invitations-title"] { order: 3; }
+.page-team > section[aria-labelledby="team-permissions-title"] { order: 4; }
+.page-team > section[aria-labelledby="invitation-history-title"] { order: 5; }
+
+.page-team > section {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: none;
+  overflow: visible;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] {
+  padding: 0;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .mb-4 {
+  min-height: 76px;
+  margin: 0 !important;
+  padding: 16px 20px 14px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .mb-4 > div:first-child::before {
+  content: "WORKSPACE ACCESS";
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] h2,
+.page-team > section[aria-labelledby="team-workspace-settings-title"] h2,
+.page-team > section[aria-labelledby="pending-invitations-title"] h2,
+.page-team > section[aria-labelledby="team-permissions-title"] h2,
+.page-team > section[aria-labelledby="invitation-history-title"] h2 {
+  margin-top: 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 26px;
+  letter-spacing: -.015em;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] .mb-4 h2 {
+  margin-bottom: 2px;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] .mb-4 p {
+  max-width: 760px;
+  line-height: 1.5;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px auto;
+  gap: 10px;
+  margin: 14px 20px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .list {
+  margin: 14px 20px 20px !important;
+  border: 0;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .list .list-item,
+.page-team > section[aria-labelledby="pending-invitations-title"] .list-item,
+.page-team > section[aria-labelledby="invitation-history-title"] .list-item {
+  min-height: 68px;
+  padding: 12px 0;
+  border-color: var(--border);
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .list .list-item:first-child,
+.page-team > section[aria-labelledby="pending-invitations-title"] .list-item:first-child,
+.page-team > section[aria-labelledby="invitation-history-title"] .list-item:first-child {
+  border-top: 1px solid var(--border);
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .list .list-item > span:first-child {
+  gap: 12px;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] > .list .list-item > span:first-child > span:first-child {
+  width: 44px;
+  height: 44px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] select {
+  min-height: 36px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.page-team > section[aria-labelledby="team-members-title"] .btn-secondary {
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+.page-team > section[aria-labelledby="team-workspace-settings-title"],
+.page-team > section[aria-labelledby="pending-invitations-title"],
+.page-team > section[aria-labelledby="team-permissions-title"],
+.page-team > section[aria-labelledby="invitation-history-title"] {
+  padding: 18px 20px 20px;
+}
+
+.page-team > section[aria-labelledby="team-workspace-settings-title"] {
+  background: var(--bg);
+}
+
+.page-team > section[aria-labelledby="team-workspace-settings-title"] > .mb-4,
+.page-team > section[aria-labelledby="team-permissions-title"] > .mb-4 {
+  margin-bottom: 14px !important;
+  padding-bottom: 12px;
+}
+
+.page-team > section[aria-labelledby="team-workspace-settings-title"] > .mb-4::before {
+  content: "WORKSPACE";
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.page-team > section[aria-labelledby="team-workspace-settings-title"] form {
+  gap: 12px;
+}
+
+.page-team > section[aria-labelledby="team-workspace-settings-title"] textarea,
+.page-team > section[aria-labelledby="team-workspace-settings-title"] input {
+  min-height: 40px;
+  border-radius: 9px;
+}
+
+.page-team > section[aria-labelledby="pending-invitations-title"] > p,
+.page-team > section[aria-labelledby="invitation-history-title"] > p {
+  max-width: 760px;
+  margin: 2px 0 10px;
+}
+
+.page-team > section[aria-labelledby="team-permissions-title"] .overflow-x-auto {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+}
+
+.page-team .team-permissions-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.page-team .team-permissions-table th,
+.page-team .team-permissions-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.page-team .team-permissions-table thead th {
+  background: var(--pill-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.page-team .team-permissions-table tbody th {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.page-team .team-permissions-table tbody td {
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+
+.page-team .team-permissions-table tbody tr:last-child th,
+.page-team .team-permissions-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.page-team .team-permission-limited {
+  color: var(--text-muted);
+}
+
+.page-team .team-permissions-note {
+  max-width: 900px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .page-team { gap: 10px; }
+  .page-team > section[aria-labelledby="team-members-title"] > .mb-4,
+  .page-team > section[aria-labelledby="team-workspace-settings-title"],
+  .page-team > section[aria-labelledby="pending-invitations-title"],
+  .page-team > section[aria-labelledby="team-permissions-title"],
+  .page-team > section[aria-labelledby="invitation-history-title"] {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .page-team > section[aria-labelledby="team-members-title"] > .list {
+    margin-left: 14px !important;
+    margin-right: 14px !important;
+  }
+  .page-team > section[aria-labelledby="team-members-title"] > .inline-form {
+    grid-template-columns: 1fr;
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+}
