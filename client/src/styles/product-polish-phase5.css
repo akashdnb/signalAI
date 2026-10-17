@@ -98,6 +98,9 @@ input, select, textarea { max-width: 100%; }
 .page.page-workspace > div:last-child > :first-child { width: auto; border-right: 1px solid var(--border); }
 .page.page-workspace > div:last-child > :nth-child(2) { width: auto; border-right: 1px solid var(--border); }
 .page.page-workspace > div:last-child > :last-child { width: auto; }
+.page.page-workspace > div:last-child > :last-child:empty { display: flex; align-items: center; justify-content: center; padding: 1.25rem; }
+.page.page-workspace > div:last-child > :last-child:empty::before { content: "Select a conversation to view lead context and operator actions."; max-width: 18rem; color: var(--text-muted); font-size: .8rem; line-height: 1.5; text-align: center; }
+.page.page-workspace > div:last-child > :nth-child(2) > p.muted { display: flex; min-height: 100%; align-items: center; justify-content: center; margin: 0; padding: 2rem; text-align: center; line-height: 1.5; }
 .page.page-workspace .inbox-conversation { min-height: 76px; padding: .8rem .9rem; gap: .75rem; }
 .page.page-workspace .inbox-conversation:hover { background: var(--pill-bg); }
 .page.page-workspace .inbox-conversation-selected { background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)); box-shadow: inset 3px 0 0 var(--accent); }
