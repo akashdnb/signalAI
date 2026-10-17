@@ -6,6 +6,7 @@ import {
   type JourneyAccountReadiness,
 } from "../components/JourneyAccountsPanel";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
+import "../styles/journey-builder-parity.css";
 
 export function JourneyBuilderPage() {
   const { tenantId, campaignId } = useParams<{ tenantId: string; campaignId: string }>();
@@ -94,7 +95,7 @@ export function JourneyBuilderPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-56px)] flex-col px-3 py-3 md:px-4 md:py-3">
+    <div className="page-journey-builder flex min-h-[calc(100vh-56px)] flex-col px-3 py-3 md:px-4 md:py-3">
       <JourneyAccountsPanel
         tenantId={tenantId}
         campaignId={campaignId}
