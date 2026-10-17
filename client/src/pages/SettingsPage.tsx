@@ -1,4 +1,6 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
+import { PageHeader } from "../components/ui";
+import "../styles/knowledge-settings-parity.css";
 
 interface SettingsNavItem {
   to: string;
@@ -24,16 +26,12 @@ const PERSONAL_ITEMS: SettingsNavItem[] = [
 
 function SettingsNavList({ items }: { items: SettingsNavItem[] }) {
   return (
-    <ul className="list-none space-y-0.5 p-0">
+    <ul className="settings-nav-list">
       {items.map((item) => (
         <li key={item.to}>
           <NavLink
             to={item.to}
-            className={({ isActive }) =>
-              `block rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
-                isActive ? "bg-chip text-accent" : "text-ink hover:bg-chip"
-              }`
-            }
+            className={({ isActive }) => `settings-nav-link${isActive ? " is-active" : ""}`}
           >
             {item.label}
           </NavLink>
@@ -43,32 +41,28 @@ function SettingsNavList({ items }: { items: SettingsNavItem[] }) {
   );
 }
 
-/**
- * Settings' left sub-nav (Workspace config + Personal preferences), matching
- * the preview's literal IA. Team & access and Plan & billing render here
- * instead of as separate top-level sidebar routes — see AppShell's
- * SECONDARY_NAV — though their old top-level URLs still redirect here (App.tsx)
- * so existing bookmarks/links keep working.
- */
+/** Settings sub-nav keeps workspace and personal controls in the same IA as the preview. */
 export function SettingsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   if (!tenantId) return null;
 
   return (
-    <div className="page page-wide">
-      <h1>Settings</h1>
-      <p className="muted">Manage appearance, workspace access, plan and usage, and automation behavior.</p>
+    <div className="page page-wide settings-page">
+      <PageHeader
+        title="Settings"
+        description="Manage appearance, workspace access, plan and usage, and automation behavior."
+      />
 
-      <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-        <aside className="shrink-0 lg:w-56">
-          <div className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Workspace</div>
+      <div className="settings-layout">
+        <aside className="settings-nav" aria-label="Settings sections">
+          <div className="settings-nav-group-label">Workspace</div>
           <SettingsNavList items={WORKSPACE_ITEMS} />
-          <div className="my-3 border-t border-line" />
-          <div className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">Personal</div>
+          <div className="settings-nav-divider" />
+          <div className="settings-nav-group-label">Personal</div>
           <SettingsNavList items={PERSONAL_ITEMS} />
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="settings-content">
           <Outlet />
         </div>
       </div>
