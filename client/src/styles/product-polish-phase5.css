@@ -24,3 +24,66 @@ input, select, textarea { max-width: 100%; }
 .react-flow__handle:hover { transform: scale(1.15); }
 .banner-error, .banner-success, .banner-warning, .banner-info { border-radius: 12px; }
 @media (max-width: 760px) { main { scroll-padding-top: 72px; } .page { min-width: 0; } }
+
+/* Auth: keep the real sign-in flow visually quiet and product-first. Preview-only
+ * notices/actions are intentionally not copied because they describe sample state. */
+.relative.min-h-screen > .mx-auto > .w-full.max-w-sm > .rounded-2xl { border-radius: 14px; box-shadow: 0 12px 36px -18px rgb(15 23 42 / 28%); }
+.relative.min-h-screen h1 { letter-spacing: -0.025em; }
+.relative.min-h-screen input { min-height: 42px; border-radius: 9px; }
+.relative.min-h-screen .btn-primary { min-height: 42px; border-radius: 9px; }
+
+/* Settings → Plan & billing: translate the preview's compact settings hierarchy
+ * onto the production billing data without changing API semantics or inventing
+ * payment state. */
+.page-billing { min-width: 0; }
+.page-billing .billing-panel { display: grid; gap: 1rem; }
+.page-billing .billing-panel > .banner { margin: 0; }
+.page-billing .billing-panel .billing-plan-section,
+.page-billing .billing-panel .billing-usage-section,
+.page-billing .billing-panel > .billing-payment-notice,
+.page-billing .billing-panel > .billing-entitlement-notice { margin: 0; }
+.page-billing .billing-panel .billing-plan-section,
+.page-billing .billing-panel .billing-usage-section { border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); padding: 1.15rem 1.25rem; }
+.page-billing .billing-panel .billing-plan-section > :first-child,
+.page-billing .billing-panel .billing-usage-section > :first-child { margin-top: 0; }
+.page-billing .billing-plan-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.page-billing .billing-section-eyebrow { margin: 0 0 .25rem; color: var(--text-muted); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.page-billing .billing-plan-name { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.02em; }
+.page-billing .billing-trial-note { margin: .85rem 0 0; padding-top: .8rem; border-top: 1px solid var(--border); }
+.page-billing .billing-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.page-billing .billing-usage-meter { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); padding: 1rem; }
+.page-billing .billing-usage-meter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.page-billing .billing-usage-meter h3 { margin: 0; font-size: .95rem; }
+.page-billing .billing-usage-meter p { margin: .25rem 0 0; color: var(--text-muted); font-size: .8rem; }
+.page-billing .billing-usage-percent { font-size: .95rem; font-variant-numeric: tabular-nums; }
+.page-billing .billing-usage-track { height: 7px; margin: .9rem 0 .65rem; overflow: hidden; border-radius: 999px; background: var(--border); }
+.page-billing .billing-usage-track > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.page-billing .billing-usage-meter-footer { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--text-muted); font-size: .75rem; }
+.page-billing .billing-overage-note,
+.page-billing .billing-payment-notice { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-muted); padding: .9rem 1rem; }
+.page-billing .billing-overage-price { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.page-billing .billing-reset-note { margin: 0; font-size: .76rem; line-height: 1.5; }
+
+/* Integrations: preserve live connection controls while using the same compact
+ * account-card hierarchy as the reference. Technical fields remain conditional
+ * on data returned by the production API. */
+.page-wide:has(.integration-accounts) { max-width: 1120px; }
+.page-wide:has(.integration-accounts) .integration-accounts { padding: 0; overflow: hidden; }
+.page-wide:has(.integration-accounts) .integration-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.15rem 1.25rem; border-bottom: 1px solid var(--border); }
+.page-wide:has(.integration-accounts) .integration-section-heading h2 { margin: 0; font-size: 1.05rem; letter-spacing: -.012em; }
+.page-wide:has(.integration-accounts) .integration-account-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 1rem; padding: 1.15rem 1.25rem; }
+.page-wide:has(.integration-accounts) .integration-account-row + .integration-account-row { border-top: 1px solid var(--surface-divider); }
+.page-wide:has(.integration-accounts) .integration-account-actions { align-self: start; }
+.page-wide:has(.integration-accounts) .integration-account-row details summary { color: var(--accent); font-weight: 600; }
+.page-wide:has(.integration-accounts) .integration-empty-state { margin: 1rem 1.25rem 1.25rem; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface-muted); padding: 1rem; }
+.page-wide:has(.integration-accounts) > .card:not(.integration-accounts) { display: flex; align-items: flex-start; }
+
+@media (max-width: 760px) {
+  .page-billing .billing-plan-summary,
+  .page-billing .billing-overage-note,
+  .page-billing .billing-payment-notice { flex-direction: column; }
+  .page-billing .billing-usage-grid { grid-template-columns: 1fr; }
+  .page-wide:has(.integration-accounts) .integration-section-heading,
+  .page-wide:has(.integration-accounts) .integration-account-row { grid-template-columns: 1fr; display: grid; }
+  .page-wide:has(.integration-accounts) .integration-account-actions { justify-content: flex-start; flex-wrap: wrap; }
+}
