@@ -108,6 +108,22 @@ export async function createCampaign(
   return toCampaign(result.rows[0]!);
 }
 
+/** Create an unpublished campaign using a caller-owned pool/client transaction. */
+export async function createCampaignWithClient(
+  client: Queryable,
+  tenantId: string,
+  name: string,
+  keywords: string[],
+): Promise<Campaign> {
+  const result = await client.query<CampaignRow>(
+    `insert into campaigns (tenant_id, name, keywords, enabled)
+     values ($1, $2, $3, false)
+     returning *`,
+    [tenantId, name, keywords],
+  );
+  return toCampaign(result.rows[0]!);
+}
+
 export async function listCampaigns(pool: Pool, tenantId: string): Promise<Campaign[]> {
   const result = await pool.query<CampaignRow>(`select campaigns.*, exists (select 1 from campaign_journey_versions published where published.tenant_id = campaigns.tenant_id and published.campaign_id = campaigns.id) as published from campaigns where campaigns.tenant_id = $1 order by campaigns.created_at desc`, [tenantId]);
   return result.rows.map(toCampaign);
@@ -205,6 +221,45 @@ export async function deleteDraftCampaign(
   } finally {
     client.release();
   }
+}
+
+/**
+ * Runtime selection for reusable journeys must be scoped to the receiving
+ * Instagram business account, not merely its workspace. This uses the durable
+ * meta_tokens row + explicit journey binding and excludes disconnected accounts.
+ */
+export async function listActiveCampaignKeywordsForInstagramAccount(
+  pool: Queryable,
+  tenantId: string,
+  instagramAccountId: string,
+): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {
+  const result = await pool.query<{
+    id: string;
+    keywords: string[];
+    target_media_ids: string[];
+    trigger_source: TriggerSource;
+    reply_channel: ReplyChannel;
+  }>(
+    `select c.id, c.keywords, c.target_media_ids, c.trigger_source, c.reply_channel
+       from campaigns c
+       join campaign_instagram_accounts cia on cia.campaign_id = c.id
+       join meta_tokens mt on mt.id = cia.meta_token_id
+      where c.tenant_id = $1
+        and mt.tenant_id = $1
+        and mt.instagram_account_id = $2
+        and mt.status = 'healthy'
+        and cia.enabled = true
+        and c.enabled = true
+      order by c.created_at asc`,
+    [tenantId, instagramAccountId],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    keywords: row.keywords,
+    targetMediaIds: row.target_media_ids,
+    triggerSource: row.trigger_source,
+    replyChannel: row.reply_channel,
+  }));
 }
 
 export async function listActiveCampaignKeywords(pool: Queryable, tenantId: string): Promise<Array<{ id: string; keywords: string[]; targetMediaIds: string[]; triggerSource: TriggerSource; replyChannel: ReplyChannel }>> {

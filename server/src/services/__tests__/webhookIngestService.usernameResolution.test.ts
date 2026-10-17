@@ -15,7 +15,7 @@ function sleep(ms: number) {
 }
 
 async function resolutionJobs(pool: ReturnType<typeof getPool>) {
-  return pool.query<{ data: { tenantId: string; leadId: string; leadEventId: string; instagramUserId: string } }>(
+  return pool.query<{ data: { tenantId: string; leadId: string; leadEventId: string; instagramUserId: string; instagramAccountId?: string } }>(
     "select data from pgboss.job where name = $1",
     [USERNAME_RESOLUTION_QUEUE],
   );
@@ -73,7 +73,7 @@ describe("webhookIngestService — username resolution enqueue", () => {
 
     const jobs = await resolutionJobs(pool);
     expect(jobs.rows).toHaveLength(1);
-    expect(jobs.rows[0]!.data).toMatchObject({ tenantId: tenant.id, instagramUserId: "ig-user-1" });
+    expect(jobs.rows[0]!.data).toMatchObject({ tenantId: tenant.id, instagramUserId: "ig-user-1", instagramAccountId: "acct-1" });
   });
 
   it("does not enqueue a resolution job for a comment event that already has a username", async () => {

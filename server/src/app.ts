@@ -18,6 +18,8 @@ import { webhooksRouter } from "./routes/webhooks.js";
 import { authRouter } from "./routes/auth.js";
 import { authEmailRouter } from "./routes/authEmail.js";
 import { googleAuthRouter } from "./routes/authGoogle.js";
+import { mcpOAuthRouter } from "./routes/mcpOAuth.js";
+import { mcpOAuthAutomationScopesRouter } from "./routes/mcpOAuthAutomationScopes.js";
 import { paginationRouter } from "./routes/pagination.js";
 import { campaignsRouter } from "./routes/campaigns.js";
 import { contentRouter } from "./routes/content.js";
@@ -25,6 +27,8 @@ import { journeyRuntimeRouter } from "./routes/journeyRuntime.js";
 import { billingRouter } from "./routes/billing.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { leadsRouter } from "./routes/leads.js";
+import { profileRouter } from "./routes/profile.js";
+import { notificationsRouter } from "./routes/notifications.js";
 import { knowledgeBaseRouter } from "./routes/knowledgeBase.js";
 import { guardrailsConfigRouter } from "./routes/guardrailsConfig.js";
 import { leadScoringRulesRouter } from "./routes/leadScoringRules.js";
@@ -33,6 +37,8 @@ import { onboardingRouter } from "./routes/onboarding.js";
 import { workspaceManagementRouter } from "./routes/workspaceManagement.js";
 import { workspacesRouter } from "./routes/workspaces.js";
 import { billingAccountsRouter } from "./routes/billingAccounts.js";
+import { mcpCapabilitiesRouter } from "./routes/mcpCapabilities.js";
+import { mcpAutomationOperationalCapabilitiesRouter } from "./routes/mcpAutomationOperationalCapabilities.js";
 import { createProductionInstagramWebhookRouter } from "./integrations/instagram/webhooks/createInstagramWebhookRouter.js";
 import type { LLMProvider } from "./llm/provider.js";
 import type { EmbeddingProvider } from "./llm/embeddingProvider.js";
@@ -84,9 +90,20 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use(authRouter);
   app.use(authEmailRouter);
   app.use(googleAuthRouter);
+  // Extended OAuth scope discovery/authorization must run before the legacy
+  // OAuth router so lifecycle scopes are accepted while token exchange remains
+  // owned by the existing implementation.
+  app.use(mcpOAuthAutomationScopesRouter);
+  app.use(mcpOAuthRouter);
   app.use(workspacesRouter);
   app.use(billingAccountsRouter);
   app.use(workspaceManagementRouter);
+
+  // Client-facing SignalAI MCP automation operation boundary is registered
+  // before the broader capability router so its lifecycle actions cannot be
+  // swallowed by the legacy capability-unavailable path.
+  app.use(mcpAutomationOperationalCapabilitiesRouter);
+  app.use(mcpCapabilitiesRouter);
 
   app.use(paginationRouter);
   // Content media enrichment is registered before the legacy campaigns
@@ -103,6 +120,8 @@ export function createApp(options?: { llmProvider?: LLMProvider; embeddingProvid
   app.use("/tenants/:tenantId", dashboardReadCacheHeaders);
   app.use(dashboardRouter(options?.llmProvider, options?.embeddingProvider ?? null));
 
+  app.use(profileRouter);
+  app.use(notificationsRouter);
   app.use(leadsRouter);
   app.use(knowledgeBaseRouter(options?.embeddingProvider ?? null));
   app.use(guardrailsConfigRouter);

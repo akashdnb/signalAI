@@ -42,6 +42,26 @@ Do not add a new font, palette, token namespace, or UI framework for a page refr
 
 ## Type and copy
 
+### Type scale
+
+Pages drifted apart because each screen picked its own sizes: Leads was built on a 14px base while Inbox, Knowledge, Integrations and Team sat on 12px, and section headings ranged from 12px to 28px. Size is assigned by **role**, not per page, so a panel heading is the same size everywhere it appears.
+
+| Role | Size | Used for |
+|---|---|---|
+| Page title | 32px | `h1` on every screen, including the auth and recovery screens |
+| Display | 40px | the sign-in hero only |
+| Metric | 28px | KPI numbers, usage totals, chart summary figures |
+| Section heading | 18px | every panel, card, modal and table-toolbar `h2` |
+| Sub-heading | 16px | `h3` inside a panel or article |
+| Body | 14px | default copy, descriptions, table cells, nav items, buttons, inputs |
+| Dense body | 13px | reserved; use only where 14px genuinely will not fit |
+| Label | 12px | form labels, captions, `<small>`, metadata, timestamps, chips |
+| Eyebrow | 11px | uppercase tracked labels and table `th` only |
+
+Nothing renders below 11px, and 11px is reserved for uppercase tracked labels — never body copy. Do not add a step between these; if something needs to be "slightly bigger", it belongs at the next role up.
+
+Weights are restricted to the five faces actually loaded — `400 / 500 / 600 / 700 / 800`. Values in between (`550`, `650`, `740`) are silently rounded to one of these by the browser, so they create no visual difference while implying a hierarchy that does not exist.
+
 - Follow the existing typography and hierarchy in the UI foundation. Use size, weight, line length, and spacing to establish levels; do not make everything a large headline or a dense wall of text.
 - Name the actual object and action: "Connect Instagram account", "Save journey", "Retry sync", or "No conversations match these filters".
 - Prefer concrete verbs and product-specific language. Remove phrases that merely sound polished, including generic "AI-powered" claims, "seamlessly", "unlock", "revolutionize", and unsupported promises.

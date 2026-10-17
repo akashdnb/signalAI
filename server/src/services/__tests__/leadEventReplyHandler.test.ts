@@ -67,7 +67,8 @@ async function seedMatchedEvent(
   attributesOverrides: Record<string, unknown> = {},
   priorInboundDmAt: Date | null = new Date(Date.now() - 5 * 60 * 1000),
 ) {
-  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1");
+  await upsertToken(pool, keyring, { tenantId, instagramAccountId: "acct-1", accessToken: "token-1" });
+  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1", "acct-1");
   // Most handler tests exercise an event inside an already-open DM window.
   // Seed a real inbound DM event rather than relying on a manually-set window
   // projection, which is intentionally not the policy source of truth.
@@ -83,8 +84,6 @@ async function seedMatchedEvent(
     });
     await updateMessagingWindow(pool, tenantId, lead.id, priorInboundDmAt, new Date(priorInboundDmAt.getTime() + 60 * 60 * 1000));
   }
-  await upsertToken(pool, keyring, { tenantId, instagramAccountId: "acct-1", accessToken: "token-1" });
-
   const event = await insertEventIdempotent(pool, {
     tenantId,
     leadId: lead.id,
@@ -92,7 +91,7 @@ async function seedMatchedEvent(
     eventType: "comment",
     occurredAt: new Date(),
     sequence: priorInboundDmAt ? 2 : 1,
-    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
+    attributes: { instagramAccountId: "acct-1", matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
   });
   await insertPii(pool, {
     tenantId,
@@ -113,9 +112,9 @@ async function seedMatchedMessageEvent(
   dmText: string,
   attributesOverrides: Record<string, unknown> = {},
 ) {
-  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1");
-  await updateMessagingWindow(pool, tenantId, lead.id, new Date(), new Date(Date.now() + 60 * 60 * 1000));
   await upsertToken(pool, keyring, { tenantId, instagramAccountId: "acct-1", accessToken: "token-1" });
+  const lead = await findOrCreateLeadByInstagramUserId(pool, tenantId, "ig-user-1", "acct-1");
+  await updateMessagingWindow(pool, tenantId, lead.id, new Date(), new Date(Date.now() + 60 * 60 * 1000));
 
   const event = await insertEventIdempotent(pool, {
     tenantId,
@@ -124,7 +123,7 @@ async function seedMatchedMessageEvent(
     eventType: "message",
     occurredAt: new Date(),
     sequence: 1,
-    attributes: { matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
+    attributes: { instagramAccountId: "acct-1", matchedCampaignId: campaignId, matchedKeyword: keyword, ...attributesOverrides },
   });
   await insertPii(pool, { tenantId, leadEventId: event!.id, leadId: lead.id, dmText, username: "real_handle" });
   return { lead, event: event! };

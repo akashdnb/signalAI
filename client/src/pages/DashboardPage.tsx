@@ -9,7 +9,6 @@ import {
   type ConversationsTimeseriesPoint,
   type Funnel,
   type LeadListItem,
-  type PipelineStage,
   type RevenueByCurrency,
 } from "../api";
 import { ConversationsChart } from "../components/ConversationsChart";
@@ -164,23 +163,14 @@ export function DashboardPage() {
 
   if (!tenantId) return null;
 
-  // Funnel is the canonical all-lead snapshot. Do not derive stage totals from
-  // the paginated Leads response, otherwise Overview can silently undercount.
-  const stageCounts = funnel
-    ? funnel.stages.reduce(
-        (acc, stage) => {
-          const match = PIPELINE_STAGES.find((pipelineStage) => pipelineStage.value === stage.key);
-          if (match) acc[match.value] = stage.count;
-          return acc;
-        },
-        Object.fromEntries(PIPELINE_STAGES.map((s) => [s.value, 0])) as Record<PipelineStage, number>,
-      )
-    : undefined;
+  // The funnel endpoint provides a full current-stage distribution, including
+  // a server-computed unmapped-lead count. The Leads page is paginated, so
+  // its visible page must never drive dashboard totals.
+  const stageCounts = funnel?.stageCounts;
+  const uncategorizedLeadCount = funnel?.unmappedLeadCount ?? 0;
   const categorizedLeadCount = stageCounts ? Object.values(stageCounts).reduce((total, count) => total + count, 0) : 0;
-  const uncategorizedLeadCount = funnel
-    ? Math.max(0, (analytics?.uniqueLeads ?? categorizedLeadCount) - categorizedLeadCount)
-    : 0;
-  const totalLeadCount = analytics?.uniqueLeads ?? categorizedLeadCount;
+  const totalLeadCount = analytics?.uniqueLeads ?? categorizedLeadCount + uncategorizedLeadCount;
+
   const qualifiedCount = funnel?.stages.find((s) => s.key === "qualified")?.count ?? 0;
   const meetingCount = funnel?.stages.find((s) => s.key === "meeting")?.count ?? 0;
   const recentLeads = leads?.slice(0, 5) ?? [];
@@ -258,7 +248,11 @@ export function DashboardPage() {
       </header>
 
       <div className="overview-toolbar">
-        {account?.connected && <span className="pill pill-ok"><span className="mr-1">●</span>Instagram connected</span>}
+        {account?.connected && account.status === "healthy" && (
+          <span className="pill pill-ok">
+            <span className="mr-1">●</span>Instagram healthy
+          </span>
+        )}
         <label className="overview-period-select">
           <span className="sr-only">Reporting period</span>
           <select value={period} onChange={(e) => setPeriod(e.target.value as ReportingPeriod)}>
@@ -284,6 +278,22 @@ export function DashboardPage() {
         </div>
       )}
 
+      {account?.connected && account.status === "error" && (
+        <div className="banner banner-error flex flex-wrap items-start justify-between gap-3" role="alert">
+          <div className="min-w-0">
+            <strong>Instagram connection needs attention.</strong>
+            <p className="m-0 mt-1">Automatic replies for journeys using this account may be paused until the account is reconnected.</p>
+            {account.lastError && <p className="m-0 mt-1 text-sm">Latest check: {account.lastError}</p>}
+          </div>
+          <Link className="link-button" to={`/dashboard/${tenantId}/integrations`}>Review connection</Link>
+        </div>
+      )}
+      {account?.connected && account.status !== "healthy" && account.status !== "error" && (
+        <div className="banner flex flex-wrap items-center justify-between gap-3" role="status">
+          <span>An Instagram connection exists, but its health status is unavailable.</span>
+          <Link className="link-button" to={`/dashboard/${tenantId}/integrations`}>Check connection</Link>
+        </div>
+      )}
       {account !== null && !account.connected && (
         <section className="card overview-connect-card">
           <div>

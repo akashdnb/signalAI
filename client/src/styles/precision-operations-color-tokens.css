@@ -1,0 +1,943 @@
+/*
+ * SignalAI Precision Operations — Color Token Layer
+ *
+ * Keep every preview color in this file. Components consume semantic tokens
+ * rather than choosing colors locally. This intentionally preserves the
+ * current preview palette so this refactor is visual-neutral; swapping the
+ * palette later only requires changing this layer.
+ */
+
+/* Shared brand-mark and provider-logo tokens. Third-party provider marks keep
+   their official colors; preview palette rules override only SignalAI's mark. */
+:root {
+  --signalai-logo-gradient-start: #22d3ee;
+  --signalai-logo-gradient-middle: #2563eb;
+  --signalai-logo-gradient-end: #7c3aed;
+  --signalai-logo-sparkle: #7c3aed;
+  --po-color-brand-google-blue: #4285f4;
+  --po-color-brand-google-green: #34a853;
+  --po-color-brand-google-yellow: #fbbc05;
+  --po-color-brand-google-red: #ea4335;
+  --po-color-brand-facebook-blue: #0866ff;
+}
+
+body:has(.po-preview-app) {
+  /* Surfaces */
+  --po-color-canvas: #f1f5fa;
+  --po-color-surface: #ffffff;
+  --po-color-surface-muted: #f8fafc;
+  --po-color-surface-subtle: #fafbf8;
+  --po-color-surface-hover: #f0f1ed;
+  --po-color-surface-selected: #f1edfc;
+
+  /* Content */
+  --po-color-ink: #111827;
+  --po-color-secondary: #4b5563;
+  --po-color-muted: #616a7a;
+  --po-color-muted-strong: #4d5852;
+  --po-color-placeholder: #929a94;
+  --po-color-white: #ffffff;
+
+  /* Borders */
+  --po-color-border: #e2e8f0;
+  --po-color-border-strong: #cbd5e1;
+  --po-color-border-subtle: #edf0eb;
+  --po-color-border-hover: #9ba69f;
+
+  /* Brand / primary */
+  --po-color-primary: #7c3aed;
+  --po-color-primary-hover: #6d28d9;
+  --po-color-primary-soft: #f3e8ff;
+  --po-color-primary-border: #e2d9fa;
+  --po-color-primary-strong: #5c37b4;
+  --po-color-primary-deep: #5632a6;
+
+  /* Purple-derived component states */
+  --po-color-purple-soft: #f0eafe;
+  --po-color-purple-border: #e2dbf5;
+  --po-color-purple-icon: #f1ecfd;
+  --po-color-purple-count: #e5dbfa;
+  --po-color-purple-count-text: #5632a6;
+  --po-color-purple-selected: #f1edfc;
+  --po-color-purple-message: #f2edff;
+  --po-color-purple-message-border: #e4dafa;
+
+  /* Semantic states */
+  --po-color-success: #21734e;
+  --po-color-success-soft: #e7f5ec;
+  --po-color-success-border: #cde9d8;
+  --po-color-success-strong: #286845;
+  --po-color-warning: #8e5d10;
+  --po-color-warning-soft: #fff3da;
+  --po-color-warning-border: #f0ddb3;
+  --po-color-warning-dot: #d99a2b;
+  --po-color-error: #9b2c28;
+  --po-color-error-soft: #fff1f0;
+  --po-color-error-border: #efc9c7;
+  --po-color-info: #3265a4;
+  --po-color-info-soft: #edf4ff;
+  --po-color-info-border: #d7e3f6;
+
+  /* Node / channel accents */
+  --po-color-trigger: #b83f83;
+  --po-color-trigger-soft: #fff0f7;
+  --po-color-trigger-border: #f0d3e4;
+  --po-color-goal: #2a7851;
+  --po-color-goal-soft: #ebf7ef;
+  --po-color-goal-border: #cee7d7;
+  --po-color-instagram: #8c39ca;
+  --po-color-instagram-soft: #f5edfc;
+
+  /* Utility / chrome */
+  --po-color-notice-bg: #eef1f5;
+  --po-color-notice-text: #4c5b6c;
+  --po-color-notice-strong: #26384b;
+  --po-color-notice-dot: #5e6f89;
+  --po-color-canvas-bg: #f7f8f5;
+  --po-color-canvas-topline: #f9faf7;
+  --po-color-canvas-grid: #d7dcd5;
+  --po-color-canvas-watermark: #bec5bf;
+  --po-color-connector: #9fa9a0;
+  --po-color-connector-arrow: #89948b;
+  --po-color-footer-text: #636c66;
+  --po-color-modal-backdrop: rgb(19 27 22 / 40%);
+
+  /* Neutral component fills */
+  --po-color-neutral-soft: #f4f5f2;
+  --po-color-neutral-border: #dfe4de;
+  --po-color-neutral-text: #535d57;
+  --po-color-neutral-avatar-bg: #ebe7f7;
+  --po-color-neutral-avatar-border: #ddd8ed;
+  --po-color-neutral-avatar-text: #4f3693;
+  --po-color-neutral-icon-border: #e2e5e0;
+  --po-color-neutral-quiet: #eeefeb;
+  --po-color-neutral-field: #fbfcf9;
+  --po-color-neutral-field-text: #445047;
+  --po-color-neutral-table-head: #f8f9f6;
+  --po-color-neutral-table-head-text: #7c867e;
+  --po-color-neutral-table-text: #4c5850;
+  --po-color-neutral-label: #6b746e;
+  --po-color-neutral-muted: #8a938d;
+
+  /* Auth */
+  --po-color-auth-gradient: linear-gradient(135deg, #e7defb 0%, #eef1fc 45%, #dcf0fb 100%);
+  --po-color-auth-error-bg: #fef2f2;
+  --po-color-auth-error-border: #fecaca;
+  --po-color-auth-error-text: #991b1b;
+}
+
+/* Keep the legacy preview variables as aliases. This is the compatibility
+ * bridge that lets the large preview stylesheet migrate without component
+ * code changes. */
+.po-preview-app {
+  --po-canvas: var(--po-color-canvas);
+  --po-surface: var(--po-color-surface);
+  --po-surface-muted: var(--po-color-surface-muted);
+  --po-ink: var(--po-color-ink);
+  --po-secondary: var(--po-color-secondary);
+  --po-muted: var(--po-color-muted);
+  --po-line: var(--po-color-border);
+  --po-line-strong: var(--po-color-border-strong);
+  --po-primary: var(--po-color-primary);
+  --po-primary-hover: var(--po-color-primary-hover);
+  --po-primary-soft: var(--po-color-primary-soft);
+  --po-green: var(--po-color-success);
+  --po-green-soft: var(--po-color-success-soft);
+  --po-amber: var(--po-color-warning);
+  --po-amber-soft: var(--po-color-warning-soft);
+}
+
+/* Bridge the app's Tailwind accent aliases into the preview token system. This
+   keeps utility links, focus styles and text-accent elements palette-aware,
+   while leaving the production app's root accent unchanged. */
+.po-preview-app {
+  --accent: var(--po-color-primary);
+  --accent-hover: var(--po-color-primary-hover);
+  --accent-soft: var(--po-color-primary-soft);
+  --accent-blue: var(--po-color-primary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+}
+
+/* Legacy hard-coded component colors are redirected here so palette changes
+ * remain centralized while the preview stylesheet is progressively cleaned. */
+.po-preview-app .po-sidebar,
+.po-preview-app .po-button--secondary,
+.po-preview-app .po-canvas-footer button,
+.po-preview-app .po-inspector,
+.po-preview-app .po-search,
+.po-preview-app .po-thread,
+.po-preview-app .po-select-wrap select,
+.po-preview-app .po-modal,
+.po-preview-app .po-icon-button { background: var(--po-color-surface); }
+
+.po-preview-app .po-workspace-avatar,
+.po-preview-app .po-avatar { border-color: var(--po-color-neutral-avatar-border); background: var(--po-color-neutral-avatar-bg); color: var(--po-color-neutral-avatar-text); }
+.po-preview-app .po-nav-item { color: var(--po-color-muted-strong); }
+.po-preview-app button.po-nav-item:hover,
+.po-preview-app .po-palette-item:hover { background: var(--po-color-surface-hover); }
+.po-preview-app .po-nav-item.is-muted { color: var(--po-color-muted-strong); }
+.po-preview-app .po-nav-count { background: var(--po-color-purple-count); color: var(--po-color-purple-count-text); }
+.po-preview-app .po-preview-notice { border-bottom-color: var(--po-color-legacy-hex-e0e4ea); background: var(--po-color-notice-bg); color: var(--po-color-notice-text); }
+.po-preview-app .po-preview-notice-dot { background: var(--po-color-notice-dot); }
+.po-preview-app .po-preview-notice strong { color: var(--po-color-notice-strong); }
+
+.po-preview-app .po-tag { background: var(--po-color-legacy-hex-eef0ed); color: var(--po-color-neutral-text); }
+.po-preview-app .po-tag--purple { border-color: var(--po-color-primary-border); background: var(--po-color-purple-soft); color: var(--po-color-primary-strong); }
+.po-preview-app .po-tag--green,
+.po-preview-app .po-tag--success { border-color: var(--po-color-success-border); background: var(--po-color-success-soft); color: var(--po-color-success); }
+.po-preview-app .po-tag--amber,
+.po-preview-app .po-tag--warning { border-color: var(--po-color-warning-border); background: var(--po-color-warning-soft); color: var(--po-color-warning); }
+.po-preview-app .po-tag--blue { border-color: var(--po-color-info-border); background: var(--po-color-info-soft); color: var(--po-color-info); }
+.po-preview-app .po-tag--neutral { border-color: var(--po-color-neutral-border); background: var(--po-color-neutral-soft); color: var(--po-color-neutral-text); }
+
+.po-preview-app .po-save-status.is-dirty,
+.po-preview-app .po-flow-summary span,
+.po-preview-app .po-save-status-dot.is-dirty { color: var(--po-color-warning); background-color: var(--po-color-warning-dot); }
+.po-preview-app .po-palette { background: var(--po-color-surface-subtle); }
+.po-preview-app .po-group-label,
+.po-preview-app .po-coming-soon > div,
+.po-preview-app .po-flow-node-kicker { color: var(--po-color-neutral-label); }
+.po-preview-app .po-palette-icon { border-color: var(--po-color-purple-border); background: var(--po-color-purple-icon); }
+.po-preview-app .po-palette-icon--instagram,
+.po-preview-app .po-flow-node-icon--trigger,
+.po-preview-app .po-inspector-icon.po-flow-node-icon--trigger { border-color: var(--po-color-trigger-border); background: var(--po-color-trigger-soft); color: var(--po-color-trigger); }
+.po-preview-app .po-flow-node-icon--goal,
+.po-preview-app .po-inspector-icon.po-flow-node-icon--goal { border-color: var(--po-color-goal-border); background: var(--po-color-goal-soft); color: var(--po-color-goal); }
+.po-preview-app .po-flow-node-icon--followup { border-color: var(--po-color-info-border); background: var(--po-color-info-soft); color: var(--po-color-info); }
+.po-preview-app .po-canvas { background: var(--po-color-canvas-bg); }
+.po-preview-app .po-canvas-topline { border-bottom-color: var(--po-color-legacy-hex-e5e8e2); background: var(--po-color-canvas-topline); }
+.po-preview-app .po-canvas-workspace { background-image: radial-gradient(var(--po-color-canvas-grid) .85px, transparent .85px); }
+.po-preview-app .po-canvas-watermark { color: var(--po-color-canvas-watermark); }
+.po-preview-app .po-flow-node:hover { border-color: var(--po-color-legacy-hex-aaa1cb); }
+.po-preview-app .po-flow-node-icon { border-color: var(--po-color-purple-border); background: var(--po-color-purple-icon); }
+.po-preview-app .po-flow-connector { background: var(--po-color-connector); }
+.po-preview-app .po-flow-connector span { border-color: var(--po-color-connector-arrow); }
+.po-preview-app .po-add-step { border-color: var(--po-color-legacy-hex-c4cbc4); background: var(--po-color-neutral-field); }
+.po-preview-app .po-readonly-field,
+.po-preview-app .po-inspector-fields textarea,
+.po-preview-app .po-composer textarea { background: var(--po-color-neutral-field); color: var(--po-color-neutral-field-text); }
+.po-preview-app .po-filter-tabs button span { background: var(--po-color-legacy-hex-ebe4fb); color: var(--po-color-legacy-hex-5737a7); }
+.po-preview-app .po-search input::placeholder { color: var(--po-color-placeholder); }
+.po-preview-app .po-conversation-list,
+.po-preview-app .po-conversation-details { background: var(--po-color-legacy-hex-fcfdfa); }
+.po-preview-app .po-conversation:hover { background: var(--po-color-legacy-hex-f5f6f2); }
+.po-preview-app .po-conversation.is-selected { background: var(--po-color-purple-selected); }
+.po-preview-app .po-post-context { background: var(--po-color-neutral-field); }
+.po-preview-app .po-message > span { background: var(--po-color-neutral-table-head); }
+.po-preview-app .po-message--outgoing > span { border-color: var(--po-color-purple-message-border); background: var(--po-color-purple-message); }
+.po-preview-app .po-inline-notice { border-color: var(--po-color-legacy-hex-c9dfd1); background: var(--po-color-legacy-hex-edf7f0); color: var(--po-color-success-strong); }
+.po-preview-app .po-leads-table th { background: var(--po-color-neutral-table-head); color: var(--po-color-neutral-table-head-text); }
+.po-preview-app .po-leads-table td { color: var(--po-color-neutral-table-text); }
+.po-preview-app .po-modal-icon { border-color: var(--po-color-purple-border); background: var(--po-color-primary-soft); }
+.po-preview-app .po-modal-icon--warning { border-color: var(--po-color-warning-border); background: var(--po-color-warning-soft); }
+.po-preview-app .po-readiness-empty { border-color: var(--po-color-legacy-hex-b5beb6); }
+.po-preview-app .po-nav-coming-soon { color: var(--po-color-legacy-hex-8c9690); }
+.po-preview-app .po-nav-coming-soon small { background: var(--po-color-purple-soft); color: var(--po-color-legacy-hex-66528a); }
+.po-preview-app .po-inline-notice--error { border-color: var(--po-color-error-border); background: var(--po-color-error-soft); color: var(--po-color-error); }
+.po-preview-app .po-system-state-mark { border-color: var(--po-color-warning-border); background: var(--po-color-warning-soft); }
+.po-preview-app .po-auth-inline-error { color: var(--po-color-error); }
+.po-preview-app.po-standalone-preview .po-auth-layout { background: var(--po-color-auth-gradient); }
+.po-preview-app.po-standalone-preview .po-auth-error { border-color: var(--po-color-auth-error-border); background: var(--po-color-auth-error-bg); color: var(--po-color-auth-error-text); }
+
+/* Dark palette tokens. Component selectors below consume the same semantic
+ * roles, so changing this block changes the entire dark preview coherently. */
+.po-preview-app.is-dark,
+body:has(.po-preview-app.is-dark) {
+  --po-color-canvas: #141816;
+  --po-color-surface: #1b211e;
+  --po-color-surface-muted: #202723;
+  --po-color-surface-subtle: #202723;
+  --po-color-surface-hover: #202723;
+  --po-color-surface-selected: #302746;
+  --po-color-ink: #edf1ec;
+  --po-color-secondary: #c1cbc3;
+  --po-color-muted: #93a098;
+  --po-color-muted-strong: #c1cbc3;
+  --po-color-placeholder: #93a098;
+  --po-color-border: #303a34;
+  --po-color-border-strong: #465148;
+  --po-color-border-subtle: #303a34;
+  --po-color-primary: #b49af5;
+  --po-color-primary-hover: #c3b0fa;
+  --po-color-primary-soft: #302746;
+  --po-color-primary-border: #554578;
+  --po-color-primary-strong: #d6c6ff;
+  --po-color-success: #81d0a2;
+  --po-color-success-soft: #203c2c;
+  --po-color-success-border: #355744;
+  --po-color-warning: #f0c36a;
+  --po-color-warning-soft: #3b301e;
+  --po-color-warning-border: #5a482b;
+  --po-color-trigger: #d68ab7;
+  --po-color-trigger-soft: #3b2634;
+  --po-color-trigger-border: #684457;
+  --po-color-goal: #81d0a2;
+  --po-color-goal-soft: #203c2c;
+  --po-color-goal-border: #355744;
+  --po-color-info: #a9d6ff;
+  --po-color-info-soft: #1f3446;
+  --po-color-info-border: #344b60;
+  --po-color-canvas-bg: #171d19;
+  --po-color-canvas-topline: #1b211e;
+  --po-color-canvas-grid: #354139;
+  --po-color-neutral-field: #202723;
+  --po-color-neutral-field-text: #edf1ec;
+  --po-color-neutral-table-head: #202723;
+  --po-color-neutral-table-head-text: #93a098;
+  --po-color-neutral-table-text: #c1cbc3;
+  --po-color-neutral-label: #93a098;
+  --po-color-purple-message: #302746;
+  --po-color-purple-message-border: #554578;
+  --po-color-auth-error-bg: #351c24;
+  --po-color-auth-error-border: #7f1d1d;
+  --po-color-auth-error-text: #fecaca;
+  --po-color-auth-gradient: linear-gradient(135deg, #201a3d 0%, #171d34 45%, #0d1f30 100%);
+}
+
+.po-preview-app.is-dark .po-flow-node.is-selected { box-shadow: inset 3px 0 0 var(--po-color-primary), 0 0 0 2px var(--po-color-primary-border); }
+.po-preview-app.is-dark .po-canvas-workspace { background-color: var(--po-color-canvas-bg); background-image: radial-gradient(var(--po-color-canvas-grid) .85px, transparent .85px); }
+.po-preview-app.is-dark .po-post-art { color: var(--po-color-legacy-hex-18231c); }
+.po-preview-app.is-dark .po-status-dot { background: var(--po-color-success); }
+.po-preview-app.is-dark .po-message--outgoing > span { background: var(--po-color-purple-message); border-color: var(--po-color-purple-message-border); }
+.po-preview-app.is-dark .po-tag--purple { background: var(--po-color-primary-soft); border-color: var(--po-color-primary-border); color: var(--po-color-primary-strong); }
+.po-preview-app.is-dark .po-tag--blue { background: var(--po-color-info-soft); border-color: var(--po-color-info-border); color: var(--po-color-info); }
+.po-preview-app.is-dark .po-tag--green,
+.po-preview-app.is-dark .po-tag--success { background: var(--po-color-success-soft); border-color: var(--po-color-success-border); color: var(--po-color-success); }
+.po-preview-app.is-dark .po-tag--warning,
+.po-preview-app.is-dark .po-tag--amber { background: var(--po-color-warning-soft); border-color: var(--po-color-warning-border); color: var(--po-color-warning); }
+.po-preview-app.is-dark .po-nav-coming-soon small { background: var(--po-color-primary-soft); color: var(--po-color-primary-strong); }
+.po-preview-app.is-dark.po-standalone-preview .po-auth-layout { background: var(--po-color-auth-gradient); }
+.po-preview-app.is-dark.po-standalone-preview .po-auth-error { border-color: var(--po-color-auth-error-border); background: var(--po-color-auth-error-bg); color: var(--po-color-auth-error-text); }
+
+/* Compatibility tokens for legacy illustrations and uncommon states. Every
+   retained color value in the preview is declared here rather than embedded
+   in a component stylesheet. Use a semantic token when updating these states. */
+body:has(.po-preview-app) {
+  --po-color-white: #ffffff;
+  --po-color-black: #000000;
+  --po-color-transparent: transparent;
+  --po-color-current: currentColor;
+  --po-color-shadow-card: rgb(15 23 42 / 4%);
+  --po-color-shadow-modal: rgb(15 23 42 / 18%);
+  --po-color-shadow-menu: rgb(15 23 42 / 13%);
+  --po-color-shadow-menu-strong: rgb(15 23 42 / 15%);
+  --po-color-shadow-soft: rgb(15 23 42 / 25%);
+  --po-color-shadow-modal-dark: rgb(0 0 0 / 50%);
+  --po-color-focus-shadow: rgb(124 58 237 / 10%);
+  --po-color-focus-shadow-strong: rgb(124 58 237 / 18%);
+  --po-color-focus-shadow-dark: rgb(180 154 245 / 30%);
+  --po-color-focus-shadow-soft: rgb(109 54 216 / 8%);
+  --po-color-art-shadow: rgb(37 61 47 / 23%);
+  --po-color-white-glaze: rgb(255 255 255 / 13%);
+  --po-color-legacy-hex-f8fafc: #f8fafc;
+  --po-color-legacy-hex-87908a: #87908a;
+  --po-color-legacy-hex-e0e4ea: #e0e4ea;
+  --po-color-legacy-hex-eef0ed: #eef0ed;
+  --po-color-legacy-hex-cbdff4: #cbdff4;
+  --po-color-legacy-hex-eaf3fc: #eaf3fc;
+  --po-color-legacy-hex-285c91: #285c91;
+  --po-color-legacy-hex-8d5b16: #8d5b16;
+  --po-color-legacy-hex-a9b2ac: #a9b2ac;
+  --po-color-legacy-hex-9ba69f: #9ba69f;
+  --po-color-legacy-hex-f3d8e6: #f3d8e6;
+  --po-color-legacy-hex-fff0f6: #fff0f6;
+  --po-color-legacy-hex-e5e8e2: #e5e8e2;
+  --po-color-legacy-hex-aaa1cb: #aaa1cb;
+  --po-color-legacy-hex-e1daf5: #e1daf5;
+  --po-color-legacy-hex-59645d: #59645d;
+  --po-color-legacy-hex-9aa39c: #9aa39c;
+  --po-color-legacy-hex-c4cbc4: #c4cbc4;
+  --po-color-legacy-hex-edf0eb: #edf0eb;
+  --po-color-legacy-hex-e0d9f5: #e0d9f5;
+  --po-color-legacy-hex-ebe4fb: #ebe4fb;
+  --po-color-legacy-hex-5737a7: #5737a7;
+  --po-color-legacy-hex-fcfdfa: #fcfdfa;
+  --po-color-legacy-hex-f5f6f2: #f5f6f2;
+  --po-color-legacy-hex-ab4c87: #ab4c87;
+  --po-color-legacy-hex-c9dfd1: #c9dfd1;
+  --po-color-legacy-hex-edf7f0: #edf7f0;
+  --po-color-legacy-hex-e1d9f5: #e1d9f5;
+  --po-color-legacy-hex-b5beb6: #b5beb6;
+  --po-color-legacy-hex-19875b: #19875b;
+  --po-color-legacy-hex-e7dff8: #e7dff8;
+  --po-color-legacy-hex-eee7d8: #eee7d8;
+  --po-color-legacy-hex-d7dcca: #d7dcca;
+  --po-color-legacy-hex-1c2b22: #1c2b22;
+  --po-color-legacy-hex-ece2d2: #ece2d2;
+  --po-color-legacy-hex-f6f3eb: #f6f3eb;
+  --po-color-legacy-hex-d2ded1: #d2ded1;
+  --po-color-legacy-hex-e7e9ef: #e7e9ef;
+  --po-color-legacy-hex-f6f4ed: #f6f4ed;
+  --po-color-legacy-hex-d6deed: #d6deed;
+  --po-color-legacy-hex-d7ded8: #d7ded8;
+  --po-color-legacy-hex-edf0e8: #edf0e8;
+  --po-color-legacy-hex-b9cdc2: #b9cdc2;
+  --po-color-legacy-hex-f1d4e5: #f1d4e5;
+  --po-color-legacy-hex-171d19: #171d19;
+  --po-color-legacy-hex-354139: #354139;
+  --po-color-legacy-hex-18231c: #18231c;
+  --po-color-legacy-hex-1f3446: #1f3446;
+  --po-color-legacy-hex-344b60: #344b60;
+  --po-color-legacy-hex-a9d6ff: #a9d6ff;
+  --po-color-legacy-hex-355744: #355744;
+  --po-color-legacy-hex-a1e0b9: #a1e0b9;
+  --po-color-legacy-hex-5a482b: #5a482b;
+  --po-color-legacy-hex-8c9690: #8c9690;
+  --po-color-legacy-hex-66528a: #66528a;
+  --po-color-legacy-hex-ffaaa4: #ffaaa4;
+  --po-color-legacy-hex-e7defb: #e7defb;
+  --po-color-legacy-hex-eef1fc: #eef1fc;
+  --po-color-legacy-hex-dcf0fb: #dcf0fb;
+  --po-color-legacy-rgb-148-163-184-24: rgb(148 163 184 / 24%);
+  --po-color-legacy-hex-fecaca: #fecaca;
+  --po-color-legacy-hex-fef2f2: #fef2f2;
+  --po-color-legacy-hex-991b1b: #991b1b;
+  --po-color-legacy-hex-201a3d: #201a3d;
+  --po-color-legacy-hex-171d34: #171d34;
+  --po-color-legacy-hex-0d1f30: #0d1f30;
+  --po-color-legacy-hex-7f1d1d: #7f1d1d;
+  --po-color-legacy-hex-351c24: #351c24;
+  --po-color-legacy-hex-b91c1c: #b91c1c;
+  --po-color-legacy-hex-d8d5e2: #d8d5e2;
+  --po-color-legacy-hex-e8e5ef: #e8e5ef;
+  --po-color-legacy-hex-817b91: #817b91;
+  --po-color-legacy-hex-3b354c: #3b354c;
+  --po-color-legacy-hex-2b2736: #2b2736;
+  --po-color-legacy-hex-a19bad: #a19bad;
+  --po-color-legacy-hex-5b21b6: #5b21b6;
+  --po-color-legacy-hex-fafbfc: #fafbfc;
+  --po-color-legacy-hex-fafaff: #fafaff;
+  --po-color-legacy-hex-2563eb: #2563eb;
+  --po-color-legacy-hex-4c1d95: #4c1d95;
+  --po-color-legacy-hex-d1fae5: #d1fae5;
+  --po-color-legacy-hex-047857: #047857;
+  --po-color-legacy-hex-fef3c7: #fef3c7;
+  --po-color-legacy-hex-92400e: #92400e;
+  --po-color-legacy-hex-667085: #667085;
+  --po-color-legacy-hex-a8aebb: #a8aebb;
+  --po-color-legacy-hex-f6f7fb: #f6f7fb;
+  --po-color-legacy-hex-626a7c: #626a7c;
+  --po-color-legacy-hex-e5e7eb: #e5e7eb;
+  --po-color-legacy-hex-d8dce5: #d8dce5;
+  --po-color-legacy-hex-f1eafe: #f1eafe;
+  --po-color-legacy-hex-087f5b: #087f5b;
+  --po-color-legacy-hex-eaf8f2: #eaf8f2;
+  --po-color-legacy-hex-a15c00: #a15c00;
+  --po-color-legacy-hex-fff6df: #fff6df;
+  --po-color-legacy-hex-eef4ff: #eef4ff;
+  --po-color-legacy-hex-273142: #273142;
+  --po-color-legacy-hex-f7f5fb: #f7f5fb;
+  --po-color-legacy-hex-fbfbfd: #fbfbfd;
+  --po-color-legacy-hex-fafafa: #fafafa;
+  --po-color-legacy-hex-c9ced8: #c9ced8;
+  --po-color-legacy-hex-f3f4f7: #f3f4f7;
+  --po-color-legacy-hex-596273: #596273;
+  --po-color-legacy-hex-eef0f4: #eef0f4;
+  --po-color-legacy-hex-faf9fd: #faf9fd;
+  --po-color-legacy-hex-fcfbff: #fcfbff;
+  --po-color-legacy-hex-b4bbc7: #b4bbc7;
+  --po-color-legacy-hex-f8f6fc: #f8f6fc;
+  --po-color-legacy-hex-9b72ed: #9b72ed;
+  --po-color-legacy-hex-ddd5ee: #ddd5ee;
+  --po-color-legacy-hex-faf8ff: #faf8ff;
+  --po-color-legacy-hex-5e566d: #5e566d;
+  --po-color-legacy-hex-8ab4ff: #8ab4ff;
+  --po-color-legacy-hex-1e2a40: #1e2a40;
+  --po-color-legacy-hex-55605a: #55605a;
+  --po-color-legacy-hex-262e29: #262e29;
+  --po-color-legacy-hex-6d7a72: #6d7a72;
+  --po-color-legacy-hex-3a3350: #3a3350;
+  --po-color-legacy-hex-1e1a2b: #1e1a2b;
+  --po-color-legacy-hex-c7c0d6: #c7c0d6;
+  --po-color-legacy-hex-cdb8ff: #cdb8ff;
+  --po-color-legacy-hex-2b2342: #2b2342;
+  --po-color-legacy-hex-453a63: #453a63;
+  --po-color-legacy-hex-3a2535: #3a2535;
+  --po-color-legacy-hex-5a3b50: #5a3b50;
+  --po-color-legacy-hex-1e3328: #1e3328;
+  --po-color-legacy-hex-2f4d3b: #2f4d3b;
+  --po-color-legacy-hex-32455f: #32455f;
+  --po-color-legacy-hex-2a332d: #2a332d;
+}
+
+
+/* Preview-only palette switcher.
+ * Use ?palette=navy-cobalt|teal-emerald|slate-cyan|forest-slate|orange-amber|neutral-slate
+ * together with ?theme=light|dark.
+ */
+
+body[data-po-palette] .po-preview-app {
+  /* Stable semantic states: brand changes must not change meaning. */
+  --po-color-success: #059669; --po-color-success-soft: #ecfdf5; --po-color-success-border: #a7f3d0; --po-color-success-strong: #047857;
+  --po-color-warning: #d97706; --po-color-warning-soft: #fffbeb; --po-color-warning-border: #fde68a; --po-color-warning-dot: #f59e0b;
+  --po-color-error: #dc2626; --po-color-error-soft: #fef2f2; --po-color-error-border: #fecaca;
+  --po-color-info: #0284c7; --po-color-info-soft: #f0f9ff; --po-color-info-border: #bae6fd;
+  --po-color-trigger: #db2777; --po-color-trigger-soft: #fdf2f8; --po-color-trigger-border: #fbcfe8;
+  --po-color-goal: #059669; --po-color-goal-soft: #ecfdf5; --po-color-goal-border: #a7f3d0;
+  --po-color-instagram: #db2777; --po-color-instagram-soft: #fdf2f8;
+
+  /* Explicitly bridge legacy tokens: later dark-mode stylesheets still declare
+     --po-primary directly, so the selected palette must set it at this scope. */
+  --po-primary: var(--po-color-primary);
+  --po-primary-hover: var(--po-color-primary-hover);
+  --po-primary-soft: var(--po-color-primary-soft);
+}
+
+/* Light palettes */
+body[data-po-palette="navy-cobalt"] .po-preview-app { --po-color-primary:#1e3a8a; --po-color-primary-hover:#2563eb; --po-color-primary-soft:#eff6ff; --po-color-primary-border:#bfdbfe; --po-color-primary-strong:#1d4ed8; --po-color-primary-deep:#1e40af; --po-color-primary-action:#1e3a8a; --po-color-primary-action-hover:#1d4ed8; --po-color-chart-1:#2563eb; --po-color-chart-2:#0891b2; --po-color-chart-3:#10b981; --po-color-chart-4:#d97706; --po-color-chart-5:#64748b; --po-color-chart-grid:#e2e8f0; }
+body[data-po-palette="teal-emerald"] .po-preview-app { --po-color-primary:#065f4a; --po-color-primary-hover:#10b981; --po-color-primary-soft:#ecfdf5; --po-color-primary-border:#a7f3d0; --po-color-primary-strong:#047857; --po-color-primary-deep:#064e3b; --po-color-primary-action:#065f4a; --po-color-primary-action-hover:#047857; --po-color-chart-1:#0d9488; --po-color-chart-2:#2563eb; --po-color-chart-3:#65a30d; --po-color-chart-4:#d97706; --po-color-chart-5:#64748b; --po-color-chart-grid:#d7e7e0; }
+body[data-po-palette="slate-cyan"] .po-preview-app { --po-color-primary:#0f172a; --po-color-primary-hover:#06b6d4; --po-color-primary-soft:#e0f2fe; --po-color-primary-border:#bae6fd; --po-color-primary-strong:#0891b2; --po-color-primary-deep:#164e63; --po-color-primary-action:#0f172a; --po-color-primary-action-hover:#164e63; --po-color-chart-1:#06b6d4; --po-color-chart-2:#64748b; --po-color-chart-3:#0d9488; --po-color-chart-4:#f59e0b; --po-color-chart-5:#3b82f6; --po-color-chart-grid:#d8e3eb; }
+body[data-po-palette="forest-slate"] .po-preview-app { --po-color-primary:#14532d; --po-color-primary-hover:#16a34a; --po-color-primary-soft:#f0fdf4; --po-color-primary-border:#bbf7d0; --po-color-primary-strong:#15803d; --po-color-primary-deep:#166534; --po-color-primary-action:#14532d; --po-color-primary-action-hover:#166534; --po-color-chart-1:#16a34a; --po-color-chart-2:#65a30d; --po-color-chart-3:#0d9488; --po-color-chart-4:#d97706; --po-color-chart-5:#64748b; --po-color-chart-grid:#dce8dd; }
+body[data-po-palette="orange-amber"] .po-preview-app { --po-color-primary:#c2410c; --po-color-primary-hover:#f97316; --po-color-primary-soft:#fff7ed; --po-color-primary-border:#fed7aa; --po-color-primary-strong:#c2410c; --po-color-primary-deep:#9a3412; --po-color-primary-action:#c2410c; --po-color-primary-action-hover:#9a3412; --po-color-chart-1:#f97316; --po-color-chart-2:#b45309; --po-color-chart-3:#0d9488; --po-color-chart-4:#2563eb; --po-color-chart-5:#64748b; --po-color-chart-grid:#f0e1d5; }
+body[data-po-palette="neutral-slate"] .po-preview-app { --po-color-primary:#334155; --po-color-primary-hover:#475569; --po-color-primary-soft:#f1f5f9; --po-color-primary-border:#cbd5e1; --po-color-primary-strong:#334155; --po-color-primary-deep:#1e293b; --po-color-primary-action:#334155; --po-color-primary-action-hover:#1e293b; --po-color-chart-1:#475569; --po-color-chart-2:#0f766e; --po-color-chart-3:#b45309; --po-color-chart-4:#64748b; --po-color-chart-5:#0d9488; --po-color-chart-grid:#dbe2e9; }
+
+/* Existing preview selectors call these legacy purple names. Redirect them to
+ * the selected brand so the palette changes the active/selected states too. */
+body[data-po-palette] .po-preview-app {
+  --po-color-purple-soft:var(--po-color-primary-soft); --po-color-purple-border:var(--po-color-primary-border); --po-color-purple-icon:var(--po-color-primary-soft);
+  --po-color-purple-count:var(--po-color-primary-soft); --po-color-purple-count-text:var(--po-color-primary-strong); --po-color-purple-selected:var(--po-color-primary-soft);
+  --po-color-purple-message:var(--po-color-primary-soft); --po-color-purple-message-border:var(--po-color-primary-border);
+}
+body[data-po-palette] .po-preview-app .po-flow-node:hover { border-color:var(--po-color-primary-border); }
+body[data-po-palette] .po-preview-app .po-filter-tabs button span { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-nav-coming-soon small { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+
+/* Shared dark foundation. */
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-color-canvas:#0b1220; --po-color-surface:#111827; --po-color-surface-muted:#172033; --po-color-surface-subtle:#172033; --po-color-surface-hover:#1e293b;
+  --po-color-ink:#f8fafc; --po-color-secondary:#cbd5e1; --po-color-muted:#94a3b8; --po-color-muted-strong:#cbd5e1; --po-color-placeholder:#94a3b8;
+  --po-color-border:#273449; --po-color-border-strong:#3b4a60; --po-color-border-subtle:#273449; --po-color-border-hover:#64748b;
+  --po-color-neutral-field:#172033; --po-color-neutral-field-text:#dbe4ee; --po-color-neutral-soft:#172033; --po-color-neutral-border:#334155; --po-color-neutral-text:#cbd5e1;
+  --po-color-neutral-quiet:#1e293b; --po-color-neutral-table-head:#172033; --po-color-neutral-table-head-text:#94a3b8; --po-color-neutral-table-text:#cbd5e1;
+  --po-color-neutral-label:#94a3b8; --po-color-neutral-muted:#64748b; --po-color-canvas-bg:#0f172a; --po-color-canvas-topline:#111827;
+  --po-color-canvas-grid:#334155; --po-color-canvas-watermark:#64748b; --po-color-connector:#64748b; --po-color-connector-arrow:#94a3b8;
+  --po-color-footer-text:#94a3b8; --po-color-notice-bg:#172033; --po-color-notice-text:#cbd5e1; --po-color-notice-strong:#f8fafc; --po-color-notice-dot:#94a3b8;
+  --po-color-neutral-avatar-bg:#1e293b; --po-color-neutral-avatar-border:#334155; --po-color-neutral-avatar-text:#cbd5e1; --po-color-neutral-icon-border:#334155;
+}
+
+/* Dark palettes use bright accents for selected text and dark, contrast-safe
+ * fills for buttons carrying white text. */
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --po-color-primary:#60a5fa; --po-color-primary-hover:#93c5fd; --po-color-primary-soft:#172554; --po-color-primary-border:#1d4ed8; --po-color-primary-strong:#bfdbfe; --po-color-primary-deep:#93c5fd; --po-color-primary-action:#1d4ed8; --po-color-primary-action-hover:#1e40af; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); --po-color-canvas:#0b1220; --po-color-surface:#111827; --po-color-surface-muted:#172033; --po-color-surface-subtle:#172033; --po-color-surface-hover:#1e293b; --po-color-border:#273449; --po-color-border-subtle:#273449; --po-color-border-strong:#3b4a60; --po-color-border-hover:#3b4a60; --po-color-neutral-field:#172033; --po-color-neutral-field-text:#dbe4ee; --po-color-neutral-soft:#172033; --po-color-neutral-border:#273449; --po-color-neutral-text:#cbd5e1; --po-color-neutral-quiet:#1e293b; --po-color-neutral-table-head:#172033; --po-color-neutral-table-head-text:#94a3b8; --po-color-neutral-table-text:#cbd5e1; --po-color-neutral-label:#94a3b8; --po-color-neutral-muted:#94a3b8; --po-color-canvas-bg:#0f172a; --po-color-canvas-topline:#111827; --po-color-canvas-grid:#334155; --po-color-ink:#f8fafc; --po-color-secondary:#cbd5e1; --po-color-muted:#94a3b8; --po-color-muted-strong:#cbd5e1; --po-color-placeholder:#94a3b8; --po-color-neutral-avatar-bg:#172033; --po-color-neutral-avatar-border:#273449; --po-color-neutral-avatar-text:#cbd5e1; --po-color-neutral-icon-border:#273449; --po-color-chart-1:#60a5fa; --po-color-chart-2:#22d3ee; --po-color-chart-3:#34d399; --po-color-chart-4:#fbbf24; --po-color-chart-5:#94a3b8; --po-color-chart-grid:#334155; }
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --po-color-primary:#34d399; --po-color-primary-hover:#6ee7b7; --po-color-primary-soft:#063b2f; --po-color-primary-border:#047857; --po-color-primary-strong:#a7f3d0; --po-color-primary-deep:#6ee7b7; --po-color-primary-action:#047857; --po-color-primary-action-hover:#065f46; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); --po-color-canvas:#071c1a; --po-color-surface:#0c2925; --po-color-surface-muted:#12372f; --po-color-surface-subtle:#12372f; --po-color-surface-hover:#1b453e; --po-color-border:#245349; --po-color-border-subtle:#245349; --po-color-border-strong:#35685b; --po-color-border-hover:#35685b; --po-color-neutral-field:#102f29; --po-color-neutral-field-text:#d5f3e9; --po-color-neutral-soft:#12372f; --po-color-neutral-border:#245349; --po-color-neutral-text:#b5d9ce; --po-color-neutral-quiet:#1b453e; --po-color-neutral-table-head:#12372f; --po-color-neutral-table-head-text:#88b7a8; --po-color-neutral-table-text:#b5d9ce; --po-color-neutral-label:#88b7a8; --po-color-neutral-muted:#88b7a8; --po-color-canvas-bg:#0a221e; --po-color-canvas-topline:#0c2925; --po-color-canvas-grid:#294f44; --po-color-ink:#e9fff7; --po-color-secondary:#b5d9ce; --po-color-muted:#88b7a8; --po-color-muted-strong:#b5d9ce; --po-color-placeholder:#88b7a8; --po-color-neutral-avatar-bg:#12372f; --po-color-neutral-avatar-border:#245349; --po-color-neutral-avatar-text:#b5d9ce; --po-color-neutral-icon-border:#245349; --po-color-chart-1:#34d399; --po-color-chart-2:#60a5fa; --po-color-chart-3:#a3e635; --po-color-chart-4:#fbbf24; --po-color-chart-5:#99a7b4; --po-color-chart-grid:#294f44; }
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --po-color-primary:#22d3ee; --po-color-primary-hover:#67e8f9; --po-color-primary-soft:#0c3340; --po-color-primary-border:#0e7490; --po-color-primary-strong:#a5f3fc; --po-color-primary-deep:#67e8f9; --po-color-primary-action:#155e75; --po-color-primary-action-hover:#164e63; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); --po-color-canvas:#081724; --po-color-surface:#0d2333; --po-color-surface-muted:#123348; --po-color-surface-subtle:#123348; --po-color-surface-hover:#194158; --po-color-border:#25475c; --po-color-border-subtle:#25475c; --po-color-border-strong:#37647b; --po-color-border-hover:#37647b; --po-color-neutral-field:#102b3d; --po-color-neutral-field-text:#dceff7; --po-color-neutral-soft:#123348; --po-color-neutral-border:#25475c; --po-color-neutral-text:#c0d9e5; --po-color-neutral-quiet:#194158; --po-color-neutral-table-head:#123348; --po-color-neutral-table-head-text:#8fafbf; --po-color-neutral-table-text:#c0d9e5; --po-color-neutral-label:#8fafbf; --po-color-neutral-muted:#8fafbf; --po-color-canvas-bg:#0a1d2b; --po-color-canvas-topline:#0d2333; --po-color-canvas-grid:#294b5e; --po-color-ink:#f0faff; --po-color-secondary:#c0d9e5; --po-color-muted:#8fafbf; --po-color-muted-strong:#c0d9e5; --po-color-placeholder:#8fafbf; --po-color-neutral-avatar-bg:#123348; --po-color-neutral-avatar-border:#25475c; --po-color-neutral-avatar-text:#c0d9e5; --po-color-neutral-icon-border:#25475c; --po-color-chart-1:#22d3ee; --po-color-chart-2:#94a3b8; --po-color-chart-3:#2dd4bf; --po-color-chart-4:#fbbf24; --po-color-chart-5:#60a5fa; --po-color-chart-grid:#294b5e; }
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --po-color-primary:#4ade80; --po-color-primary-hover:#86efac; --po-color-primary-soft:#12351f; --po-color-primary-border:#166534; --po-color-primary-strong:#bbf7d0; --po-color-primary-deep:#86efac; --po-color-primary-action:#15803d; --po-color-primary-action-hover:#166534; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); --po-color-canvas:#0d1c15; --po-color-surface:#14271b; --po-color-surface-muted:#1d3827; --po-color-surface-subtle:#1d3827; --po-color-surface-hover:#284b35; --po-color-border:#2d5038; --po-color-border-subtle:#2d5038; --po-color-border-strong:#42694c; --po-color-border-hover:#42694c; --po-color-neutral-field:#1a3122; --po-color-neutral-field-text:#e1f5e5; --po-color-neutral-soft:#1d3827; --po-color-neutral-border:#2d5038; --po-color-neutral-text:#c6dfcc; --po-color-neutral-quiet:#284b35; --po-color-neutral-table-head:#1d3827; --po-color-neutral-table-head-text:#94b79d; --po-color-neutral-table-text:#c6dfcc; --po-color-neutral-label:#94b79d; --po-color-neutral-muted:#94b79d; --po-color-canvas-bg:#102219; --po-color-canvas-topline:#14271b; --po-color-canvas-grid:#31543b; --po-color-ink:#f1fff4; --po-color-secondary:#c6dfcc; --po-color-muted:#94b79d; --po-color-muted-strong:#c6dfcc; --po-color-placeholder:#94b79d; --po-color-neutral-avatar-bg:#1d3827; --po-color-neutral-avatar-border:#2d5038; --po-color-neutral-avatar-text:#c6dfcc; --po-color-neutral-icon-border:#2d5038; --po-color-chart-1:#4ade80; --po-color-chart-2:#a3e635; --po-color-chart-3:#2dd4bf; --po-color-chart-4:#fbbf24; --po-color-chart-5:#94a3b8; --po-color-chart-grid:#31543b; }
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --po-color-primary:#fb923c; --po-color-primary-hover:#fdba74; --po-color-primary-soft:#3b2417; --po-color-primary-border:#9a3412; --po-color-primary-strong:#fed7aa; --po-color-primary-deep:#fdba74; --po-color-primary-action:#c2410c; --po-color-primary-action-hover:#9a3412; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); --po-color-canvas:#21170f; --po-color-surface:#2a1d13; --po-color-surface-muted:#382819; --po-color-surface-subtle:#382819; --po-color-surface-hover:#4a3320; --po-color-border:#5b402a; --po-color-border-subtle:#5b402a; --po-color-border-strong:#7b5636; --po-color-border-hover:#7b5636; --po-color-neutral-field:#332317; --po-color-neutral-field-text:#f8e7d8; --po-color-neutral-soft:#382819; --po-color-neutral-border:#5b402a; --po-color-neutral-text:#e5c8b0; --po-color-neutral-quiet:#4a3320; --po-color-neutral-table-head:#382819; --po-color-neutral-table-head-text:#bd9c81; --po-color-neutral-table-text:#e5c8b0; --po-color-neutral-label:#bd9c81; --po-color-neutral-muted:#bd9c81; --po-color-canvas-bg:#241a11; --po-color-canvas-topline:#2a1d13; --po-color-canvas-grid:#60442d; --po-color-ink:#fff7ed; --po-color-secondary:#e5c8b0; --po-color-muted:#bd9c81; --po-color-muted-strong:#e5c8b0; --po-color-placeholder:#bd9c81; --po-color-neutral-avatar-bg:#382819; --po-color-neutral-avatar-border:#5b402a; --po-color-neutral-avatar-text:#e5c8b0; --po-color-neutral-icon-border:#5b402a; --po-color-chart-1:#fb923c; --po-color-chart-2:#fbbf24; --po-color-chart-3:#2dd4bf; --po-color-chart-4:#60a5fa; --po-color-chart-5:#cbd5e1; --po-color-chart-grid:#60442d; }
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --po-color-primary:#cbd5e1; --po-color-primary-hover:#e2e8f0; --po-color-primary-soft:#1e293b; --po-color-primary-border:#475569; --po-color-primary-strong:#f1f5f9; --po-color-primary-deep:#e2e8f0; --po-color-primary-action:#475569; --po-color-primary-action-hover:#334155; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); --po-color-canvas:#11151b; --po-color-surface:#1b2028; --po-color-surface-muted:#242b35; --po-color-surface-subtle:#242b35; --po-color-surface-hover:#2e3744; --po-color-border:#343d49; --po-color-border-subtle:#343d49; --po-color-border-strong:#4a5665; --po-color-border-hover:#4a5665; --po-color-neutral-field:#242b35; --po-color-neutral-field-text:#e5eaf0; --po-color-neutral-soft:#242b35; --po-color-neutral-border:#343d49; --po-color-neutral-text:#c4ccd6; --po-color-neutral-quiet:#2e3744; --po-color-neutral-table-head:#242b35; --po-color-neutral-table-head-text:#939eac; --po-color-neutral-table-text:#c4ccd6; --po-color-neutral-label:#939eac; --po-color-neutral-muted:#939eac; --po-color-canvas-bg:#171d25; --po-color-canvas-topline:#1b2028; --po-color-canvas-grid:#36404c; --po-color-ink:#f5f7fa; --po-color-secondary:#c4ccd6; --po-color-muted:#939eac; --po-color-muted-strong:#c4ccd6; --po-color-placeholder:#939eac; --po-color-neutral-avatar-bg:#242b35; --po-color-neutral-avatar-border:#343d49; --po-color-neutral-avatar-text:#c4ccd6; --po-color-neutral-icon-border:#343d49; --po-color-chart-1:#cbd5e1; --po-color-chart-2:#5eead4; --po-color-chart-3:#fbbf24; --po-color-chart-4:#94a3b8; --po-color-chart-5:#67e8f9; --po-color-chart-grid:#36404c; }
+
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-color-purple-soft:var(--po-color-primary-soft); --po-color-purple-border:var(--po-color-primary-border); --po-color-purple-icon:var(--po-color-primary-soft);
+  --po-color-purple-count:var(--po-color-primary-soft); --po-color-purple-count-text:var(--po-color-primary-strong); --po-color-purple-selected:var(--po-color-primary-soft);
+  --po-color-purple-message:var(--po-color-primary-soft); --po-color-purple-message-border:var(--po-color-primary-border);
+}
+
+/* Legacy dark selectors still contain the original purple in the design-system
+ * and final-fixes layers. Higher-scoped rules below intentionally win for the
+ * selected preview palette only; status colours remain semantic and unchanged. */
+body[data-po-palette] .po-preview-app .po-button--primary,
+body[data-po-palette] .po-preview-app .po-plan-card > button {
+  border-color:var(--po-color-primary-action);
+  background:var(--po-color-primary-action);
+  color:var(--po-color-white);
+}
+body[data-po-palette] .po-preview-app .po-button--primary:hover:not(:disabled),
+body[data-po-palette] .po-preview-app .po-plan-card > button:hover {
+  border-color:var(--po-color-primary-action-hover);
+  background:var(--po-color-primary-action-hover);
+  color:var(--po-color-white);
+}
+body[data-po-palette] .po-preview-app .po-nav-item.is-active {
+  background:var(--po-color-primary-soft);
+  color:var(--po-color-primary);
+  box-shadow:inset 2px 0 0 var(--po-color-primary);
+}
+body[data-po-palette] .po-preview-app .po-nav-item.is-active::before { background:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-nav-count { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-conversation.is-selected { background:var(--po-color-primary-soft); }
+body[data-po-palette] .po-preview-app .po-message--outgoing > span { background:var(--po-color-primary-soft); border-color:var(--po-color-primary-border); }
+body[data-po-palette] .po-preview-app .po-tag--purple { background:var(--po-color-primary-soft); border-color:var(--po-color-primary-border); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-leads-production-table .po-tag--purple { background:var(--po-color-primary-soft); border-color:var(--po-color-primary-border); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-leads-production-table .po-tag--neutral { background:var(--po-color-neutral-soft); border-color:var(--po-color-neutral-border); color:var(--po-color-neutral-text); }
+body[data-po-palette] .po-preview-app .po-nav-coming-soon small { background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-lead-unread-dot { background:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-leads-pagination button:not(:disabled) { color:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-leads-disclaimer { color:var(--po-color-primary); }
+body[data-po-palette] .po-preview-app .po-trigger-badge.is-comment,
+body[data-po-palette] .po-preview-app .po-trigger-badge.is-both { border-color:var(--po-color-primary-border); background:var(--po-color-primary-soft); color:var(--po-color-primary-strong); }
+body[data-po-palette] .po-preview-app .po-brand .text-accent { color:var(--po-color-primary) !important; }
+body[data-po-palette] .po-preview-app.is-dark .po-profile-avatar { background:var(--po-color-primary-action); color:var(--po-color-white); }
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table .po-tag--neutral { background:var(--po-color-neutral-soft); border-color:var(--po-color-neutral-border); color:var(--po-color-neutral-text); }
+
+/* Align dark legacy tokens with the dark palette surface tokens as well as the
+   accent tokens. Earlier .is-dark rules have greater specificity than the
+   legacy aliases, so restate these aliases at the same scoped specificity. */
+body[data-po-palette] .po-preview-app.is-dark {
+  --po-canvas: var(--po-color-canvas);
+  --po-surface: var(--po-color-surface);
+  --po-surface-muted: var(--po-color-surface-muted);
+  --po-ink: var(--po-color-ink);
+  --po-secondary: var(--po-color-secondary);
+  --po-muted: var(--po-color-muted);
+  --po-line: var(--po-color-border);
+  --po-line-strong: var(--po-color-border-strong);
+  --po-primary: var(--po-color-primary);
+  --po-primary-hover: var(--po-color-primary-hover);
+  --po-primary-soft: var(--po-color-primary-soft);
+  --po-green: var(--po-color-success);
+  --po-green-soft: var(--po-color-success-soft);
+  --po-amber: var(--po-color-warning);
+  --po-amber-soft: var(--po-color-warning-soft);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-plan-card,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-card,
+body[data-po-palette] .po-preview-app.is-dark .po-thread-empty {
+  background: var(--po-color-surface);
+  border-color: var(--po-color-border);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-preview-notice {
+  border-color: var(--po-color-border);
+  background: var(--po-color-notice-bg);
+  color: var(--po-color-notice-text);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-nav-item:hover:not(.is-active),
+body[data-po-palette] .po-preview-app.is-dark .po-palette-item:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-conversation:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-automation-table tbody tr:hover,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table tbody tr:hover {
+  background: var(--po-color-surface-hover);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-automation-table th,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-table th,
+body[data-po-palette] .po-preview-app.is-dark .po-leads-production-table th,
+body[data-po-palette] .po-preview-app.is-dark table th {
+  background: var(--po-color-neutral-table-head);
+  color: var(--po-color-neutral-table-head-text);
+}
+body[data-po-palette] .po-preview-app.is-dark .po-canvas-workspace {
+  background-color: var(--po-color-canvas-bg);
+  background-image: radial-gradient(var(--po-color-canvas-grid) .85px, transparent .85px);
+}
+
+/* Recolor the inlined brand mark only inside this preview. The shared Logo
+   component keeps its original production colors everywhere else. */
+body[data-po-palette="navy-cobalt"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#60a5fa; --signalai-logo-gradient-middle:#2563eb; --signalai-logo-gradient-end:#1e3a8a; --signalai-logo-sparkle:#1e3a8a; }
+body[data-po-palette="teal-emerald"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#34d399; --signalai-logo-gradient-middle:#10b981; --signalai-logo-gradient-end:#065f4a; --signalai-logo-sparkle:#065f4a; }
+body[data-po-palette="slate-cyan"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#67e8f9; --signalai-logo-gradient-middle:#06b6d4; --signalai-logo-gradient-end:#0f172a; --signalai-logo-sparkle:#0891b2; }
+body[data-po-palette="forest-slate"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#86efac; --signalai-logo-gradient-middle:#16a34a; --signalai-logo-gradient-end:#14532d; --signalai-logo-sparkle:#14532d; }
+body[data-po-palette="orange-amber"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#fdba74; --signalai-logo-gradient-middle:#f97316; --signalai-logo-gradient-end:#c2410c; --signalai-logo-sparkle:#c2410c; }
+body[data-po-palette="neutral-slate"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#94a3b8; --signalai-logo-gradient-middle:#475569; --signalai-logo-gradient-end:#334155; --signalai-logo-sparkle:#334155; }
+
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#93c5fd; --signalai-logo-gradient-middle:#60a5fa; --signalai-logo-gradient-end:#2563eb; --signalai-logo-sparkle:#60a5fa; }
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#6ee7b7; --signalai-logo-gradient-middle:#34d399; --signalai-logo-gradient-end:#047857; --signalai-logo-sparkle:#34d399; }
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#67e8f9; --signalai-logo-gradient-middle:#22d3ee; --signalai-logo-gradient-end:#0e7490; --signalai-logo-sparkle:#22d3ee; }
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#86efac; --signalai-logo-gradient-middle:#4ade80; --signalai-logo-gradient-end:#15803d; --signalai-logo-sparkle:#4ade80; }
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fdba74; --signalai-logo-gradient-middle:#fb923c; --signalai-logo-gradient-end:#c2410c; --signalai-logo-sparkle:#fb923c; }
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#e2e8f0; --signalai-logo-gradient-middle:#94a3b8; --signalai-logo-gradient-end:#475569; --signalai-logo-sparkle:#cbd5e1; }
+
+/* Settings appearance-picker tokens: the miniature previews and swatches are
+   independent of the currently selected palette so all options stay scannable. */
+.po-preview-app {
+  --po-color-swatch-border: var(--po-color-border-strong);
+  --po-color-mode-light-canvas: #f1f5fa;
+  --po-color-mode-light-surface: #ffffff;
+  --po-color-mode-light-sidebar: #e2e8f0;
+  --po-color-mode-light-accent: #1e3a8a;
+  --po-color-mode-dark-canvas: #0b1220;
+  --po-color-mode-dark-surface: #111827;
+  --po-color-mode-dark-sidebar: #172033;
+  --po-color-mode-dark-accent: #60a5fa;
+}
+.po-preview-app .po-appearance-mode-option[data-theme="light"] {
+  --po-mode-preview-bg: var(--po-color-mode-light-canvas);
+  --po-mode-preview-surface: var(--po-color-mode-light-surface);
+  --po-mode-preview-sidebar: var(--po-color-mode-light-sidebar);
+  --po-mode-preview-accent: var(--po-color-mode-light-accent);
+  --po-mode-preview-border: var(--po-color-border);
+}
+.po-preview-app .po-appearance-mode-option[data-theme="dark"] {
+  --po-mode-preview-bg: var(--po-color-mode-dark-canvas);
+  --po-mode-preview-surface: var(--po-color-mode-dark-surface);
+  --po-mode-preview-sidebar: var(--po-color-mode-dark-sidebar);
+  --po-mode-preview-accent: var(--po-color-mode-dark-accent);
+  --po-mode-preview-border: var(--po-color-border);
+}
+
+.po-preview-app .po-appearance-palette-option[data-palette="navy-cobalt"] {
+  --po-appearance-swatch-1: #1e3a8a;
+  --po-appearance-swatch-2: #2563eb;
+  --po-appearance-swatch-3: #60a5fa;
+  --po-appearance-swatch-4: #eff6ff;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="teal-emerald"] {
+  --po-appearance-swatch-1: #065f4a;
+  --po-appearance-swatch-2: #10b981;
+  --po-appearance-swatch-3: #34d399;
+  --po-appearance-swatch-4: #ecfdf5;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="slate-cyan"] {
+  --po-appearance-swatch-1: #0f172a;
+  --po-appearance-swatch-2: #06b6d4;
+  --po-appearance-swatch-3: #22d3ee;
+  --po-appearance-swatch-4: #e0f2fe;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="forest-slate"] {
+  --po-appearance-swatch-1: #14532d;
+  --po-appearance-swatch-2: #16a34a;
+  --po-appearance-swatch-3: #86efac;
+  --po-appearance-swatch-4: #f0fdf4;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="orange-amber"] {
+  --po-appearance-swatch-1: #c2410c;
+  --po-appearance-swatch-2: #f97316;
+  --po-appearance-swatch-3: #fdba74;
+  --po-appearance-swatch-4: #fff7ed;
+}
+.po-preview-app .po-appearance-palette-option[data-palette="neutral-slate"] {
+  --po-appearance-swatch-1: #334155;
+  --po-appearance-swatch-2: #475569;
+  --po-appearance-swatch-3: #94a3b8;
+  --po-appearance-swatch-4: #f1f5f9;
+}
+
+body[data-po-palette="ocean-blue"] .po-preview-app { --po-color-primary:#075985; --po-color-primary-hover:#0284c7; --po-color-primary-soft:#e0f2fe; --po-color-primary-border:#bae6fd; --po-color-primary-strong:#0369a1; --po-color-primary-deep:#0c4a6e; --po-color-primary-action:#075985; --po-color-primary-action-hover:#0c4a6e; --po-color-chart-1:#0284c7; --po-color-chart-2:#0d9488; --po-color-chart-3:#f59e0b; --po-color-chart-4:#475569; --po-color-chart-5:#65a30d; --po-color-chart-grid:#d7e7f0; }
+body[data-po-palette="rose-graphite"] .po-preview-app { --po-color-primary:#9f1239; --po-color-primary-hover:#e11d48; --po-color-primary-soft:#fff1f2; --po-color-primary-border:#fecdd3; --po-color-primary-strong:#be123c; --po-color-primary-deep:#881337; --po-color-primary-action:#9f1239; --po-color-primary-action-hover:#881337; --po-color-chart-1:#e11d48; --po-color-chart-2:#64748b; --po-color-chart-3:#0d9488; --po-color-chart-4:#d97706; --po-color-chart-5:#2563eb; --po-color-chart-grid:#eadce1; }
+body[data-po-palette="amber-minimal"] .po-preview-app { --po-color-primary:#92400e; --po-color-primary-hover:#d97706; --po-color-primary-soft:#fffbeb; --po-color-primary-border:#fde68a; --po-color-primary-strong:#b45309; --po-color-primary-deep:#78350f; --po-color-primary-action:#92400e; --po-color-primary-action-hover:#78350f; --po-color-chart-1:#d97706; --po-color-chart-2:#92400e; --po-color-chart-3:#0d9488; --po-color-chart-4:#64748b; --po-color-chart-5:#2563eb; --po-color-chart-grid:#eee3c9; }
+body[data-po-palette="ocean-blue"]:has(.po-preview-app.is-dark),
+body[data-po-palette="ocean-blue"] .po-preview-app.is-dark { --po-color-primary:#38bdf8; --po-color-primary-hover:#7dd3fc; --po-color-primary-soft:#14364d; --po-color-primary-border:#39728f; --po-color-primary-strong:#f1f9ff; --po-color-primary-deep:#f1f9ff; --po-color-primary-action:#075985; --po-color-primary-action-hover:#0c4a6e; --po-color-canvas:#081c2c; --po-color-surface:#0d293d; --po-color-surface-muted:#14364d; --po-color-surface-subtle:#14364d; --po-color-surface-hover:#1d4863; --po-color-border:#27536d; --po-color-border-subtle:#27536d; --po-color-border-strong:#39728f; --po-color-border-hover:#39728f; --po-color-neutral-field:#12344a; --po-color-neutral-field-text:#dceffc; --po-color-neutral-soft:#14364d; --po-color-neutral-border:#27536d; --po-color-neutral-text:#c2dbea; --po-color-neutral-quiet:#1d4863; --po-color-neutral-table-head:#14364d; --po-color-neutral-table-head-text:#8eb7cf; --po-color-neutral-table-text:#c2dbea; --po-color-neutral-label:#8eb7cf; --po-color-neutral-muted:#8eb7cf; --po-color-canvas-bg:#0a2236; --po-color-canvas-topline:#0d293d; --po-color-canvas-grid:#2b526a; --po-color-ink:#f1f9ff; --po-color-secondary:#c2dbea; --po-color-muted:#8eb7cf; --po-color-muted-strong:#c2dbea; --po-color-placeholder:#8eb7cf; --po-color-neutral-avatar-bg:#14364d; --po-color-neutral-avatar-border:#27536d; --po-color-neutral-avatar-text:#c2dbea; --po-color-neutral-icon-border:#27536d; --po-color-chart-1:#38bdf8; --po-color-chart-2:#2dd4bf; --po-color-chart-3:#fbbf24; --po-color-chart-4:#cbd5e1; --po-color-chart-5:#a3e635; --po-color-chart-grid:#2b526a; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="rose-graphite"]:has(.po-preview-app.is-dark),
+body[data-po-palette="rose-graphite"] .po-preview-app.is-dark { --po-color-primary:#fb7185; --po-color-primary-hover:#fda4af; --po-color-primary-soft:#39242d; --po-color-primary-border:#754b5a; --po-color-primary-strong:#fff5f7; --po-color-primary-deep:#fff5f7; --po-color-primary-action:#9f1239; --po-color-primary-action-hover:#881337; --po-color-canvas:#21151a; --po-color-surface:#2b1c23; --po-color-surface-muted:#39242d; --po-color-surface-subtle:#39242d; --po-color-surface-hover:#4a303b; --po-color-border:#5a3946; --po-color-border-subtle:#5a3946; --po-color-border-strong:#754b5a; --po-color-border-hover:#754b5a; --po-color-neutral-field:#35222b; --po-color-neutral-field-text:#f7e6ec; --po-color-neutral-soft:#39242d; --po-color-neutral-border:#5a3946; --po-color-neutral-text:#e2c8d1; --po-color-neutral-quiet:#4a303b; --po-color-neutral-table-head:#39242d; --po-color-neutral-table-head-text:#bf97a5; --po-color-neutral-table-text:#e2c8d1; --po-color-neutral-label:#bf97a5; --po-color-neutral-muted:#bf97a5; --po-color-canvas-bg:#251820; --po-color-canvas-topline:#2b1c23; --po-color-canvas-grid:#5a3b48; --po-color-ink:#fff5f7; --po-color-secondary:#e2c8d1; --po-color-muted:#bf97a5; --po-color-muted-strong:#e2c8d1; --po-color-placeholder:#bf97a5; --po-color-neutral-avatar-bg:#39242d; --po-color-neutral-avatar-border:#5a3946; --po-color-neutral-avatar-text:#e2c8d1; --po-color-neutral-icon-border:#5a3946; --po-color-chart-1:#fb7185; --po-color-chart-2:#cbd5e1; --po-color-chart-3:#5eead4; --po-color-chart-4:#fbbf24; --po-color-chart-5:#60a5fa; --po-color-chart-grid:#5a3b48; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="amber-minimal"]:has(.po-preview-app.is-dark),
+body[data-po-palette="amber-minimal"] .po-preview-app.is-dark { --po-color-primary:#fbbf24; --po-color-primary-hover:#fde68a; --po-color-primary-soft:#372b1b; --po-color-primary-border:#745b39; --po-color-primary-strong:#fff9eb; --po-color-primary-deep:#fff9eb; --po-color-primary-action:#92400e; --po-color-primary-action-hover:#78350f; --po-color-canvas:#1e1810; --po-color-surface:#2a2116; --po-color-surface-muted:#372b1b; --po-color-surface-subtle:#372b1b; --po-color-surface-hover:#483823; --po-color-border:#58452b; --po-color-border-subtle:#58452b; --po-color-border-strong:#745b39; --po-color-border-hover:#745b39; --po-color-neutral-field:#332717; --po-color-neutral-field-text:#f7ecd5; --po-color-neutral-soft:#372b1b; --po-color-neutral-border:#58452b; --po-color-neutral-text:#e0d0b0; --po-color-neutral-quiet:#483823; --po-color-neutral-table-head:#372b1b; --po-color-neutral-table-head-text:#b7a27d; --po-color-neutral-table-text:#e0d0b0; --po-color-neutral-label:#b7a27d; --po-color-neutral-muted:#b7a27d; --po-color-canvas-bg:#221a10; --po-color-canvas-topline:#2a2116; --po-color-canvas-grid:#5a4527; --po-color-ink:#fff9eb; --po-color-secondary:#e0d0b0; --po-color-muted:#b7a27d; --po-color-muted-strong:#e0d0b0; --po-color-placeholder:#b7a27d; --po-color-neutral-avatar-bg:#372b1b; --po-color-neutral-avatar-border:#58452b; --po-color-neutral-avatar-text:#e0d0b0; --po-color-neutral-icon-border:#58452b; --po-color-chart-1:#fbbf24; --po-color-chart-2:#fdba74; --po-color-chart-3:#5eead4; --po-color-chart-4:#94a3b8; --po-color-chart-5:#60a5fa; --po-color-chart-grid:#5a4527; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+
+/* Added presets: logo mark and picker swatches draw from the same token layer. */
+body[data-po-palette="ocean-blue"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#7dd3fc; --signalai-logo-gradient-middle:#0284c7; --signalai-logo-gradient-end:#075985; --signalai-logo-sparkle:#075985; }
+body[data-po-palette="rose-graphite"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#fda4af; --signalai-logo-gradient-middle:#e11d48; --signalai-logo-gradient-end:#9f1239; --signalai-logo-sparkle:#9f1239; }
+body[data-po-palette="amber-minimal"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#fde68a; --signalai-logo-gradient-middle:#d97706; --signalai-logo-gradient-end:#92400e; --signalai-logo-sparkle:#92400e; }
+body[data-po-palette="ocean-blue"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#7dd3fc; --signalai-logo-gradient-middle:#38bdf8; --signalai-logo-gradient-end:#0284c7; --signalai-logo-sparkle:#38bdf8; }
+body[data-po-palette="rose-graphite"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fda4af; --signalai-logo-gradient-middle:#fb7185; --signalai-logo-gradient-end:#e11d48; --signalai-logo-sparkle:#fb7185; }
+body[data-po-palette="amber-minimal"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fde68a; --signalai-logo-gradient-middle:#fbbf24; --signalai-logo-gradient-end:#d97706; --signalai-logo-sparkle:#fbbf24; }
+.po-preview-app .po-appearance-palette-option[data-palette="ocean-blue"] { --po-appearance-swatch-1:#075985; --po-appearance-swatch-2:#0284c7; --po-appearance-swatch-3:#38bdf8; --po-appearance-swatch-4:#e0f2fe; }
+.po-preview-app .po-appearance-palette-option[data-palette="rose-graphite"] { --po-appearance-swatch-1:#9f1239; --po-appearance-swatch-2:#e11d48; --po-appearance-swatch-3:#fb7185; --po-appearance-swatch-4:#fff1f2; }
+.po-preview-app .po-appearance-palette-option[data-palette="amber-minimal"] { --po-appearance-swatch-1:#92400e; --po-appearance-swatch-2:#d97706; --po-appearance-swatch-3:#fbbf24; --po-appearance-swatch-4:#fffbeb; }
+
+/* Preview focus shadows and light/dark thumbnails resolve from the active
+   semantic primary token. Each palette has its own dark surface preview. */
+body[data-po-palette] .po-preview-app {
+  --po-color-focus-shadow: color-mix(in srgb, var(--po-color-primary) 12%, transparent);
+  --po-color-focus-shadow-strong: color-mix(in srgb, var(--po-color-primary) 20%, transparent);
+  --po-color-focus-shadow-dark: color-mix(in srgb, var(--po-color-primary) 32%, transparent);
+}
+body[data-po-palette="navy-cobalt"] .po-preview-app {
+  --po-color-mode-light-canvas:#f1f5fa; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#e2e8f0; --po-color-mode-light-accent:#1e3a8a;
+  --po-color-mode-dark-canvas:#0b1220; --po-color-mode-dark-surface:#111827; --po-color-mode-dark-sidebar:#172033; --po-color-mode-dark-accent:#60a5fa;
+}
+body[data-po-palette="teal-emerald"] .po-preview-app {
+  --po-color-mode-light-canvas:#f3faf7; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#dceee6; --po-color-mode-light-accent:#065f4a;
+  --po-color-mode-dark-canvas:#071c1a; --po-color-mode-dark-surface:#0c2925; --po-color-mode-dark-sidebar:#12372f; --po-color-mode-dark-accent:#34d399;
+}
+body[data-po-palette="slate-cyan"] .po-preview-app {
+  --po-color-mode-light-canvas:#f1f7fa; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#dce8ee; --po-color-mode-light-accent:#0f172a;
+  --po-color-mode-dark-canvas:#081724; --po-color-mode-dark-surface:#0d2333; --po-color-mode-dark-sidebar:#123348; --po-color-mode-dark-accent:#22d3ee;
+}
+body[data-po-palette="forest-slate"] .po-preview-app {
+  --po-color-mode-light-canvas:#f4f8f3; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#deeadc; --po-color-mode-light-accent:#14532d;
+  --po-color-mode-dark-canvas:#0d1c15; --po-color-mode-dark-surface:#14271b; --po-color-mode-dark-sidebar:#1d3827; --po-color-mode-dark-accent:#4ade80;
+}
+body[data-po-palette="orange-amber"] .po-preview-app {
+  --po-color-mode-light-canvas:#fff8f1; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#f2e4d6; --po-color-mode-light-accent:#c2410c;
+  --po-color-mode-dark-canvas:#21170f; --po-color-mode-dark-surface:#2a1d13; --po-color-mode-dark-sidebar:#382819; --po-color-mode-dark-accent:#fb923c;
+}
+body[data-po-palette="neutral-slate"] .po-preview-app {
+  --po-color-mode-light-canvas:#f5f7fa; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#e3e8ef; --po-color-mode-light-accent:#334155;
+  --po-color-mode-dark-canvas:#11151b; --po-color-mode-dark-surface:#1b2028; --po-color-mode-dark-sidebar:#242b35; --po-color-mode-dark-accent:#cbd5e1;
+}
+body[data-po-palette="ocean-blue"] .po-preview-app {
+  --po-color-mode-light-canvas:#f1f8fc; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#d9e9f3; --po-color-mode-light-accent:#075985;
+  --po-color-mode-dark-canvas:#081c2c; --po-color-mode-dark-surface:#0d293d; --po-color-mode-dark-sidebar:#14364d; --po-color-mode-dark-accent:#38bdf8;
+}
+body[data-po-palette="rose-graphite"] .po-preview-app {
+  --po-color-mode-light-canvas:#fff6f7; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#f2dfe4; --po-color-mode-light-accent:#9f1239;
+  --po-color-mode-dark-canvas:#21151a; --po-color-mode-dark-surface:#2b1c23; --po-color-mode-dark-sidebar:#39242d; --po-color-mode-dark-accent:#fb7185;
+}
+body[data-po-palette="amber-minimal"] .po-preview-app {
+  --po-color-mode-light-canvas:#fffbef; --po-color-mode-light-surface:#ffffff; --po-color-mode-light-sidebar:#f0e4ca; --po-color-mode-light-accent:#92400e;
+  --po-color-mode-dark-canvas:#1e1810; --po-color-mode-dark-surface:#2a2116; --po-color-mode-dark-sidebar:#372b1b; --po-color-mode-dark-accent:#fbbf24;
+}
+
+/* Mirror the selected dark palette at document scope for utilities and body-level
+   layout tokens; otherwise the preview root could be themed while body aliases
+   inherited the shared dark default. */
+body[data-po-palette="navy-cobalt"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#0b1220; --po-color-surface:#111827; --po-color-surface-muted:#172033; --po-color-surface-subtle:#172033; --po-color-surface-hover:#1e293b;
+  --po-color-border:#273449; --po-color-border-subtle:#273449; --po-color-border-strong:#3b4a60; --po-color-border-hover:#3b4a60;
+  --po-color-ink:#f8fafc; --po-color-secondary:#cbd5e1; --po-color-muted:#94a3b8; --po-color-muted-strong:#cbd5e1; --po-color-placeholder:#94a3b8;
+  --po-color-neutral-field:#172033; --po-color-neutral-field-text:#f8fafc; --po-color-neutral-soft:#172033; --po-color-neutral-border:#273449; --po-color-neutral-text:#cbd5e1; --po-color-neutral-quiet:#1e293b;
+  --po-color-neutral-table-head:#172033; --po-color-neutral-table-head-text:#94a3b8; --po-color-neutral-table-text:#cbd5e1; --po-color-neutral-label:#94a3b8; --po-color-neutral-muted:#94a3b8;
+  --po-color-canvas-bg:#0f172a; --po-color-canvas-topline:#111827; --po-color-canvas-grid:#334155;
+  --po-color-notice-bg:#172033; --po-color-notice-text:#cbd5e1; --po-color-notice-strong:#f8fafc; --po-color-notice-dot:#94a3b8;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="teal-emerald"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#071c1a; --po-color-surface:#0c2925; --po-color-surface-muted:#12372f; --po-color-surface-subtle:#12372f; --po-color-surface-hover:#1b453e;
+  --po-color-border:#245349; --po-color-border-subtle:#245349; --po-color-border-strong:#35685b; --po-color-border-hover:#35685b;
+  --po-color-ink:#e9fff7; --po-color-secondary:#b5d9ce; --po-color-muted:#88b7a8; --po-color-muted-strong:#b5d9ce; --po-color-placeholder:#88b7a8;
+  --po-color-neutral-field:#12372f; --po-color-neutral-field-text:#e9fff7; --po-color-neutral-soft:#12372f; --po-color-neutral-border:#245349; --po-color-neutral-text:#b5d9ce; --po-color-neutral-quiet:#1b453e;
+  --po-color-neutral-table-head:#12372f; --po-color-neutral-table-head-text:#88b7a8; --po-color-neutral-table-text:#b5d9ce; --po-color-neutral-label:#88b7a8; --po-color-neutral-muted:#88b7a8;
+  --po-color-canvas-bg:#0a221e; --po-color-canvas-topline:#0c2925; --po-color-canvas-grid:#294f44;
+  --po-color-notice-bg:#12372f; --po-color-notice-text:#b5d9ce; --po-color-notice-strong:#e9fff7; --po-color-notice-dot:#88b7a8;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="slate-cyan"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#081724; --po-color-surface:#0d2333; --po-color-surface-muted:#123348; --po-color-surface-subtle:#123348; --po-color-surface-hover:#194158;
+  --po-color-border:#25475c; --po-color-border-subtle:#25475c; --po-color-border-strong:#37647b; --po-color-border-hover:#37647b;
+  --po-color-ink:#f0faff; --po-color-secondary:#c0d9e5; --po-color-muted:#8fafbf; --po-color-muted-strong:#c0d9e5; --po-color-placeholder:#8fafbf;
+  --po-color-neutral-field:#123348; --po-color-neutral-field-text:#f0faff; --po-color-neutral-soft:#123348; --po-color-neutral-border:#25475c; --po-color-neutral-text:#c0d9e5; --po-color-neutral-quiet:#194158;
+  --po-color-neutral-table-head:#123348; --po-color-neutral-table-head-text:#8fafbf; --po-color-neutral-table-text:#c0d9e5; --po-color-neutral-label:#8fafbf; --po-color-neutral-muted:#8fafbf;
+  --po-color-canvas-bg:#0a1d2b; --po-color-canvas-topline:#0d2333; --po-color-canvas-grid:#294b5e;
+  --po-color-notice-bg:#123348; --po-color-notice-text:#c0d9e5; --po-color-notice-strong:#f0faff; --po-color-notice-dot:#8fafbf;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="forest-slate"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#0d1c15; --po-color-surface:#14271b; --po-color-surface-muted:#1d3827; --po-color-surface-subtle:#1d3827; --po-color-surface-hover:#284b35;
+  --po-color-border:#2d5038; --po-color-border-subtle:#2d5038; --po-color-border-strong:#42694c; --po-color-border-hover:#42694c;
+  --po-color-ink:#f1fff4; --po-color-secondary:#c6dfcc; --po-color-muted:#94b79d; --po-color-muted-strong:#c6dfcc; --po-color-placeholder:#94b79d;
+  --po-color-neutral-field:#1d3827; --po-color-neutral-field-text:#f1fff4; --po-color-neutral-soft:#1d3827; --po-color-neutral-border:#2d5038; --po-color-neutral-text:#c6dfcc; --po-color-neutral-quiet:#284b35;
+  --po-color-neutral-table-head:#1d3827; --po-color-neutral-table-head-text:#94b79d; --po-color-neutral-table-text:#c6dfcc; --po-color-neutral-label:#94b79d; --po-color-neutral-muted:#94b79d;
+  --po-color-canvas-bg:#102219; --po-color-canvas-topline:#14271b; --po-color-canvas-grid:#31543b;
+  --po-color-notice-bg:#1d3827; --po-color-notice-text:#c6dfcc; --po-color-notice-strong:#f1fff4; --po-color-notice-dot:#94b79d;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="orange-amber"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#21170f; --po-color-surface:#2a1d13; --po-color-surface-muted:#382819; --po-color-surface-subtle:#382819; --po-color-surface-hover:#4a3320;
+  --po-color-border:#5b402a; --po-color-border-subtle:#5b402a; --po-color-border-strong:#7b5636; --po-color-border-hover:#7b5636;
+  --po-color-ink:#fff7ed; --po-color-secondary:#e5c8b0; --po-color-muted:#bd9c81; --po-color-muted-strong:#e5c8b0; --po-color-placeholder:#bd9c81;
+  --po-color-neutral-field:#382819; --po-color-neutral-field-text:#fff7ed; --po-color-neutral-soft:#382819; --po-color-neutral-border:#5b402a; --po-color-neutral-text:#e5c8b0; --po-color-neutral-quiet:#4a3320;
+  --po-color-neutral-table-head:#382819; --po-color-neutral-table-head-text:#bd9c81; --po-color-neutral-table-text:#e5c8b0; --po-color-neutral-label:#bd9c81; --po-color-neutral-muted:#bd9c81;
+  --po-color-canvas-bg:#241a11; --po-color-canvas-topline:#2a1d13; --po-color-canvas-grid:#60442d;
+  --po-color-notice-bg:#382819; --po-color-notice-text:#e5c8b0; --po-color-notice-strong:#fff7ed; --po-color-notice-dot:#bd9c81;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="neutral-slate"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#11151b; --po-color-surface:#1b2028; --po-color-surface-muted:#242b35; --po-color-surface-subtle:#242b35; --po-color-surface-hover:#2e3744;
+  --po-color-border:#343d49; --po-color-border-subtle:#343d49; --po-color-border-strong:#4a5665; --po-color-border-hover:#4a5665;
+  --po-color-ink:#f5f7fa; --po-color-secondary:#c4ccd6; --po-color-muted:#939eac; --po-color-muted-strong:#c4ccd6; --po-color-placeholder:#939eac;
+  --po-color-neutral-field:#242b35; --po-color-neutral-field-text:#f5f7fa; --po-color-neutral-soft:#242b35; --po-color-neutral-border:#343d49; --po-color-neutral-text:#c4ccd6; --po-color-neutral-quiet:#2e3744;
+  --po-color-neutral-table-head:#242b35; --po-color-neutral-table-head-text:#939eac; --po-color-neutral-table-text:#c4ccd6; --po-color-neutral-label:#939eac; --po-color-neutral-muted:#939eac;
+  --po-color-canvas-bg:#171d25; --po-color-canvas-topline:#1b2028; --po-color-canvas-grid:#36404c;
+  --po-color-notice-bg:#242b35; --po-color-notice-text:#c4ccd6; --po-color-notice-strong:#f5f7fa; --po-color-notice-dot:#939eac;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="ocean-blue"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#081c2c; --po-color-surface:#0d293d; --po-color-surface-muted:#14364d; --po-color-surface-subtle:#14364d; --po-color-surface-hover:#1d4863;
+  --po-color-border:#27536d; --po-color-border-subtle:#27536d; --po-color-border-strong:#39728f; --po-color-border-hover:#39728f;
+  --po-color-ink:#f1f9ff; --po-color-secondary:#c2dbea; --po-color-muted:#8eb7cf; --po-color-muted-strong:#c2dbea; --po-color-placeholder:#8eb7cf;
+  --po-color-neutral-field:#14364d; --po-color-neutral-field-text:#f1f9ff; --po-color-neutral-soft:#14364d; --po-color-neutral-border:#27536d; --po-color-neutral-text:#c2dbea; --po-color-neutral-quiet:#1d4863;
+  --po-color-neutral-table-head:#14364d; --po-color-neutral-table-head-text:#8eb7cf; --po-color-neutral-table-text:#c2dbea; --po-color-neutral-label:#8eb7cf; --po-color-neutral-muted:#8eb7cf;
+  --po-color-canvas-bg:#0a2236; --po-color-canvas-topline:#0d293d; --po-color-canvas-grid:#2b526a;
+  --po-color-notice-bg:#14364d; --po-color-notice-text:#c2dbea; --po-color-notice-strong:#f1f9ff; --po-color-notice-dot:#8eb7cf;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="rose-graphite"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#21151a; --po-color-surface:#2b1c23; --po-color-surface-muted:#39242d; --po-color-surface-subtle:#39242d; --po-color-surface-hover:#4a303b;
+  --po-color-border:#5a3946; --po-color-border-subtle:#5a3946; --po-color-border-strong:#754b5a; --po-color-border-hover:#754b5a;
+  --po-color-ink:#fff5f7; --po-color-secondary:#e2c8d1; --po-color-muted:#bf97a5; --po-color-muted-strong:#e2c8d1; --po-color-placeholder:#bf97a5;
+  --po-color-neutral-field:#39242d; --po-color-neutral-field-text:#fff5f7; --po-color-neutral-soft:#39242d; --po-color-neutral-border:#5a3946; --po-color-neutral-text:#e2c8d1; --po-color-neutral-quiet:#4a303b;
+  --po-color-neutral-table-head:#39242d; --po-color-neutral-table-head-text:#bf97a5; --po-color-neutral-table-text:#e2c8d1; --po-color-neutral-label:#bf97a5; --po-color-neutral-muted:#bf97a5;
+  --po-color-canvas-bg:#251820; --po-color-canvas-topline:#2b1c23; --po-color-canvas-grid:#5a3b48;
+  --po-color-notice-bg:#39242d; --po-color-notice-text:#e2c8d1; --po-color-notice-strong:#fff5f7; --po-color-notice-dot:#bf97a5;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+body[data-po-palette="amber-minimal"]:has(.po-preview-app.is-dark) {
+  --po-color-canvas:#1e1810; --po-color-surface:#2a2116; --po-color-surface-muted:#372b1b; --po-color-surface-subtle:#372b1b; --po-color-surface-hover:#483823;
+  --po-color-border:#58452b; --po-color-border-subtle:#58452b; --po-color-border-strong:#745b39; --po-color-border-hover:#745b39;
+  --po-color-ink:#fff9eb; --po-color-secondary:#e0d0b0; --po-color-muted:#b7a27d; --po-color-muted-strong:#e0d0b0; --po-color-placeholder:#b7a27d;
+  --po-color-neutral-field:#372b1b; --po-color-neutral-field-text:#fff9eb; --po-color-neutral-soft:#372b1b; --po-color-neutral-border:#58452b; --po-color-neutral-text:#e0d0b0; --po-color-neutral-quiet:#483823;
+  --po-color-neutral-table-head:#372b1b; --po-color-neutral-table-head-text:#b7a27d; --po-color-neutral-table-text:#e0d0b0; --po-color-neutral-label:#b7a27d; --po-color-neutral-muted:#b7a27d;
+  --po-color-canvas-bg:#221a10; --po-color-canvas-topline:#2a2116; --po-color-canvas-grid:#5a4527;
+  --po-color-notice-bg:#372b1b; --po-color-notice-text:#e0d0b0; --po-color-notice-strong:#fff9eb; --po-color-notice-dot:#b7a27d;
+  --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted);
+  --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted);
+  --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+}
+
+/* Data visualization tokens: each theme has its own color series and grid. */
+body[data-po-palette="navy-cobalt"] .po-preview-app {  --po-color-chart-1:#2563eb; --po-color-chart-2:#0ea5e9; --po-color-chart-3:#10b981; --po-color-chart-4:#f59e0b; --po-color-chart-5:#64748b; --po-color-chart-grid:#dbeafe;}
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark {  --po-color-chart-1:#60a5fa; --po-color-chart-2:#38bdf8; --po-color-chart-3:#34d399; --po-color-chart-4:#fbbf24; --po-color-chart-5:#cbd5e1; --po-color-chart-grid:#334155;}
+body[data-po-palette="teal-emerald"] .po-preview-app {  --po-color-chart-1:#059669; --po-color-chart-2:#0d9488; --po-color-chart-3:#3b82f6; --po-color-chart-4:#f59e0b; --po-color-chart-5:#64748b; --po-color-chart-grid:#d1fae5;}
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark {  --po-color-chart-1:#34d399; --po-color-chart-2:#2dd4bf; --po-color-chart-3:#60a5fa; --po-color-chart-4:#fbbf24; --po-color-chart-5:#cbd5e1; --po-color-chart-grid:#28564c;}
+body[data-po-palette="slate-cyan"] .po-preview-app {  --po-color-chart-1:#0891b2; --po-color-chart-2:#64748b; --po-color-chart-3:#2563eb; --po-color-chart-4:#10b981; --po-color-chart-5:#f59e0b; --po-color-chart-grid:#dbeafe;}
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark {  --po-color-chart-1:#22d3ee; --po-color-chart-2:#94a3b8; --po-color-chart-3:#60a5fa; --po-color-chart-4:#34d399; --po-color-chart-5:#fbbf24; --po-color-chart-grid:#2a4b5d;}
+body[data-po-palette="forest-slate"] .po-preview-app {  --po-color-chart-1:#16a34a; --po-color-chart-2:#0d9488; --po-color-chart-3:#2563eb; --po-color-chart-4:#d97706; --po-color-chart-5:#64748b; --po-color-chart-grid:#dcfce7;}
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark {  --po-color-chart-1:#4ade80; --po-color-chart-2:#2dd4bf; --po-color-chart-3:#60a5fa; --po-color-chart-4:#fbbf24; --po-color-chart-5:#cbd5e1; --po-color-chart-grid:#2f563c;}
+body[data-po-palette="orange-amber"] .po-preview-app {  --po-color-chart-1:#ea580c; --po-color-chart-2:#d97706; --po-color-chart-3:#0d9488; --po-color-chart-4:#2563eb; --po-color-chart-5:#64748b; --po-color-chart-grid:#ffedd5;}
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark {  --po-color-chart-1:#fb923c; --po-color-chart-2:#fbbf24; --po-color-chart-3:#2dd4bf; --po-color-chart-4:#60a5fa; --po-color-chart-5:#cbd5e1; --po-color-chart-grid:#5a4029;}
+body[data-po-palette="neutral-slate"] .po-preview-app {  --po-color-chart-1:#475569; --po-color-chart-2:#64748b; --po-color-chart-3:#0ea5e9; --po-color-chart-4:#16a34a; --po-color-chart-5:#d97706; --po-color-chart-grid:#e2e8f0;}
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark {  --po-color-chart-1:#cbd5e1; --po-color-chart-2:#94a3b8; --po-color-chart-3:#38bdf8; --po-color-chart-4:#4ade80; --po-color-chart-5:#fbbf24; --po-color-chart-grid:#3a4552;}
+
+/* Palette-specific dark surface ramps. Set tokens on both the document and
+   preview root so the page canvas and every nested surface switch together. */
+body[data-po-palette="navy-cobalt"]:has(.po-preview-app.is-dark),
+body[data-po-palette="navy-cobalt"] .po-preview-app.is-dark { --po-color-canvas:#0b1220; --po-color-surface:#111827; --po-color-surface-muted:#172033; --po-color-surface-hover:#1e293b; --po-color-surface-selected:#1e293b; --po-color-ink:#f8fafc; --po-color-secondary:#cbd5e1; --po-color-muted:#94a3b8; --po-color-muted-strong:#cbd5e1; --po-color-placeholder:#94a3b8; --po-color-border:#273449; --po-color-border-strong:#3b4a60; --po-color-border-subtle:#273449; --po-color-border-hover:#64748b; --po-color-neutral-field:#172033; --po-color-neutral-field-text:#dbe4ee; --po-color-neutral-soft:#172033; --po-color-neutral-border:#334155; --po-color-neutral-text:#cbd5e1; --po-color-neutral-quiet:#1e293b; --po-color-neutral-table-head:#172033; --po-color-neutral-table-head-text:#94a3b8; --po-color-neutral-table-text:#cbd5e1; --po-color-neutral-label:#cbd5e1; --po-color-neutral-muted:#94a3b8; --po-color-canvas-bg:#0f172a; --po-color-canvas-topline:#111827; --po-color-canvas-grid:#334155; --po-color-canvas-watermark:#64748b; --po-color-connector:#94a3b8; --po-color-connector-arrow:#94a3b8; --po-color-notice-bg:#172033; --po-color-notice-text:#cbd5e1; --po-color-notice-strong:#f8fafc; --po-color-notice-dot:#94a3b8; --po-color-neutral-avatar-bg:#1e293b; --po-color-neutral-avatar-border:#334155; --po-color-neutral-avatar-text:#cbd5e1; --po-color-neutral-icon-border:#334155; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="teal-emerald"]:has(.po-preview-app.is-dark),
+body[data-po-palette="teal-emerald"] .po-preview-app.is-dark { --po-color-canvas:#071e1b; --po-color-surface:#0d2925; --po-color-surface-muted:#13352f; --po-color-surface-hover:#1a4139; --po-color-surface-selected:#15352f; --po-color-ink:#f0fdf9; --po-color-secondary:#c5e7dd; --po-color-muted:#8eb8a8; --po-color-muted-strong:#c5e7dd; --po-color-placeholder:#8eb8a8; --po-color-border:#274b43; --po-color-border-strong:#39645a; --po-color-border-subtle:#274b43; --po-color-border-hover:#4f7f72; --po-color-neutral-field:#13352f; --po-color-neutral-field-text:#d8eee7; --po-color-neutral-soft:#13352f; --po-color-neutral-border:#274b43; --po-color-neutral-text:#c5e7dd; --po-color-neutral-quiet:#1a4139; --po-color-neutral-table-head:#13352f; --po-color-neutral-table-head-text:#8eb8a8; --po-color-neutral-table-text:#c5e7dd; --po-color-neutral-label:#c5e7dd; --po-color-neutral-muted:#8eb8a8; --po-color-canvas-bg:#0a211f; --po-color-canvas-topline:#0d2925; --po-color-canvas-grid:#28544b; --po-color-canvas-watermark:#4f7f72; --po-color-connector:#8eb8a8; --po-color-connector-arrow:#8eb8a8; --po-color-notice-bg:#13352f; --po-color-notice-text:#c5e7dd; --po-color-notice-strong:#f0fdf9; --po-color-notice-dot:#8eb8a8; --po-color-neutral-avatar-bg:#15352f; --po-color-neutral-avatar-border:#274b43; --po-color-neutral-avatar-text:#c5e7dd; --po-color-neutral-icon-border:#274b43; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="slate-cyan"]:has(.po-preview-app.is-dark),
+body[data-po-palette="slate-cyan"] .po-preview-app.is-dark { --po-color-canvas:#0b1622; --po-color-surface:#111f2d; --po-color-surface-muted:#172b3c; --po-color-surface-hover:#20384b; --po-color-surface-selected:#193146; --po-color-ink:#f1f9ff; --po-color-secondary:#cbdce8; --po-color-muted:#8ea9bc; --po-color-muted-strong:#cbdce8; --po-color-placeholder:#8ea9bc; --po-color-border:#2a4052; --po-color-border-strong:#415c70; --po-color-border-subtle:#2a4052; --po-color-border-hover:#587388; --po-color-neutral-field:#172b3c; --po-color-neutral-field-text:#dbeaf5; --po-color-neutral-soft:#172b3c; --po-color-neutral-border:#31495b; --po-color-neutral-text:#cbdce8; --po-color-neutral-quiet:#20384b; --po-color-neutral-table-head:#172b3c; --po-color-neutral-table-head-text:#8ea9bc; --po-color-neutral-table-text:#cbdce8; --po-color-neutral-label:#cbdce8; --po-color-neutral-muted:#8ea9bc; --po-color-canvas-bg:#0c1a28; --po-color-canvas-topline:#111f2d; --po-color-canvas-grid:#2a4154; --po-color-canvas-watermark:#415c70; --po-color-connector:#8ea9bc; --po-color-connector-arrow:#8ea9bc; --po-color-notice-bg:#172b3c; --po-color-notice-text:#cbdce8; --po-color-notice-strong:#f1f9ff; --po-color-notice-dot:#8ea9bc; --po-color-neutral-avatar-bg:#193146; --po-color-neutral-avatar-border:#2a4052; --po-color-neutral-avatar-text:#cbdce8; --po-color-neutral-icon-border:#2a4052; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="forest-slate"]:has(.po-preview-app.is-dark),
+body[data-po-palette="forest-slate"] .po-preview-app.is-dark { --po-color-canvas:#0d1d14; --po-color-surface:#13281c; --po-color-surface-muted:#1b3425; --po-color-surface-hover:#24432f; --po-color-surface-selected:#1e3727; --po-color-ink:#f2fbf4; --po-color-secondary:#c9decf; --po-color-muted:#8fae98; --po-color-muted-strong:#c9decf; --po-color-placeholder:#8fae98; --po-color-border:#2d4b38; --po-color-border-strong:#45664f; --po-color-border-subtle:#2d4b38; --po-color-border-hover:#587663; --po-color-neutral-field:#1b3425; --po-color-neutral-field-text:#d9e9de; --po-color-neutral-soft:#1b3425; --po-color-neutral-border:#355440; --po-color-neutral-text:#c9decf; --po-color-neutral-quiet:#24432f; --po-color-neutral-table-head:#1b3425; --po-color-neutral-table-head-text:#8fae98; --po-color-neutral-table-text:#c9decf; --po-color-neutral-label:#c9decf; --po-color-neutral-muted:#8fae98; --po-color-canvas-bg:#102218; --po-color-canvas-topline:#13281c; --po-color-canvas-grid:#2d4b38; --po-color-canvas-watermark:#45664f; --po-color-connector:#8fae98; --po-color-connector-arrow:#8fae98; --po-color-notice-bg:#1b3425; --po-color-notice-text:#c9decf; --po-color-notice-strong:#f2fbf4; --po-color-notice-dot:#8fae98; --po-color-neutral-avatar-bg:#1e3727; --po-color-neutral-avatar-border:#2d4b38; --po-color-neutral-avatar-text:#c9decf; --po-color-neutral-icon-border:#2d4b38; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="orange-amber"]:has(.po-preview-app.is-dark),
+body[data-po-palette="orange-amber"] .po-preview-app.is-dark { --po-color-canvas:#21170f; --po-color-surface:#2b1e14; --po-color-surface-muted:#382719; --po-color-surface-hover:#473120; --po-color-surface-selected:#3b2a1b; --po-color-ink:#fff7ed; --po-color-secondary:#e8d3bc; --po-color-muted:#ba9e81; --po-color-muted-strong:#e8d3bc; --po-color-placeholder:#ba9e81; --po-color-border:#503a29; --po-color-border-strong:#6a4b35; --po-color-border-subtle:#503a29; --po-color-border-hover:#7c5b40; --po-color-neutral-field:#382719; --po-color-neutral-field-text:#f6e4d1; --po-color-neutral-soft:#382719; --po-color-neutral-border:#604730; --po-color-neutral-text:#e8d3bc; --po-color-neutral-quiet:#473120; --po-color-neutral-table-head:#382719; --po-color-neutral-table-head-text:#ba9e81; --po-color-neutral-table-text:#e8d3bc; --po-color-neutral-label:#e8d3bc; --po-color-neutral-muted:#ba9e81; --po-color-canvas-bg:#261a11; --po-color-canvas-topline:#2b1e14; --po-color-canvas-grid:#4e3826; --po-color-canvas-watermark:#6a4b35; --po-color-connector:#ba9e81; --po-color-connector-arrow:#ba9e81; --po-color-notice-bg:#382719; --po-color-notice-text:#e8d3bc; --po-color-notice-strong:#fff7ed; --po-color-notice-dot:#ba9e81; --po-color-neutral-avatar-bg:#3b2a1b; --po-color-neutral-avatar-border:#503a29; --po-color-neutral-avatar-text:#e8d3bc; --po-color-neutral-icon-border:#503a29; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="neutral-slate"]:has(.po-preview-app.is-dark),
+body[data-po-palette="neutral-slate"] .po-preview-app.is-dark { --po-color-canvas:#12161c; --po-color-surface:#1a2028; --po-color-surface-muted:#232b35; --po-color-surface-hover:#2d3743; --po-color-surface-selected:#242c36; --po-color-ink:#f1f5f9; --po-color-secondary:#cbd5e1; --po-color-muted:#94a3b8; --po-color-muted-strong:#cbd5e1; --po-color-placeholder:#94a3b8; --po-color-border:#343f4b; --po-color-border-strong:#4b5968; --po-color-border-subtle:#343f4b; --po-color-border-hover:#5c6b7a; --po-color-neutral-field:#232b35; --po-color-neutral-field-text:#dbe4ee; --po-color-neutral-soft:#232b35; --po-color-neutral-border:#3b4653; --po-color-neutral-text:#cbd5e1; --po-color-neutral-quiet:#2d3743; --po-color-neutral-table-head:#232b35; --po-color-neutral-table-head-text:#94a3b8; --po-color-neutral-table-text:#cbd5e1; --po-color-neutral-label:#cbd5e1; --po-color-neutral-muted:#94a3b8; --po-color-canvas-bg:#161c24; --po-color-canvas-topline:#1a2028; --po-color-canvas-grid:#36414f; --po-color-canvas-watermark:#4b5968; --po-color-connector:#94a3b8; --po-color-connector-arrow:#94a3b8; --po-color-notice-bg:#232b35; --po-color-notice-text:#cbd5e1; --po-color-notice-strong:#f1f5f9; --po-color-notice-dot:#94a3b8; --po-color-neutral-avatar-bg:#242c36; --po-color-neutral-avatar-border:#343f4b; --po-color-neutral-avatar-text:#cbd5e1; --po-color-neutral-icon-border:#343f4b; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+
+/* Keep graph series semantic and theme-controlled rather than choosing colors
+   in chart markup or component styles. */
+body[data-po-palette="navy-cobalt"] .po-preview-app { --po-color-chart-stage-1:var(--po-color-chart-1); --po-color-chart-stage-2:var(--po-color-chart-2); --po-color-chart-stage-3:var(--po-color-chart-3); --po-color-chart-stage-4:var(--po-color-chart-4); }
+body[data-po-palette="teal-emerald"] .po-preview-app { --po-color-chart-stage-1:var(--po-color-chart-1); --po-color-chart-stage-2:var(--po-color-chart-2); --po-color-chart-stage-3:var(--po-color-chart-3); --po-color-chart-stage-4:var(--po-color-chart-4); }
+body[data-po-palette="slate-cyan"] .po-preview-app { --po-color-chart-stage-1:var(--po-color-chart-1); --po-color-chart-stage-2:var(--po-color-chart-2); --po-color-chart-stage-3:var(--po-color-chart-3); --po-color-chart-stage-4:var(--po-color-chart-4); }
+body[data-po-palette="forest-slate"] .po-preview-app { --po-color-chart-stage-1:var(--po-color-chart-1); --po-color-chart-stage-2:var(--po-color-chart-2); --po-color-chart-stage-3:var(--po-color-chart-3); --po-color-chart-stage-4:var(--po-color-chart-4); }
+body[data-po-palette="orange-amber"] .po-preview-app { --po-color-chart-stage-1:var(--po-color-chart-1); --po-color-chart-stage-2:var(--po-color-chart-2); --po-color-chart-stage-3:var(--po-color-chart-3); --po-color-chart-stage-4:var(--po-color-chart-4); }
+body[data-po-palette="neutral-slate"] .po-preview-app { --po-color-chart-stage-1:var(--po-color-chart-1); --po-color-chart-stage-2:var(--po-color-chart-2); --po-color-chart-stage-3:var(--po-color-chart-3); --po-color-chart-stage-4:var(--po-color-chart-4); }
+
+/* Four Settings palette IDs require matching semantic, chart, logo and swatch tokens.
+   Keep the identifier spelling consistent with PreviewPalette and the URL bridge. */
+body[data-po-palette="ocean-sky"] .po-preview-app { --po-color-primary:#075985; --po-color-primary-hover:#0284c7; --po-color-primary-soft:#e0f2fe; --po-color-primary-border:#bae6fd; --po-color-primary-strong:#0369a1; --po-color-primary-deep:#0c4a6e; --po-color-primary-action:#075985; --po-color-primary-action-hover:#0c4a6e; --po-color-chart-1:#0284c7; --po-color-chart-2:#0d9488; --po-color-chart-3:#f59e0b; --po-color-chart-4:#475569; --po-color-chart-5:#65a30d; --po-color-chart-grid:#d7e7f0; }
+body[data-po-palette="ocean-sky"] .po-preview-app.is-dark { --po-color-canvas:#081c2c; --po-color-surface:#0d293d; --po-color-surface-muted:#14364d; --po-color-surface-subtle:#14364d; --po-color-surface-hover:#1d4863; --po-color-border:#27536d; --po-color-border-subtle:#27536d; --po-color-border-strong:#39728f; --po-color-border-hover:#39728f; --po-color-neutral-field:#12344a; --po-color-neutral-field-text:#dceffc; --po-color-neutral-soft:#14364d; --po-color-neutral-border:#27536d; --po-color-neutral-text:#c2dbea; --po-color-neutral-quiet:#1d4863; --po-color-neutral-table-head:#14364d; --po-color-neutral-table-head-text:#8eb7cf; --po-color-neutral-table-text:#c2dbea; --po-color-neutral-label:#8eb7cf; --po-color-neutral-muted:#8eb7cf; --po-color-canvas-bg:#0a2236; --po-color-canvas-topline:#0d293d; --po-color-canvas-grid:#2b526a; --po-color-ink:#f1f9ff; --po-color-secondary:#c2dbea; --po-color-muted:#8eb7cf; --po-color-muted-strong:#c2dbea; --po-color-placeholder:#8eb7cf; --po-color-neutral-avatar-bg:#14364d; --po-color-neutral-avatar-border:#27536d; --po-color-neutral-avatar-text:#c2dbea; --po-color-neutral-icon-border:#27536d; --po-color-primary:#38bdf8; --po-color-primary-hover:#7dd3fc; --po-color-primary-soft:#14364d; --po-color-primary-border:#39728f; --po-color-primary-strong:#f1f9ff; --po-color-primary-deep:#f1f9ff; --po-color-primary-action:#075985; --po-color-primary-action-hover:#0c4a6e; --po-color-chart-1:#38bdf8; --po-color-chart-2:#2dd4bf; --po-color-chart-3:#fbbf24; --po-color-chart-4:#cbd5e1; --po-color-chart-5:#a3e635; --po-color-chart-grid:#2b526a; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="ocean-sky"]:has(.po-preview-app.is-dark) { --po-color-canvas:#081c2c; --po-color-surface:#0d293d; --po-color-surface-muted:#14364d; --po-color-surface-subtle:#14364d; --po-color-surface-hover:#1d4863; --po-color-border:#27536d; --po-color-border-subtle:#27536d; --po-color-border-strong:#39728f; --po-color-border-hover:#39728f; --po-color-ink:#f1f9ff; --po-color-secondary:#c2dbea; --po-color-muted:#8eb7cf; --po-color-muted-strong:#c2dbea; --po-color-placeholder:#8eb7cf; --po-color-neutral-field:#12344a; --po-color-neutral-field-text:#dceffc; --po-color-neutral-soft:#14364d; --po-color-neutral-border:#27536d; --po-color-neutral-text:#c2dbea; --po-color-neutral-quiet:#1d4863; --po-color-neutral-table-head:#14364d; --po-color-neutral-table-head-text:#8eb7cf; --po-color-neutral-table-text:#c2dbea; --po-color-neutral-label:#8eb7cf; --po-color-neutral-muted:#8eb7cf; --po-color-canvas-bg:#0a2236; --po-color-canvas-topline:#0d293d; --po-color-canvas-grid:#2b526a; --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted); --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted); --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong); }
+body[data-po-palette="ocean-sky"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#7dd3fc; --signalai-logo-gradient-middle:#0284c7; --signalai-logo-gradient-end:#075985; --signalai-logo-sparkle:#075985; }
+body[data-po-palette="ocean-sky"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#7dd3fc; --signalai-logo-gradient-middle:#38bdf8; --signalai-logo-gradient-end:#0284c7; --signalai-logo-sparkle:#38bdf8; }
+.po-preview-app .po-appearance-palette-option[data-palette="ocean-sky"] { --po-appearance-swatch-1:#075985; --po-appearance-swatch-2:#0284c7; --po-appearance-swatch-3:#38bdf8; --po-appearance-swatch-4:#e0f2fe; }
+body[data-po-palette="jade-mint"] .po-preview-app { --po-color-primary:#065f46; --po-color-primary-hover:#059669; --po-color-primary-soft:#d1fae5; --po-color-primary-border:#a7f3d0; --po-color-primary-strong:#047857; --po-color-primary-deep:#064e3b; --po-color-primary-action:#065f46; --po-color-primary-action-hover:#047857; --po-color-chart-1:#059669; --po-color-chart-2:#0d9488; --po-color-chart-3:#84cc16; --po-color-chart-4:#f59e0b; --po-color-chart-5:#64748b; --po-color-chart-grid:#d5e9df; }
+body[data-po-palette="jade-mint"] .po-preview-app.is-dark { --po-color-canvas:#071d19; --po-color-surface:#0b2b24; --po-color-surface-muted:#12372e; --po-color-surface-subtle:#12372e; --po-color-surface-hover:#1b483b; --po-color-border:#245247; --po-color-border-subtle:#245247; --po-color-border-strong:#347361; --po-color-border-hover:#347361; --po-color-neutral-field:#102f28; --po-color-neutral-field-text:#d9f7eb; --po-color-neutral-soft:#12372e; --po-color-neutral-border:#245247; --po-color-neutral-text:#b8ded0; --po-color-neutral-quiet:#1b483b; --po-color-neutral-table-head:#12372e; --po-color-neutral-table-head-text:#8bb8a8; --po-color-neutral-table-text:#b8ded0; --po-color-neutral-label:#8bb8a8; --po-color-neutral-muted:#8bb8a8; --po-color-canvas-bg:#0a231e; --po-color-canvas-topline:#0b2b24; --po-color-canvas-grid:#2d594a; --po-color-ink:#effff8; --po-color-secondary:#b8ded0; --po-color-muted:#8bb8a8; --po-color-muted-strong:#b8ded0; --po-color-placeholder:#8bb8a8; --po-color-neutral-avatar-bg:#12372e; --po-color-neutral-avatar-border:#245247; --po-color-neutral-avatar-text:#b8ded0; --po-color-neutral-icon-border:#245247; --po-color-primary:#34d399; --po-color-primary-hover:#6ee7b7; --po-color-primary-soft:#12372e; --po-color-primary-border:#347361; --po-color-primary-strong:#d9f7eb; --po-color-primary-deep:#effff8; --po-color-primary-action:#047857; --po-color-primary-action-hover:#065f46; --po-color-chart-1:#34d399; --po-color-chart-2:#2dd4bf; --po-color-chart-3:#a3e635; --po-color-chart-4:#fbbf24; --po-color-chart-5:#94a3b8; --po-color-chart-grid:#2d594a; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="jade-mint"]:has(.po-preview-app.is-dark) { --po-color-canvas:#071d19; --po-color-surface:#0b2b24; --po-color-surface-muted:#12372e; --po-color-surface-subtle:#12372e; --po-color-surface-hover:#1b483b; --po-color-border:#245247; --po-color-border-subtle:#245247; --po-color-border-strong:#347361; --po-color-border-hover:#347361; --po-color-ink:#effff8; --po-color-secondary:#b8ded0; --po-color-muted:#8bb8a8; --po-color-muted-strong:#b8ded0; --po-color-placeholder:#8bb8a8; --po-color-neutral-field:#102f28; --po-color-neutral-field-text:#d9f7eb; --po-color-neutral-soft:#12372e; --po-color-neutral-border:#245247; --po-color-neutral-text:#b8ded0; --po-color-neutral-quiet:#1b483b; --po-color-neutral-table-head:#12372e; --po-color-neutral-table-head-text:#8bb8a8; --po-color-neutral-table-text:#b8ded0; --po-color-neutral-label:#8bb8a8; --po-color-neutral-muted:#8bb8a8; --po-color-canvas-bg:#0a231e; --po-color-canvas-topline:#0b2b24; --po-color-canvas-grid:#2d594a; --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted); --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted); --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong); }
+body[data-po-palette="jade-mint"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#6ee7b7; --signalai-logo-gradient-middle:#10b981; --signalai-logo-gradient-end:#065f46; --signalai-logo-sparkle:#065f46; }
+body[data-po-palette="jade-mint"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#6ee7b7; --signalai-logo-gradient-middle:#34d399; --signalai-logo-gradient-end:#059669; --signalai-logo-sparkle:#34d399; }
+.po-preview-app .po-appearance-palette-option[data-palette="jade-mint"] { --po-appearance-swatch-1:#065f46; --po-appearance-swatch-2:#10b981; --po-appearance-swatch-3:#6ee7b7; --po-appearance-swatch-4:#d1fae5; }
+body[data-po-palette="rose-slate"] .po-preview-app { --po-color-primary:#9f1239; --po-color-primary-hover:#e11d48; --po-color-primary-soft:#fff1f2; --po-color-primary-border:#fecdd3; --po-color-primary-strong:#be123c; --po-color-primary-deep:#881337; --po-color-primary-action:#9f1239; --po-color-primary-action-hover:#881337; --po-color-chart-1:#e11d48; --po-color-chart-2:#64748b; --po-color-chart-3:#0d9488; --po-color-chart-4:#d97706; --po-color-chart-5:#2563eb; --po-color-chart-grid:#e4dfe4; }
+body[data-po-palette="rose-slate"] .po-preview-app.is-dark { --po-color-canvas:#121720; --po-color-surface:#1c2430; --po-color-surface-muted:#27313f; --po-color-surface-subtle:#27313f; --po-color-surface-hover:#354252; --po-color-border:#3e4b5d; --po-color-border-subtle:#3e4b5d; --po-color-border-strong:#586b80; --po-color-border-hover:#586b80; --po-color-neutral-field:#222e3c; --po-color-neutral-field-text:#f4e8ed; --po-color-neutral-soft:#27313f; --po-color-neutral-border:#3e4b5d; --po-color-neutral-text:#d8c7d0; --po-color-neutral-quiet:#354252; --po-color-neutral-table-head:#27313f; --po-color-neutral-table-head-text:#a99ca9; --po-color-neutral-table-text:#d8c7d0; --po-color-neutral-label:#a99ca9; --po-color-neutral-muted:#a99ca9; --po-color-canvas-bg:#151c27; --po-color-canvas-topline:#1c2430; --po-color-canvas-grid:#39485a; --po-color-ink:#fff6f8; --po-color-secondary:#d8c7d0; --po-color-muted:#a99ca9; --po-color-muted-strong:#d8c7d0; --po-color-placeholder:#a99ca9; --po-color-neutral-avatar-bg:#27313f; --po-color-neutral-avatar-border:#3e4b5d; --po-color-neutral-avatar-text:#d8c7d0; --po-color-neutral-icon-border:#3e4b5d; --po-color-primary:#fb7185; --po-color-primary-hover:#fda4af; --po-color-primary-soft:#27313f; --po-color-primary-border:#586b80; --po-color-primary-strong:#fff6f8; --po-color-primary-deep:#fff6f8; --po-color-primary-action:#9f1239; --po-color-primary-action-hover:#881337; --po-color-chart-1:#fb7185; --po-color-chart-2:#cbd5e1; --po-color-chart-3:#5eead4; --po-color-chart-4:#fbbf24; --po-color-chart-5:#60a5fa; --po-color-chart-grid:#39485a; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="rose-slate"]:has(.po-preview-app.is-dark) { --po-color-canvas:#121720; --po-color-surface:#1c2430; --po-color-surface-muted:#27313f; --po-color-surface-subtle:#27313f; --po-color-surface-hover:#354252; --po-color-border:#3e4b5d; --po-color-border-subtle:#3e4b5d; --po-color-border-strong:#586b80; --po-color-border-hover:#586b80; --po-color-ink:#fff6f8; --po-color-secondary:#d8c7d0; --po-color-muted:#a99ca9; --po-color-muted-strong:#d8c7d0; --po-color-placeholder:#a99ca9; --po-color-neutral-field:#222e3c; --po-color-neutral-field-text:#f4e8ed; --po-color-neutral-soft:#27313f; --po-color-neutral-border:#3e4b5d; --po-color-neutral-text:#d8c7d0; --po-color-neutral-quiet:#354252; --po-color-neutral-table-head:#27313f; --po-color-neutral-table-head-text:#a99ca9; --po-color-neutral-table-text:#d8c7d0; --po-color-neutral-label:#a99ca9; --po-color-neutral-muted:#a99ca9; --po-color-canvas-bg:#151c27; --po-color-canvas-topline:#1c2430; --po-color-canvas-grid:#39485a; --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted); --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted); --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong); }
+body[data-po-palette="rose-slate"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#fda4af; --signalai-logo-gradient-middle:#e11d48; --signalai-logo-gradient-end:#9f1239; --signalai-logo-sparkle:#9f1239; }
+body[data-po-palette="rose-slate"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fda4af; --signalai-logo-gradient-middle:#fb7185; --signalai-logo-gradient-end:#e11d48; --signalai-logo-sparkle:#fb7185; }
+.po-preview-app .po-appearance-palette-option[data-palette="rose-slate"] { --po-appearance-swatch-1:#9f1239; --po-appearance-swatch-2:#e11d48; --po-appearance-swatch-3:#fb7185; --po-appearance-swatch-4:#fff1f2; }
+body[data-po-palette="amber-graphite"] .po-preview-app { --po-color-primary:#78350f; --po-color-primary-hover:#d97706; --po-color-primary-soft:#fffbeb; --po-color-primary-border:#fde68a; --po-color-primary-strong:#92400e; --po-color-primary-deep:#451a03; --po-color-primary-action:#78350f; --po-color-primary-action-hover:#451a03; --po-color-chart-1:#d97706; --po-color-chart-2:#92400e; --po-color-chart-3:#0d9488; --po-color-chart-4:#64748b; --po-color-chart-5:#2563eb; --po-color-chart-grid:#e9e2d7; }
+body[data-po-palette="amber-graphite"] .po-preview-app.is-dark { --po-color-canvas:#191715; --po-color-surface:#23211e; --po-color-surface-muted:#302d28; --po-color-surface-subtle:#302d28; --po-color-surface-hover:#423d34; --po-color-border:#4a453c; --po-color-border-subtle:#4a453c; --po-color-border-strong:#675e50; --po-color-border-hover:#675e50; --po-color-neutral-field:#2b2823; --po-color-neutral-field-text:#f5ead8; --po-color-neutral-soft:#302d28; --po-color-neutral-border:#4a453c; --po-color-neutral-text:#dfd1b8; --po-color-neutral-quiet:#423d34; --po-color-neutral-table-head:#302d28; --po-color-neutral-table-head-text:#b2a58f; --po-color-neutral-table-text:#dfd1b8; --po-color-neutral-label:#b2a58f; --po-color-neutral-muted:#b2a58f; --po-color-canvas-bg:#1c1915; --po-color-canvas-topline:#23211e; --po-color-canvas-grid:#51483b; --po-color-ink:#fff9ed; --po-color-secondary:#dfd1b8; --po-color-muted:#b2a58f; --po-color-muted-strong:#dfd1b8; --po-color-placeholder:#b2a58f; --po-color-neutral-avatar-bg:#302d28; --po-color-neutral-avatar-border:#4a453c; --po-color-neutral-avatar-text:#dfd1b8; --po-color-neutral-icon-border:#4a453c; --po-color-primary:#fbbf24; --po-color-primary-hover:#fde68a; --po-color-primary-soft:#302d28; --po-color-primary-border:#675e50; --po-color-primary-strong:#fff9ed; --po-color-primary-deep:#fff9ed; --po-color-primary-action:#78350f; --po-color-primary-action-hover:#451a03; --po-color-chart-1:#fbbf24; --po-color-chart-2:#fdba74; --po-color-chart-3:#5eead4; --po-color-chart-4:#94a3b8; --po-color-chart-5:#60a5fa; --po-color-chart-grid:#51483b; --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-primary-soft); }
+body[data-po-palette="amber-graphite"]:has(.po-preview-app.is-dark) { --po-color-canvas:#191715; --po-color-surface:#23211e; --po-color-surface-muted:#302d28; --po-color-surface-subtle:#302d28; --po-color-surface-hover:#423d34; --po-color-border:#4a453c; --po-color-border-subtle:#4a453c; --po-color-border-strong:#675e50; --po-color-border-hover:#675e50; --po-color-ink:#fff9ed; --po-color-secondary:#dfd1b8; --po-color-muted:#b2a58f; --po-color-muted-strong:#dfd1b8; --po-color-placeholder:#b2a58f; --po-color-neutral-field:#2b2823; --po-color-neutral-field-text:#f5ead8; --po-color-neutral-soft:#302d28; --po-color-neutral-border:#4a453c; --po-color-neutral-text:#dfd1b8; --po-color-neutral-quiet:#423d34; --po-color-neutral-table-head:#302d28; --po-color-neutral-table-head-text:#b2a58f; --po-color-neutral-table-text:#dfd1b8; --po-color-neutral-label:#b2a58f; --po-color-neutral-muted:#b2a58f; --po-color-canvas-bg:#1c1915; --po-color-canvas-topline:#23211e; --po-color-canvas-grid:#51483b; --po-bg:var(--po-color-canvas); --po-surface:var(--po-color-surface); --po-surface-muted:var(--po-color-surface-muted); --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary); --po-text-muted:var(--po-color-muted); --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong); }
+body[data-po-palette="amber-graphite"] .po-preview-app:not(.is-dark) { --signalai-logo-gradient-start:#fde68a; --signalai-logo-gradient-middle:#d97706; --signalai-logo-gradient-end:#78350f; --signalai-logo-sparkle:#78350f; }
+body[data-po-palette="amber-graphite"] .po-preview-app.is-dark { --signalai-logo-gradient-start:#fde68a; --signalai-logo-gradient-middle:#fbbf24; --signalai-logo-gradient-end:#d97706; --signalai-logo-sparkle:#fbbf24; }
+.po-preview-app .po-appearance-palette-option[data-palette="amber-graphite"] { --po-appearance-swatch-1:#78350f; --po-appearance-swatch-2:#d97706; --po-appearance-swatch-3:#fbbf24; --po-appearance-swatch-4:#fffbeb; }

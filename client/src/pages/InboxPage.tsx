@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
   api,
   type HandoffStatus,
   type LeadListItem,
+  type LeadTag,
   type PipelineStage,
   type TenantMember,
   type TimelineEntry,
@@ -21,6 +22,7 @@ import {
   formatMessagingWindow,
   leadDisplayName,
 } from "../lib/leadFormatting";
+import { useTenant } from "../context/TenantContext";
 
 type Tab = "all" | "unread" | "ai" | "qualified" | "attention";
 
@@ -54,9 +56,11 @@ function initialsFor(username: string | null): string {
 export function InboxPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const navigate = useNavigate();
+  const { selectedAccountId } = useTenant();
 
   const [pageData, setPageData] = useState<PaginatedResponse<LeadListItem> | null>(null);
   const [members, setMembers] = useState<TenantMember[] | null>(null);
+  const [tags, setTags] = useState<LeadTag[] | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -96,12 +100,13 @@ export function InboxPage() {
       const result = await getLeadsPage(tenantId, page, PAGE_SIZE, {
         ...getFilters(),
         q: search.trim() || undefined,
+        accountId: selectedAccountId || undefined,
       });
       setPageData(result);
       if (result.page !== page) setPage(result.page);
       setError(null);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (err instanceof ApiError && (err.status === 401)) {
         navigate("/login", { replace: true });
         return;
       }
@@ -111,12 +116,21 @@ export function InboxPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, search]);
+  }, [tab, search, selectedAccountId]);
 
   useEffect(() => {
     reloadLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, tab, search, page, reloadCount]);
+  }, [tenantId, tab, search, selectedAccountId, page, reloadCount]);
+
+  useEffect(() => {
+    setPageData(null);
+    setError(null);
+    setSelectedLeadId(null);
+    setTags(null);
+    setPendingEntries([]);
+    setComposeText("");
+  }, [tenantId, selectedAccountId]);
 
   const selectedLastInboundAtRef = useRef<string | null>(null);
   const reloadLeadsRef = useRef(reloadLeads);
@@ -153,6 +167,18 @@ export function InboxPage() {
       // Non-critical — the owner dropdown just stays empty.
     });
   }, [tenantId]);
+
+  useEffect(() => {
+    if (!tenantId || !selectedLeadId) {
+      setTags(null);
+      return;
+    }
+    setTags(null);
+    api
+      .listLeadTags(tenantId, selectedLeadId)
+      .then(setTags)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load tags"));
+  }, [tenantId, selectedLeadId]);
 
   /** Total conversation count, independent of the active tab — matches the preview's "All" tab count badge. */
   useEffect(() => {
@@ -493,6 +519,24 @@ export function InboxPage() {
                   Escalate for attention
                 </button>
               )}
+
+              <div className="mt-4">
+                {tags === null ? (
+                  <p className="muted small">Loading tags…</p>
+                ) : tags.length === 0 ? (
+                  <p className="muted small">No tags.</p>
+                ) : (
+                  tags.map((t) => (
+                    <span className="tag-chip" key={t.tagId}>
+                      {t.name}
+                    </span>
+                  ))
+                )}
+              </div>
+
+              <p className="mt-4">
+                <Link to={`/dashboard/${tenantId}/leads/${selectedLead.id}`}>Open full profile →</Link>
+              </p>
             </div>
           )}
         </div>

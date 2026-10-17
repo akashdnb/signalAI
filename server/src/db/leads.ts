@@ -10,6 +10,8 @@ export interface Lead {
   tenantId: string;
   customerId: string | null;
   instagramUserId: string | null;
+  /** Provider account that owns this conversation; null only for legacy/unattributed history. */
+  instagramAccountId: string | null;
   activeMilestoneId: string | null;
   /** DM Conversation Continuation: which campaign this lead's DM conversation currently belongs to — set on every real keyword match for a DM event, read as a fallback when a later message in the same still-open messaging window doesn't match any keyword on its own. Never set/read for comment events. */
   activeDmCampaignId: string | null;
@@ -29,6 +31,7 @@ interface LeadRow {
   tenant_id: string;
   customer_id: string | null;
   instagram_user_id: string | null;
+  instagram_account_id: string | null;
   active_milestone_id: string | null;
   active_dm_campaign_id: string | null;
   last_inbound_at: Date | null;
@@ -47,6 +50,7 @@ function toLead(row: LeadRow): Lead {
     tenantId: row.tenant_id,
     customerId: row.customer_id,
     instagramUserId: row.instagram_user_id,
+    instagramAccountId: row.instagram_account_id,
     activeMilestoneId: row.active_milestone_id,
     activeDmCampaignId: row.active_dm_campaign_id,
     lastInboundAt: row.last_inbound_at,
@@ -74,16 +78,52 @@ export async function findOrCreateLeadByInstagramUserId(
   pool: Queryable,
   tenantId: string,
   instagramUserId: string,
+  requestedInstagramAccountId?: string,
 ): Promise<Lead> {
-  const result = await pool.query<LeadRow>(
-    `insert into leads (tenant_id, instagram_user_id)
-     values ($1, $2)
-     on conflict (tenant_id, instagram_user_id) where instagram_user_id is not null
-     do update set tenant_id = excluded.tenant_id
-     returning *, (xmax = 0) as is_new`,
-    [tenantId, instagramUserId],
-  );
-  const row = result.rows[0]!;
+  let instagramAccountId = requestedInstagramAccountId ?? null;
+
+  // Preserve legacy utility calls for workspaces with one (or no) account,
+  // but never guess which account owns a conversation when the workspace is
+  // multi-account. Webhook ingestion always passes the receiving account ID.
+  if (!instagramAccountId) {
+    const accounts = await pool.query<{ instagram_account_id: string }>(
+      `select instagram_account_id from meta_tokens where tenant_id = $1 order by created_at asc limit 2`,
+      [tenantId],
+    );
+    if (accounts.rows.length > 1) {
+      throw new Error("instagramAccountId is required to resolve a lead in a multi-account workspace");
+    }
+    instagramAccountId = accounts.rows[0]?.instagram_account_id ?? null;
+  }
+
+  const result = instagramAccountId
+    ? await pool.query<LeadRow>(
+        `insert into leads (tenant_id, instagram_user_id, instagram_account_id)
+         select $1, $2, $3
+          where exists (
+            select 1 from meta_tokens
+             where tenant_id = $1 and instagram_account_id = $3
+          )
+         on conflict (tenant_id, instagram_account_id, instagram_user_id)
+           where instagram_account_id is not null and instagram_user_id is not null
+         do update set tenant_id = excluded.tenant_id
+         returning *, (xmax = 0) as is_new`,
+        [tenantId, instagramUserId, instagramAccountId],
+      )
+    : await pool.query<LeadRow>(
+        `insert into leads (tenant_id, instagram_user_id)
+         values ($1, $2)
+         on conflict (tenant_id, instagram_user_id)
+           where instagram_account_id is null and instagram_user_id is not null
+         do update set tenant_id = excluded.tenant_id
+         returning *, (xmax = 0) as is_new`,
+        [tenantId, instagramUserId],
+      );
+  const row = result.rows[0];
+  if (!row && instagramAccountId) {
+    throw new Error("Instagram account does not belong to this workspace");
+  }
+  if (!row) throw new Error("Unable to create or resolve lead");
 
   if (row.is_new) {
     // Customer/Lead split (roadmap Phase 1 Platform Foundations): mint one
@@ -399,6 +439,8 @@ export interface LeadFilters {
   handoffStatus?: HandoffStatus;
   /** Inbox "Unread" tab — see LeadListItem.unread for the definition. */
   unreadOnly?: boolean;
+  /** Provider Instagram account ID. Resolved from a tenant-owned meta_tokens row by the route before reaching this query. */
+  instagramAccountId?: string;
 }
 
 /**
@@ -444,6 +486,10 @@ export async function listLeadsForTenant(
   }
   if (filters.unreadOnly) {
     conditions.push(`l.last_inbound_at is not null and (l.last_read_at is null or l.last_inbound_at > l.last_read_at)`);
+  }
+  if (filters.instagramAccountId) {
+    params.push(filters.instagramAccountId);
+    conditions.push(`l.instagram_account_id = $${params.length}`);
   }
 
   params.push(limit);

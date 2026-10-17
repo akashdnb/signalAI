@@ -7,7 +7,7 @@ import {
   upsertMediaMetadata,
 } from "../db/mediaMetadata.js";
 import { listConnectedInstagramAccounts } from "../db/connectedAccounts.js";
-import { getDecryptedToken } from "../db/tokens.js";
+import { getDecryptedToken, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
 import { fetchMediaMetadata } from "../lib/instagramMedia.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 import { Sentry } from "../lib/sentry.js";
@@ -40,7 +40,23 @@ contentRouter.use("/tenants/:tenantId", requireTenantSession);
 contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const pool = getPool();
   const tenantId = req.params.tenantId;
-  let media = await listKnownMediaForTenant(pool, tenantId);
+  const rawAccountRowId = req.query.accountId;
+  if (rawAccountRowId !== undefined && (typeof rawAccountRowId !== "string" || !rawAccountRowId.trim())) {
+    return res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+  }
+  const requestedAccountRowId = typeof rawAccountRowId === "string"
+    ? rawAccountRowId.trim()
+    : undefined;
+  // The account resolver deliberately returns null for unknown IDs; narrow
+  // that to undefined so database helpers receive only string | undefined.
+  const resolvedInstagramAccountId = requestedAccountRowId
+    ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
+    : null;
+  if (requestedAccountRowId && !resolvedInstagramAccountId) {
+    return res.status(404).json({ error: "Instagram account not found for this workspace" });
+  }
+  const instagramAccountId = resolvedInstagramAccountId ?? undefined;
+  let media = await listKnownMediaForTenant(pool, tenantId, instagramAccountId);
   const now = Date.now();
 
   const needsRefresh = media.filter((entry) => {
@@ -58,7 +74,10 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
     const accounts = (await listConnectedInstagramAccounts(pool, tenantId)).filter(
       (account) => account.status === "healthy",
     );
-    const accountsToTry = accounts.slice(0, 10);
+    const accountsToTry = (instagramAccountId
+      ? accounts.filter((account) => account.instagramAccountId === instagramAccountId)
+      : accounts
+    ).slice(0, 10);
 
     let refreshed = 0;
     for (const entry of needsRefresh) {
@@ -96,13 +115,13 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
           MAX_METADATA_REFRESH_FAILURES,
         );
         const retryAt = new Date(Date.now() + retryDelayForFailure(failureCount));
-        await recordMediaMetadataRefreshFailure(pool, tenantId, entry.mediaId, retryAt);
+        await recordMediaMetadataRefreshFailure(pool, tenantId, entry.mediaId, retryAt, instagramAccountId);
         Sentry.captureException(lastError);
       }
     }
 
     if (refreshed > 0) {
-      media = await listKnownMediaForTenant(pool, tenantId);
+      media = await listKnownMediaForTenant(pool, tenantId, instagramAccountId);
     }
   }
 

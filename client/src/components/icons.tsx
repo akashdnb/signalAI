@@ -212,6 +212,26 @@ export function LogoutIcon(props: IconProps) {
   );
 }
 
+export function PanelLeftCloseIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4.5v15" />
+      <path d="m16 9-3 3 3 3" />
+    </Icon>
+  );
+}
+
+export function PanelLeftOpenIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4.5v15" />
+      <path d="m13 9 3 3-3 3" />
+    </Icon>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <Icon {...props}>

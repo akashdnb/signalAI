@@ -1,0 +1,363 @@
+/* SignalAI Precision Operations — Design System v1.
+ * Scoped to the isolated preview shell; production routes are untouched.
+ */
+body:has(.po-preview-app) {
+  --po-bg:var(--po-color-legacy-hex-f6f7fb); --po-surface:var(--po-color-white); --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary);
+  --po-text-muted:var(--po-color-legacy-hex-626a7c); --po-border:var(--po-color-legacy-hex-e5e7eb); --po-border-strong:var(--po-color-legacy-hex-d8dce5);
+  --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-legacy-hex-f1eafe);
+  --po-success:var(--po-color-legacy-hex-087f5b); --po-success-soft:var(--po-color-legacy-hex-eaf8f2); --po-warning:var(--po-color-legacy-hex-a15c00); --po-warning-soft:var(--po-color-legacy-hex-fff6df);
+  --po-info:var(--po-color-legacy-hex-2563eb); --po-info-soft:var(--po-color-legacy-hex-eef4ff); --po-radius-sm:6px; --po-radius-md:8px;
+  --po-radius-lg:12px; --po-radius-xl:16px; --po-focus:0 0 0 3px var(--po-color-focus-shadow-strong);
+  --po-shadow-dialog:0 24px 60px var(--po-color-shadow-modal); background:var(--po-bg); color:var(--po-text);
+}
+body:has(.po-preview-app),body:has(.po-preview-app) button,body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px;line-height:1.2;letter-spacing:-.025em;font-weight:800}
+body:has(.po-preview-app) .po-page-header>div>p,body:has(.po-preview-app) .po-builder-heading>p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
+body:has(.po-preview-app) .po-eyebrow,body:has(.po-preview-app) .po-group-label,body:has(.po-preview-app) .po-sample-label{font-size:11px;line-height:16px;letter-spacing:.08em;font-weight:700;color:var(--po-text-muted)}
+body:has(.po-preview-app) .po-panel-title h2,body:has(.po-preview-app) .po-list-toolbar h2,body:has(.po-preview-app) .po-panel-heading h2{font-size:18px;line-height:26px;letter-spacing:-.012em;font-weight:700}
+body:has(.po-preview-app) .po-panel-title p,body:has(.po-preview-app) .po-list-toolbar p,body:has(.po-preview-app) .po-panel-copy{color:var(--po-text-secondary);font-size:14px;line-height:22px}
+body:has(.po-preview-app) .po-sidebar{background:var(--po-surface);border-right:1px solid var(--po-border)}
+body:has(.po-preview-app) .po-sidebar-brand-row{border-bottom:1px solid var(--po-border)}
+body:has(.po-preview-app) .po-nav-item{min-height:40px;border-radius:var(--po-radius-md);color:var(--po-color-legacy-hex-273142);font-size:14px;font-weight:600;transition:background-color 120ms ease,color 120ms ease}
+body:has(.po-preview-app) .po-nav-item:hover:not(.is-active){background:var(--po-color-legacy-hex-f7f5fb)}
+body:has(.po-preview-app) .po-nav-item.is-active{background:var(--po-primary-soft);color:var(--po-primary);font-weight:700;box-shadow:inset 2px 0 0 var(--po-primary)}
+body:has(.po-preview-app) .po-nav-label{color:var(--po-text-muted);font-size:11px;letter-spacing:.1em;font-weight:700}
+body:has(.po-preview-app) .po-plan-card{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);background:var(--po-color-legacy-hex-fbfbfd);box-shadow:none}
+body:has(.po-preview-app) .po-plan-card button{border-radius:var(--po-radius-md);min-height:40px}
+body:has(.po-preview-app) .po-page-header{margin-bottom:24px}
+body:has(.po-preview-app) .po-header-actions{gap:8px}
+body:has(.po-preview-app) .po-button{min-height:38px;border-radius:var(--po-radius-md);padding:0 14px;font-size:14px;line-height:22px;font-weight:700;box-shadow:none;transition:background-color 120ms ease,border-color 120ms ease,color 120ms ease,transform 120ms ease,box-shadow 120ms ease}
+body:has(.po-preview-app) .po-button--primary{background:var(--po-primary);color:var(--po-color-white)}
+body:has(.po-preview-app) .po-button--primary:hover:not(:disabled){background:var(--po-primary-hover)}
+body:has(.po-preview-app) .po-button--secondary{background:var(--po-surface);color:var(--po-text);border:1px solid var(--po-border-strong)}
+body:has(.po-preview-app) .po-button--secondary:hover:not(:disabled){background:var(--po-color-legacy-hex-fafafa);border-color:var(--po-color-legacy-hex-c9ced8)}
+body:has(.po-preview-app) .po-button--quiet{background:var(--po-color-transparent);color:var(--po-text-secondary)}
+body:has(.po-preview-app) .po-button--quiet:hover:not(:disabled){background:var(--po-color-legacy-hex-f3f4f7);color:var(--po-text)}
+body:has(.po-preview-app) .po-button:active:not(:disabled){transform:translateY(1px)}
+body:has(.po-preview-app) .po-tag{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 9px;border:1px solid var(--po-color-transparent);border-radius:999px;font-size:12px;line-height:17px;font-weight:700;white-space:nowrap}
+body:has(.po-preview-app) .po-tag--neutral{background:var(--po-color-notice-bg);color:var(--po-color-legacy-hex-596273)}
+body:has(.po-preview-app) .po-tag--purple{background:var(--po-primary-soft);color:var(--po-primary)}
+body:has(.po-preview-app) .po-tag--green{background:var(--po-success-soft);color:var(--po-success)}
+body:has(.po-preview-app) .po-tag--amber,body:has(.po-preview-app) .po-tag--warning{background:var(--po-warning-soft);color:var(--po-warning)}
+body:has(.po-preview-app) .po-tag--blue{background:var(--po-info-soft);color:var(--po-info)}
+body:has(.po-preview-app) .po-content-panel,body:has(.po-preview-app) .po-metric,body:has(.po-preview-app) .po-outcome-banner,body:has(.po-preview-app) .po-definition-block,body:has(.po-preview-app) .po-table-card,body:has(.po-preview-app) .po-settings-card,body:has(.po-preview-app) .po-integration-card,body:has(.po-preview-app) .po-billing-card,body:has(.po-preview-app) .po-team-card{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);box-shadow:none}
+body:has(.po-preview-app) .po-content-panel{background:var(--po-surface)}
+body:has(.po-preview-app) .po-panel-title{padding-bottom:16px;border-bottom:1px solid var(--po-color-legacy-hex-eef0f4)}
+body:has(.po-preview-app) .po-overview-metrics{gap:0;overflow:hidden;border:1px solid var(--po-border);border-radius:var(--po-radius-lg);background:var(--po-surface)}
+body:has(.po-preview-app) .po-overview-metrics .po-metric{border:0;border-right:1px solid var(--po-border);border-radius:0;padding:20px 18px;background:var(--po-color-transparent)}
+body:has(.po-preview-app) .po-overview-metrics .po-metric:last-child{border-right:0}
+body:has(.po-preview-app) .po-metric>span{font-size:12px;color:var(--po-text-secondary)}
+body:has(.po-preview-app) .po-metric strong{margin-top:6px;font-size:28px;line-height:32px;letter-spacing:-.025em}
+body:has(.po-preview-app) .po-metric small{color:var(--po-text-muted);font-size:12px;line-height:19px}
+body:has(.po-preview-app) .po-overview-grid{gap:16px}
+body:has(.po-preview-app) .po-chart-summary strong{font-size:28px;line-height:32px}
+body:has(.po-preview-app) .po-text-action{color:var(--po-primary);font-size:14px;font-weight:700}
+body:has(.po-preview-app) .po-action-row,body:has(.po-preview-app) .po-recent-item{border-color:var(--po-color-legacy-hex-eef0f4)}
+body:has(.po-preview-app) .po-action-row:hover,body:has(.po-preview-app) .po-recent-item:hover{background:var(--po-color-legacy-hex-faf9fd)}
+body:has(.po-preview-app) .po-tab-bar{gap:28px;border-bottom:1px solid var(--po-border)}
+body:has(.po-preview-app) .po-tab-bar button{min-height:44px;padding:0 0 10px;border-bottom:2px solid var(--po-color-transparent);color:var(--po-text-secondary);font-size:14px;font-weight:600}
+body:has(.po-preview-app) .po-tab-bar button.is-active{color:var(--po-text);border-color:var(--po-primary)}
+body:has(.po-preview-app) .po-outcome-banner{display:flex;align-items:center;gap:16px;padding:18px 20px;background:var(--po-surface);border-color:var(--po-border)}
+body:has(.po-preview-app) .po-outcome-banner p{color:var(--po-text-secondary);font-size:14px;line-height:22px}
+body:has(.po-preview-app) .po-list-toolbar{align-items:flex-end;margin-top:28px;margin-bottom:16px}
+body:has(.po-preview-app) .po-list-toolbar h2{margin-bottom:4px}
+body:has(.po-preview-app) .po-automation-filters{gap:12px}
+body:has(.po-preview-app) .po-automation-filters label{color:var(--po-text-muted);font-size:12px;font-weight:600}
+body:has(.po-preview-app) .po-search,body:has(.po-preview-app) .po-automation-filter select,body:has(.po-preview-app) .po-automation-search input{min-height:40px;border-radius:var(--po-radius-md);border-color:var(--po-border-strong);background:var(--po-surface)}
+body:has(.po-preview-app) .po-search:focus-within{border-color:var(--po-primary);box-shadow:var(--po-focus)}
+body:has(.po-preview-app) .po-automation-table{border:1px solid var(--po-border);border-radius:var(--po-radius-lg);overflow:hidden;background:var(--po-surface)}
+body:has(.po-preview-app) .po-automation-table th{height:42px;background:var(--po-color-legacy-hex-fafbfc);color:var(--po-text-muted);font-size:11px;letter-spacing:.07em;font-weight:700}
+body:has(.po-preview-app) .po-automation-table td{min-height:64px;padding-top:14px;padding-bottom:14px;border-color:var(--po-color-legacy-hex-eef0f4);font-size:14px}
+body:has(.po-preview-app) .po-automation-table tbody tr:hover{background:var(--po-color-legacy-hex-fcfbff)}
+body:has(.po-preview-app) .po-builder-header{padding-bottom:18px;border-bottom:1px solid var(--po-border)}
+body:has(.po-preview-app) .po-breadcrumb{margin-bottom:8px;color:var(--po-text-muted);font-size:12px}
+body:has(.po-preview-app) .po-breadcrumb button{color:var(--po-primary);font-weight:500}
+body:has(.po-preview-app) .po-save-status{color:var(--po-text-muted);font-size:12px;font-weight:600}
+body:has(.po-preview-app) .po-save-status.is-dirty{color:var(--po-warning)}
+body:has(.po-preview-app) .po-save-status-dot{width:7px;height:7px;border-radius:50%;background:var(--po-color-legacy-hex-b4bbc7)}
+body:has(.po-preview-app) .po-save-status.is-dirty .po-save-status-dot{background:var(--po-warning)}
+body:has(.po-preview-app) .po-builder-tabs,body:has(.po-preview-app) .po-automation-tabs{border-bottom:1px solid var(--po-border)}
+body:has(.po-preview-app) .po-builder-tabs button,body:has(.po-preview-app) .po-automation-tabs button{min-height:44px;font-size:14px;font-weight:700}
+body:has(.po-preview-app) .po-palette{background:var(--po-surface);border-right:1px solid var(--po-border)}
+body:has(.po-preview-app) .po-palette-item{border-radius:var(--po-radius-md);padding:10px 8px}
+body:has(.po-preview-app) .po-palette-item:hover{background:var(--po-color-legacy-hex-f8f6fc)}
+body:has(.po-preview-app) .po-flow-node{border:1px solid var(--po-border-strong);border-radius:12px;background:var(--po-surface);box-shadow:0 2px 5px var(--po-color-shadow-card);transition:border-color 120ms ease,box-shadow 120ms ease,transform 120ms ease}
+body:has(.po-preview-app) .po-flow-node:hover,body:has(.po-preview-app) .po-flow-node.is-selected{border-color:var(--po-color-legacy-hex-9b72ed);box-shadow:0 8px 24px var(--po-color-focus-shadow)}
+body:has(.po-preview-app) .po-flow-node.is-selected{box-shadow:inset 3px 0 0 var(--po-primary),0 8px 24px var(--po-color-focus-shadow)}
+body:has(.po-preview-app) .po-flow-node-kicker{color:var(--po-color-neutral-label);font-size:11px;letter-spacing:.08em;font-weight:700}
+body:has(.po-preview-app) .po-flow-node-content strong{font-size:14px;line-height:20px}
+body:has(.po-preview-app) .po-flow-node-content>span:not(.po-flow-node-kicker){font-size:14px;line-height:20px}
+body:has(.po-preview-app) .po-flow-node-content small{font-size:12px;line-height:17px}
+body:has(.po-preview-app) .po-dialog-backdrop{background:var(--po-color-modal-backdrop);backdrop-filter:blur(2px)}
+body:has(.po-preview-app) .po-dialog,body:has(.po-preview-app) .po-modal,body:has(.po-preview-app) .po-inspector-dialog{border:1px solid var(--po-border);border-radius:var(--po-radius-xl);box-shadow:var(--po-shadow-dialog);background:var(--po-surface)}
+body:has(.po-preview-app) input,body:has(.po-preview-app) select,body:has(.po-preview-app) textarea{border-radius:var(--po-radius-md);border-color:var(--po-border-strong);color:var(--po-text);background:var(--po-surface);font-size:14px}
+body:has(.po-preview-app) input:focus,body:has(.po-preview-app) select:focus,body:has(.po-preview-app) textarea:focus{border-color:var(--po-primary);box-shadow:var(--po-focus)}
+body:has(.po-preview-app) label{color:var(--po-text-secondary);font-size:12px;line-height:18px;font-weight:600}
+body:has(.po-preview-app) table th{color:var(--po-text-muted);background:var(--po-color-legacy-hex-fafbfc);font-size:11px;letter-spacing:.07em;font-weight:700}
+body:has(.po-preview-app) table td{font-size:14px;color:var(--po-text)}
+body:has(.po-preview-app) .po-preview-notice{border:1px solid var(--po-color-legacy-hex-ddd5ee);background:var(--po-color-legacy-hex-faf8ff);color:var(--po-color-legacy-hex-5e566d);border-radius:var(--po-radius-md);font-size:12px}
+/* Dark theme.
+ * The token block above is light-only and is set on `body`, so without this the
+ * preview's dark mode (.po-preview-app.is-dark, which redefines a different
+ * namespace in precision-operations-preview.css) left the light text token on a
+ * dark surface at insufficient contrast. Same specificity as the light block, so
+ * source order decides; keep this last.
+ */
+body:has(.po-preview-app.is-dark) {
+  --po-bg:var(--po-color-canvas); --po-text:var(--po-color-ink); --po-text-secondary:var(--po-color-secondary);
+  --po-text-muted:var(--po-color-muted); --po-border:var(--po-color-border); --po-border-strong:var(--po-color-border-strong);
+  --po-primary:var(--po-color-primary); --po-primary-hover:var(--po-color-primary-hover); --po-primary-soft:var(--po-color-purple-soft);
+  --po-success:var(--po-color-success); --po-success-soft:var(--po-color-success-soft); --po-warning:var(--po-color-warning); --po-warning-soft:var(--po-color-warning-soft);
+  --po-info:var(--po-color-legacy-hex-8ab4ff); --po-info-soft:var(--po-color-legacy-hex-1e2a40);
+  --po-focus:0 0 0 3px var(--po-color-focus-shadow-dark);
+  --po-shadow-dialog:0 24px 60px var(--po-color-shadow-modal-dark);
+}
+/* Hardcoded light values from the block above that have no token to follow. */
+body:has(.po-preview-app.is-dark) .po-nav-item{color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-nav-item:hover:not(.is-active){background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-nav-label{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-eyebrow,body:has(.po-preview-app.is-dark) .po-group-label,body:has(.po-preview-app.is-dark) .po-sample-label{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-plan-card{background:var(--po-color-surface)}
+body:has(.po-preview-app.is-dark) .po-button--secondary:hover:not(:disabled){background:var(--po-color-surface-muted);border-color:var(--po-color-legacy-hex-55605a)}
+body:has(.po-preview-app.is-dark) .po-button--quiet:hover:not(:disabled){background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-tag--neutral{background:var(--po-color-legacy-hex-262e29);color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-panel-title{border-bottom-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-action-row,body:has(.po-preview-app.is-dark) .po-recent-item{border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-action-row:hover,body:has(.po-preview-app.is-dark) .po-recent-item:hover{background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-outcome-banner{background:var(--po-color-surface);border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-automation-table th,body:has(.po-preview-app.is-dark) table th{background:var(--po-color-surface-muted);color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-automation-table td{border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-automation-table tbody tr:hover{background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-automation-filters label{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-breadcrumb{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-flow-node-kicker{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-save-status-dot{background:var(--po-color-legacy-hex-6d7a72)}
+body:has(.po-preview-app.is-dark) .po-palette-item:hover{background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-preview-notice{border-color:var(--po-color-legacy-hex-3a3350);background:var(--po-color-legacy-hex-1e1a2b);color:var(--po-color-legacy-hex-c7c0d6)}
+/* --po-primary is the lavender accent for text on dark; as a button fill under
+ * white text it is 2.36:1. Keep the production accent for filled buttons. */
+body:has(.po-preview-app.is-dark) .po-button--primary{background:var(--po-color-primary);color:var(--po-color-white)}
+body:has(.po-preview-app.is-dark) .po-button--primary:hover:not(:disabled){background:var(--po-color-primary-hover)}
+body:has(.po-preview-app.is-dark) .po-plan-card > button{background:var(--po-color-primary);color:var(--po-color-white)}
+body:has(.po-preview-app.is-dark) .po-plan-card > button:hover{background:var(--po-color-primary-hover)}
+/* White on the lavender accent is 2.36:1; keep the production accent for filled shapes. */
+body:has(.po-preview-app.is-dark) .po-profile-avatar{background:var(--po-color-primary);color:var(--po-color-white)}
+/* The skip link paints white on var(--po-ink), which is light in dark mode. */
+body:has(.po-preview-app.is-dark) .po-skip-link{background:var(--po-color-ink);color:var(--po-color-white)}
+body:has(.po-preview-app.is-dark) .po-footer{color:var(--po-color-muted)}
+/* Remaining hardcoded light fills in precision-operations-preview.css that had no
+ * dark counterpart, so light-mode tokens were painting onto them. */
+body:has(.po-preview-app.is-dark) .po-conversation:hover{background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-conversation.is-selected{background:var(--po-color-purple-soft)}
+body:has(.po-preview-app.is-dark) .po-conversation{border-bottom-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-add-step{background:var(--po-color-surface-muted);border-color:var(--po-color-border-strong);color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-canvas-footer{background:var(--po-color-surface);border-top-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-canvas-footer button{background:var(--po-color-surface-muted);color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-icon-button{background:var(--po-color-surface-muted);color:var(--po-text-secondary)}
+body:has(.po-preview-app.is-dark) .po-post-context{background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-thread-empty{background:var(--po-color-surface)}
+body:has(.po-preview-app.is-dark) .po-coming-soon > div{color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-leads-disclaimer{color:var(--po-primary)}
+body:has(.po-preview-app.is-dark) .po-leads-production-card,
+body:has(.po-preview-app.is-dark) .po-thread-empty{background:var(--po-color-surface);border-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-leads-filter-row select{background:var(--po-color-surface-muted);color:var(--po-text)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table th{background:var(--po-color-surface-muted);color:var(--po-text-muted)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table td{color:var(--po-text-secondary);border-bottom-color:var(--po-border)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table tbody tr:hover{background:var(--po-color-surface-muted)}
+body:has(.po-preview-app.is-dark) .po-time-cell{color:var(--po-text-muted)!important}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--purple,
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--neutral{background:var(--po-color-purple-soft);color:var(--po-color-legacy-hex-cdb8ff)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--green{background:var(--po-color-success-soft);color:var(--po-color-success)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--amber{background:var(--po-color-warning-soft);color:var(--po-color-warning)}
+body:has(.po-preview-app.is-dark) .po-leads-production-table .po-tag--blue{background:var(--po-color-legacy-hex-1e2a40);color:var(--po-color-legacy-hex-8ab4ff)}
+body:has(.po-preview-app.is-dark) .po-lead-username{color:var(--po-color-legacy-hex-8ab4ff)}
+/* Icon chips are pastel tints with no dark counterpart, so they rendered as bright
+ * squares on the dark canvas - most visible in the builder palette and flow nodes. */
+body:has(.po-preview-app.is-dark) .po-nav-count{background:var(--po-color-purple-soft);color:var(--po-color-legacy-hex-cdb8ff)}
+body:has(.po-preview-app.is-dark) .po-instagram-chip,
+body:has(.po-preview-app.is-dark) .po-palette-icon,
+body:has(.po-preview-app.is-dark) .po-flow-node-icon,
+body:has(.po-preview-app.is-dark) .po-inspector-icon{background:var(--po-color-legacy-hex-2b2342);border-color:var(--po-color-legacy-hex-453a63)}
+body:has(.po-preview-app.is-dark) .po-palette-icon--instagram,
+body:has(.po-preview-app.is-dark) .po-flow-node-icon--trigger,
+body:has(.po-preview-app.is-dark) .po-inspector-icon.po-flow-node-icon--trigger{background:var(--po-color-legacy-hex-3a2535);border-color:var(--po-color-legacy-hex-5a3b50)}
+body:has(.po-preview-app.is-dark) .po-flow-node-icon--goal,
+body:has(.po-preview-app.is-dark) .po-inspector-icon.po-flow-node-icon--goal{background:var(--po-color-legacy-hex-1e3328);border-color:var(--po-color-legacy-hex-2f4d3b)}
+body:has(.po-preview-app.is-dark) .po-flow-node-icon--followup{background:var(--po-color-legacy-hex-1e2a40);border-color:var(--po-color-legacy-hex-32455f)}
+body:has(.po-preview-app.is-dark) .po-token-track,
+body:has(.po-preview-app.is-dark) .po-usage-track{background:var(--po-color-legacy-hex-2a332d)}
+body:has(.po-preview-app.is-dark) .po-leads-pagination,
+body:has(.po-preview-app.is-dark) .po-leads-pagination span{color:var(--po-text-muted)}
+
+/* ---- Control consistency ---------------------------------------------------
+ * Buttons wrapped their labels ("Add source", "Invite teammate" each broke onto
+ * two lines) because .po-button has no nowrap and was being shrunk by its flex
+ * parent. Search fields and selects had drifted to six different heights and
+ * paddings, and every select except .po-select-wrap used the native OS arrow,
+ * which sits flush against the right border.
+ */
+body:has(.po-preview-app) .po-preview-app .po-button{white-space:nowrap;flex-shrink:0;width:auto}
+
+body:has(.po-preview-app) .po-preview-app .po-search,
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search{
+  min-height:40px;gap:8px;padding:0 12px;border-radius:var(--po-radius-md);
+  border:1px solid var(--po-border-strong)}
+body:has(.po-preview-app) .po-preview-app .po-search svg{width:15px;height:15px}
+body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px}
+
+body:has(.po-preview-app) .po-preview-app select{
+  appearance:none;-webkit-appearance:none;min-height:40px;
+  padding:0 32px 0 12px;border-radius:var(--po-radius-md)}
+/* As a shorthand, and specific enough to survive the per-screen rules that set a plain
+ * `background:` - which resets repeat/position/size and left the chevron tiling. */
+body:has(.po-preview-app) .po-preview-app select:not([multiple]){
+  background:var(--po-surface) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23626a7c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 11px center/14px 14px}
+/* .po-select-wrap draws its own chevron element, so it must not get a second one. */
+body:has(.po-preview-app) .po-preview-app .po-select-wrap select{background-image:none;padding-right:30px}
+body:has(.po-preview-app) .po-select-wrap svg{right:11px;width:14px;height:14px}
+body:has(.po-preview-app) .po-select-wrap{min-height:40px}
+body:has(.po-preview-app) .po-preview-app .po-detail-control select{min-height:36px;padding:0 30px 0 10px;background-position:right 9px center}
+body:has(.po-preview-app) .po-preview-app.is-dark select:not([multiple]){
+  background:var(--po-surface) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2393a098' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 11px center/14px 14px}
+body:has(.po-preview-app) .po-preview-app.is-dark .po-select-wrap select{background-image:none}
+
+/* ---- Heading and control roles, by element ---------------------------------
+ * The heading rules below used to enumerate the components they applied to, so
+ * any h2 that was not on the list kept its own weight (.po-integration-card-header
+ * h2 stayed at 800 while every listed one was 700). Assigning the role to the
+ * element covers every component, including ones added later.
+ */
+body:has(.po-preview-app) .po-preview-app h1{font-size:32px;font-weight:800;line-height:1.15}
+body:has(.po-preview-app) .po-preview-app h2{font-size:18px;font-weight:700;line-height:1.3}
+body:has(.po-preview-app) .po-preview-app h3{font-size:16px;font-weight:700;line-height:1.4}
+/* The sign-in hero is display copy, not a section heading. */
+body:has(.po-preview-app) .po-preview-app .po-auth-brand h2{font-size:40px;font-weight:800;line-height:1.13}
+/* Form controls had drifted to three weights (400/500/600) across screens. */
+body:has(.po-preview-app) .po-preview-app input,
+body:has(.po-preview-app) .po-preview-app select,
+body:has(.po-preview-app) .po-preview-app textarea,
+body:has(.po-preview-app) .po-preview-app .po-search input{font-size:14px;font-weight:500}
+
+/* ---- Builder canvas fixes --------------------------------------------------
+ * 5. .po-builder-more-wrap had no rules at all, so the absolutely-positioned
+ *    dropdown had no positioned ancestor and rendered at the foot of the page.
+ * 3. The inspector resized between its tabs because the dialog sized to content.
+ * 4. The separator keeps a destructive action away from the confirming one.
+ */
+body:has(.po-preview-app) .po-preview-app .po-builder-more-wrap{position:relative;display:inline-flex}
+/* 6. The canvas used to grow the page as steps were added, and the palette scrolled
+ *    away with it. Bounding the grid row lets each column scroll on its own. */
+@media (min-width:1024px){
+  body:has(.po-preview-app) .po-preview-app .po-builder-grid{height:clamp(460px,66vh,760px)}
+}
+/* A delete control nobody can see is not an option; it stays visible but quiet. */
+body:has(.po-preview-app) .po-preview-app .po-inspector-dialog{height:min(88vh,760px)}
+/* Pushing the quiet action left with an auto margin made the three buttons wrap in a
+ * narrow dialog. A gap plus extra room before the confirming action keeps the
+ * destructive one from sitting flush against it, on one row. */
+body:has(.po-preview-app) .po-preview-app .po-modal-footer .po-button--primary{margin-left:10px}
+/* A three-action footer needs more room than the 510px default or it wraps. */
+body:has(.po-preview-app) .po-preview-app .po-modal:has(.po-modal-footer .po-button--primary):has(.po-modal-footer .po-button--secondary){width:min(100%,580px)}
+
+/* A step landing on the canvas now says so, and the node it added is marked. */
+body:has(.po-preview-app) .po-preview-app .po-flow-notice{
+  display:inline-flex;align-items:center;gap:7px;margin:0;padding:3px 11px;
+  border:1px solid var(--po-primary);border-radius:999px;
+  background:var(--po-primary-soft);color:var(--po-primary);
+  font-size:12px;font-weight:600}
+body:has(.po-preview-app) .po-preview-app .po-flow-node.is-new{
+  border-color:var(--po-primary);box-shadow:0 0 0 3px var(--po-primary-soft)}
+body:has(.po-preview-app) .po-preview-app .po-flow-notice-undo{margin-left:2px;padding:0 2px;border:0;background:var(--po-color-transparent);color:inherit;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell{position:relative;display:flex;width:100%}
+/* The remove control and the drag grip were both pinned to the node's top-right and
+ * overlapped. The grip moves to the vertical centre; the content keeps clear of both. */
+body:has(.po-preview-app) .po-preview-app .po-flow-node-end{align-self:center}
+body:has(.po-preview-app) .po-preview-app .po-flow-node{min-height:0;padding:12px 13px}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell:has(.po-flow-node-remove) .po-flow-node-content{padding-right:24px}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell > .po-flow-node{flex:1;min-width:0}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove{
+  position:absolute;top:8px;right:8px;z-index:2;display:inline-flex;align-items:center;
+  justify-content:center;width:26px;height:26px;border:1px solid var(--po-color-transparent);border-radius:6px;
+  background:var(--po-color-transparent);color:var(--po-text-muted);font-size:16px;line-height:1;
+  opacity:.5;transition:opacity 120ms ease,background-color 120ms ease,color 120ms ease}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-shell:hover .po-flow-node-remove,
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove:focus-visible{opacity:1}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove:hover{
+  border-color:var(--po-border);background:var(--po-bg);color:var(--po-text)}
+body:has(.po-preview-app) .po-preview-app .po-flow-node-remove::after{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  min-width:44px;min-height:44px;width:100%;height:100%}
+
+/* ---- Filter row + builder header spacing -----------------------------------
+ * The search column and the select columns carried different label/control
+ * spacing and three competing min-heights (43 -> 44 -> 39), so the search box
+ * sat 13px below the selects. Bottom-aligning the row and settling on one
+ * control height lines them up.
+ */
+body:has(.po-preview-app) .po-preview-app .po-automation-filters{align-items:end}
+body:has(.po-preview-app) .po-preview-app .po-automation-search,
+body:has(.po-preview-app) .po-preview-app .po-automation-filter{display:flex;min-width:0;flex-direction:column;gap:7px}
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search{min-height:40px}
+body:has(.po-preview-app) .po-preview-app .po-automation-search .po-search input{min-height:38px}
+/* The builder header stacked an 18px padding under a 24px margin, leaving 43px
+ * of empty space between the title block and the tabs. */
+body:has(.po-preview-app) .po-preview-app .po-builder-header{padding-bottom:14px;margin-bottom:14px}
+
+/* ---- Pointer targets ------------------------------------------------------
+ * AGENTS.md: layouts must work "without ... tiny touch targets". Row checkboxes
+ * were 15x15, the row action menu 31x31, global icons 34x34 and pagination
+ * 21x17. The hit area is expanded with an overlay so the dense desktop layout
+ * keeps its current visual size, and the controls themselves grow to 44px on a
+ * coarse pointer, where the 44x44 minimum actually applies.
+ */
+body:has(.po-preview-app) .po-preview-app .po-icon-button,
+body:has(.po-preview-app) .po-preview-app .po-global-icon,
+body:has(.po-preview-app) .po-preview-app .po-leads-pagination button,
+body:has(.po-preview-app) .po-preview-app .po-row-actions button{position:relative}
+body:has(.po-preview-app) .po-preview-app .po-icon-button::after,
+body:has(.po-preview-app) .po-preview-app .po-global-icon::after,
+body:has(.po-preview-app) .po-preview-app .po-leads-pagination button::after,
+body:has(.po-preview-app) .po-preview-app .po-row-actions button::after{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  min-width:44px;min-height:44px;width:100%;height:100%}
+/* Drawn rather than native: a native box inherits the field styling above and the
+ * engines disagree about what to paint, which is why unchecked boxes came out
+ * solid black. This renders identically everywhere. */
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"],
+body:has(.po-preview-app) .po-preview-app input[type="radio"]{
+  appearance:none;-webkit-appearance:none;flex:0 0 auto;margin:0;
+  width:18px;height:18px;padding:0;cursor:pointer;
+  border:1.5px solid var(--po-border-strong);border-radius:4px;
+  background-color:var(--po-surface);background-image:none;
+  background-repeat:no-repeat;background-position:center;background-size:12px 12px;
+  box-shadow:none}
+body:has(.po-preview-app) .po-preview-app input[type="radio"]{border-radius:50%}
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"]:checked{
+  border-color:var(--po-primary);background-color:var(--po-primary);background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5l3.5 3.5L13 5'/%3E%3C/svg%3E")}
+body:has(.po-preview-app) .po-preview-app input[type="radio"]:checked{
+  border-color:var(--po-primary);background-color:var(--po-primary);
+  box-shadow:inset 0 0 0 3.5px var(--po-surface)}
+/* White on the lavender accent is 2.36:1; keep the production accent for the filled
+   state, as the buttons do. */
+body:has(.po-preview-app) .po-preview-app.is-dark input[type="checkbox"]:checked,
+body:has(.po-preview-app) .po-preview-app.is-dark input[type="radio"]:checked{
+  border-color:var(--po-color-primary);background-color:var(--po-color-primary)}
+body:has(.po-preview-app) .po-preview-app input[type="checkbox"]:disabled,
+body:has(.po-preview-app) .po-preview-app input[type="radio"]:disabled{opacity:.5;cursor:not-allowed}
+@media (pointer: coarse){
+  /* Every real control, not just the ones with a .po-button class. Links sitting
+     inside a line of text keep their size (WCAG 2.5.8 exempts inline links). */
+  body:has(.po-preview-app) .po-preview-app button,
+  body:has(.po-preview-app) .po-preview-app select,
+  body:has(.po-preview-app) .po-preview-app [role="tab"],
+  body:has(.po-preview-app) .po-preview-app .po-detail-control select,
+  body:has(.po-preview-app) .po-preview-app .po-search,
+  body:has(.po-preview-app) .po-preview-app .po-skip-link{min-height:44px}
+  body:has(.po-preview-app) .po-preview-app .po-icon-button,
+  body:has(.po-preview-app) .po-preview-app .po-global-icon{width:44px;height:44px}
+  body:has(.po-preview-app) .po-preview-app input[type="checkbox"]{width:22px;height:22px}
+}
+
+@media (max-width:900px){body:has(.po-preview-app) .po-page-header h1,body:has(.po-preview-app) .po-builder-header h1{font-size:32px}body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(2){border-right:0}body:has(.po-preview-app) .po-overview-metrics .po-metric:nth-child(-n+2){border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-outcome-banner{align-items:flex-start;flex-wrap:wrap}}
+@media (max-width:640px){body:has(.po-preview-app) .po-overview-metrics{grid-template-columns:1fr}body:has(.po-preview-app) .po-overview-metrics .po-metric{border-right:0;border-bottom:1px solid var(--po-border)}body:has(.po-preview-app) .po-overview-metrics .po-metric:last-child{border-bottom:0}body:has(.po-preview-app) .po-button{min-height:42px}body:has(.po-preview-app) .po-list-toolbar{align-items:stretch}}
+@media (prefers-reduced-motion:reduce){body:has(.po-preview-app) *,body:has(.po-preview-app) *::before,body:has(.po-preview-app) *::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
