@@ -1,0 +1,16 @@
+# ORCHESTRATOR LOG — 2026-10-18 Part 3
+
+Continuation of `ORCHESTRATOR-LOG-2026-10-18-part2.md`. Created because the prior continuation is maintained as append-only dated parts and must not be reconstructed wholesale.
+
+## 2026-10-18 — [Independent VM Agent] hourly wake-up: source/backlog refresh and render blocker
+
+- Refreshed the foundation branch through GitHub. Current `feat/preview-to-production-foundation` HEAD is `120d0ae73e171d5afbc6539bb4f558d33cc91ba9`.
+- Re-read `AGENTS.md`, `DESIGN.md`, `client/src/components/ui/README.md`, `GAPS.md`, the newest GAPS continuation `GAPS-2026-10-17-part12.md`, and the latest dated orchestrator continuations. The current backlog still has Lead Detail as a rendered production failure, Analytics as a backend/product semantics decision, and several Leads/Inbox/Settings differences that are either intentional real-data/runtime differences or awaiting deployed rendered verification.
+- `client/src/pages/PrecisionOperationsPreviewPage.tsx` is not present on the current foundation branch. Shared log state records that the live preview service is sourced from the separate `feat/precision-operations-product-ui` branch; the missing foundation path was not treated as a defect.
+- Open PR review: PR #150 (`style(shell): match collapsed rail controls to preview`) is already open against the foundation branch and covers the identified collapsed-rail geometry issue, so no duplicate shell change was started. No other open PRs are present.
+- Open issue review: issue #149 remains the sole open issue and records the Analytics date-range/account-filter backend semantics decision; no frontend-only implementation is justified without that contract.
+- Lead Detail source freshness check: the merged PR #147 fix is present in the current foundation source (`server/src/middleware/resolveLeadParam.ts` and router registration). The remaining rendered production failure is therefore consistent with stale deployment state rather than a confirmed current-foundation source defect; no duplicate Lead Detail patch was opened.
+- Render state: `signalai-bui` is pinned to `feat/preview-to-production-foundation` with auto-deploy OFF; the preview service is pinned to `feat/precision-operations-product-ui` with auto-deploy OFF. Current live renders cannot safely validate the latest source until their deployments are refreshed.
+- BrowserMCP hosted Playwright worker is unavailable for a fresh render pass. No agent-chat tabs were inspected or used as substitutes. No new preview/production browser tab was opened in this source-only pass, so no browser tab cleanup was required.
+- No application source change was justified this cycle because the highest-priority concrete items were already fixed/in flight, intentionally richer in production, or blocked on backend/product semantics or deployment freshness. No PR was opened, no `main` write was made, and no production deployment was triggered.
+- **BLOCKER:** fresh rendered preview-vs-production verification remains unavailable until the approved app-browser worker is restored and deployed preview/production reflect their current source branches. Re-check shared state on the next hourly wake-up; do not declare the migration complete.
