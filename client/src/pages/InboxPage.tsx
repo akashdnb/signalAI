@@ -73,6 +73,7 @@ export function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [allCount, setAllCount] = useState<number | null>(null);
+  const latestListRequestRef = useRef(0);
 
   const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
@@ -94,18 +95,33 @@ export function InboxPage() {
             ? { handoffStatus: "requested" as HandoffStatus }
             : {};
 
+  function clearSelectedLead() {
+    setSelectedLeadId(null);
+    selectedLastInboundAtRef.current = null;
+    setTags(null);
+    setPendingEntries([]);
+    setComposeText("");
+    setError(null);
+  }
+
   async function reloadLeads() {
     if (!tenantId) return;
+    const requestId = ++latestListRequestRef.current;
     try {
       const result = await getLeadsPage(tenantId, page, PAGE_SIZE, {
         ...getFilters(),
         q: search.trim() || undefined,
         accountId: selectedAccountId || undefined,
       });
+      if (requestId !== latestListRequestRef.current) return;
       setPageData(result);
       if (result.page !== page) setPage(result.page);
+      if (selectedLeadIdRef.current && !result.items.some((lead) => lead.id === selectedLeadIdRef.current)) {
+        clearSelectedLead();
+      }
       setError(null);
     } catch (err) {
+      if (requestId !== latestListRequestRef.current) return;
       if (err instanceof ApiError && (err.status === 401)) {
         navigate("/login", { replace: true });
         return;
@@ -126,10 +142,7 @@ export function InboxPage() {
   useEffect(() => {
     setPageData(null);
     setError(null);
-    setSelectedLeadId(null);
-    setTags(null);
-    setPendingEntries([]);
-    setComposeText("");
+    clearSelectedLead();
   }, [tenantId, selectedAccountId]);
 
   const selectedLastInboundAtRef = useRef<string | null>(null);
