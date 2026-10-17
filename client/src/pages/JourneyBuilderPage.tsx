@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiError, api, type Campaign } from "../api";
-import { type JourneyAccountReadiness } from "../components/JourneyAccountsPanel";
+import {
+  getJourneyAccountReadiness,
+  subscribeJourneyAccountReadiness,
+  type JourneyAccountReadiness,
+} from "../components/JourneyAccountsPanel";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
 import "../styles/journey-builder-parity.css";
 
@@ -14,11 +18,21 @@ export function JourneyBuilderPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [accountReadiness, setAccountReadiness] = useState<JourneyAccountReadiness>({
-    status: "loading",
-    healthyAssignedCount: 0,
-    unavailableAssignedCount: 0,
-  });
+  const readinessTenantId = tenantId ?? "";
+  const readinessCampaignId = campaignId ?? "";
+  const subscribeReadiness = useCallback(
+    (listener: () => void) => subscribeJourneyAccountReadiness(readinessTenantId, readinessCampaignId, listener),
+    [readinessTenantId, readinessCampaignId],
+  );
+  const getReadiness = useCallback(
+    () => getJourneyAccountReadiness(readinessTenantId, readinessCampaignId),
+    [readinessTenantId, readinessCampaignId],
+  );
+  const accountReadiness: JourneyAccountReadiness = useSyncExternalStore(
+    subscribeReadiness,
+    getReadiness,
+    getReadiness,
+  );
 
   const loadCampaign = useCallback(async () => {
     if (!tenantId || !campaignId) return;
@@ -47,14 +61,6 @@ export function JourneyBuilderPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to refresh automation");
     }
-  }, [tenantId, campaignId]);
-
-  useEffect(() => {
-    setAccountReadiness({
-      status: "loading",
-      healthyAssignedCount: 0,
-      unavailableAssignedCount: 0,
-    });
   }, [tenantId, campaignId]);
 
   useEffect(() => {
