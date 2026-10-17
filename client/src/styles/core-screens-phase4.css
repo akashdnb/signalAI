@@ -61,7 +61,7 @@
 .analytics-section-heading { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .analytics-section-heading h2 { margin: .15rem 0 .3rem; font-size: 1.15rem !important; }
 .analytics-section-heading p { max-width: 820px; margin: 0; line-height: 1.55; }
-.analytics-bars { display: grid; grid-template-columns: repeat(14, minmax(24px, 1fr)); align-items: end; gap: .55rem; min-height: 210px; padding: 1rem .25rem .25rem; border-bottom: 1px solid var(--border); }
+.analytics-bars { display: grid; grid-template-columns: repeat(30, minmax(20px, 1fr)); align-items: end; gap: .45rem; min-height: 210px; min-width: 720px; overflow-x: auto; padding: 1rem .25rem .25rem; border-bottom: 1px solid var(--border); }
 .analytics-bar-item { display: grid; grid-template-rows: auto 150px auto; align-items: end; min-width: 0; text-align: center; }
 .analytics-bar-item strong { font-size: .7rem; font-variant-numeric: tabular-nums; }
 .analytics-bar-track { height: 150px; display: flex; align-items: flex-end; justify-content: center; }
