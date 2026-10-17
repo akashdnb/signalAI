@@ -21,7 +21,6 @@ function getStageCount(funnel: Funnel, key: string): number {
 
 function ActivityVolume({ points }: { points: ConversationsTimeseriesPoint[] }) {
   const maxCount = Math.max(1, ...points.map((point) => point.comments + point.dms));
-  const visiblePoints = points.slice(-14);
   return (
     <div className="analytics-activity">
       <div className="analytics-section-heading">
@@ -31,8 +30,8 @@ function ActivityVolume({ points }: { points: ConversationsTimeseriesPoint[] }) 
           <p className="muted">Daily inbound comments and DM send reservations. One person can generate multiple events; this is activity volume, not a conversion rate.</p>
         </div>
       </div>
-      <div className="analytics-bars" aria-label="Daily activity volume for the last 14 days">
-        {visiblePoints.map((point) => {
+      <div className="analytics-bars" aria-label="Daily activity volume for the last 30 days">
+        {points.map((point) => {
           const total = point.comments + point.dms;
           const label = new Date(`${point.date}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
           return (
@@ -86,7 +85,7 @@ function PipelineProgression({ funnel }: { funnel: Funnel }) {
   );
 }
 
-function TopPosts({ tenantId, posts, keywords }: { tenantId: string; posts: TopPost[] | null; keywords: TopKeyword[] | null }) {
+function TopPosts({ tenantId, posts, keywords, error }: { tenantId: string; posts: TopPost[] | null; keywords: TopKeyword[] | null; error: string | null }) {
   return (
     <section className="card analytics-supporting-panel">
       <div className="analytics-section-heading">
@@ -96,7 +95,13 @@ function TopPosts({ tenantId, posts, keywords }: { tenantId: string; posts: TopP
           <p className="muted">Posts that generated the most inbound comments. Linking a comment to a lead is an event association, not conversion attribution.</p>
         </div>
       </div>
-      {posts === null ? <LoadingState label="Loading post signals" className="min-h-24 py-5" /> : posts.length === 0 ? <p className="muted">No commented posts yet.</p> : (
+      {error ? (
+        <ErrorState title="Top post signals unavailable" description={error} />
+      ) : posts === null ? (
+        <LoadingState label="Loading post signals" className="min-h-24 py-5" />
+      ) : posts.length === 0 ? (
+        <p className="muted">No commented posts yet.</p>
+      ) : (
         <div className="analytics-table-scroll">
           <table className="table">
             <thead><tr><th>Post</th><th>Comments</th><th>Next step</th></tr></thead>
@@ -124,6 +129,8 @@ export function AnalyticsPage() {
   const [topPosts, setTopPosts] = useState<TopPost[] | null>(null);
   const [topKeywords, setTopKeywords] = useState<TopKeyword[] | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [timeseriesError, setTimeseriesError] = useState<string | null>(null);
+  const [topPostsError, setTopPostsError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
@@ -136,10 +143,12 @@ export function AnalyticsPage() {
       setTopPosts(null);
       setTopKeywords(null);
       setErrors([]);
+      setTimeseriesError(null);
+      setTopPostsError(null);
       const results = await Promise.allSettled([
         api.getFunnel(tenantId, selectedAccountId),
         api.getRevenue(tenantId, selectedAccountId),
-        api.getConversationsTimeseries(tenantId),
+        api.getConversationsTimeseries(tenantId, selectedAccountId),
         api.getTopPosts(tenantId, selectedAccountId),
         api.getTopKeywords(tenantId, selectedAccountId),
       ]);
@@ -152,8 +161,16 @@ export function AnalyticsPage() {
       const [funnelResult, revenueResult, timeseriesResult, postsResult, keywordsResult] = results;
       if (funnelResult.status === "fulfilled") setFunnel(funnelResult.value); else nextErrors.push("Pipeline analytics could not be loaded.");
       if (revenueResult.status === "fulfilled") setRevenue(revenueResult.value); else nextErrors.push("Revenue analytics could not be loaded.");
-      if (timeseriesResult.status === "fulfilled") setTimeseries(timeseriesResult.value); else nextErrors.push("Activity history could not be loaded.");
-      if (postsResult.status === "fulfilled") setTopPosts(postsResult.value); else nextErrors.push("Top post signals could not be loaded.");
+      if (timeseriesResult.status === "fulfilled") setTimeseries(timeseriesResult.value); else {
+        const message = timeseriesResult.reason instanceof Error ? timeseriesResult.reason.message : "The activity history request failed.";
+        setTimeseriesError(message);
+        nextErrors.push("Activity history could not be loaded.");
+      }
+      if (postsResult.status === "fulfilled") setTopPosts(postsResult.value); else {
+        const message = postsResult.reason instanceof Error ? postsResult.reason.message : "The top post request failed.";
+        setTopPostsError(message);
+        nextErrors.push("Top post signals could not be loaded.");
+      }
       if (keywordsResult.status === "fulfilled") setTopKeywords(keywordsResult.value); else nextErrors.push("Trigger keyword signals could not be loaded.");
       setErrors(nextErrors);
     }
@@ -193,9 +210,9 @@ export function AnalyticsPage() {
       {activeTab === "activity" ? (
         <>
           <section className="card analytics-primary-panel">
-            {timeseries === null ? <LoadingState label="Loading activity" description="Fetching real conversation activity for the workspace." /> : <ActivityVolume points={timeseries} />}
+            {timeseriesError ? <ErrorState title="Activity history unavailable" description={timeseriesError} action={<button type="button" className="btn-primary btn-small" onClick={retry}>Retry</button>} /> : timeseries === null ? <LoadingState label="Loading activity" description="Fetching real conversation activity for the workspace." /> : <ActivityVolume points={timeseries} />}
           </section>
-          <TopPosts tenantId={tenantId} posts={topPosts} keywords={topKeywords} />
+          <TopPosts tenantId={tenantId} posts={topPosts} keywords={topKeywords} error={topPostsError} />
         </>
       ) : (
         funnel === null ? (
