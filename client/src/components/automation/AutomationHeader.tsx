@@ -11,7 +11,7 @@ export function AutomationHeader() {
       </div>
       <a href="/docs/introduction" target="_blank" rel="noopener noreferrer" className="hidden shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-chip md:flex" aria-label="Open SignalAI documentation in a new tab">
         <FileTextIcon className="h-4 w-4" />
-        Docs
+        Docs ↗
       </a>
       <a href="/docs/quick-start" target="_blank" rel="noopener noreferrer" aria-label="Open SignalAI quick start documentation in a new tab" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-ink md:hidden">
         <FileTextIcon className="h-4.5 w-4.5" />
