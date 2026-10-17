@@ -132,7 +132,7 @@ export default function App() {
       <Route path="/dashboard/:tenantId" element={<AppShell />}>
         <Route index element={<LazyPage Page={DashboardPage} />} />
         <Route path="settings" element={<LazyPage Page={SettingsPage} />}>
-          <Route index element={<Navigate to="general" replace />} />
+          <Route index element={<Navigate to="team" replace />} />
           <Route path="general" element={<LazyPage Page={SettingsGeneralPage} />} />
           <Route path="team" element={<LazyPage Page={TeamPage} />} />
           <Route path="billing" element={<LazyPage Page={BillingPage} />} />
