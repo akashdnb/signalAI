@@ -2,298 +2,33 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Campaign, type LeadListItem, type Milestone, type PipelineStage, type TenantMember } from "../../api";
 import { formatRelativeTime, handoffLabel, PIPELINE_STAGES } from "../../lib/leadFormatting";
+import { Button, EmptyState, ErrorState, LoadingState } from "../ui";
 
 const PAGE_SIZE = 10;
-
-function StatTile({ value, label }: { value: string | number; label: string }) {
-  return (
-    <div className="stat">
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
-}
+function StatTile({ value, label }: { value: string | number; label: string }) { return <div className="builder-leads-metric"><span>{label}</span><strong>{value}</strong></div>; }
 
 export function LeadsPanel({ tenantId, campaign }: { tenantId: string; campaign: Campaign }) {
-  const [leads, setLeads] = useState<LeadListItem[] | null>(null);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [members, setMembers] = useState<TenantMember[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<PipelineStage | "all">("all");
-  const [page, setPage] = useState(0);
-  const [capturedByLead, setCapturedByLead] = useState<Record<string, Record<string, string>>>({});
-  const [savingOwnerFor, setSavingOwnerFor] = useState<string | null>(null);
-
-  async function reload() {
-    try {
-      const [ms, allLeads, mem] = await Promise.all([
-        api.listMilestones(tenantId, campaign.id),
-        api.getLeads(tenantId),
-        api.listMembers(tenantId),
-      ]);
-      const milestoneIds = new Set(ms.map((m) => m.id));
-      setMilestones(ms);
-      setMembers(mem);
-      setLeads(allLeads.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load leads");
-    }
-  }
-
-  useEffect(() => {
-    reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const [leads, setLeads] = useState<LeadListItem[] | null>(null); const [milestones, setMilestones] = useState<Milestone[]>([]); const [members, setMembers] = useState<TenantMember[]>([]); const [error, setError] = useState<string | null>(null); const [search, setSearch] = useState(""); const [statusFilter, setStatusFilter] = useState<PipelineStage | "all">("all"); const [page, setPage] = useState(0); const [capturedByLead, setCapturedByLead] = useState<Record<string, Record<string, string>>>({}); const [savingOwnerFor, setSavingOwnerFor] = useState<string | null>(null);
+  async function reload() { try { const [ms, allLeads, mem] = await Promise.all([api.listMilestones(tenantId, campaign.id), api.getLeads(tenantId), api.listMembers(tenantId)]); const milestoneIds = new Set(ms.map((m) => m.id)); setMilestones(ms); setMembers(mem); setLeads(allLeads.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId))); } catch (err) { setError(err instanceof Error ? err.message : "Failed to load leads"); } }
+  useEffect(() => { void reload(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, campaign.id]);
-
-  const filtered = useMemo(() => {
-    if (!leads) return null;
-    const q = search.trim().toLowerCase();
-    return leads.filter((l) => {
-      if (statusFilter !== "all" && l.pipelineStage !== statusFilter) return false;
-      if (q && !(l.username ?? "").toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [leads, search, statusFilter]);
-
-  const pageItems = useMemo(() => {
-    if (!filtered) return [];
-    return filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-  }, [filtered, page]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCapturedFacts() {
-      const missing = pageItems.filter((l) => !(l.id in capturedByLead));
-      if (missing.length === 0) return;
-      const entries = await Promise.all(
-        missing.map(async (l) => [l.id, await api.getCapturedFacts(tenantId, l.id).catch(() => ({}))] as const),
-      );
-      if (cancelled) return;
-      setCapturedByLead((prev) => {
-        const next = { ...prev };
-        for (const [id, facts] of entries) next[id] = facts;
-        return next;
-      });
-    }
-    loadCapturedFacts();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filtered = useMemo(() => { if (!leads) return null; const q = search.trim().toLowerCase(); return leads.filter((l) => (statusFilter === "all" || l.pipelineStage === statusFilter) && (!q || (l.username ?? "").toLowerCase().includes(q))); }, [leads, search, statusFilter]);
+  const pageItems = useMemo(() => filtered ? filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE) : [], [filtered, page]);
+  useEffect(() => { let cancelled = false; async function loadCapturedFacts() { const missing = pageItems.filter((l) => !(l.id in capturedByLead)); if (!missing.length) return; const entries = await Promise.all(missing.map(async (l) => [l.id, await api.getCapturedFacts(tenantId, l.id).catch(() => ({}))] as const)); if (cancelled) return; setCapturedByLead((prev) => { const next = { ...prev }; for (const [id, facts] of entries) next[id] = facts; return next; }); } void loadCapturedFacts(); return () => { cancelled = true; }; // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageItems, tenantId]);
-
-  async function handleOwnerChange(leadId: string, ownerUserId: string) {
-    setSavingOwnerFor(leadId);
-    try {
-      await api.updateLead(tenantId, leadId, { ownerUserId: ownerUserId || null });
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reassign lead");
-    } finally {
-      setSavingOwnerFor(null);
-    }
-  }
-
-  if (error) return <div className="banner banner-error">{error}</div>;
-  if (!leads || !filtered) return <p className="muted">Loading…</p>;
-
-  const totalCount = leads.length;
-  const qualifiedCount = leads.filter((l) => ["qualified", "meeting_scheduled", "won"].includes(l.pipelineStage)).length;
-  const meetingCount = leads.filter((l) => ["meeting_scheduled", "won"].includes(l.pipelineStage)).length;
-  const wonCount = leads.filter((l) => l.pipelineStage === "won").length;
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-
-  const rows = pageItems.map((lead) => ({
-    lead,
-    milestone: milestones.find((m) => m.id === lead.activeMilestoneId),
-    facts: capturedByLead[lead.id],
-    stage: PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage),
-    handoff: handoffLabel(lead.handoffStatus),
-  }));
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="m-0 text-[16px] font-semibold text-ink">Leads from this automation</h2>
-        <p className="muted m-0 mt-1 text-xs leading-5">
-          This view shows leads currently linked to one of this automation’s goals. Leads that have finished or left the goal sequence may not appear here.
-        </p>
-      </div>
-      <div className="stat-grid">
-        <StatTile value={totalCount} label="Progressing now" />
-        <StatTile value={qualifiedCount} label="Qualified in active goals" />
-        <StatTile value={meetingCount} label="Meetings scheduled in active goals" />
-        <StatTile value={wonCount} label="Won in active goals" />
-      </div>
-
-      <div className="filter-row">
-        <input
-          type="text"
-          placeholder="Search by username..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(0);
-          }}
-          style={{ maxWidth: 220 }}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as PipelineStage | "all");
-            setPage(0);
-          }}
-        >
-          <option value="all">All stages</option>
-          {PIPELINE_STAGES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <p className="muted">No leads match these filters.</p>
-      ) : (
-        <>
-          {/* Mobile: cards, not a squeezed table (section 52 of the mobile fix). */}
-          <div className="flex flex-col gap-3 md:hidden">
-            {rows.map(({ lead, milestone, facts, stage, handoff }) => (
-              <div key={lead.id} className="card mb-0">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chip text-sm font-semibold text-accent">
-                      {(lead.username ?? "?").charAt(0).toUpperCase()}
-                    </span>
-                    <span className="truncate text-sm font-semibold text-ink">@{lead.username ?? "unknown"}</span>
-                  </span>
-                  <span className="pill m-0 shrink-0">{stage?.label ?? lead.pipelineStage}</span>
-                </div>
-
-                <div className="mt-2.5 text-sm text-ink">{milestone?.goalDescription ?? "—"}</div>
-                {facts && Object.keys(facts).length > 0 && (
-                  <div className="muted small mt-0.5">{Object.values(facts).slice(0, 2).join(" · ")}</div>
-                )}
-                <span className={`${handoff.className} mt-2 inline-block`}>{handoff.text}</span>
-
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
-                  <select
-                    value={lead.ownerUserId ?? ""}
-                    onChange={(e) => handleOwnerChange(lead.id, e.target.value)}
-                    disabled={savingOwnerFor === lead.id}
-                    style={{ marginTop: 0, width: "auto", flex: 1 }}
-                  >
-                    <option value="">Unassigned</option>
-                    {members.map((m) => (
-                      <option key={m.userId} value={m.userId}>
-                        {m.email}
-                      </option>
-                    ))}
-                  </select>
-                  <Link
-                    to={`/dashboard/${tenantId}/leads/${lead.id}`}
-                    className="flex min-h-11 shrink-0 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink no-underline"
-                  >
-                    View
-                  </Link>
-                </div>
-                <div className="muted small mt-2">Last activity {formatRelativeTime(lead.lastInboundAt)}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden md:block" style={{ overflowX: "auto" }}>
-          <table className="table" aria-label="Leads from this automation">
-            <thead>
-              <tr>
-                <th>Lead</th>
-                <th>Current goal</th>
-                <th>Stage</th>
-                <th>Handoff</th>
-                <th>Owner</th>
-                <th className="whitespace-nowrap">Last activity</th>
-                <th className="whitespace-nowrap">View</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ lead, milestone, facts, stage, handoff }) => {
-                return (
-                  <tr key={lead.id}>
-                    <td>
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-chip text-xs font-semibold text-accent">
-                          {(lead.username ?? "?").charAt(0).toUpperCase()}
-                        </span>
-                        @{lead.username ?? "unknown"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="text-xs">{milestone?.goalDescription ?? "—"}</div>
-                      {facts && Object.keys(facts).length > 0 && (
-                        <div className="muted small mt-0.5">
-                          {Object.values(facts).slice(0, 2).join(" · ")}
-                        </div>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <span className="pill" style={{ marginLeft: 0 }}>
-                        {stage?.label ?? lead.pipelineStage}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap"><span className={handoff.className} style={{ marginLeft: 0 }}>{handoff.text}</span></td>
-                    <td>
-                      <select
-                        value={lead.ownerUserId ?? ""}
-                        onChange={(e) => handleOwnerChange(lead.id, e.target.value)}
-                        disabled={savingOwnerFor === lead.id}
-                        style={{ minWidth: 120 }}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => (
-                          <option key={m.userId} value={m.userId}>
-                            {m.email}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="text-xs"><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time></td>
-                    <td className="whitespace-nowrap">
-                      <Link to={`/dashboard/${tenantId}/leads/${lead.id}`} className="link-button">
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        </>
-      )}
-
-      {filtered.length > PAGE_SIZE && (
-        <div className="flex items-center justify-between text-sm text-subtle">
-          <span>
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
-          </span>
-          <div className="flex gap-2">
-            <button type="button" className="btn-secondary btn-small" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </button>
-            <button
-              type="button"
-              className="btn-secondary btn-small"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  async function handleOwnerChange(leadId: string, ownerUserId: string) { setSavingOwnerFor(leadId); try { await api.updateLead(tenantId, leadId, { ownerUserId: ownerUserId || null }); await reload(); } catch (err) { setError(err instanceof Error ? err.message : "Failed to reassign lead"); } finally { setSavingOwnerFor(null); } }
+  if (error) return <ErrorState title="Couldn't load automation leads" description={error} action={<Button variant="secondary" onClick={() => setError(null)}>Retry</Button>} />;
+  if (!leads || !filtered) return <LoadingState label="Loading automation leads" description="Checking the current goal-linked leads and owners." />;
+  const totalCount = leads.length; const qualifiedCount = leads.filter((l) => ["qualified", "meeting_scheduled", "won"].includes(l.pipelineStage)).length; const meetingCount = leads.filter((l) => ["meeting_scheduled", "won"].includes(l.pipelineStage)).length; const wonCount = leads.filter((l) => l.pipelineStage === "won").length; const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const rows = pageItems.map((lead) => ({ lead, milestone: milestones.find((m) => m.id === lead.activeMilestoneId), facts: capturedByLead[lead.id], stage: PIPELINE_STAGES.find((s) => s.value === lead.pipelineStage), handoff: handoffLabel(lead.handoffStatus) }));
+  return <div className="flex flex-col gap-4 builder-leads-panel">
+    <header className="builder-leads-header"><div><p className="overview-eyebrow">Automation leads</p><h2 className="m-0 text-lg font-semibold text-ink">Leads from this automation</h2><p className="muted m-0 mt-1 max-w-3xl text-sm leading-5">Only leads currently linked to one of this automation's goals are shown. Finished or exited leads remain in the production lead system but are not invented or reclassified here.</p></div></header>
+    <div className="builder-leads-metric-row"><StatTile value={totalCount} label="Progressing now" /><StatTile value={qualifiedCount} label="Qualified" /><StatTile value={meetingCount} label="Meetings scheduled" /><StatTile value={wonCount} label="Won" /></div>
+    <div className="builder-leads-toolbar"><div className="builder-leads-search"><span aria-hidden="true">⌕</span><input type="text" aria-label="Search leads by username" placeholder="Search leads..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} /></div><select aria-label="Filter leads by stage" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as PipelineStage | "all"); setPage(0); }}><option value="all">All stages</option>{PIPELINE_STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select><span className="builder-leads-count">{filtered.length} matching</span></div>
+    {filtered.length === 0 ? <EmptyState title="No leads match these filters" description="Try a different username search or pipeline stage. The production data is unchanged." /> : <>
+      <div className="builder-leads-table-wrap"><table className="table builder-leads-table" aria-label="Leads from this automation"><thead><tr><th>Lead</th><th>Current goal</th><th>Stage</th><th>Handoff</th><th>Owner</th><th>Last activity</th><th>View</th></tr></thead><tbody>{rows.map(({ lead, milestone, facts, stage, handoff }) => <tr key={lead.id}><td><span className="flex items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-chip text-xs font-semibold text-accent">{(lead.username ?? "?").charAt(0).toUpperCase()}</span>@{lead.username ?? "unknown"}</span></td><td><div className="text-xs">{milestone?.goalDescription ?? "—"}</div>{facts && Object.keys(facts).length > 0 && <div className="muted small mt-0.5">{Object.values(facts).slice(0, 2).join(" · ")}</div>}</td><td className="whitespace-nowrap"><span className="pill" style={{ marginLeft: 0 }}>{stage?.label ?? lead.pipelineStage}</span></td><td className="whitespace-nowrap"><span className={handoff.className} style={{ marginLeft: 0 }}>{handoff.text}</span></td><td><select aria-label={`Owner for @${lead.username ?? "unknown"}`} value={lead.ownerUserId ?? ""} onChange={(e) => void handleOwnerChange(lead.id, e.target.value)} disabled={savingOwnerFor === lead.id}><option value="">Unassigned</option>{members.map((m) => <option key={m.userId} value={m.userId}>{m.email}</option>)}</select></td><td className="text-xs"><time dateTime={lead.lastInboundAt ?? undefined} title={lead.lastInboundAt ? new Date(lead.lastInboundAt).toLocaleString() : undefined}>{lead.lastInboundAt ? formatRelativeTime(lead.lastInboundAt) : "No activity"}</time></td><td className="whitespace-nowrap"><Link to={`/dashboard/${tenantId}/leads/${lead.id}`} className="link-button">View</Link></td></tr>)}</tbody></table></div>
+      <div className="builder-leads-mobile md:hidden">{rows.map(({ lead, milestone, facts, stage, handoff }) => <div key={lead.id} className="builder-lead-card"><div className="flex items-start justify-between gap-2"><span className="flex min-w-0 items-center gap-2"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chip text-sm font-semibold text-accent">{(lead.username ?? "?").charAt(0).toUpperCase()}</span><span className="truncate text-sm font-semibold text-ink">@{lead.username ?? "unknown"}</span></span><span className="pill m-0 shrink-0">{stage?.label ?? lead.pipelineStage}</span></div><div className="mt-2.5 text-sm text-ink">{milestone?.goalDescription ?? "—"}</div>{facts && Object.keys(facts).length > 0 && <div className="muted small mt-0.5">{Object.values(facts).slice(0, 2).join(" · ")}</div>}<span className={`${handoff.className} mt-2 inline-block`}>{handoff.text}</span><div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3"><select aria-label={`Owner for @${lead.username ?? "unknown"}`} value={lead.ownerUserId ?? ""} onChange={(e) => void handleOwnerChange(lead.id, e.target.value)} disabled={savingOwnerFor === lead.id} style={{ marginTop: 0, width: "auto", flex: 1 }}><option value="">Unassigned</option>{members.map((m) => <option key={m.userId} value={m.userId}>{m.email}</option>)}</select><Link to={`/dashboard/${tenantId}/leads/${lead.id}`} className="flex min-h-11 shrink-0 items-center rounded-lg border border-line px-3 text-sm font-medium text-ink no-underline">View</Link></div><div className="muted small mt-2">Last activity {formatRelativeTime(lead.lastInboundAt)}</div></div>)}</div>
+    </>}
+    {filtered.length > PAGE_SIZE && <div className="flex items-center justify-between text-sm text-subtle"><span>Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}</span><div className="flex gap-2"><button type="button" className="btn-secondary btn-small" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Previous</button><button type="button" className="btn-secondary btn-small" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>Next</button></div></div>}
+  </div>;
 }
