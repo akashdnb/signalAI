@@ -320,3 +320,17 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - PR #101 cleanup refresh is delegated.
 - Current `GAPS.md` open items remain unresolved, and responsive exact widths are not verified.
 - No deployment occurred and no writes were made to `main`; this append is log-only and does not edit any app file or PR.
+
+## 2026-10-17 14:33 IST — Foundation merge/release status and delegated parity work
+
+- PR #105 Analytics/Content was squash-merged as `55178a9efd910b25ae19f2802cb146846c31ee73`.
+- PR #108 Journey Results/Leads was squash-merged as `7ad1df0f15ddffb8c2855ff38ccbad1962d9d3bc` after delegated Retry review.
+- PR #101 preview-bundle retirement was squash-merged as `50a6a81439b6cf0241b61c6c32ed53617c6fc8b2`.
+- PR #109 AppShell/Overview/Leads/Automation was squash-merged as `c68e8eba040c726b1a06283c592ddd08b5f7ca26`.
+- PR #106 Auth/Billing/Integrations was squash-merged as `31bb7a6a8136dad1271afde6522e6d5227e5d7df` after typography corrections.
+- PR #103 Inbox stale-selection/polling guard was squash-merged as `db3270d8b72b3f91d1673658d8d1536756b5828a`.
+- PR #104 Knowledge/Settings had already been merged as `2729c64dc83d434f3cab36118a53e243b4e7c4ea`.
+- Duplicate PR #110 and stale PR #102 were closed.
+- A fresh delegated Inbox visual/state parity implementation task was launched from the current foundation, and a delegated `GAPS.md` re-audit was launched.
+- Current `GAPS.md` still contains open visual parity items. No responsive exact-width verification is claimed, no CI/workflow run is claimed, and no production deploy or `main` write occurred.
+- This append is log-only: `GAPS.md` and all application files were left unchanged. Existing log history was preserved.
