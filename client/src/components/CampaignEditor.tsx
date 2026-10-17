@@ -235,8 +235,8 @@ export interface CampaignEditorHandle {
 }
 
 /** Automation Details subsection: one unified draft with an explicit Save/Discard bar (section 13), collapsible on mobile (section 13-15 of the mobile fix). Milestones/post-targeting keep their own immediate-save widgets, matching the reference's own per-widget save buttons. */
-export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: string; campaign: Campaign; onChanged: () => void; onDirtyChange?: (dirty: boolean) => void }>(
-  function CampaignEditor({ tenantId, campaign, onChanged, onDirtyChange }, ref) {
+export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: string; campaign: Campaign; onChanged: () => void; onDirtyChange?: (dirty: boolean) => void; afterTrigger?: React.ReactNode }>(
+  function CampaignEditor({ tenantId, campaign, onChanged, onDirtyChange, afterTrigger }, ref) {
     const [draft, setDraft] = useState<SettingsDraft>(() => draftFromCampaign(campaign));
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<string[]>([]);
@@ -548,6 +548,8 @@ export const CampaignEditor = forwardRef<CampaignEditorHandle, { tenantId: strin
             <KeywordChips keywords={draft.keywords} onChange={(keywords) => setDraft({ ...draft, keywords })} />
           </div>
         </Card>
+
+        {afterTrigger}
 
         <Card title="How should it reply?" defaultOpen>
           <div className="mb-1 text-sm">Reply style</div>
