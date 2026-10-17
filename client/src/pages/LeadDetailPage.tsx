@@ -63,23 +63,70 @@ export function LeadDetailPage() {
   const [savingDeal, setSavingDeal] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const detailRequestRef = useRef(0);
+  const intelligenceRequestRef = useRef(0);
+
   async function loadAll() {
     if (!tenantId || !leadId) return;
-    const [l, n, tg, d, m, cf, fd] = await Promise.all([api.getLead(tenantId, leadId), api.listLeadNotes(tenantId, leadId), api.listLeadTags(tenantId, leadId), api.listLeadDeals(tenantId, leadId), api.listMembers(tenantId), api.getCapturedFacts(tenantId, leadId), api.listFieldDefinitions(tenantId)]);
-    setLead(l); setNotes(n); setTags(tg); setDeals(d); setMembers(m); setCapturedFacts(cf); setFieldDefinitions(fd); setError(null);
+    const requestId = ++detailRequestRef.current;
+    const [leadResult, notesResult, tagsResult, dealsResult, membersResult, factsResult, fieldsResult] =
+      await Promise.allSettled([
+        api.getLead(tenantId, leadId),
+        api.listLeadNotes(tenantId, leadId),
+        api.listLeadTags(tenantId, leadId),
+        api.listLeadDeals(tenantId, leadId),
+        api.listMembers(tenantId),
+        api.getCapturedFacts(tenantId, leadId),
+        api.listFieldDefinitions(tenantId),
+      ]);
+
+    if (requestId !== detailRequestRef.current) return;
+    if (leadResult.status === "rejected") throw leadResult.reason;
+
+    // Auxiliary sections can fail independently; a notes or tags outage must
+    // not keep the core live lead profile from rendering.
+    setLead(leadResult.value);
+    setNotes(notesResult.status === "fulfilled" ? notesResult.value : null);
+    setTags(tagsResult.status === "fulfilled" ? tagsResult.value : null);
+    setDeals(dealsResult.status === "fulfilled" ? dealsResult.value : null);
+    setMembers(membersResult.status === "fulfilled" ? membersResult.value : null);
+    setCapturedFacts(factsResult.status === "fulfilled" ? factsResult.value : null);
+    setFieldDefinitions(fieldsResult.status === "fulfilled" ? fieldsResult.value : null);
+
+    const auxiliaryFailures = [notesResult, tagsResult, dealsResult, membersResult, factsResult, fieldsResult]
+      .filter((result) => result.status === "rejected");
+    setError(auxiliaryFailures.length > 0
+      ? "Some lead details could not be loaded. The available profile data is shown; retry to load the missing details."
+      : null);
   }
   async function loadIntelligence() {
     if (!tenantId || !leadId) return;
+    const requestId = ++intelligenceRequestRef.current;
     setIntelligenceError(null);
-    try { const [current, history] = await Promise.all([api.getLeadIntelligence(tenantId, leadId), api.getLeadIntelligenceHistory(tenantId, leadId)]); setIntelligence(current); setIntelligenceHistory(history); }
-    catch (err) { setIntelligence(null); setIntelligenceHistory(null); setIntelligenceError(err instanceof Error ? err.message : "Failed to load lead intelligence"); }
+    try {
+      const [current, history] = await Promise.all([api.getLeadIntelligence(tenantId, leadId), api.getLeadIntelligenceHistory(tenantId, leadId)]);
+      if (requestId !== intelligenceRequestRef.current) return;
+      setIntelligence(current); setIntelligenceHistory(history);
+    } catch (err) {
+      if (requestId !== intelligenceRequestRef.current) return;
+      setIntelligence(null); setIntelligenceHistory(null); setIntelligenceError(err instanceof Error ? err.message : "Failed to load lead intelligence");
+    }
   }
   async function handleRecalculateIntelligence() {
     if (!tenantId || !leadId) return;
+    const requestId = ++intelligenceRequestRef.current;
     setRecalculating(true); setIntelligenceError(null);
-    try { const refreshed = await api.recalculateLeadIntelligence(tenantId, leadId); setIntelligence(refreshed); setIntelligenceHistory(await api.getLeadIntelligenceHistory(tenantId, leadId)); }
-    catch (err) { setIntelligenceError(err instanceof Error ? err.message : "Failed to recalculate lead intelligence"); }
-    finally { setRecalculating(false); }
+    try {
+      const refreshed = await api.recalculateLeadIntelligence(tenantId, leadId);
+      const history = await api.getLeadIntelligenceHistory(tenantId, leadId);
+      if (requestId !== intelligenceRequestRef.current) return;
+      setIntelligence(refreshed); setIntelligenceHistory(history);
+    } catch (err) {
+      if (requestId !== intelligenceRequestRef.current) return;
+      setIntelligenceError(err instanceof Error ? err.message : "Failed to recalculate lead intelligence");
+    } finally {
+      if (requestId === intelligenceRequestRef.current) setRecalculating(false);
+    }
   }
   useEffect(() => {
     // Key tab state off the serialized location search, not a mutable URLSearchParams reference.
@@ -89,10 +136,18 @@ export function LeadDetailPage() {
   useEffect(() => {
     if (!tenantId || !leadId) return;
     let cancelled = false;
+    detailRequestRef.current += 1;
+    intelligenceRequestRef.current += 1;
+    setLead(null); setNotes(null); setTags(null); setDeals(null); setMembers(null); setCapturedFacts(null); setFieldDefinitions(null);
+    setIntelligence(undefined); setIntelligenceHistory(null); setIntelligenceError(null); setError(null);
     loadAll().catch((err) => { if (cancelled) return; if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { navigate("/login", { replace: true }); return; } setError(err instanceof Error ? err.message : "Failed to load lead"); });
-    loadIntelligence();
+    void loadIntelligence();
     api.markLeadRead(tenantId, leadId).catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      detailRequestRef.current += 1;
+      intelligenceRequestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, leadId, reloadCount]);
   function handleTabChange(tab: LeadDetailTab) {
@@ -126,7 +181,7 @@ export function LeadDetailPage() {
         description={lead?.username ? `@${lead.username.replace(/^@/, "")} · Instagram lead` : lead ? "Instagram hasn't provided a username for this lead yet. You can still review the conversation and captured details here." : "Review context, ownership, conversation, activity, notes, and next steps."}
         actions={<Link className="btn-secondary btn-small" to={`/dashboard/${tenantId}/leads`}>← Back to leads</Link>}
       />
-      {error && <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert"><span>{error}</span>{!lead && <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>Retry loading lead</button>}</div>}
+      {error && <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert"><span>{error}</span><button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>{lead ? "Retry loading details" : "Retry loading lead"}</button></div>}
       {!lead ? <p className="muted" role="status">{error ? "Lead details could not be loaded." : "Loading lead…"}</p> : <>
         <div className="lead-detail-tabs" role="tablist" aria-label="Lead details">
           {TABS.map((t, index) => <button key={t.value} ref={(element) => { tabRefs.current[index] = element; }} id={`lead-tab-${t.value}`} type="button" role="tab" aria-selected={activeTab === t.value} aria-controls="lead-tabpanel" tabIndex={activeTab === t.value ? 0 : -1} className={activeTab === t.value ? "lead-detail-tab is-active" : "lead-detail-tab"} onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => { let nextIndex: number | null = null; if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length; if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length; if (event.key === "Home") nextIndex = 0; if (event.key === "End") nextIndex = TABS.length - 1; if (nextIndex !== null) { event.preventDefault(); tabRefs.current[nextIndex]?.focus(); handleTabChange(TABS[nextIndex].value); } }} onClick={() => handleTabChange(t.value)}>{t.label}</button>)}
