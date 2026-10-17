@@ -14,7 +14,7 @@ export function AutomationHeader() {
         Docs
       </a>
       <a href="/docs/quick-start" target="_blank" rel="noopener noreferrer" aria-label="Open SignalAI quick start documentation in a new tab" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-ink md:hidden">
-        <FileTextIcon className="h-4.5 h-4.5" />
+        <FileTextIcon className="h-4.5 w-4.5" />
       </a>
     </div>
   );
