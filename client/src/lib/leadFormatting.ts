@@ -62,7 +62,7 @@ export function formatLeadMessagePreview(preview: string | null | undefined): { 
     return { label: "Shared Instagram media", title: value };
   }
 
-  return { label: value };
+  return { label: value, title: value };
 }
 
 /** Explain how much of the Instagram messaging window remains, with the exact expiry available as the title. */
