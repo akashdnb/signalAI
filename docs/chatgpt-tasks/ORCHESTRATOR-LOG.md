@@ -102,8 +102,6 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 
 ## 2026-10-17 — Release branch divergence and visual QA status
 
-**Timestamp:** 2026-10-17 02:46 Asia/Kolkata (IST)
-
 ### Verified source drift / visual reference
 
 - The live Render preview service `signalai-precision-operations-preview` is configured to branch `feat/precision-operations-product-ui`.
@@ -271,3 +269,12 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - Knowledge had one real source-level composition gap, fixed in PR #119 with a one-file CSS-only change to `client/src/styles/knowledge-settings-parity.css` (**+10/-2**) that reorders the existing real source review first, source preview second, retrieval test last, preserving all APIs/data/loading/error/retry/pagination/permissions semantics.
 - PR #119 was squash-merged as `6897415df9a1e8880f85858fa10064524f81cb9c` on `feat/preview-to-production-foundation`.
 - No `main` write or production deploy occurred.
+
+## 2026-10-18 21:xx IST — Lead Detail fix merged; remaining PR backlog reviewed
+
+- PR #147 (`fix(leads): resolve legacy username route params`) was source-reviewed and squash-merged into `feat/preview-to-production-foundation` as `20e19de713333f633aec0566f1472728ef06f87a`.
+- The fix is functional, not cosmetic: a router-level `leadId` resolver preserves UUID routes and tenant-scopes legacy Instagram username lookup before UUID-backed lead/deal/tag handlers run; ambiguous usernames return 409 instead of guessing.
+- The merged head is GitHub-verified and signed. No status checks were exposed for the head (`combined status: []`); therefore CI/build/test passage is **not** claimed. Merge was permitted because the PR was non-draft, mergeable, source-reviewed, and the defect/root cause was directly verified against the production 500 evidence.
+- Remaining open PRs #141, #142, #144, #145, #146, and #148 were reviewed. All are draft and currently behind the new foundation merge, so none is currently merge-ready. Their PR descriptions also explicitly state that automated checks were not observed/claimed.
+- PR #148 was refreshed safely onto the current foundation `20e19de...` without changing its four-file scope. Its branch now has one commit `8bde04465641aa4144b8eb9a3cd91917acb4abdf`, compare is **1 ahead / 0 behind**, and the exact four changed files remain the Settings scoring/lead-fields parity files. No CI status is exposed yet, so it remains draft and unmerged.
+- PRs #141/#142/#144/#145/#146 require the same current-base refresh before final merge review. No new PR was opened. No deployment occurred and `main` was untouched.
