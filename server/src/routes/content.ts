@@ -66,6 +66,8 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const requestedAccountRowId = typeof rawAccountRowId === "string"
     ? rawAccountRowId.trim()
     : undefined;
+  // The account resolver deliberately returns null for unknown IDs; narrow
+  // that to undefined so database helpers receive only string | undefined.
   const resolvedInstagramAccountId = requestedAccountRowId
     ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
     : null;
@@ -81,6 +83,9 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
     const retryAt = entry.refreshRetryAt?.getTime() ?? 0;
     const isStale = !fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS;
     const retryIsDue = retryAt <= now;
+
+    // A retry record is media-level state. It must not be masked by a newer
+    // legacy/account-specific presentation row with a fresh fetched_at.
     return retryIsDue && (isStale || entry.refreshFailureCount > 0);
   });
 
@@ -114,6 +119,9 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
           enriched = true;
           break;
         } catch (err) {
+          // A media id belongs to one connected account. A failed lookup on
+          // one account is therefore expected when a workspace has multiple
+          // accounts; try the next account before giving up.
           lastError = err;
         }
       }
