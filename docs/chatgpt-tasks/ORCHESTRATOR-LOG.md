@@ -268,3 +268,35 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - Read this log in full before appending; no prior entries were edited or removed.
 - Branch/commit/PR references above are exact (`task/reconcile-current-main-into-foundation`, commit `95c330f`, PR #100).
 - No merge into foundation or `main`, and no deployment, occurred.
+
+
+## 2026-10-17 — Delegation and source-of-truth correction
+
+**Timestamp:** 2026-10-17 (Asia/Kolkata)
+
+### Verified repository state
+
+- PR #93 (JourneyBuilder parity) and PR #94 (Leads table polish) are merged into `feat/preview-to-production-foundation`; the foundation head is `eaf50af2d38c04715a6b9b8016d9f87e1cc7f3bf`.
+- PR #100 is merged, but its base was foundation at `3897dff7d08bb31413af8843fc044b25f4795e57` and it merged into the child branch `task/reconcile-current-main-into-foundation` at `4357e4c6399726472a0e56cb548c702621b4085f` (merge commit `99cc1091eaff2fcb9045caf078408a387d1f8983`). It did **not** advance foundation. Its recovered workspace/account, notification, Inbox tag, and related backend behavior must not be represented as landed on foundation until that branch is integrated.
+- PR #101, `task/retire-production-preview-bundle` → foundation, remains open and unmerged. Head: `c1d86a85a6149e94fd67421c5efff5bfbf851c6a`; base: `eaf50af2d38c04715a6b9b8016d9f87e1cc7f3bf`. It removes the bundled `?preview=precision-operations` route/assets while preserving the separate preview service, but build/lint/CI and the parity release gate remain outstanding. No Render deployment was triggered.
+- The historical `NEEDS DECISION` and earlier statements are retained unchanged; this entry clarifies current state rather than rewriting prior history.
+
+### Delegated sessions
+
+- Started a read-only Inbox parity audit in a separate ChatGPT session (`Inbox parity audit`); scope includes rendered production-vs-preview behavior, filtering, pagination, selection/read-state risks, account scoping, dark mode and 390/768/1024/1440 widths. Findings are pending; no changes authorized.
+- Started a separate docs-only session (`Draft log correction`) to independently check PR state and draft a minimal append-only correction. Its proposed correction was reviewed against current GitHub PR metadata before recording this entry.
+- Delegation is now the default for independent audits and implementation-sized tasks, including small tasks. Use scoped branches/PRs and avoid overlapping write scopes; no session may touch `main` or deploy production without explicit authorization. Anti-AI UI guidelines in `AGENTS.md` and `DESIGN.md` remain mandatory.
+- The currently available connector/browser surface can create ChatGPT sessions and send scoped prompts but exposes no native agent-spawn/status API. A session is only marked complete once its returned findings or commits/PR are actually inspected.
+
+### Next actions
+
+1. Finish and review the delegated Inbox parity findings before implementation.
+2. Assign any Inbox implementation to a separate scoped agent/session on a child branch from the current foundation head; preserve production API/data/permissions and test read/unread, filters, pagination, polling and account scope.
+3. Continue page-parity work by delegating separate non-overlapping areas; keep Render/browser verification explicit and honest.
+4. Do not merge PR #101 or any child PR without verification; any eventual merge into foundation must use squash-and-merge. Do not touch `main` or deploy production without an explicit separate instruction.
+
+### Verification
+
+- Read current `AGENTS.md`, `DESIGN.md`, `client/src/components/ui/README.md`, and this log before updating.
+- Confirmed PR metadata for #93, #94, #100 and #101 via GitHub connector; checked current live browser tabs and the two delegated session prompts.
+- No app source changes, PR merge, `main` writes, or Render deploy performed by this log update.
