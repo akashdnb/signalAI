@@ -22,3 +22,12 @@ Continuation of the 2026-10-18 orchestration log. Append-only; prior dated parts
 - Billing has cancellation guards, truthful live billing/usage data, bounded usage meters, and configured/unconfigured checkout handling. No new source fix justified; Plan & Billing remains parked on the product/backend decision already recorded.
 - No browser tab was opened in this pass. BrowserMCP's current extension state could not attach to the previously listed production tab, so no rendered claim was made from that stale tab listing.
 - No production deployment, `main` write, or speculative preview-data change occurred.
+
+## 2026-10-18 02:37 IST — Dashboard reporting cutoff corrected with full-file read-SHA-write
+
+- Re-read the complete current `DashboardPage.tsx` from `feat/preview-to-production-foundation` and captured its pre-write blob SHA `c8e7093aaaaba509a13c065420b230ac4b2aac2b` before making any change.
+- Confirmed the bug: `Last 7 days`/`Last 30 days` used an exact rolling-time cutoff (`now - 6/29 days`) while `fillDailySeries` renders calendar-day slots from midnight. That could drop earlier activity from the first visible day even though that day remained on the chart.
+- Replaced the complete file in one GitHub contents write, changing only `periodStart()` so bounded periods begin at local midnight for the first included calendar day. The rest of the file was preserved, including real API calls, live data semantics, account behavior, and UI composition.
+- Commit: `be7ed504305e4efa2255a4ee43b12521fab908a3` (`fix(dashboard): align reporting cutoff with calendar-day window`).
+- Re-fetched `DashboardPage.tsx` after the write and confirmed the new helper is present on `feat/preview-to-production-foundation`.
+- This is an independently-safe frontend correctness fix, not a preview-data or backend-contract change. No production deployment and no `main` write occurred.
