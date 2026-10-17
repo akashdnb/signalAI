@@ -343,3 +343,11 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - Fresh Inbox visual parity is merged; the GAPS re-audit confirms many live production differences remain.
 - No deploy or `main` writes occurred. No CI/workflow run is claimed, and no responsive exact-width verification is claimed.
 - This append is log-only: `GAPS.md` and all application files were left unchanged. Existing log history was preserved.
+
+## 2026-10-17 14:45 IST — Journey Builder Flow/Setup merge and final parity status
+
+- PR #113 Journey Builder Flow/Setup was squash-merged as `c7e6eb4a6b7b9983a7bd4faab87d3cd348ae832e` after delegated source review and the required BuilderNode eyebrow typography correction from 10px to 11px.
+- Current foundation head after the merge is `c7e6eb4a6b7b9983a7bd4faab87d3cd348ae832e`.
+- `GAPS.md` remains open because production has not been deployed and live rendered parity is not demonstrated; affected visual parity gaps therefore remain unresolved for release purposes.
+- No CI/workflow run or responsive exact-width verification is claimed.
+- No production deployment or `main` write occurred. This append is log-only; `GAPS.md` and all application files were left unchanged. Existing log history was preserved.
