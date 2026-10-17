@@ -33,7 +33,7 @@ export function SettingsProfilePage() {
         if (self) setRole(self.role);
       })
       .catch(() => {
-        // Role display degrades gracefully — not a page-blocking error.
+        // Role display is supplementary; profile editing remains available if membership lookup fails.
       });
     return () => {
       cancelled = true;
@@ -88,28 +88,30 @@ export function SettingsProfilePage() {
 
   const displayName = [firstName, lastName].filter(Boolean).join(" ") || deriveDisplayName(profile?.email ?? session?.email);
   const initial = (firstName?.charAt(0) || profile?.email?.charAt(0) || session?.email?.charAt(0) || "?").toUpperCase();
+  const email = profile?.email ?? session?.email ?? "—";
 
   return (
-    <section className="card">
-      <h2>Profile</h2>
-      <p className="muted small">Update how your name and profile image appear to teammates. Your sign-in email is managed by your identity provider.</p>
+    <section className="card settings-panel settings-profile-panel">
+      <div className="settings-panel-header">
+        <div>
+          <div className="settings-eyebrow">PERSONAL ACCOUNT</div>
+          <h2>Profile</h2>
+          <p className="muted small">Manage how your name and account details appear to teammates.</p>
+        </div>
+      </div>
 
-      <div className="mt-4 flex items-center gap-3 rounded-xl border border-line p-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-base font-semibold text-white">
-          {session?.picture ? (
-            <img src={session.picture} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+      <div className="settings-profile-summary">
+        <span className="settings-profile-avatar">
+          {profile?.profilePictureUrl || session?.picture ? (
+            <img src={profile?.profilePictureUrl ?? session?.picture} alt="" referrerPolicy="no-referrer" />
           ) : (
             initial
           )}
         </span>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-ink">{displayName}</div>
-          <div className="truncate text-sm text-subtle">{profile?.email ?? session?.email ?? "—"}</div>
-          {role && (
-            <StatusBadge tone="neutral" className="mt-1">
-              {formatRole(role)}
-            </StatusBadge>
-          )}
+          <div className="truncate text-sm text-subtle">{email}</div>
+          {role && <StatusBadge tone="neutral" className="mt-1">{formatRole(role)}</StatusBadge>}
         </div>
       </div>
 
@@ -118,21 +120,31 @@ export function SettingsProfilePage() {
       ) : error && !profile ? (
         <div className="mt-4 banner banner-error" role="alert">{error}</div>
       ) : (
-        <form className="mt-4 max-w-2xl space-y-4" onSubmit={(event) => void saveProfile(event)}>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form className="settings-form" onSubmit={(event) => void saveProfile(event)}>
+          <div className="settings-form-grid">
             <Field label="First name" htmlFor="profile-first-name">
               <TextInput id="profile-first-name" value={firstName} maxLength={80} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" />
             </Field>
             <Field label="Last name" htmlFor="profile-last-name">
               <TextInput id="profile-last-name" value={lastName} maxLength={80} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" />
             </Field>
+            <Field label="Email address" htmlFor="profile-email" hint="Managed by your sign-in identity provider.">
+              <TextInput id="profile-email" value={email} readOnly aria-readonly="true" />
+            </Field>
+            <Field label="Workspace role" htmlFor="profile-role" hint={role ? "Your workspace membership controls this role." : "Workspace role is unavailable until membership data loads."}>
+              <TextInput id="profile-role" value={role ? formatRole(role) : "—"} readOnly aria-readonly="true" />
+            </Field>
           </div>
+
           <Field label="Profile image URL" htmlFor="profile-picture-url" hint="Optional. Use a public HTTPS image URL. Leave empty to remove the current image.">
             <TextInput id="profile-picture-url" type="url" value={pictureUrl} maxLength={2048} onChange={(event) => setPictureUrl(event.target.value)} placeholder="https://…" autoComplete="url" />
           </Field>
+
           {error && <p className="text-sm text-err-ink" role="alert">{error}</p>}
           {saved && <p className="text-sm text-ok-ink" role="status">Profile saved.</p>}
-          <Button type="submit" disabled={saving || loading}>{saving ? "Saving…" : "Save profile"}</Button>
+          <div>
+            <Button type="submit" disabled={saving || loading}>{saving ? "Saving…" : "Save profile"}</Button>
+          </div>
         </form>
       )}
     </section>
