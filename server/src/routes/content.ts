@@ -8,6 +8,7 @@ import {
 } from "../db/mediaMetadata.js";
 import { listConnectedInstagramAccounts } from "../db/connectedAccounts.js";
 import { getDecryptedToken, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
+import { getTopKeywords, getTopPosts } from "../db/analytics.js";
 import { fetchMediaMetadata } from "../lib/instagramMedia.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 import { Sentry } from "../lib/sentry.js";
@@ -24,6 +25,24 @@ const METADATA_REFRESH_RETRY_DELAYS_MS = [
 function retryDelayForFailure(failureCount: number): number {
   const boundedFailureCount = Math.min(Math.max(failureCount, 1), MAX_METADATA_REFRESH_FAILURES);
   return METADATA_REFRESH_RETRY_DELAYS_MS[boundedFailureCount - 1];
+}
+
+async function resolveAnalyticsAccountScope(
+  tenantId: string,
+  rawAccountId: unknown,
+  res: Parameters<Parameters<typeof Router>[0]>[0],
+): Promise<string | undefined | false> {
+  if (rawAccountId === undefined) return undefined;
+  if (typeof rawAccountId !== "string" || !rawAccountId.trim()) {
+    res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+    return false;
+  }
+  const accountId = await resolveInstagramAccountIdForTenant(getPool(), tenantId, rawAccountId.trim());
+  if (!accountId) {
+    res.status(404).json({ error: "Instagram account not found for this workspace" });
+    return false;
+  }
+  return accountId;
 }
 
 export const contentRouter = Router();
@@ -47,8 +66,6 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   const requestedAccountRowId = typeof rawAccountRowId === "string"
     ? rawAccountRowId.trim()
     : undefined;
-  // The account resolver deliberately returns null for unknown IDs; narrow
-  // that to undefined so database helpers receive only string | undefined.
   const resolvedInstagramAccountId = requestedAccountRowId
     ? await resolveInstagramAccountIdForTenant(pool, tenantId, requestedAccountRowId)
     : null;
@@ -64,9 +81,6 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
     const retryAt = entry.refreshRetryAt?.getTime() ?? 0;
     const isStale = !fetchedAt || now - fetchedAt >= METADATA_REFRESH_AFTER_MS;
     const retryIsDue = retryAt <= now;
-
-    // A retry record is media-level state. It must not be masked by a newer
-    // legacy/account-specific presentation row with a fresh fetched_at.
     return retryIsDue && (isStale || entry.refreshFailureCount > 0);
   });
 
@@ -100,9 +114,6 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
           enriched = true;
           break;
         } catch (err) {
-          // A media id belongs to one connected account. A failed lookup on
-          // one account is therefore expected when a workspace has multiple
-          // accounts; try the next account before giving up.
           lastError = err;
         }
       }
@@ -126,4 +137,19 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   }
 
   return res.status(200).json(media);
+});
+
+/** Analytics content signals use the same tenant session and optional connected-account scope as the content surface. */
+contentRouter.get("/tenants/:tenantId/analytics/top-posts", async (req, res) => {
+  const scope = await resolveAnalyticsAccountScope(req.params.tenantId, req.query.accountId, res);
+  if (scope === false) return;
+  const posts = await getTopPosts(getPool(), req.params.tenantId, 10, scope);
+  return res.status(200).json(posts);
+});
+
+contentRouter.get("/tenants/:tenantId/analytics/top-keywords", async (req, res) => {
+  const scope = await resolveAnalyticsAccountScope(req.params.tenantId, req.query.accountId, res);
+  if (scope === false) return;
+  const keywords = await getTopKeywords(getPool(), req.params.tenantId, 10, scope);
+  return res.status(200).json(keywords);
 });
