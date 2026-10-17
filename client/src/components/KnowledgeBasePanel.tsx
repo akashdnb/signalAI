@@ -137,45 +137,6 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
     <div className="knowledge-base-panel">
       {error && pageData !== null && <div className="banner banner-error" role="alert">{error}</div>}
 
-      <section className="mb-6 border-b border-line pb-5">
-        <h3 className="text-base font-semibold text-ink">Test knowledge retrieval</h3>
-        <p className="muted small mt-1">Check which stored passages would be returned for a question. This uses the configured embedding service and your ready sources.</p>
-        <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={handleRetrievalCheck}>
-          <div className="min-w-[240px] flex-1">
-            <Field label="Sample question" htmlFor="kb-retrieval-query">
-              <TextInput
-                id="kb-retrieval-query"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                maxLength={1000}
-                placeholder="e.g. What is the refund policy?"
-              />
-            </Field>
-          </div>
-          <Button type="submit" size="md" disabled={retrievalLoading}>
-            {retrievalLoading ? "Checking…" : "Check retrieval"}
-          </Button>
-        </form>
-        {retrievalError && <p className="mt-2 text-sm text-err-ink" role="alert">{retrievalError}</p>}
-        {retrieval && (
-          <div className="mt-3" aria-live="polite">
-            {retrieval.count === 0 ? (
-              <p className="muted small">No matching passages were found in ready sources.</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="muted small">{retrieval.count} matching passage{retrieval.count === 1 ? "" : "s"} returned.</p>
-                {retrieval.results.map((item, index) => (
-                  <div className="border-l-2 border-line pl-3" key={`${item.documentId}-${index}`}>
-                    <p className="m-0 text-sm text-ink whitespace-pre-wrap">{item.content}</p>
-                    <p className="muted small mt-1">Similarity {item.similarity.toFixed(3)} · Source ID {item.documentId}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
       {documents === null && error ? (
         <ErrorState
           title="Couldn't load knowledge sources"
@@ -351,6 +312,45 @@ export function KnowledgeBasePanel({ tenantId }: { tenantId: string }) {
           )}
         </section>
       )}
+
+      <section className="mb-6 border-b border-line pb-5">
+        <h3 className="text-base font-semibold text-ink">Test knowledge retrieval</h3>
+        <p className="muted small mt-1">Check which stored passages would be returned for a question. This uses the configured embedding service and your ready sources.</p>
+        <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={handleRetrievalCheck}>
+          <div className="min-w-[240px] flex-1">
+            <Field label="Sample question" htmlFor="kb-retrieval-query">
+              <TextInput
+                id="kb-retrieval-query"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                maxLength={1000}
+                placeholder="e.g. What is the refund policy?"
+              />
+            </Field>
+          </div>
+          <Button type="submit" size="md" disabled={retrievalLoading}>
+            {retrievalLoading ? "Checking…" : "Check retrieval"}
+          </Button>
+        </form>
+        {retrievalError && <p className="mt-2 text-sm text-err-ink" role="alert">{retrievalError}</p>}
+        {retrieval && (
+          <div className="mt-3" aria-live="polite">
+            {retrieval.count === 0 ? (
+              <p className="muted small">No matching passages were found in ready sources.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="muted small">{retrieval.count} matching passage{retrieval.count === 1 ? "" : "s"} returned.</p>
+                {retrieval.results.map((item, index) => (
+                  <div className="border-l-2 border-line pl-3" key={`${item.documentId}-${index}`}>
+                    <p className="m-0 text-sm text-ink whitespace-pre-wrap">{item.content}</p>
+                    <p className="muted small mt-1">Similarity {item.similarity.toFixed(3)} · Source ID {item.documentId}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
