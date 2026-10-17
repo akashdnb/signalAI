@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useTenant } from "../../context/TenantContext";
 
 const TIMEZONE_OPTIONS = [
@@ -18,14 +17,9 @@ const TIMEZONE_OPTIONS = [
  */
 export function SettingsGeneralPage() {
   const { tenant } = useTenant();
-  const [workspaceName] = useState(tenant?.name ?? "");
-  const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+  const workspaceName = tenant?.name ?? "Loading…";
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const defaultOwner = "first_available";
-
-  useEffect(() => {
-    // TenantContext may still be loading when this component mounts. The
-    // current tenant name is rendered when available; there is no mutation API to persist it.
-  }, [tenant?.name]);
 
   return (
     <section className="card settings-panel">
