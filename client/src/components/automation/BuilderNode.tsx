@@ -48,7 +48,7 @@ export function BuilderNode({
   children?: ReactNode;
 }) {
   return (
-    <div className="relative w-[300px] max-w-[calc(100vw-40px)]">
+    <div className="relative w-[430px] max-w-[calc(100vw-40px)]">
       <div
         role="button"
         tabIndex={0}
@@ -60,7 +60,7 @@ export function BuilderNode({
             onClick();
           }
         }}
-        className={`relative w-full cursor-grab active:cursor-grabbing rounded-xl border border-l-4 bg-card p-3.5 pr-10 text-left shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition-shadow ${
+        className={`relative min-h-[96px] w-full cursor-grab active:cursor-grabbing rounded-xl border border-l-4 bg-card p-4 pr-11 text-left shadow-[0_3px_12px_rgba(15,23,42,0.05)] transition-shadow ${
           ACCENT_BORDER[accent]
         } ${
           selected
@@ -77,17 +77,17 @@ export function BuilderNode({
 
           <div className="min-w-0 flex-1">
             {eyebrow && (
-              <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-subtle">
+              <div className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">
                 {eyebrow}
               </div>
             )}
 
-            <div className="break-words text-[13px] font-semibold leading-[1.35] text-ink">
+            <div className="break-words text-[14px] font-semibold leading-[1.35] text-ink">
               {title}
             </div>
 
             {subtitle && (
-              <div className="mt-0.5 text-[11px] leading-4 text-subtle">
+              <div className="mt-0.5 text-[12px] leading-4 text-subtle">
                 {subtitle}
               </div>
             )}
@@ -102,7 +102,7 @@ export function BuilderNode({
         )}
 
         {children && (
-          <div className="mt-2 break-words text-[11px] leading-4 text-subtle">
+          <div className="mt-2 break-words text-[12px] leading-4 text-subtle">
             {children}
           </div>
         )}
