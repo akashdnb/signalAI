@@ -334,3 +334,12 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - A fresh delegated Inbox visual/state parity implementation task was launched from the current foundation, and a delegated `GAPS.md` re-audit was launched.
 - Current `GAPS.md` still contains open visual parity items. No responsive exact-width verification is claimed, no CI/workflow run is claimed, and no production deploy or `main` write occurred.
 - This append is log-only: `GAPS.md` and all application files were left unchanged. Existing log history was preserved.
+
+## 2026-10-17 14:40 IST — Inbox parity and GAPS re-audit follow-up
+
+- PR #111 Inbox visual parity was squash-merged as `2933c90d7b87b589fa59a1700f6a8fdbe1771884` after delegated source review plus two typography-floor fixes.
+- PR #112 `GAPS.md` re-audit was squash-merged as `6245226cc9f186ff14edd24ac2f147b81faa80bc` and kept affected gaps **OPEN** because current live production has not been updated/deployed and rendered parity is not demonstrated.
+- PR #113 Journey Builder Flow/Setup is open. Source review found one design violation: the BuilderNode eyebrow is 10px and must become 11px; a delegated fix is in progress.
+- Fresh Inbox visual parity is merged; the GAPS re-audit confirms many live production differences remain.
+- No deploy or `main` writes occurred. No CI/workflow run is claimed, and no responsive exact-width verification is claimed.
+- This append is log-only: `GAPS.md` and all application files were left unchanged. Existing log history was preserved.
