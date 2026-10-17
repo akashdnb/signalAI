@@ -47,7 +47,7 @@ input, select, textarea { max-width: 100%; }
 .page-billing .billing-panel .billing-plan-section > :first-child,
 .page-billing .billing-panel .billing-usage-section > :first-child { margin-top: 0; }
 .page-billing .billing-plan-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.page-billing .billing-section-eyebrow { margin: 0 0 .25rem; color: var(--text-muted); font-size: .72rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.page-billing .billing-section-eyebrow { margin: 0 0 .25rem; color: var(--text-muted); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .page-billing .billing-plan-name { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.02em; }
 .page-billing .billing-trial-note { margin: .85rem 0 0; padding-top: .8rem; border-top: 1px solid var(--border); }
 .page-billing .billing-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
