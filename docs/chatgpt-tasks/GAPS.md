@@ -31,7 +31,7 @@ This file records QA findings comparing the live production app against the Prec
 - theme/viewport checked: light and dark state; natural desktop BrowserMCP viewport only (no dedicated resize control available)
 - STATUS: NEW
 - Gap: Production renders the sidebar expanded by default, with the full SignalAI wordmark and ~215px-wide navigation, while the preview renders the sidebar collapsed by default to a ~46px icon rail. This changes the available content width and shifts every page's main content horizontally.
-- Evidence: Production Overview snapshot shows "Collapse sidebar" and nav items spanning x=12..227; preview Overview shows "Expand sidebar" and nav buttons spanning x=17..63. Production workspace selector begins around x=260 while preview begins around x=106. See production `https://signalai-bui.onrender.com/dashboard/008a82d5-a627-470f-88df-183fb25c45c/` and preview `https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=overview&theme=light`.
+- Evidence: Production Overview snapshot shows "Collapse sidebar" and nav items spanning x=12..227; preview Overview shows "Expand sidebar" and nav buttons spanning x=17..63. Production workspace selector begins around x=260 while preview begins around x=106. See production `https://signalai-bui.onrender.com/dashboard/008a82d5-a627-470f-88df-183fbf25c45c/` and preview `https://signalai-precision-operations-preview.onrender.com/?preview=precision-operations&screen=overview&theme=light`.
 
 ## 2026-10-17 13:43 — Dashboard / Overview
 - theme/viewport checked: light + dark; natural desktop BrowserMCP viewport only
@@ -102,3 +102,27 @@ This file records QA findings comparing the live production app against the Prec
 ## Viewport / theme verification note
 
 BrowserMCP exposed the user's natural desktop Chrome viewport but did not expose a dedicated viewport-resize action. Therefore this first pass does **not** claim 390, 768, 1024, or exact 1440px verification. Light-theme rendered pages were audited directly; dark-theme state was checked on Overview in both preview and production, but pixel/color conclusions were not inferred from text-only snapshots. More screen-by-screen dark and responsive passes remain open.
+
+## 2026-10-17 14:02 — Re-verification: Analytics
+- theme/viewport checked: production light + dark; preview light + dark; natural desktop BrowserMCP viewport only
+- STATUS: STILL OPEN
+- Gap: Production Analytics is no longer stuck on the loading state after the dark-theme toggle, but it still does not match the preview composition. Production uses the expanded sidebar and positions the analytics tabs around x≈278/y≈326, while preview uses the collapsed rail and positions the same tabs around x≈106/y≈204. Production's rendered content is also materially different: it has `Workspace-wide current data`, current pipeline KPI content, `DMs reserved`, and a shorter activity/content-signals presentation; preview has four KPI cards (`Comments received`, `Direct messages`, `Replies sent`, `Human handoffs`), a 7-day activity chart/table, metric definitions, sample post ranking, and trigger keywords.
+- Evidence: Production light snapshot at `/dashboard/<workspace>/analytics` initially showed `Loading analytics…`; production dark-theme snapshot after clicking the theme control rendered `Activity volume`, `Lead conversion`, current-data KPI/content sections and links. Preview light and dark URLs `...?preview=precision-operations&screen=analytics&theme=light|dark` both rendered the complete preview analytics structure. Real metric values were ignored.
+
+## 2026-10-17 14:02 — Re-verification: Settings / Team & access
+- theme/viewport checked: production light + dark; preview dark (preview light was verified in the first pass); natural desktop BrowserMCP viewport only
+- STATUS: STILL OPEN
+- Gap: The previous production loading gap is resolved, but Team & access remains structurally different from the preview. Production now renders workspace-name/description controls, live pending invitations and invitation history, and a server-enforced role-permissions table; preview renders a compact three-member sample roster with one pending invite and a different role-permission matrix. The AppShell/sidebar geometry also remains expanded in production versus collapsed in preview.
+- Evidence: Production light snapshot `/settings/team` now renders `WORKSPACE MEMBERS`, `Invite teammate`, two pending invitations, invitation history, and capability rows; production dark snapshot after theme toggle renders the same content. Preview dark `...?preview=precision-operations&screen=settings&theme=dark&settingsSection=Team+%26+access` renders `WORKSPACE MEMBERS`, three sample members, `Invite teammate`, and preview role permissions. No data-value mismatch was treated as a gap.
+
+## 2026-10-17 14:02 — Settings / Profile
+- theme/viewport checked: production light + dark; preview light + dark; natural desktop BrowserMCP viewport only
+- STATUS: NEW
+- Gap: Production Profile uses the expanded settings layout and a substantially different live form from the preview. Production's light state briefly showed `Loading profile…`; its dark state rendered editable `First name`, `Last name`, and optional `Profile image URL` fields plus `Save profile`. Preview renders a compact profile identity card with avatar/name/email/role, fields labeled `Display name`, `Email address`, `Workspace role`, a `Save profile` action, and an explicit `Account updates are not sent to a server.` note. Production also places the settings navigation around x≈278, while preview places it around x≈115.
+- Evidence: Production `/settings/profile` snapshots were taken in light and dark. Preview `...?preview=precision-operations&screen=settings&theme=light|dark&settingsSection=Profile` both rendered the complete preview profile structure. Theme differences were observed through the rendered theme state; exact color-token comparison was not inferred from text snapshots.
+
+## 2026-10-17 14:02 — Settings / Notifications
+- theme/viewport checked: production light + dark; preview light + dark; natural desktop BrowserMCP viewport only
+- STATUS: NEW
+- Gap: Production Notifications is a detailed two-channel notification matrix with six operational events and separate `IN-APP` / `EMAIL` On/Off controls, an email recipient, and a workspace/account persistence explanation. Preview Notifications is a shorter preference list with four user-facing categories (`Automation failures`, `Human handoffs`, `New qualified leads`, `Weekly summary`) and a single save action, plus a preview-only note that no email or push notifications are sent. The information architecture and control density therefore differ materially.
+- Evidence: Production `/settings/notifications` light and dark snapshots render six events including `New leads`, `Automation failures`, `Instagram connection needs attention`, `Instagram disconnected`, and `Important system alerts`, with IN-APP/EMAIL controls and `Save notification preferences`. Preview light and dark `...?preview=precision-operations&screen=settings&theme=light|dark&settingsSection=Notifications` render the four preference rows and the preview-only delivery note. Real recipient/account values were ignored.
