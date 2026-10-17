@@ -88,12 +88,13 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
             <p className="muted">No captured fields yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table min-w-[620px]">
+              <table className="table min-w-[700px]">
                 <thead>
                   <tr>
-                    <th>Field</th>
-                    <th>Internal key</th>
+                    <th>Label</th>
+                    <th>Technical key</th>
                     <th>Type</th>
+                    <th>Used for</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -103,6 +104,7 @@ export function FieldDefinitionsPanel({ tenantId }: { tenantId: string }) {
                       <td><strong>{d.label}</strong></td>
                       <td><code>{d.fieldKey}</code></td>
                       <td>{VALUE_TYPES.find((t) => t.value === d.valueType)?.label ?? d.valueType}</td>
+                      <td><span className="muted small">Not reported by the field-definition API</span></td>
                       <td>
                         <button type="button" className="btn-secondary btn-small" onClick={() => void handleDelete(d.id)}>
                           Remove
