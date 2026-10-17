@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
@@ -697,14 +697,16 @@ export function JourneyBuilder({
                 </button>
               )}
 
-              <Link
-                to="/docs/journey-builder"
-                aria-label="Open automation flow documentation"
+              <a
+                href="/docs/journey-builder"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open automation flow documentation in a new tab"
                 className="builder-toolbar-button hidden h-9 min-w-[72px] items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-ink lg:inline-flex"
               >
                 <FileTextIcon className="h-4 w-4 shrink-0" />
-                Docs
-              </Link>
+                Docs ↗
+              </a>
 
               <button
                 type="button"

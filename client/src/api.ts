@@ -81,7 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // body wasn't JSON — keep statusText
     }
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       clearSession();
     }
     throw new ApiError(res.status, message);
@@ -116,7 +116,7 @@ async function requestMultipart<T>(path: string, formData: FormData): Promise<T>
     } catch {
       // body wasn't JSON — keep statusText
     }
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       clearSession();
     }
     throw new ApiError(res.status, message);
@@ -178,8 +178,80 @@ export const INDUSTRY_LABEL: Record<TenantIndustry, string> = {
 export interface TenantSummary {
   id: string;
   name: string;
+  description?: string | null;
   billingStatus: "none" | "active" | "canceled";
   industry: TenantIndustry | null;
+}
+
+
+
+/** User-owned profile: never accepts a target user id. */
+export interface UserProfile {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePictureUrl: string | null;
+  createdAt: string;
+}
+
+
+export type NotificationSeverity = "info" | "success" | "warning" | "critical";
+export type NotificationChannel = "email" | "in_app";
+export interface NotificationPreferenceChannel {
+  type: NotificationChannel;
+  label: string;
+  description: string;
+  available: boolean;
+  reason: string | null;
+  enabled: boolean;
+}
+export interface NotificationPreferenceEvent {
+  type: string;
+  label: string;
+  description: string;
+  severity: NotificationSeverity;
+  channels: NotificationPreferenceChannel[];
+}
+export interface NotificationPreferences {
+  events: NotificationPreferenceEvent[];
+  recipient: { email: string };
+}
+export interface InAppNotification {
+  id: string;
+  eventType: string;
+  title: string;
+  message: string;
+  severity: NotificationSeverity;
+  entityType: string | null;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+export interface NotificationInbox {
+  notifications: InAppNotification[];
+  unreadCount: number;
+}
+
+export interface KnowledgeBaseDocumentPreview {
+  documentId: string;
+  filename: string;
+  content: string;
+  /** True when preview content was capped to keep responses bounded. */
+  truncated: boolean;
+  chunkCount: number;
+}
+
+export interface KnowledgeRetrievalResult {
+  content: string;
+  documentId: string;
+  similarity: number;
+}
+
+export interface KnowledgeRetrievalResponse {
+  query: string;
+  results: KnowledgeRetrievalResult[];
+  count: number;
 }
 
 export interface AccountHealth {
@@ -237,6 +309,8 @@ export interface Campaign {
 
 export interface ObservedMedia {
   mediaId: string;
+  /** Instagram business account that owns this media; absent on legacy unattributed metadata. */
+  instagramAccountId?: string | null;
   commentCount: number;
   lastSeenAt: string | null;
   /** Cached Graph API metadata — null until enriched (see server's routes/campaigns.ts), which happens lazily whenever the picker loads an entry it doesn't have this for yet. */
@@ -506,6 +580,8 @@ export interface FunnelStage {
 
 export interface Funnel {
   stages: FunnelStage[];
+  stageCounts: Record<PipelineStage, number>;
+  unmappedLeadCount: number;
   openWithNoOutcome: number;
 }
 
@@ -707,11 +783,11 @@ export const api = {
   updateDealStage: (tenantId: string, dealId: string, stage: DealStage) =>
     request<Deal>(`/tenants/${tenantId}/deals/${dealId}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
 
-  getTopPosts: (tenantId: string) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts`),
-  getTopKeywords: (tenantId: string) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords`),
+  getTopPosts: (tenantId: string, accountId?: string | null) => request<TopPost[]>(`/tenants/${tenantId}/analytics/top-posts${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getTopKeywords: (tenantId: string, accountId?: string | null) => request<TopKeyword[]>(`/tenants/${tenantId}/analytics/top-keywords${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
-  getFunnel: (tenantId: string) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel`),
-  getRevenue: (tenantId: string) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue`),
+  getFunnel: (tenantId: string, accountId?: string | null) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
+  getRevenue: (tenantId: string, accountId?: string | null) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getConversationsTimeseries: (tenantId: string) =>
     request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
   getDropoff: (tenantId: string, campaignId: string) =>
@@ -764,7 +840,7 @@ export const api = {
   // Backs the campaign editor's post-targeting picker: posts this tenant
   // has actually received a comment on, derived from ingested events
   // rather than a Graph API media-listing call.
-  listObservedMedia: (tenantId: string) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media`),
+  listObservedMedia: (tenantId: string, accountId?: string | null) => request<ObservedMedia[]>(`/tenants/${tenantId}/observed-media${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   // Resolves a pasted post/Reel URL against the connected account's own
   // media and adds it as a known post — usable for targeting even before
   // any comment on it has arrived.
@@ -842,8 +918,36 @@ export const api = {
     }),
   getUsage: (tenantId: string) => request<UsageSummary>(`/tenants/${tenantId}/usage`),
 
+
+  getNotificationPreferences: (tenantId: string) =>
+    request<NotificationPreferences>(`/tenants/${tenantId}/notifications/preferences`),
+  updateNotificationPreferences: (tenantId: string, preferences: Array<{ eventType: string; channel: NotificationChannel; enabled: boolean }>) =>
+    request<{ saved: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/preferences`, {
+      method: "PUT",
+      body: JSON.stringify({ preferences }),
+    }),
+  getNotifications: (tenantId: string, limit = 10) =>
+    request<NotificationInbox>(`/tenants/${tenantId}/notifications?limit=${limit}`),
+  markNotificationRead: (tenantId: string, notificationId: string) =>
+    request<{ read: boolean }>(`/tenants/${tenantId}/notifications/${notificationId}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: (tenantId: string) =>
+    request<{ read: boolean; updatedCount: number }>(`/tenants/${tenantId}/notifications/read-all`, { method: "POST" }),
+
+  getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
+  updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
+    request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+
   listKnowledgeBaseDocuments: (tenantId: string) =>
     request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
+  getKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<{ document: Omit<KnowledgeBaseDocument, "storageKey"> }>(`/tenants/${tenantId}/knowledge-base/${documentId}`).then((r) => r.document),
+  previewKnowledgeBaseDocument: (tenantId: string, documentId: string) =>
+    request<KnowledgeBaseDocumentPreview>(`/tenants/${tenantId}/knowledge-base/${documentId}/preview`),
+  retrieveKnowledgeBase: (tenantId: string, query: string, limit = 5) =>
+    request<KnowledgeRetrievalResponse>(`/tenants/${tenantId}/knowledge-base/retrieval`, {
+      method: "POST",
+      body: JSON.stringify({ query, limit }),
+    }),
   uploadKnowledgeBaseDocument: (tenantId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

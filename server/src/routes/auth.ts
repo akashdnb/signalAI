@@ -7,7 +7,7 @@ import { markTokenError, upsertToken } from "../db/tokens.js";
 import { registerInstagramTrialUse } from "../db/instagramTrialHistory.js";
 import { endTrialImmediately } from "../db/tenants.js";
 import { trySpendNonce } from "../db/oauthNonces.js";
-import { requireTenantSession } from "../lib/tenantAuth.js";
+import { requireTenantPermission, requireTenantSession } from "../lib/tenantAuth.js";
 import {
   OAUTH_NONCE_COOKIE,
   createOAuthState,
@@ -26,7 +26,7 @@ import { Sentry } from "../lib/sentry.js";
 
 export const authRouter = Router();
 
-authRouter.post("/tenants/:tenantId/instagram/connect-link", requireTenantSession, async (req, res) => {
+authRouter.post("/tenants/:tenantId/instagram/connect-link", requireTenantPermission("instagram:connect"), async (req, res) => {
   const { tenantId } = req.params;
   const accountId = typeof req.body?.accountId === "string" ? req.body.accountId : undefined;
 

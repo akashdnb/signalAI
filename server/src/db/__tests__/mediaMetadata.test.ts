@@ -3,7 +3,7 @@ import { getPool, closePool } from "../pool.js";
 import { createTenant } from "../tenants.js";
 import { findOrCreateLeadByInstagramUserId } from "../leads.js";
 import { insertEventIdempotent } from "../events.js";
-import { upsertMediaMetadata, listKnownMediaForTenant } from "../mediaMetadata.js";
+import { upsertMediaMetadata, listKnownMediaForTenant, recordMediaMetadataRefreshFailure } from "../mediaMetadata.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import type { RawMediaMetadata } from "../../lib/instagramMedia.js";
 
@@ -97,6 +97,58 @@ describe("mediaMetadata", () => {
     const known = await listKnownMediaForTenant(pool, tenant.id);
     expect(known).toEqual([
       expect.objectContaining({ mediaId: "media-1", commentCount: 1, caption: "Look at this!" }),
+    ]);
+  });
+
+  it("records selected-account refresh failures without changing another account's metadata", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const retryAt = new Date("2026-10-17T12:00:00.000Z");
+    await upsertMediaMetadata(pool, tenant.id, metadata({ mediaId: "shared-media", caption: "Account A" }), "acct-a");
+    await upsertMediaMetadata(pool, tenant.id, metadata({ mediaId: "shared-media", caption: "Account B" }), "acct-b");
+
+    await recordMediaMetadataRefreshFailure(pool, tenant.id, "shared-media", retryAt, "acct-a");
+
+    const rows = await pool.query<{
+      instagram_account_id: string;
+      refresh_failure_count: number;
+      refresh_retry_at: Date | null;
+    }>(
+      "select instagram_account_id, refresh_failure_count, refresh_retry_at from media_metadata where tenant_id = $1 and media_id = $2 order by instagram_account_id",
+      [tenant.id, "shared-media"],
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows.find((row) => row.instagram_account_id === "acct-a")).toMatchObject({
+      refresh_failure_count: 1,
+      refresh_retry_at: retryAt,
+    });
+    expect(rows.rows.find((row) => row.instagram_account_id === "acct-b")).toMatchObject({
+      refresh_failure_count: 0,
+      refresh_retry_at: null,
+    });
+  });
+
+  it("stores an account-specific retry record when no metadata row exists yet", async () => {
+    const pool = getPool();
+    const tenant = await createTenant(pool, "creator-a");
+    const retryAt = new Date("2026-10-17T12:00:00.000Z");
+
+    await recordMediaMetadataRefreshFailure(pool, tenant.id, "never-enriched", retryAt, "acct-a");
+
+    const rows = await pool.query<{
+      instagram_account_id: string | null;
+      refresh_failure_count: number;
+      refresh_retry_at: Date | null;
+    }>(
+      "select instagram_account_id, refresh_failure_count, refresh_retry_at from media_metadata where tenant_id = $1 and media_id = $2",
+      [tenant.id, "never-enriched"],
+    );
+    expect(rows.rows).toEqual([
+      expect.objectContaining({
+        instagram_account_id: "acct-a",
+        refresh_failure_count: 1,
+        refresh_retry_at: retryAt,
+      }),
     ]);
   });
 

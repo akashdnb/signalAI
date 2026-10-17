@@ -1,57 +1,139 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { api, type NotificationChannel, type NotificationPreferenceEvent } from "../../api";
+import { Button } from "../../components/ui";
 
-interface NotificationPref {
-  key: string;
-  label: string;
-  description: string;
-  defaultOn: boolean;
-}
-
-const PREFS: NotificationPref[] = [
-  { key: "automation_failures", label: "Automation failures", description: "When a journey fails or needs attention", defaultOn: true },
-  { key: "human_handoffs", label: "Human handoffs", description: "When a conversation is handed to a teammate", defaultOn: true },
-  { key: "new_qualified_leads", label: "New qualified leads", description: "When a lead reaches your qualification goal", defaultOn: false },
-  { key: "weekly_summary", label: "Weekly summary", description: "A weekly overview of lead and automation activity", defaultOn: true },
-];
-
-/**
- * Visual shell matching the preview's Notifications section — consistent
- * with the header bell, which is already disabled ("Notifications are not
- * available yet") because there's no real notification event system.
- * Toggles are local-only.
- */
 export function SettingsNotificationsPage() {
-  const [prefs, setPrefs] = useState(() => Object.fromEntries(PREFS.map((p) => [p.key, p.defaultOn])) as Record<string, boolean>);
+  const { tenantId } = useParams<{ tenantId: string }>();
+  const [events, setEvents] = useState<NotificationPreferenceEvent[]>([]);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    let cancelled = false;
+    api
+      .getNotificationPreferences(tenantId)
+      .then((result) => {
+        if (cancelled) return;
+        setEvents(result.events);
+        setEmailAddress(result.recipient.email);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load notification preferences.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantId]);
+
+  function toggle(eventType: string, channel: NotificationChannel, enabled: boolean) {
+    setSaved(false);
+    setEvents((current) =>
+      current.map((event) =>
+        event.type !== eventType
+          ? event
+          : { ...event, channels: event.channels.map((item) => (item.type === channel ? { ...item, enabled } : item)) },
+      ),
+    );
+  }
+
+  async function savePreferences() {
+    if (!tenantId) return;
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const preferences = events.flatMap((event) =>
+        event.channels
+          .filter((channel) => channel.available)
+          .map((channel) => ({ eventType: event.type, channel: channel.type, enabled: channel.enabled })),
+      );
+      await api.updateNotificationPreferences(tenantId, preferences);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save notification preferences.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!tenantId) return null;
 
   return (
     <section className="card">
       <h2>Notifications</h2>
-      <p className="muted small">Choose which updates are important enough to bring to your attention.</p>
+      <p className="muted small">Choose which SignalAI events appear in your inbox and which should be emailed to your sign-in address.</p>
 
-      <ul className="list mt-4">
-        {PREFS.map((pref) => (
-          <li key={pref.key} className="list-item">
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-ink">{pref.label}</span>
-              <span className="block text-sm text-subtle">{pref.description}</span>
-            </span>
-            <input
-              type="checkbox"
-              aria-label={pref.label}
-              checked={prefs[pref.key]}
-              onChange={(e) => setPrefs((prev) => ({ ...prev, [pref.key]: e.target.checked }))}
-              className="h-5 w-5 shrink-0 accent-accent"
-            />
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary btn-small">
-          Save notification preferences
-        </button>
-        <span className="muted small">This workspace doesn&rsquo;t send notifications yet — preferences aren&rsquo;t saved.</span>
-      </div>
+      {loading ? (
+        <p className="mt-4 muted small" role="status">Loading notification preferences…</p>
+      ) : error && events.length === 0 ? (
+        <div className="mt-4 banner banner-error" role="alert">{error}</div>
+      ) : (
+        <>
+          <p className="mt-4 muted small">Email recipient: {emailAddress}. In-app notifications are enabled by default. Email settings are saved for this workspace and your account.</p>
+          <div className="mt-3 w-full overflow-x-auto">
+            <table className="w-full min-w-[36rem] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-subtle">
+                  <th className="py-3 pr-4 font-medium">Event</th>
+                  <th className="px-3 py-3 font-medium">In-app</th>
+                  <th className="px-3 py-3 font-medium">Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.type} className="border-b border-line last:border-b-0">
+                    <th scope="row" className="py-3 pr-4 text-left align-top font-medium text-ink">
+                      {event.label}
+                      <p className="mt-1 max-w-xl text-xs font-normal leading-5 text-subtle">{event.description}</p>
+                    </th>
+                    {(["in_app", "email"] as NotificationChannel[]).map((channelType) => {
+                      const channel = event.channels.find((item) => item.type === channelType)!;
+                      return (
+                        <td key={channelType} className="px-3 py-3 align-top">
+                          {channel.available ? (
+                            <label className="inline-flex min-h-8 items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={channel.enabled}
+                                disabled={saving}
+                                onChange={(eventChange) => toggle(event.type, channelType, eventChange.target.checked)}
+                                aria-label={`${channel.label} for ${event.label}`}
+                                className="h-4 w-4 accent-accent"
+                              />
+                              <span className="text-xs text-subtle">{channel.enabled ? "On" : "Off"}</span>
+                            </label>
+                          ) : (
+                            <span className="block max-w-44 text-xs text-subtle" title={channel.reason ?? undefined}>
+                              Unavailable
+                              <span className="mt-1 block leading-5">{channel.reason}</span>
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {error && <p className="mt-3 text-sm text-err-ink" role="alert">{error}</p>}
+          {saved && <p className="mt-3 text-sm text-ok-ink" role="status">Notification preferences saved.</p>}
+          <div className="mt-4">
+            <Button onClick={() => void savePreferences()} disabled={saving}>
+              {saving ? "Saving preferences…" : "Save notification preferences"}
+            </Button>
+          </div>
+        </>
+      )}
     </section>
   );
 }

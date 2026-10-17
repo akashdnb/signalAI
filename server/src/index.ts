@@ -29,6 +29,7 @@ import { ensureInstagramInboundQueue } from "./queue/instagramInboundQueue.js";
 import { startInstagramInboundWorker } from "./queue/instagramInboundWorker.js";
 import { ensureTenantScoringRefreshQueue, startTenantScoringRefreshWorker } from "./queue/tenantScoringRefreshQueue.js";
 import { sendTelegramAlert } from "./lib/telegram.js";
+import { ensureNotificationQueue, startNotificationDeliveryWorker } from "./notifications/service.js";
 
 /**
  * Every Phase 1 campaign defaults to rule_based, which never calls this —
@@ -80,6 +81,8 @@ async function main() {
   await startUsageRollupWorker(boss, pool);
   await ensureAlertsQueue(boss);
   await startAlertsWorker(boss, pool);
+  await ensureNotificationQueue(boss);
+  await startNotificationDeliveryWorker(boss, pool);
   await ensureUsernameResolutionQueue(boss);
   await startUsernameResolutionWorker(boss, pool, config.tokenKeyring);
 

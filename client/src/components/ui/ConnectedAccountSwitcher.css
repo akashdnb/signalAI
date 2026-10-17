@@ -1,0 +1,247 @@
+.sai-account-switcher {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(520px, 54vw);
+  color: var(--po-color-ink);
+}
+
+.po-preview-app .sai-account-switcher__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid transparent !important;
+  border-radius: 11px;
+  background: transparent !important;
+  color: var(--po-color-ink);
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+.po-preview-app .sai-account-switcher__trigger:hover,
+.po-preview-app .sai-account-switcher__trigger[aria-expanded="true"] {
+  background: var(--po-color-surface-hover) !important;
+}
+
+.po-preview-app .sai-account-switcher__trigger:focus-visible,
+.po-preview-app .sai-account-switcher__option:focus-visible {
+  outline: 2px solid var(--po-color-primary);
+  outline-offset: 2px;
+}
+
+.po-preview-app .sai-account-switcher__provider-chip,
+.po-preview-app .sai-account-switcher__option-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  background: var(--po-color-primary-soft);
+  color: var(--po-color-primary);
+  font-weight: 800;
+}
+
+.po-preview-app .sai-account-switcher__provider-chip {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.po-preview-app .sai-account-switcher__identity {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.po-preview-app .sai-account-switcher__identity strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.po-preview-app .sai-account-switcher__identity small {
+  color: var(--po-color-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.po-preview-app .sai-account-switcher__chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--po-color-muted);
+  transition: transform 140ms ease, color 140ms ease;
+}
+
+.po-preview-app .sai-account-switcher__trigger[aria-expanded="true"] .sai-account-switcher__chevron {
+  transform: rotate(180deg);
+  color: var(--po-color-primary);
+}
+
+.po-preview-app .sai-account-switcher__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 110;
+  width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid var(--po-color-border);
+  border-radius: 12px;
+  background: var(--po-color-surface);
+  box-shadow: 0 16px 40px var(--po-color-shadow-menu);
+  transform-origin: top left;
+  animation: sai-account-switcher-enter 120ms ease-out;
+}
+
+@keyframes sai-account-switcher-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.po-preview-app .sai-account-switcher__panel-heading {
+  padding: 9px 10px 11px;
+  border-bottom: 1px solid var(--po-color-border);
+}
+
+.po-preview-app .sai-account-switcher__panel-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.po-preview-app .sai-account-switcher__panel-heading strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.po-preview-app .sai-account-switcher__panel-heading small {
+  color: var(--po-color-muted);
+  font-size: 11px;
+}
+
+.po-preview-app .sai-account-switcher__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+}
+
+.po-preview-app .sai-account-switcher__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 54px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent !important;
+  color: var(--po-color-ink);
+  text-align: left;
+}
+
+.po-preview-app .sai-account-switcher__option:hover,
+.po-preview-app .sai-account-switcher__option.is-selected {
+  background: var(--po-color-primary-soft) !important;
+}
+
+.po-preview-app .sai-account-switcher__option-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.po-preview-app .sai-account-switcher__option-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.po-preview-app .sai-account-switcher__option-copy strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.po-preview-app .sai-account-switcher__option-copy small {
+  overflow: hidden;
+  color: var(--po-color-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.po-preview-app .sai-account-switcher__selected-icon {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  color: var(--po-color-primary);
+}
+
+.po-preview-app .sai-account-switcher__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 1px 8px;
+  padding: 0 10px;
+  min-height: 39px;
+  border: 1px solid var(--po-color-border);
+  border-radius: 8px;
+  background: var(--po-color-neutral-field);
+  color: var(--po-color-muted);
+}
+
+.po-preview-app .sai-account-switcher__search:focus-within {
+  border-color: var(--po-color-primary);
+  box-shadow: 0 0 0 3px var(--po-color-primary-soft);
+}
+
+/* Account scope filter portaled into a screen's filter row. It reuses the
+   search-box base, but must match the sibling filter selects (surface fill,
+   strong border, 40px height) and show one custom chevron, not the native
+   select arrow stacked with it. */
+.po-preview-app .sai-account-switcher__filter {
+  min-height: 40px;
+  border-color: var(--po-color-border-strong);
+  background: var(--po-color-surface);
+}
+.po-preview-app .sai-account-switcher__filter select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2px;
+}
+.po-preview-app .sai-account-switcher__filter-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--po-color-muted);
+}
+
+@media (max-width: 760px) {
+  .sai-account-switcher { flex: 1 1 100%; width: 100%; max-width: none; }
+  .po-preview-app .sai-account-switcher__trigger { min-height: 44px; }
+  .po-preview-app .sai-account-switcher__provider-chip { width: 36px; height: 36px; }
+  .po-preview-app .sai-account-switcher__panel { right: 0; left: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .po-preview-app .sai-account-switcher__chevron,
+  .po-preview-app .sai-account-switcher__panel { animation: none; transition: none; }
+}

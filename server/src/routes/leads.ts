@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
+import type { Pool } from "pg";
 import { getPool } from "../db/pool.js";
 import {
   getLead,
@@ -21,7 +22,7 @@ import { createDeal, listDealsForLead, updateDealStage, type DealStage } from ".
 import { listTenantMembers } from "../db/tenantMembers.js";
 import { getTopPosts, getTopKeywords } from "../db/analytics.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
-import { getSoleConnectedAccount, getDecryptedToken } from "../db/tokens.js";
+import { getDecryptedToken, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
 import { tryReserveSend } from "../db/accountSends.js";
 import { sendInstagramMessage } from "../lib/instagramSend.js";
 import { recordSentReply } from "../db/sentReplies.js";
@@ -31,6 +32,30 @@ import { config } from "../config.js";
 export const leadsRouter = Router();
 
 leadsRouter.use("/tenants/:tenantId", requireTenantSession);
+
+type RequestedAccountFilter =
+  | { ok: true; instagramAccountId?: string }
+  | { ok: false };
+
+async function resolveRequestedAccountFilter(
+  pool: Pool,
+  tenantId: string,
+  rawAccountId: unknown,
+  res: Response,
+): Promise<RequestedAccountFilter> {
+  if (rawAccountId === undefined) return { ok: true };
+  if (typeof rawAccountId !== "string" || rawAccountId.trim().length === 0) {
+    res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+    return { ok: false };
+  }
+  const instagramAccountId = await resolveInstagramAccountIdForTenant(pool, tenantId, rawAccountId.trim());
+  if (!instagramAccountId) {
+    res.status(404).json({ error: "Instagram account not found for this workspace" });
+    return { ok: false };
+  }
+  return { ok: true, instagramAccountId };
+}
+
 
 // Phase 2A Lead Profiles: everything a Customer 360 view needs about one
 // lead beyond what the list already shows.
@@ -210,13 +235,15 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
     return res.status(409).json({ error: "the messaging window is closed — a fresh inbound DM is required, or an approved HUMAN_AGENT support reply must be within 7 days of the customer's last DM" });
   }
 
-  const account = await getSoleConnectedAccount(pool, tenantId);
-  if (!account) return res.status(409).json({ error: "no Instagram account connected for this tenant" });
+  const instagramAccountId = lead.instagramAccountId;
+  if (!instagramAccountId) {
+    return res.status(409).json({ error: "this lead is not associated with a specific Instagram account; open a new account-scoped conversation before replying" });
+  }
 
-  const token = await getDecryptedToken(pool, config.tokenKeyring, tenantId, account.instagramAccountId);
-  if (!token) return res.status(409).json({ error: "Instagram connection is not currently valid — reconnect and try again" });
+  const token = await getDecryptedToken(pool, config.tokenKeyring, tenantId, instagramAccountId);
+  if (!token) return res.status(409).json({ error: "Instagram connection for this lead is not currently valid — reconnect and try again" });
 
-  const reserved = await tryReserveSend(pool, tenantId, account.instagramAccountId, HOURLY_SEND_LIMIT);
+  const reserved = await tryReserveSend(pool, tenantId, instagramAccountId, HOURLY_SEND_LIMIT);
   if (!reserved) return res.status(429).json({ error: "hourly send limit reached for this Instagram account — try again shortly" });
 
   const sendResult = await sendInstagramMessage(
@@ -241,6 +268,8 @@ leadsRouter.post("/tenants/:tenantId/leads/:leadId/reply", async (req, res) => {
 
 leadsRouter.get("/tenants/:tenantId/leads/:leadId/notes", async (req, res) => {
   const { tenantId, leadId } = req.params;
+  const lead = await getLead(getPool(), tenantId, leadId);
+  if (!lead) return res.status(404).json({ error: "lead not found for this tenant" });
   const notes = await listLeadNotes(getPool(), tenantId, leadId);
   return res.status(200).json(notes);
 });
@@ -355,11 +384,17 @@ leadsRouter.get("/tenants/:tenantId/members", async (req, res) => {
 });
 
 leadsRouter.get("/tenants/:tenantId/analytics/top-posts", async (req, res) => {
-  const posts = await getTopPosts(getPool(), req.params.tenantId);
+  const pool = getPool();
+  const scope = await resolveRequestedAccountFilter(pool, req.params.tenantId, req.query.accountId, res);
+  if (!scope.ok) return;
+  const posts = await getTopPosts(pool, req.params.tenantId, 10, scope.instagramAccountId);
   return res.status(200).json(posts);
 });
 
 leadsRouter.get("/tenants/:tenantId/analytics/top-keywords", async (req, res) => {
-  const keywords = await getTopKeywords(getPool(), req.params.tenantId);
+  const pool = getPool();
+  const scope = await resolveRequestedAccountFilter(pool, req.params.tenantId, req.query.accountId, res);
+  if (!scope.ok) return;
+  const keywords = await getTopKeywords(pool, req.params.tenantId, 10, scope.instagramAccountId);
   return res.status(200).json(keywords);
 });

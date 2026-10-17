@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApp } from "../../app.js";
 import { getPool, closePool } from "../../db/pool.js";
 import { upsertToken } from "../../db/tokens.js";
+import { findOrCreateLeadByInstagramUserId } from "../../db/leads.js";
+import { upsertMediaMetadata } from "../../db/mediaMetadata.js";
 import { resetDb } from "../../__tests__/helpers/db.js";
 import { createLoggedInTenant } from "../../__tests__/helpers/auth.js";
 
@@ -345,4 +347,103 @@ describe("content observed-media route", () => {
       ]),
     );
   });
+  it("scopes media IDs, comments, and cached metadata to a server-validated account", async () => {
+    const pool = getPool();
+    const { tenant: tenantA, authHeader: authA } = await createLoggedInTenant(pool, SESSION_SECRET, "content-account-scope-a");
+    const { tenant: tenantB } = await createLoggedInTenant(pool, SESSION_SECRET, "content-account-scope-b");
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-a", accessToken: "token-a" });
+    await upsertToken(pool, keyring, { tenantId: tenantA.id, instagramAccountId: "acct-b", accessToken: "token-b" });
+    await upsertToken(pool, keyring, { tenantId: tenantB.id, instagramAccountId: "acct-foreign", accessToken: "token-foreign" });
+    const accountRows = await pool.query<{ id: string; instagram_account_id: string }>(
+      "select id, instagram_account_id from meta_tokens where tenant_id = $1",
+      [tenantA.id],
+    );
+    const rowA = accountRows.rows.find((row) => row.instagram_account_id === "acct-a")!;
+    const rowB = accountRows.rows.find((row) => row.instagram_account_id === "acct-b")!;
+    const leadA = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "same-person", "acct-a");
+    const leadB = await findOrCreateLeadByInstagramUserId(pool, tenantA.id, "same-person", "acct-b");
+
+    await pool.query(
+      `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
+       values ($1, $2, 'evt-shared-media-a', 'comment', now(), 1, $3::jsonb)`,
+      [tenantA.id, leadA.id, JSON.stringify({ mediaId: "same-media-id", instagramAccountId: "acct-a" })],
+    );
+    await pool.query(
+      `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
+       values ($1, $2, 'evt-shared-media-b', 'comment', now(), 1, $3::jsonb)`,
+      [tenantA.id, leadB.id, JSON.stringify({ mediaId: "same-media-id", instagramAccountId: "acct-b" })],
+    );
+    await pool.query(
+      `insert into lead_events (tenant_id, lead_id, meta_event_id, event_type, occurred_at, sequence, attributes)
+       values ($1, $2, 'evt-misattributed-media', 'comment', now() + interval '1 second', 2, $3::jsonb)`,
+      [tenantA.id, leadA.id, JSON.stringify({ mediaId: "wrong-account-post", instagramAccountId: "acct-b" })],
+    );
+    await upsertMediaMetadata(pool, tenantA.id, {
+      mediaId: "same-media-id",
+      caption: "Account A post",
+      mediaType: "IMAGE",
+      thumbnailUrl: "https://x/account-a.jpg",
+      permalink: "https://www.instagram.com/p/account-a/",
+      postedAt: new Date("2026-01-01T00:00:00Z"),
+    }, "acct-a");
+    await upsertMediaMetadata(pool, tenantA.id, {
+      mediaId: "same-media-id",
+      caption: "Account B post",
+      mediaType: "IMAGE",
+      thumbnailUrl: "https://x/account-b.jpg",
+      permalink: "https://www.instagram.com/p/account-b/",
+      postedAt: new Date("2026-01-02T00:00:00Z"),
+    }, "acct-b");
+
+    const app = createApp();
+    const fromA = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=${rowA.id}`)
+      .set(authA);
+    expect(fromA.status).toBe(200);
+    expect(fromA.body).toEqual([
+      expect.objectContaining({
+        mediaId: "same-media-id",
+        instagramAccountId: "acct-a",
+        commentCount: 1,
+        caption: "Account A post",
+        thumbnailUrl: "https://x/account-a.jpg",
+      }),
+    ]);
+
+    const fromB = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=${rowB.id}`)
+      .set(authA);
+    expect(fromB.status).toBe(200);
+    expect(fromB.body).toEqual([
+      expect.objectContaining({
+        mediaId: "same-media-id",
+        instagramAccountId: "acct-b",
+        commentCount: 1,
+        caption: "Account B post",
+        thumbnailUrl: "https://x/account-b.jpg",
+      }),
+    ]);
+
+    const foreignRow = await pool.query<{ id: string }>(
+      "select id from meta_tokens where tenant_id = $1 and instagram_account_id = $2",
+      [tenantB.id, "acct-foreign"],
+    );
+    const forbiddenAccount = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=${foreignRow.rows[0]!.id}`)
+      .set(authA);
+    expect(forbiddenAccount.status).toBe(404);
+    expect(forbiddenAccount.body).toMatchObject({ error: "Instagram account not found for this workspace" });
+
+    const repeatedAccount = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=${rowA.id}&accountId=${rowB.id}`)
+      .set(authA);
+    expect(repeatedAccount.status).toBe(400);
+    expect(repeatedAccount.body).toMatchObject({ error: "accountId must be a single connected-account identifier" });
+
+    const emptyAccount = await request(app)
+      .get(`/tenants/${tenantA.id}/observed-media?accountId=`)
+      .set(authA);
+    expect(emptyAccount.status).toBe(400);
+  });
+
 });

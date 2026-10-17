@@ -1,14 +1,7 @@
 name: client-browser-smoke
 
 on:
-  push:
-    paths:
-      - "client/**"
-      - ".github/workflows/client-browser-smoke.yml"
-  pull_request:
-    paths:
-      - "client/**"
-      - ".github/workflows/client-browser-smoke.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read

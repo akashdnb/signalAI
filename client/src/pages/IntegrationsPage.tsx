@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTenant } from "../context/TenantContext";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api } from "../api";
-import { workspaceApi, type ConnectedInstagramAccount } from "../api/workspace";
+import { api } from "../api";
+import { workspaceApi, type ConnectedInstagramAccount, type WorkspaceRole } from "../api/workspace";
 import { CrmMarkIcon, InstagramMarkIcon, WhatsAppMarkIcon } from "../components/icons";
 import { PageHeader, StatusBadge } from "../components/ui";
 
@@ -12,8 +13,13 @@ function formatDate(iso: string | null): string {
 
 export function IntegrationsPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const loadRequestIdRef = useRef(0);
   const navigate = useNavigate();
+  const { reloadConnectedAccounts } = useTenant();
   const [accounts, setAccounts] = useState<ConnectedInstagramAccount[] | null>(null);
+  const [currentRole, setCurrentRole] = useState<WorkspaceRole | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
@@ -21,18 +27,43 @@ export function IntegrationsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   async function loadAccounts() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++loadRequestIdRef.current;
+    const isCurrentRequest = () =>
+      requestId === loadRequestIdRef.current && activeTenantIdRef.current === requestedTenantId;
+    setAccounts(null);
+    setCurrentRole(null);
+    setError(null);
+    setConfirmingId(null);
     try {
-      setAccounts(await workspaceApi.listConnectedAccounts(tenantId));
+      const [nextAccounts, workspaces] = await Promise.all([
+        workspaceApi.listConnectedAccounts(requestedTenantId),
+        workspaceApi.listWorkspaces(),
+      ]);
+      if (!isCurrentRequest()) return;
+      const workspace = workspaces.find((item) => item.tenantId === requestedTenantId);
+      if (!workspace) {
+        setAccounts(null);
+        setCurrentRole(null);
+        setError("This workspace is not available to your account.");
+        return;
+      }
+      setAccounts(nextAccounts);
+      setCurrentRole(workspace.role);
       setError(null);
+      reloadConnectedAccounts();
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (!isCurrentRequest()) return;
+      const status = (err as Error & { status?: number }).status;
+      if (status === 401) {
         navigate("/login", { replace: true });
         return;
       }
-      const status = (err as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
-        navigate("/login", { replace: true });
+      if (status === 403) {
+        setAccounts(null);
+        setCurrentRole(null);
+        setError("You do not have access to these connected accounts.");
         return;
       }
       setError(err instanceof Error ? err.message : "Failed to load Instagram accounts");
@@ -40,7 +71,12 @@ export function IntegrationsPage() {
   }
 
   useEffect(() => {
+    loadRequestIdRef.current += 1;
     void loadAccounts();
+    return () => {
+      loadRequestIdRef.current += 1;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   async function handleConnect() {
@@ -93,7 +129,13 @@ export function IntegrationsPage() {
         title="Integrations"
         description="Connect the channels SignalAI can send and receive messages through. Connection health and the latest check are shown for each Instagram account."
         actions={
-          <button type="button" className="btn-primary btn-small" onClick={handleConnect} disabled={connecting || reconnectingId !== null}>
+          <button
+            type="button"
+            className="btn-primary btn-small"
+            onClick={handleConnect}
+            disabled={(currentRole !== "owner" && currentRole !== "admin") || connecting || reconnectingId !== null}
+            title={currentRole !== "owner" && currentRole !== "admin" ? "Only owners and admins can connect Instagram accounts" : undefined}
+          >
             <span className="inline-flex items-center gap-1.5">
               <InstagramMarkIcon className="h-4 w-4" />
               {connecting ? "Redirecting…" : "Add Instagram account"}
@@ -102,7 +144,14 @@ export function IntegrationsPage() {
         }
       />
 
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {error && (
+        <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
+          <span>{error}</span>
+          {accounts === null && <button type="button" className="link-button" onClick={() => void loadAccounts()}>Retry loading accounts</button>}
+        </div>
+      )}
+
+      {currentRole === "member" && <p className="banner" role="status">You have read-only access to connected accounts. Workspace owners and admins can connect, reconnect, or disconnect Instagram.</p>}
 
       <section className="card integration-accounts" aria-labelledby="integration-accounts-title">
         <div className="integration-section-heading">
@@ -138,20 +187,20 @@ export function IntegrationsPage() {
                     {!account.instagramUsername && (
                       <p className="muted small mt-1 mb-0">The handle will appear after this account is successfully reconnected.</p>
                     )}
-                    <p className="muted small mt-1 mb-0">Instagram account ID: <code>{account.instagramAccountId}</code></p>
+                    <details className="mt-1 text-xs text-subtle"><summary className="cursor-pointer">Advanced account details</summary><p className="mb-0 mt-1 break-all"><code>{account.instagramAccountId}</code></p></details>
                     <p className="muted small mt-1 mb-0">Last checked: {formatDate(account.lastCheckedAt)}</p>
                     {account.expiresAt && <p className="muted small mt-1 mb-0">Connection credential expires: {formatDate(account.expiresAt)}</p>}
                     {account.status === "error" && account.lastError && (
                       <span className="banner banner-error small mt-2" style={{ display: "block" }}>{account.lastError}</span>
                     )}
                     {account.status === "error" && (
-                      <p className="muted small mt-2 mb-0">Reconnect this Instagram account to refresh its credential and restore its journey assignments.</p>
+                      <p className="muted small mt-2 mb-0">Automatic replies for journeys assigned to this account are paused while the connection is unhealthy. Reconnect to restore the connection, then verify the account status here.</p>
                     )}
                   </span>
                 </span>
 
                 <span className="integration-account-actions flex shrink-0 gap-2">
-                  {account.status === "error" ? (
+                  {(currentRole === "owner" || currentRole === "admin") && account.status === "error" ? (
                     <button
                       className="btn-primary btn-small"
                       onClick={() => void handleReconnect(account.id)}
@@ -159,20 +208,22 @@ export function IntegrationsPage() {
                     >
                       {reconnectingId === account.id ? "Redirecting…" : "Reconnect"}
                     </button>
-                  ) : confirmingId === account.id ? (
-                    <>
-                      <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
-                        {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                  ) : currentRole === "owner" || currentRole === "admin" ? (
+                    confirmingId === account.id ? (
+                      <>
+                        <button className="btn-primary btn-small" onClick={() => void handleDisconnect(account.id)} disabled={disconnectingId === account.id}>
+                          {disconnectingId === account.id ? "Disconnecting…" : "Confirm"}
+                        </button>
+                        <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
+                        Disconnect
                       </button>
-                      <button className="btn-secondary btn-small" onClick={() => setConfirmingId(null)} disabled={disconnectingId === account.id}>
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button className="btn-secondary btn-small" onClick={() => setConfirmingId(account.id)}>
-                      Disconnect
-                    </button>
-                  )}
+                    )
+                  ) : null}
                 </span>
               </div>
             ))}

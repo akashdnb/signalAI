@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserPlusIcon } from "../components/icons";
-import { StatusBadge } from "../components/ui";
-import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember } from "../api/workspace";
+import { Field, StatusBadge, TextInput, TextareaInput } from "../components/ui";
+import { useTenant } from "../context/TenantContext";
+import { workspaceApi, type WorkspaceInvitation, type WorkspaceMember, type WorkspaceRole } from "../api/workspace";
 
 function formatRole(role: WorkspaceMember["role"]): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -44,8 +45,15 @@ const ROLE_PERMISSIONS = [
 
 export function TeamPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
+  const activeTenantIdRef = useRef<string | undefined>(tenantId);
+  activeTenantIdRef.current = tenantId;
+  const loadRequestIdRef = useRef(0);
   const navigate = useNavigate();
+  const { tenant, reload, reloadWorkspaces } = useTenant();
   const [members, setMembers] = useState<WorkspaceMember[] | null>(null);
+  const [currentRole, setCurrentRole] = useState<WorkspaceRole | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -53,21 +61,74 @@ export function TeamPage() {
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [saving, setSaving] = useState(false);
   const [actionKey, setActionKey] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceDescription, setWorkspaceDescription] = useState("");
+  const [savingWorkspace, setSavingWorkspace] = useState(false);
+  const [workspaceSaved, setWorkspaceSaved] = useState(false);
+
+  useEffect(() => {
+    setWorkspaceName(tenant?.name ?? "");
+    setWorkspaceDescription(tenant?.description ?? "");
+    setWorkspaceSaved(false);
+  }, [tenant?.id, tenant?.name, tenant?.description]);
 
   async function load() {
-    if (!tenantId) return;
+    if (!tenantId || activeTenantIdRef.current !== tenantId) return;
+    const requestedTenantId = tenantId;
+    const requestId = ++loadRequestIdRef.current;
+    const isCurrentRequest = () =>
+      requestId === loadRequestIdRef.current && activeTenantIdRef.current === requestedTenantId;
+    setMembers(null);
+    setCurrentRole(null);
+    setInvitations([]);
+    setError(null);
+    setPermissionError(null);
     try {
-      const [nextMembers, nextInvitations] = await Promise.all([
-        workspaceApi.listMembers(tenantId),
-        workspaceApi.listInvitations(tenantId),
+      const [nextMembers, workspaces] = await Promise.all([
+        workspaceApi.listMembers(requestedTenantId),
+        workspaceApi.listWorkspaces(),
       ]);
+      if (!isCurrentRequest()) return;
+      const workspace = workspaces.find((item) => item.tenantId === requestedTenantId);
+      if (!workspace) {
+        setMembers(null);
+        setCurrentRole(null);
+        setError("This workspace is not available to your account.");
+        return;
+      }
       setMembers(nextMembers);
-      setInvitations(nextInvitations ?? []);
+      setCurrentRole(workspace.role);
       setError(null);
+      if (workspace.role === "owner" || workspace.role === "admin") {
+        try {
+          const nextInvitations = await workspaceApi.listInvitations(requestedTenantId);
+          if (!isCurrentRequest()) return;
+          setInvitations(nextInvitations);
+        } catch (err) {
+          if (!isCurrentRequest()) return;
+          const status = (err as Error & { status?: number }).status;
+          if (status === 403) {
+            setPermissionError("Your current role can view teammates but cannot manage invitations.");
+            setInvitations([]);
+          } else {
+            setError(err instanceof Error ? err.message : "Failed to load invitations");
+          }
+        }
+      } else {
+        setInvitations([]);
+        setPermissionError("Your Member role is read-only for workspace access. Owners and admins can invite, remove, or change roles.");
+      }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       const status = (err as Error & { status?: number }).status;
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         navigate("/login", { replace: true });
+        return;
+      }
+      if (status === 403) {
+        setMembers(null);
+        setCurrentRole(null);
+        setError("You do not have access to this workspace’s team.");
         return;
       }
       setError(err instanceof Error ? err.message : "Failed to load team");
@@ -75,8 +136,42 @@ export function TeamPage() {
   }
 
   useEffect(() => {
+    loadRequestIdRef.current += 1;
     void load();
+    return () => {
+      loadRequestIdRef.current += 1;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
+
+  async function handleSaveWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!tenantId || (currentRole !== "owner" && currentRole !== "admin") || savingWorkspace) return;
+    if (!workspaceName.trim()) {
+      setError("Workspace name is required.");
+      return;
+    }
+    setSavingWorkspace(true);
+    setWorkspaceSaved(false);
+    setError(null);
+    try {
+      await workspaceApi.updateWorkspace(tenantId, {
+        name: workspaceName.trim(),
+        description: workspaceDescription.trim() || null,
+      });
+      reload();
+      reloadWorkspaces();
+      window.dispatchEvent(new Event("signalai:workspaces-updated"));
+      setWorkspaceSaved(true);
+    } catch (err) {
+      const status = (err as Error & { status?: number }).status;
+      setError(status === 403
+        ? "Only workspace owners and admins can change workspace details."
+        : err instanceof Error ? err.message : "Could not save workspace settings.");
+    } finally {
+      setSavingWorkspace(false);
+    }
+  }
 
   async function handleInvite(event: React.FormEvent) {
     event.preventDefault();
@@ -86,11 +181,12 @@ export function TeamPage() {
     try {
       const result = await workspaceApi.inviteMember(tenantId, inviteEmail.trim(), inviteRole);
       setInviting(false);
+      setNotice(null);
       setInviteEmail("");
       setInviteRole("member");
-      if (result.delivery === "failed") {
-        setError("Invitation was created, but the email could not be delivered. You can resend it after fixing delivery.");
-      }
+      setNotice(result.delivery === "failed"
+        ? "Invitation was created, but email delivery failed. Check email delivery configuration before resending."
+        : "Invitation sent.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send invitation");
@@ -107,11 +203,12 @@ export function TeamPage() {
     try {
       if (action === "resend") {
         const result = await workspaceApi.resendInvitation(tenantId, invitationId);
-        if (result.delivery === "failed") {
-          setError("Invitation was regenerated, but the email could not be delivered.");
-        }
+        setNotice(result.delivery === "failed"
+          ? "A fresh invitation was created, but email delivery failed."
+          : "A fresh invitation was sent.");
       } else {
         await workspaceApi.revokeInvitation(tenantId, invitationId);
+        setNotice("Invitation cancelled.");
       }
       await load();
     } catch (err) {
@@ -156,7 +253,59 @@ export function TeamPage() {
 
   return (
     <div className="page-team">
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {error && <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert"><span>{error}</span><button type="button" className="link-button" onClick={() => void load()}>Retry</button></div>}
+      {permissionError && <div className="banner" role="status">{permissionError}</div>}
+      {notice && <div className="banner" role="status">{notice}</div>}
+
+      <section className="card" aria-labelledby="team-workspace-settings-title">
+        <div className="mb-4 border-b border-line pb-4">
+          <h2 id="team-workspace-settings-title" className="mb-1">Workspace settings</h2>
+          <p className="muted small m-0">These details identify this workspace in the switcher. Members and connected Instagram accounts stay scoped to this workspace.</p>
+        </div>
+        <form onSubmit={(event) => void handleSaveWorkspace(event)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Workspace name">
+            <TextInput
+              value={workspaceName}
+              onChange={(event) => { setWorkspaceName(event.target.value); setWorkspaceSaved(false); }}
+              required
+              maxLength={120}
+              disabled={(currentRole !== "owner" && currentRole !== "admin") || savingWorkspace}
+              placeholder="Workspace name"
+            />
+          </Field>
+          <Field label="Description (optional)">
+            <TextareaInput
+              value={workspaceDescription}
+              onChange={(event) => { setWorkspaceDescription(event.target.value); setWorkspaceSaved(false); }}
+              maxLength={500}
+              rows={2}
+              disabled={(currentRole !== "owner" && currentRole !== "admin") || savingWorkspace}
+              placeholder="What is this workspace for?"
+            />
+          </Field>
+          <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+            {(currentRole === "owner" || currentRole === "admin") ? (
+              <button
+                type="submit"
+                className="btn-primary btn-small"
+                disabled={savingWorkspace || !workspaceName.trim() || (
+                  workspaceName.trim() === (tenant?.name ?? "") &&
+                  (workspaceDescription.trim() || "") === (tenant?.description ?? "")
+                )}
+              >
+                {savingWorkspace ? "Saving…" : "Save workspace"}
+              </button>
+            ) : (
+              <p className="muted small m-0">
+                {currentRole === null
+                  ? "Workspace permissions are still being checked. Editing is disabled until access is verified."
+                  : "Only workspace owners and admins can change these details."}
+              </p>
+            )}
+            {workspaceSaved && <span className="text-sm text-subtle" role="status">Workspace settings saved.</span>}
+          </div>
+        </form>
+      </section>
 
       <section className="card" aria-labelledby="team-members-title">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-4">
@@ -165,7 +314,14 @@ export function TeamPage() {
             <h2 id="team-members-title" className="mb-1">People with access</h2>
             <p className="muted small m-0">Owners manage billing and workspace access. Admins can manage members, connected accounts and automations. Members work with inbox, leads and automations.</p>
           </div>
-          <button type="button" className="btn-primary btn-small shrink-0" onClick={() => setInviting((value) => !value)}>
+          <button
+            type="button"
+            className="btn-primary btn-small shrink-0"
+            disabled={currentRole !== "owner" && currentRole !== "admin"}
+            title={currentRole !== "owner" && currentRole !== "admin" ? "Only owners and admins can invite teammates" : undefined}
+            onClick={() => setInviting((value) => !value)}
+          >
+
             <span className="inline-flex items-center gap-1.5">
               <UserPlusIcon className="h-4 w-4" />
               {inviting ? "Close invite form" : "Invite teammate"}
@@ -173,7 +329,7 @@ export function TeamPage() {
           </button>
         </div>
 
-        {inviting && (
+        {inviting && (currentRole === "owner" || currentRole === "admin") && (
           <form onSubmit={handleInvite} className="inline-form mt-4">
             <input
               type="email"
@@ -216,13 +372,18 @@ export function TeamPage() {
                       <select
                         aria-label={`Role for ${member.email}`}
                         value={member.role}
-                        disabled={busy}
+                        disabled={busy || (currentRole !== "owner" && currentRole !== "admin")}
                         onChange={(event) => void handleRoleChange(member, event.target.value as "admin" | "member")}
                       >
                         <option value="member">Member</option>
                         <option value="admin">Admin</option>
                       </select>
-                      <button type="button" className="btn-secondary btn-small" disabled={busy} onClick={() => void handleRemove(member)}>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-small"
+                        disabled={busy || (currentRole !== "owner" && currentRole !== "admin")}
+                        onClick={() => void handleRemove(member)}
+                      >
                         {busy ? "Saving…" : "Remove"}
                       </button>
                     </span>
@@ -234,7 +395,7 @@ export function TeamPage() {
         )}
       </section>
 
-      {pendingInvitations.length > 0 && (
+      {(currentRole === "owner" || currentRole === "admin") && pendingInvitations.length > 0 && (
         <section className="card" aria-labelledby="pending-invitations-title">
           <h2 id="pending-invitations-title">Pending invitations</h2>
           <p className="muted small">Invitations are single-use and expire automatically. Resend to issue a fresh invitation link.</p>
@@ -283,7 +444,7 @@ export function TeamPage() {
         <p className="team-permissions-note mt-3 mb-0" role="note"><strong>Important:</strong> several core routes, including automations, billing, knowledge, lead fields and AI guardrails, currently check workspace membership without consistently restricting actions by role. This table does not claim those routes are role-restricted.</p>
       </section>
 
-      {resolvedInvitations.length > 0 && (
+      {(currentRole === "owner" || currentRole === "admin") && resolvedInvitations.length > 0 && (
         <section className="card" aria-labelledby="invitation-history-title">
           <h2 id="invitation-history-title">Invitation history</h2>
           <p className="muted small">Resolved invitations stay visible so you can tell whether a teammate accepted, was cancelled, or let the invitation expire.</p>

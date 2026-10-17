@@ -1,0 +1,3 @@
+.po-page-header:has(+ .po-lead-detail-screen) > .po-button {
+  display: none;
+}
