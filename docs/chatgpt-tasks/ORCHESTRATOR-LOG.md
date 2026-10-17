@@ -242,3 +242,10 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - Source review of the current Knowledge and Settings implementation confirms the real Knowledge retrieval/preview/upload/delete flows and real Profile/Notifications/Appearance persistence paths are present on foundation; `SettingsPage.tsx` and `KnowledgePage.tsx` already import the shared parity stylesheet. A temporary child branch `task/profile-notifications-knowledge-parity` was created for investigation; no PR was opened because the parity stylesheet was already imported by the owning pages, so the branch was not merged.
 - New ChatGPT review-tab delegation was attempted for PR #114 but the new tab did not expose a usable chat composer/accepted brief; the temporary tab was closed. The existing QA auditor session remains the source of rendered gap findings.
 - `GAPS.md` still contains OPEN rendered-production parity items because production has not been deployed. No responsive 390/768/1024/1440 verification is claimed and no CI/workflow run is claimed. No `main` write occurred.
+
+## 2026-10-17 16:02 IST — PR #116 reconciliation closed; Settings / General parity merged
+
+- PR #116 remains **closed and unmerged** after delegated reconciliation analysis. Representative production-critical semantics were confirmed already present on the foundation, so no reconciliation code, branch, or PR was created.
+- Current `GAPS.md` remains **OPEN** for rendered parity; the latest audit continues to record unresolved rendered-production differences.
+- Delegated Settings / General parity was created from the current foundation as PR #117. Source review found a one-file **10-add / 3-delete** safe visual/composition-only change preserving the real read-only semantics. PR #117 was squash-merged as `eb7870688deeebc10a86bdfbd6f1564a4b223e77`.
+- No production deploy occurred and no write was made to `main`. Production remains on the older `eaf50af2...` deployment.
