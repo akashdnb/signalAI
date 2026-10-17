@@ -59,12 +59,12 @@ export function AppearanceSettingsPanel() {
                 onClick={() => chooseTheme(option.value)}
                 className={`settings-choice-card${selected ? " is-selected" : ""}`}
               >
-                <span className="settings-choice-icon"><Icon aria-hidden="true" /></span>
+                <span className="settings-choice-icon"><Icon /></span>
                 <span>
                   <span className="settings-choice-title">{option.label}</span>
                   <span className="settings-choice-description">{option.description}</span>
                 </span>
-                {selected && <CheckCircleIcon className="settings-choice-check" aria-hidden="true" />}
+                {selected && <CheckCircleIcon className="settings-choice-check" />}
               </button>
             );
           })}
@@ -93,7 +93,7 @@ export function AppearanceSettingsPanel() {
                   <span className="settings-choice-title">{option.label}</span>
                   <span className="settings-choice-description">{option.description}</span>
                 </span>
-                {selected && <CheckCircleIcon className="settings-choice-check" aria-hidden="true" />}
+                {selected && <CheckCircleIcon className="settings-choice-check" />}
               </button>
             );
           })}
