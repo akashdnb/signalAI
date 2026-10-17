@@ -264,3 +264,10 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - PR #118 changed only `client/src/components/FieldDefinitionsPanel.tsx` with **5 additions / 3 deletions**, aligning the schema hierarchy to **Label / Technical key / Type / Used for**, with truthful unsupported-usage text and no API, data, or persistence changes.
 - PR #118 was squash-merged as `9db6377024314185d9b155e96d2737e1cf7c928d` on `feat/preview-to-production-foundation`.
 - No production deploy occurred and no write was made to `main`.
+
+## 2026-10-17 16:17 IST — Delegated Analytics/Content/Knowledge source-freshness audit accepted and completed
+
+- Delegated Analytics/Content/Knowledge source-freshness audit was **accepted and completed**. Analytics and Content were stale relative to merged PR #105.
+- Knowledge had one real source-level composition gap, fixed in PR #119 with a one-file CSS-only change to `client/src/styles/knowledge-settings-parity.css` (**+10/-2**) that reorders the existing real source review first, source preview second, retrieval test last, preserving all APIs/data/loading/error/retry/pagination/permissions semantics.
+- PR #119 was squash-merged as `6897415df9a1e8880f85858fa10064524f81cb9c` on `feat/preview-to-production-foundation`.
+- No `main` write or production deploy occurred.
