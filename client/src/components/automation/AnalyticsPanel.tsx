@@ -2,212 +2,26 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Campaign, type CampaignAnalytics, type Dropoff, type LeadListItem, type TenantMember } from "../../api";
 import { formatRelativeTime } from "../../lib/leadFormatting";
+import { Button, EmptyState, ErrorState, LoadingState } from "../ui";
 
-function StatTile({ value, label }: { value: string | number; label: string }) { return <div className="stat"><div className="stat-value">{value}</div><div className="stat-label">{label}</div></div>; }
+function StatTile({ value, label, detail }: { value: string | number; label: string; detail?: string }) { return <div className="builder-results-metric"><span>{label}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</div>; }
 function FunnelBar({ label, count, of, denominatorLabel = "matched comments and messages" }: { label: string; count: number; of: number; denominatorLabel?: string }) { const pct = of > 0 ? Math.round((count / of) * 100) : 0; return <div><div className="flex justify-between text-xs text-subtle"><span>{label}</span><span title={`${count.toLocaleString()} out of ${of.toLocaleString()} ${denominatorLabel}`}>{count.toLocaleString()} <span className="text-subtle">({pct}%)</span></span></div><div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-chip"><div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} /></div></div>; }
-function TimeseriesChart({ data }: { data: CampaignAnalytics["timeseries"] }) {
-  const width = 640; const height = 180; const padding = { top: 10, right: 10, bottom: 22, left: 10 }; const plotW = width - padding.left - padding.right; const plotH = height - padding.top - padding.bottom; const maxValue = Math.max(1, ...data.map((d) => Math.max(d.comments, d.messages))); const stepX = data.length > 1 ? plotW / (data.length - 1) : 0;
-  const points = data.map((d, i) => ({ x: padding.left + i * stepX, comments: padding.top + plotH - (d.comments / maxValue) * plotH, messages: padding.top + plotH - (d.messages / maxValue) * plotH }));
-  const path = (key: "comments" | "messages") => points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p[key].toFixed(1)}`).join(" ");
-  return <div><div className="mb-2 flex items-center gap-4 text-sm"><span className="flex items-center gap-1.5 text-subtle"><span className="h-2 w-2 rounded-full" style={{ background: "var(--accent)" }} />Comments matched</span><span className="flex items-center gap-1.5 text-subtle"><span className="h-2 w-2 rounded-full" style={{ background: "var(--accent-cyan)" }} />Messages matched</span></div><svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Matched comments and messages over the last 30 days">{[0, 0.5, 1].map((f) => <line key={f} x1={padding.left} x2={width - padding.right} y1={padding.top + plotH * f} y2={padding.top + plotH * f} stroke="var(--border)" strokeWidth={1} />)}<path d={path("comments")} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /><path d={path("messages")} fill="none" stroke="var(--accent-cyan)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />{[0, Math.floor((data.length - 1) / 2), data.length - 1].map((i) => <text key={i} x={points[i]?.x ?? 0} y={height - 4} fontSize="11" fill="var(--text-muted)" textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}>{data[i] ? new Date(data[i]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</text>)}</svg></div>;
-}
+function TimeseriesChart({ data }: { data: CampaignAnalytics["timeseries"] }) { const width = 640; const height = 180; const padding = { top: 10, right: 10, bottom: 22, left: 10 }; const plotW = width - padding.left - padding.right; const plotH = height - padding.top - padding.bottom; const maxValue = Math.max(1, ...data.map((d) => Math.max(d.comments, d.messages))); const stepX = data.length > 1 ? plotW / (data.length - 1) : 0; const points = data.map((d, i) => ({ x: padding.left + i * stepX, comments: padding.top + plotH - (d.comments / maxValue) * plotH, messages: padding.top + plotH - (d.messages / maxValue) * plotH })); const path = (key: "comments" | "messages") => points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p[key].toFixed(1)}`).join(" "); return <div><div className="mb-2 flex items-center gap-4 text-sm"><span className="flex items-center gap-1.5 text-subtle"><span className="h-2 w-2 rounded-full bg-accent" />Comments matched</span><span className="flex items-center gap-1.5 text-subtle"><span className="h-2 w-2 rounded-full bg-accent-cyan" />Messages matched</span></div><svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Matched comments and messages over the last 30 days">{[0, 0.5, 1].map((f) => <line key={f} x1={padding.left} x2={width - padding.right} y1={padding.top + plotH * f} y2={padding.top + plotH * f} stroke="var(--border)" strokeWidth={1} />)}<path d={path("comments")} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /><path d={path("messages")} fill="none" stroke="var(--accent-cyan)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />{[0, Math.floor((data.length - 1) / 2), data.length - 1].map((i) => <text key={i} x={points[i]?.x ?? 0} y={height - 4} fontSize="11" fill="var(--text-muted)" textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}>{data[i] ? new Date(data[i]!.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</text>)}</svg></div>; }
 
 export function AnalyticsPanel({ tenantId, campaign }: { tenantId: string; campaign: Campaign }) {
-  const [analytics, setAnalytics] = useState<CampaignAnalytics | null>(null);
-  const [dropoff, setDropoff] = useState<Dropoff[] | null>(null);
-  const [journeyLeads, setJourneyLeads] = useState<LeadListItem[] | null>(null);
-  const [members, setMembers] = useState<TenantMember[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [a, d, ms, allLeads, mem] = await Promise.all([
-          api.getCampaignAnalytics(tenantId, campaign.id),
-          api.getDropoff(tenantId, campaign.id),
-          api.listMilestones(tenantId, campaign.id),
-          api.getLeads(tenantId),
-          api.listMembers(tenantId),
-        ]);
-        if (cancelled) return;
-        const milestoneIds = new Set(ms.map((m) => m.id));
-        setAnalytics(a);
-        setDropoff(d);
-        setJourneyLeads(allLeads.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId)));
-        setMembers(mem);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load analytics");
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId, campaign.id]);
-
-  const stageCounts = useMemo(() => {
-    if (!journeyLeads) return null;
-    return {
-      total: journeyLeads.length,
-      qualified: journeyLeads.filter((l) => ["qualified", "meeting_scheduled", "won"].includes(l.pipelineStage)).length,
-      meeting: journeyLeads.filter((l) => ["meeting_scheduled", "won"].includes(l.pipelineStage)).length,
-      won: journeyLeads.filter((l) => l.pipelineStage === "won").length,
-    };
-  }, [journeyLeads]);
-
-  const attention = useMemo(() => {
-    if (!journeyLeads) return [];
-    const staleUnread = journeyLeads.filter((l) => {
-      if (!l.unread || !l.lastInboundAt) return false;
-      return Date.now() - new Date(l.lastInboundAt).getTime() > 24 * 60 * 60 * 1000;
-    });
-    const unassigned = journeyLeads.filter((l) => !l.ownerUserId);
-    const escalated = journeyLeads.filter((l) => l.handoffStatus === "requested");
-    return [
-      ...(staleUnread.length
-        ? [{ key: "unread", title: `${staleUnread.length} conversation${staleUnread.length === 1 ? "" : "s"} unread for over a day`, leads: staleUnread }]
-        : []),
-      ...(unassigned.length && members.length
-        ? [{ key: "unassigned", title: `${unassigned.length} lead${unassigned.length === 1 ? "" : "s"} not assigned to anyone`, leads: unassigned }]
-        : []),
-      ...(escalated.length
-        ? [{ key: "handoff", title: `${escalated.length} conversation${escalated.length === 1 ? "" : "s"} waiting for human handoff`, leads: escalated }]
-        : []),
-    ];
-  }, [journeyLeads, members]);
-
-  if (error) return <div className="banner banner-error">{error}</div>;
-  if (!analytics || !dropoff || !journeyLeads || !stageCounts) return <p className="muted">Loading…</p>;
-
-  const matchedTotal = analytics.commentsMatched + analytics.messagesMatched;
-  const maxDropoff = Math.max(...dropoff.map((d) => d.advancedCount), 1);
-
-  return (
-    <div className="flex flex-col gap-4 builder-results-panel">
-      <header className="builder-results-header">
-        <div>
-          <p className="overview-eyebrow">Automation performance</p>
-          <h2 className="m-0 text-lg font-semibold text-ink">Results for {campaign.name}</h2>
-          <p className="muted m-0 mt-1 max-w-3xl text-sm leading-5">
-            Matched-event totals come from this automation’s analytics. The activity timeline covers the last 30 days; lead stage counts are a current snapshot of leads still in active goals.
-          </p>
-        </div>
-      </header>
-      <div className="stat-grid">
-        <StatTile value={analytics.commentsMatched.toLocaleString()} label="Comments matched" />
-        <StatTile value={analytics.messagesMatched.toLocaleString()} label="Messages matched" />
-        <StatTile value={analytics.conversationsStarted.toLocaleString()} label="Conversations started" />
-        <StatTile value={stageCounts.total.toLocaleString()} label="Leads in active goals" />
-        <StatTile value={stageCounts.qualified.toLocaleString()} label="Qualified in active goals" />
-        <StatTile value={stageCounts.won.toLocaleString()} label="Won in active goals" />
-      </div>
-
-      <section className="card">
-        <h3 className="m-0 mb-1 text-[15px] font-semibold text-ink">Matched activity to current progress</h3>
-        <p className="muted m-0 mb-3 text-xs leading-5">Percentages are a share of matched comment and DM events, not step-to-step conversion rates. Lead stages below only include leads currently in one of this automation’s goals.</p>
-        <div className="flex flex-col gap-2.5">
-          <FunnelBar label="Matched (comments + messages)" count={matchedTotal} of={matchedTotal} />
-          <FunnelBar label="Conversations started" count={analytics.conversationsStarted} of={matchedTotal} />
-          <FunnelBar label="Leads currently in an active goal" count={stageCounts.total} of={matchedTotal} />
-          <FunnelBar label="Qualified leads in active goals" count={stageCounts.qualified} of={matchedTotal} />
-          <FunnelBar label="Meetings scheduled in active goals" count={stageCounts.meeting} of={matchedTotal} />
-          <FunnelBar label="Won leads in active goals" count={stageCounts.won} of={matchedTotal} />
-        </div>
-      </section>
-
-      <section className="card">
-        <h3 className="m-0 mb-3 text-[15px] font-semibold text-ink">Conversations Over Time</h3>
-        {analytics.timeseries.every((p) => p.comments === 0 && p.messages === 0) ? (
-          <p className="muted">No matched activity in the last 30 days yet.</p>
-        ) : (
-          <TimeseriesChart data={analytics.timeseries} />
-        )}
-      </section>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <section className="card mb-0">
-          <h3 className="m-0 mb-3 text-[15px] font-semibold text-ink">Breakdown by Source</h3>
-          {matchedTotal === 0 ? (
-            <p className="muted">No matched events yet.</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <FunnelBar label="Comments" count={analytics.commentsMatched} of={matchedTotal} />
-              <FunnelBar label="Direct messages" count={analytics.messagesMatched} of={matchedTotal} />
-            </div>
-          )}
-        </section>
-
-        <section className="card mb-0">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <h3 className="m-0 text-[15px] font-semibold text-ink">Milestone Drop-off</h3>
-            <Link className="btn-secondary btn-small" to={`/dashboard/${tenantId}/automation/journeys/${campaign.id}`}>Review automation</Link>
-          </div>
-          {dropoff.length === 0 ? (
-            <p className="muted">No milestones yet.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {dropoff.map((d) => (
-                <div key={d.milestoneId}>
-                  <div className="flex justify-between text-xs text-subtle">
-                    <span>
-                      {d.ordinal + 1}. {d.goalDescription}
-                    </span>
-                    <span>{d.advancedCount}</span>
-                  </div>
-                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-chip">
-                    <div className="h-full rounded-full bg-accent" style={{ width: `${(d.advancedCount / maxDropoff) * 100}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      <section className="card">
-        <h3 className="m-0 mb-3 text-[15px] font-semibold text-ink">AI Behaviour Summary</h3>
-        <p className="muted small m-0">
-          Reply mode: <strong className="text-ink">{campaign.replyMode === "ai_generated" ? "AI-generated" : "Rule-based"}</strong>
-          {" · "}Tone: <strong className="text-ink">{campaign.tone.replace(/_/g, " ")}</strong>
-          {" · "}Knowledge Base: <strong className="text-ink">{campaign.useKnowledgeBase ? "On" : "Off"}</strong>
-        </p>
-      </section>
-
-      <section className="card">
-        <h3 className="m-0 mb-3 text-[15px] font-semibold text-ink">Needs Attention</h3>
-        {attention.length === 0 ? (
-          <p className="muted m-0">Nothing needs attention right now.</p>
-        ) : (
-          <ul className="m-0 list-none space-y-3 p-0 text-sm">
-            {attention.map((item) => (
-              <li key={item.key} className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3 last:border-b-0 last:pb-0">
-                <div className="min-w-0">
-                  <span className="mr-2 text-err-ink" aria-hidden="true">•</span>
-                  {item.title}
-                  <ul className="m-0 mt-2 list-none space-y-1.5 p-0">
-                    {item.leads.slice(0, 5).map((lead) => (
-                      <li key={lead.id} className="flex flex-wrap items-center justify-between gap-2">
-                        <Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>{lead.username ? `@${lead.username}` : "Instagram user"}</Link>
-                        <span className="muted small">{lead.pipelineStage.replace(/_/g, " ")}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {item.leads.length > 5 && (
-                    <p className="muted small mt-1">Showing 5 of {item.leads.length} records in the currently loaded lead sample.</p>
-                  )}
-                </div>
-                <Link className="btn-secondary btn-small shrink-0" to={`/dashboard/${tenantId}/leads`}>View leads</Link>
-              </li>
-            ))}
-          </ul>
-        )}
-        {journeyLeads.length > 0 && (
-          <p className="muted small mt-2">
-            Most recent activity {formatRelativeTime(journeyLeads[0]?.lastInboundAt ?? null)}.
-          </p>
-        )}
-      </section>
-    </div>
-  );
+  const [analytics, setAnalytics] = useState<CampaignAnalytics | null>(null); const [dropoff, setDropoff] = useState<Dropoff[] | null>(null); const [journeyLeads, setJourneyLeads] = useState<LeadListItem[] | null>(null); const [members, setMembers] = useState<TenantMember[]>([]); const [error, setError] = useState<string | null>(null);
+  useEffect(() => { let cancelled = false; async function load() { setError(null); try { const [a, d, ms, allLeads, mem] = await Promise.all([api.getCampaignAnalytics(tenantId, campaign.id), api.getDropoff(tenantId, campaign.id), api.listMilestones(tenantId, campaign.id), api.getLeads(tenantId), api.listMembers(tenantId)]); if (cancelled) return; const milestoneIds = new Set(ms.map((m) => m.id)); setAnalytics(a); setDropoff(d); setJourneyLeads(allLeads.filter((l) => l.activeMilestoneId && milestoneIds.has(l.activeMilestoneId))); setMembers(mem); } catch (err) { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load analytics"); } } void load(); return () => { cancelled = true; }; }, [tenantId, campaign.id]);
+  const stageCounts = useMemo(() => journeyLeads ? { total: journeyLeads.length, qualified: journeyLeads.filter((l) => ["qualified", "meeting_scheduled", "won"].includes(l.pipelineStage)).length, meeting: journeyLeads.filter((l) => ["meeting_scheduled", "won"].includes(l.pipelineStage)).length, won: journeyLeads.filter((l) => l.pipelineStage === "won").length } : null, [journeyLeads]);
+  const attention = useMemo(() => { if (!journeyLeads) return []; const staleUnread = journeyLeads.filter((l) => l.unread && l.lastInboundAt && Date.now() - new Date(l.lastInboundAt).getTime() > 86400000); const unassigned = journeyLeads.filter((l) => !l.ownerUserId); const escalated = journeyLeads.filter((l) => l.handoffStatus === "requested"); return [...(staleUnread.length ? [{ key: "unread", title: `${staleUnread.length} conversation${staleUnread.length === 1 ? "" : "s"} unread for over a day`, leads: staleUnread }] : []), ...(unassigned.length && members.length ? [{ key: "unassigned", title: `${unassigned.length} lead${unassigned.length === 1 ? "" : "s"} not assigned to anyone`, leads: unassigned }] : []), ...(escalated.length ? [{ key: "handoff", title: `${escalated.length} conversation${escalated.length === 1 ? "" : "s"} waiting for human handoff`, leads: escalated }] : [])]; }, [journeyLeads, members]);
+  if (error) return <ErrorState title="Couldn't load automation results" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>Retry</Button>} />;
+  if (!analytics || !dropoff || !journeyLeads || !stageCounts) return <LoadingState label="Loading automation results" description="Checking matched activity, lead progress, and milestone performance." />;
+  const matchedTotal = analytics.commentsMatched + analytics.messagesMatched; const maxDropoff = Math.max(...dropoff.map((d) => d.advancedCount), 1); const handoffCount = journeyLeads.filter((lead) => lead.handoffStatus === "requested").length;
+  return <div className="flex flex-col gap-4 builder-results-panel">
+    <header className="builder-results-header"><div><p className="overview-eyebrow">Automation results</p><h2 className="m-0 text-lg font-semibold text-ink">Results for {campaign.name}</h2><p className="muted m-0 mt-1 max-w-3xl text-sm leading-5">Real production metrics for this automation. Matched activity covers the last 30 days; lead counts are a current snapshot of leads still in active goals.</p></div></header>
+    <div className="builder-results-metric-row"><StatTile value={matchedTotal.toLocaleString()} label="Trigger events" detail="matched comments + messages" /><StatTile value={analytics.conversationsStarted.toLocaleString()} label="Conversations started" detail="matched conversations" /><StatTile value={stageCounts.total.toLocaleString()} label="Lead records progressing" detail="currently in active goals" /><StatTile value={handoffCount.toLocaleString()} label="Human reviews" detail="current handoff requests" /></div>
+    <div className="builder-results-overview-grid"><section className="builder-results-panel-surface"><header className="builder-results-panel-title"><div><p className="overview-eyebrow">Run volume</p><h3>Activity over time</h3><p>Matched comments and direct messages from the real analytics series.</p></div></header>{analytics.timeseries.every((p) => p.comments === 0 && p.messages === 0) ? <EmptyState title="No matched activity yet" description="This automation has no matched comments or direct messages in the last 30 days." /> : <TimeseriesChart data={analytics.timeseries} />}</section><section className="builder-results-panel-surface"><header className="builder-results-panel-title"><div><p className="overview-eyebrow">Milestone drop-off</p><h3>Goal progress</h3><p>Current advancement counts from the real automation goals.</p></div><Link className="btn-secondary btn-small" to={`/dashboard/${tenantId}/automation/journeys/${campaign.id}`}>Review automation</Link></header>{dropoff.length === 0 ? <EmptyState title="No goals configured" description="Add a goal in Flow before milestone progress can be measured." /> : <div className="flex flex-col gap-2.5">{dropoff.map((d) => <div key={d.milestoneId}><div className="flex justify-between text-xs text-subtle"><span>{d.ordinal + 1}. {d.goalDescription}</span><span>{d.advancedCount}</span></div><div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-chip"><div className="h-full rounded-full bg-accent" style={{ width: `${(d.advancedCount / maxDropoff) * 100}%` }} /></div></div>)}</div>}</section></div>
+    <div className="builder-results-overview-grid"><section className="builder-results-panel-surface"><header className="builder-results-panel-title"><div><p className="overview-eyebrow">Matched activity</p><h3>Progress against matched events</h3><p>Percentages are shares of matched comment and DM events, not step-to-step conversion rates.</p></div></header><div className="flex flex-col gap-2.5"><FunnelBar label="Matched (comments + messages)" count={matchedTotal} of={matchedTotal} /><FunnelBar label="Conversations started" count={analytics.conversationsStarted} of={matchedTotal} /><FunnelBar label="Leads currently in an active goal" count={stageCounts.total} of={matchedTotal} /><FunnelBar label="Qualified leads in active goals" count={stageCounts.qualified} of={matchedTotal} /><FunnelBar label="Meetings scheduled in active goals" count={stageCounts.meeting} of={matchedTotal} /><FunnelBar label="Won leads in active goals" count={stageCounts.won} of={matchedTotal} /></div></section><section className="builder-results-panel-surface"><header className="builder-results-panel-title"><div><p className="overview-eyebrow">Source breakdown</p><h3>Where matches came from</h3><p>Real event totals returned for this automation.</p></div></header>{matchedTotal === 0 ? <EmptyState title="No matched events yet" description="Comments and direct messages will appear here after this automation receives matching activity." /> : <div className="flex flex-col gap-3"><FunnelBar label="Comments" count={analytics.commentsMatched} of={matchedTotal} /><FunnelBar label="Direct messages" count={analytics.messagesMatched} of={matchedTotal} /></div>}</section></div>
+    <section className="builder-results-panel-surface"><header className="builder-results-panel-title"><div><p className="overview-eyebrow">AI behavior</p><h3>Automation behavior</h3></div><span className="builder-results-production-label">Production configuration</span></header><p className="muted m-0 text-sm">Reply mode: <strong className="text-ink">{campaign.replyMode === "ai_generated" ? "AI-generated" : "Rule-based"}</strong>{" · "}Tone: <strong className="text-ink">{campaign.tone.replace(/_/g, " ")}</strong>{" · "}Knowledge Base: <strong className="text-ink">{campaign.useKnowledgeBase ? "On" : "Off"}</strong></p></section>
+    <section className="builder-results-panel-surface"><header className="builder-results-panel-title"><div><p className="overview-eyebrow">Needs attention</p><h3>Operator follow-up</h3></div></header>{attention.length === 0 ? <EmptyState title="Nothing needs attention right now" description="There are no stale unread, unassigned, or requested-handoff leads in this automation's active goals." /> : <ul className="m-0 list-none space-y-3 p-0 text-sm">{attention.map((item) => <li key={item.key} className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3 last:border-b-0 last:pb-0"><div className="min-w-0"><span className="mr-2 text-err-ink" aria-hidden="true">•</span>{item.title}<ul className="m-0 mt-2 list-none space-y-1.5 p-0">{item.leads.slice(0, 5).map((lead) => <li key={lead.id} className="flex flex-wrap items-center justify-between gap-2"><Link to={`/dashboard/${tenantId}/leads/${lead.id}`}>{lead.username ? `@${lead.username}` : "Instagram user"}</Link><span className="muted small">{lead.pipelineStage.replace(/_/g, " ")}</span></li>)}</ul>{item.leads.length > 5 && <p className="muted small mt-1">Showing 5 of {item.leads.length} records in the currently loaded lead sample.</p>}</div><Link className="btn-secondary btn-small shrink-0" to={`/dashboard/${tenantId}/leads`}>View leads</Link></li>)}</ul>}{journeyLeads.length > 0 && <p className="muted small mt-2">Most recent activity {formatRelativeTime(journeyLeads[0]?.lastInboundAt ?? null)}.</p>}</section>
+  </div>;
 }
