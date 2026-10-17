@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { KnowledgeBasePanel } from "../components/KnowledgeBasePanel";
 import { PageHeader } from "../components/ui";
+import "../styles/knowledge-settings-parity.css";
 
 /** RAG/knowledge base is a first-class product capability, not a settings sub-item. */
 export function KnowledgePage() {
@@ -12,10 +13,10 @@ export function KnowledgePage() {
       <PageHeader
         eyebrow="AI knowledge"
         title="Knowledge base"
-        description={'Documents uploaded here ground AI replies across every journey that has "Use knowledge base for context" enabled.'}
+        description="Review sources that ground AI replies, inspect processing health, and test retrieval."
       />
       <div className="banner small knowledge-grounding-note" role="note">
-        <strong>How grounding works:</strong> sources marked Ready are available to AI replies. Processing sources are still being prepared; failed sources are not used until they are replaced or uploaded again.
+        <strong>Grounding status:</strong> Ready sources can ground AI replies. Processing sources are still being prepared; failed sources are excluded until replaced or uploaded again.
       </div>
       <KnowledgeBasePanel tenantId={tenantId} />
     </div>
