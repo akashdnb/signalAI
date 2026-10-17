@@ -73,11 +73,15 @@ export function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [allCount, setAllCount] = useState<number | null>(null);
+  const latestListRequestRef = useRef(0);
 
   const leads = pageData?.items ?? null;
   const selectedLead = leads?.find((l) => l.id === selectedLeadId) ?? null;
   const selectedLeadIdRef = useRef(selectedLeadId);
   selectedLeadIdRef.current = selectedLeadId;
+  const inboxContextSignature = `${tenantId ?? ""}|${selectedAccountId ?? ""}|${tab}|${search.trim()}|${page}`;
+  const inboxContextSignatureRef = useRef(inboxContextSignature);
+  inboxContextSignatureRef.current = inboxContextSignature;
   const standardMessagingWindowOpen = !!selectedLead?.windowOpenUntil && Date.parse(selectedLead.windowOpenUntil) > Date.now();
   const humanAgentWindowOpen = !!selectedLead?.humanAgentWindowUntil && Date.parse(selectedLead.humanAgentWindowUntil) > Date.now();
   const humanAgentOnly = !standardMessagingWindowOpen && humanAgentWindowOpen;
@@ -94,18 +98,41 @@ export function InboxPage() {
             ? { handoffStatus: "requested" as HandoffStatus }
             : {};
 
+  function clearSelectedLead() {
+    setSelectedLeadId(null);
+    selectedLastInboundAtRef.current = null;
+    setTags(null);
+    setPendingEntries([]);
+    setComposeText("");
+    setError(null);
+  }
+
   async function reloadLeads() {
     if (!tenantId) return;
+    const requestId = ++latestListRequestRef.current;
     try {
       const result = await getLeadsPage(tenantId, page, PAGE_SIZE, {
         ...getFilters(),
         q: search.trim() || undefined,
         accountId: selectedAccountId || undefined,
       });
-      setPageData(result);
+      if (requestId !== latestListRequestRef.current) return;
+      // Keep the local read state for the actively selected lead if a list request
+      // started before the user's explicit selection resolves after it.
+      const activeLeadId = selectedLeadIdRef.current;
+      const items = activeLeadId
+        ? result.items.map((lead) =>
+            lead.id === activeLeadId ? { ...lead, unread: false } : lead,
+          )
+        : result.items;
+      setPageData({ ...result, items });
       if (result.page !== page) setPage(result.page);
+      if (activeLeadId && !result.items.some((lead) => lead.id === activeLeadId)) {
+        clearSelectedLead();
+      }
       setError(null);
     } catch (err) {
+      if (requestId !== latestListRequestRef.current) return;
       if (err instanceof ApiError && (err.status === 401)) {
         navigate("/login", { replace: true });
         return;
@@ -126,10 +153,7 @@ export function InboxPage() {
   useEffect(() => {
     setPageData(null);
     setError(null);
-    setSelectedLeadId(null);
-    setTags(null);
-    setPendingEntries([]);
-    setComposeText("");
+    clearSelectedLead();
   }, [tenantId, selectedAccountId]);
 
   const selectedLastInboundAtRef = useRef<string | null>(null);
@@ -145,8 +169,10 @@ export function InboxPage() {
         return;
       }
       if (!tenantId) return;
+      const pollContextSignature = inboxContextSignatureRef.current;
       api.getLead(tenantId, selectedLeadId).then((fresh) => {
         if (selectedLeadIdRef.current !== selectedLeadId) return;
+        if (inboxContextSignatureRef.current !== pollContextSignature) return;
         if (fresh.lastInboundAt !== selectedLastInboundAtRef.current) {
           selectedLastInboundAtRef.current = fresh.lastInboundAt;
           setThreadRefreshToken((token) => token + 1);
