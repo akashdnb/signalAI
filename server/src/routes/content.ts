@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import {
@@ -30,7 +30,7 @@ function retryDelayForFailure(failureCount: number): number {
 async function resolveAnalyticsAccountScope(
   tenantId: string,
   rawAccountId: unknown,
-  res: Parameters<Parameters<typeof Router>[0]>[0],
+  res: Response,
 ): Promise<string | undefined | false> {
   if (rawAccountId === undefined) return undefined;
   if (typeof rawAccountId !== "string" || !rawAccountId.trim()) {
