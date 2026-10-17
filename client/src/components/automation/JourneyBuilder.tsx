@@ -26,7 +26,7 @@ import { NodeInspectorDialog } from "./NodeInspectorDialog";
 import { PreviewDialog } from "./PreviewDialog";
 import { TestJourneyDialog } from "./TestJourneyDialog";
 import { StatusBadge } from "../ui";
-import type { JourneyAccountReadiness } from "../JourneyAccountsPanel";
+import { JourneyAccountsPanel, type JourneyAccountReadiness } from "../JourneyAccountsPanel";
 
 type BuilderTab = "builder" | "details" | "analytics" | "leads";
 
@@ -555,30 +555,6 @@ export function JourneyBuilder({
               ? "The loaded flow version is saved."
               : "Open Flow to load and verify the current graph version.",
     },
-    {
-      title: "Instagram account",
-      status: accountReadiness.status === "loading"
-        ? "Checking"
-        : accountReadiness.status === "error"
-          ? "Check connection"
-          : accountReadiness.healthyAssignedCount > 0
-            ? "Healthy account assigned"
-            : "Assign an account",
-      tone: accountReadiness.status === "error"
-        ? "danger" as const
-        : accountReadiness.status !== "ready"
-          ? "neutral" as const
-          : accountReadiness.healthyAssignedCount > 0
-            ? "success" as const
-            : "warning" as const,
-      detail: accountReadiness.status === "loading"
-        ? "Checking connected Instagram accounts and their assignment."
-        : accountReadiness.status === "error"
-          ? "Account readiness could not be confirmed. Retry or inspect Integrations."
-          : accountReadiness.healthyAssignedCount > 0
-            ? `${accountReadiness.healthyAssignedCount} healthy account${accountReadiness.healthyAssignedCount === 1 ? "" : "s"} assigned${accountReadiness.unavailableAssignedCount > 0 ? `; ${accountReadiness.unavailableAssignedCount} unavailable` : ""}.`
-            : "Assign at least one healthy Instagram account before activating a live automation.",
-    },
   ] as const;
 
   async function handleToggleEnabled() {
@@ -967,6 +943,19 @@ export function JourneyBuilder({
                 campaign={campaign}
                 onChanged={onChanged}
                 onDirtyChange={setDetailsDirty}
+                afterTrigger={
+                  <section className="journey-setup-account-section" aria-labelledby="journey-setup-account-title">
+                    <div className="journey-setup-account-heading">
+                      <h2 id="journey-setup-account-title">Instagram account</h2>
+                      <p className="muted">Assign this reusable journey to healthy accounts that should run it.</p>
+                    </div>
+                    <JourneyAccountsPanel
+                      tenantId={tenantId}
+                      campaignId={campaign.id}
+                      onReadinessChange={undefined}
+                    />
+                  </section>
+                }
               />
             </div>
           )}
