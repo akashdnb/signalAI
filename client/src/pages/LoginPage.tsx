@@ -101,7 +101,7 @@ function MarketingColumn() {
 
 function LoginLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="relative min-h-screen" style={{ background: "var(--brand-gradient)" }}>
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-14 px-6 py-16 lg:flex-row lg:items-center">
         <MarketingColumn />
         <div className="w-full max-w-sm shrink-0">
