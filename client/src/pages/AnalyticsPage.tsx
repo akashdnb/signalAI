@@ -123,6 +123,7 @@ export function AnalyticsPage() {
   const navigate = useNavigate();
   const { selectedAccountId } = useTenant();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("activity");
+  const [showMetricDefinitions, setShowMetricDefinitions] = useState(false);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [revenue, setRevenue] = useState<RevenueByCurrency[] | null>(null);
   const [timeseries, setTimeseries] = useState<ConversationsTimeseriesPoint[] | null>(null);
@@ -205,6 +206,17 @@ export function AnalyticsPage() {
         <div><span>Direct messages</span><strong>{dmsCount === null ? "—" : dmsCount.toLocaleString()}</strong><small>Inbound DM reservations</small></div>
         <div><span>Leads</span><strong>{leadCount === null ? "—" : leadCount.toLocaleString()}</strong><small>Current pipeline</small></div>
         <div><span>Won</span><strong>{wonCount === null ? "—" : wonCount.toLocaleString()}</strong><small>Current won stage</small></div>
+      </div>
+      <div className="mt-3">
+        <button type="button" className="link-button" onClick={() => setShowMetricDefinitions((open) => !open)} aria-expanded={showMetricDefinitions}>
+          {showMetricDefinitions ? "Hide metric definitions ↑" : "How are these metrics counted? ↓"}
+        </button>
+        {showMetricDefinitions && (
+          <div className="banner mt-2" role="note">
+            <strong>Metric definitions</strong>
+            <p className="muted m-0 mt-1">Comments and DMs are inbound activity events. Leads and won are current pipeline stages, not historical conversion counts. Activity volume is not a lead conversion rate.</p>
+          </div>
+        )}
       </div>
 
       {activeTab === "activity" ? (
