@@ -249,3 +249,10 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 - Current `GAPS.md` remains **OPEN** for rendered parity; the latest audit continues to record unresolved rendered-production differences.
 - Delegated Settings / General parity was created from the current foundation as PR #117. Source review found a one-file **10-add / 3-delete** safe visual/composition-only change preserving the real read-only semantics. PR #117 was squash-merged as `eb7870688deeebc10a86bdfbd6f1564a4b223e77`.
 - No production deploy occurred and no write was made to `main`. Production remains on the older `eaf50af2...` deployment.
+
+## 2026-10-17 16:07 IST — Delegated Journey Builder Results/Leads audit accepted and completed
+
+- Delegated Journey Builder Results/Leads audit was **accepted and completed**. No changes were needed because PR #108 already implemented the preview-equivalent Results/Leads hierarchy in real production data, preserving analytics/lead APIs, owner updates, pagination, captured facts, and loading/error/empty states.
+- No branch, PR, or code change resulted from this audit.
+- `GAPS-2026-10-17-part2` still labels Results/Leads **OPEN**, but this audit is stale relative to merged PR #108.
+- No production deploy or `main` write occurred.
