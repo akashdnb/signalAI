@@ -788,8 +788,8 @@ export const api = {
   getAnalytics: (tenantId: string) => request<Analytics>(`/tenants/${tenantId}/analytics`),
   getFunnel: (tenantId: string, accountId?: string | null) => request<Funnel>(`/tenants/${tenantId}/analytics/funnel${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getRevenue: (tenantId: string, accountId?: string | null) => request<RevenueByCurrency[]>(`/tenants/${tenantId}/analytics/revenue${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
-  getConversationsTimeseries: (tenantId: string) =>
-    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries`),
+  getConversationsTimeseries: (tenantId: string, accountId?: string | null) =>
+    request<ConversationsTimeseriesPoint[]>(`/tenants/${tenantId}/analytics/timeseries${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`),
   getDropoff: (tenantId: string, campaignId: string) =>
     request<Dropoff[]>(`/tenants/${tenantId}/campaigns/${campaignId}/dropoff`),
   getCampaignAnalytics: (tenantId: string, campaignId: string) =>
@@ -935,7 +935,7 @@ export const api = {
 
   getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
   updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
-    request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+    request<{ profile: UserProfile }>(`/me/profile`, { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
 
   listKnowledgeBaseDocuments: (tenantId: string) =>
     request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),

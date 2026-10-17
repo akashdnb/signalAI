@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { config } from "../config.js";
 import { getPool } from "../db/pool.js";
 import {
@@ -8,6 +8,7 @@ import {
 } from "../db/mediaMetadata.js";
 import { listConnectedInstagramAccounts } from "../db/connectedAccounts.js";
 import { getDecryptedToken, resolveInstagramAccountIdForTenant } from "../db/tokens.js";
+import { getTopKeywords, getTopPosts } from "../db/analytics.js";
 import { fetchMediaMetadata } from "../lib/instagramMedia.js";
 import { requireTenantSession } from "../lib/tenantAuth.js";
 import { Sentry } from "../lib/sentry.js";
@@ -24,6 +25,24 @@ const METADATA_REFRESH_RETRY_DELAYS_MS = [
 function retryDelayForFailure(failureCount: number): number {
   const boundedFailureCount = Math.min(Math.max(failureCount, 1), MAX_METADATA_REFRESH_FAILURES);
   return METADATA_REFRESH_RETRY_DELAYS_MS[boundedFailureCount - 1];
+}
+
+async function resolveAnalyticsAccountScope(
+  tenantId: string,
+  rawAccountId: unknown,
+  res: Response,
+): Promise<string | undefined | false> {
+  if (rawAccountId === undefined) return undefined;
+  if (typeof rawAccountId !== "string" || !rawAccountId.trim()) {
+    res.status(400).json({ error: "accountId must be a single connected-account identifier" });
+    return false;
+  }
+  const accountId = await resolveInstagramAccountIdForTenant(getPool(), tenantId, rawAccountId.trim());
+  if (!accountId) {
+    res.status(404).json({ error: "Instagram account not found for this workspace" });
+    return false;
+  }
+  return accountId;
 }
 
 export const contentRouter = Router();
@@ -126,4 +145,19 @@ contentRouter.get("/tenants/:tenantId/observed-media", async (req, res) => {
   }
 
   return res.status(200).json(media);
+});
+
+/** Analytics content signals use the same tenant session and optional connected-account scope as the content surface. */
+contentRouter.get("/tenants/:tenantId/analytics/top-posts", async (req, res) => {
+  const scope = await resolveAnalyticsAccountScope(req.params.tenantId, req.query.accountId, res);
+  if (scope === false) return;
+  const posts = await getTopPosts(getPool(), req.params.tenantId, 10, scope);
+  return res.status(200).json(posts);
+});
+
+contentRouter.get("/tenants/:tenantId/analytics/top-keywords", async (req, res) => {
+  const scope = await resolveAnalyticsAccountScope(req.params.tenantId, req.query.accountId, res);
+  if (scope === false) return;
+  const keywords = await getTopKeywords(getPool(), req.params.tenantId, 10, scope);
+  return res.status(200).json(keywords);
 });

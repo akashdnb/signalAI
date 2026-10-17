@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type ObservedMedia } from "../api";
 import { PlayIcon } from "../components/icons";
+import { EmptyState, ErrorState, LoadingState } from "../components/ui";
 import { useTenant } from "../context/TenantContext";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -9,6 +10,13 @@ const TYPE_LABEL: Record<string, string> = {
   VIDEO: "Video",
   CAROUSEL_ALBUM: "Carousel",
 };
+
+const TYPE_FILTERS: Array<{ value: string; label: string }> = [
+  { value: "all", label: "All media" },
+  { value: "IMAGE", label: "Image" },
+  { value: "CAROUSEL_ALBUM", label: "Carousel" },
+  { value: "VIDEO", label: "Video" },
+];
 
 function formatRelative(iso: string | null): string {
   if (!iso) return "—";
@@ -31,7 +39,8 @@ export function ContentPage() {
   const { selectedAccountId } = useTenant();
 
   const [media, setMedia] = useState<ObservedMedia[] | null>(null);
-  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [previewMedia, setPreviewMedia] = useState<ObservedMedia | null>(null);
@@ -45,16 +54,15 @@ export function ContentPage() {
     setPreviewMedia(null);
     api
       .listObservedMedia(tenantId, selectedAccountId)
-      .then((m) => {
-        if (!cancelled) {
-          setMedia(m);
-          setFailedPreviews(new Set());
-          setError(null);
-        }
+      .then((items) => {
+        if (cancelled) return;
+        setMedia(items);
+        setFailedPreviews(new Set());
+        setError(null);
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof ApiError && (err.status === 401)) {
+        if (err instanceof ApiError && err.status === 401) {
           navigate("/login", { replace: true });
           return;
         }
@@ -74,16 +82,18 @@ export function ContentPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [previewMedia]);
 
-  const availableTypes = useMemo(() => {
-    if (!media) return [];
-    return Array.from(new Set(media.map((m) => m.mediaType).filter((t): t is string => Boolean(t))));
-  }, [media]);
-
-  const sorted = useMemo(() => {
+  const filteredMedia = useMemo(() => {
     if (!media) return null;
-    const filtered = typeFilter === "all" ? media : media.filter((m) => m.mediaType === typeFilter);
-    return filtered.slice().sort((a, b) => new Date(b.lastSeenAt ?? 0).getTime() - new Date(a.lastSeenAt ?? 0).getTime());
-  }, [media, typeFilter]);
+    const query = search.trim().toLowerCase();
+    return media
+      .filter((item) => typeFilter === "all" || item.mediaType === typeFilter)
+      .filter((item) => {
+        if (!query) return true;
+        return `${item.caption ?? ""} ${item.mediaId}`.toLowerCase().includes(query);
+      })
+      .slice()
+      .sort((a, b) => new Date(b.lastSeenAt ?? b.postedAt ?? 0).getTime() - new Date(a.lastSeenAt ?? a.postedAt ?? 0).getTime());
+  }, [media, search, typeFilter]);
 
   const markPreviewFailed = (mediaId: string) => {
     setFailedPreviews((current) => {
@@ -95,188 +105,168 @@ export function ContentPage() {
 
   if (!tenantId) return null;
 
-  return (
-    <div className="page page-wide">
-      <h1>Content</h1>
-      <p className="muted">Posts and Reels people have commented on, sorted by most recently active.</p><p className="muted small mt-1">If an Instagram thumbnail has expired, refresh the list to try loading it again.</p>
+  const retry = () => setReloadCount((count) => count + 1);
 
-      {error && (
+  return (
+    <div className="page page-wide page-content">
+      <header className="content-header">
+        <div>
+          <span className="overview-eyebrow">Instagram content</span>
+          <h1>Content</h1>
+          <p className="muted">Posts and Reels that have received comments, using the selected Instagram account scope.</p>
+        </div>
+        <button type="button" className="btn-secondary btn-small" onClick={retry} disabled={media === null}>
+          Refresh posts
+        </button>
+      </header>
+
+      {error && media !== null && (
         <div className="banner banner-error flex flex-wrap items-center justify-between gap-3" role="alert">
           <span>{error}</span>
-          {media === null && (
-            <button type="button" className="link-button" onClick={() => setReloadCount((count) => count + 1)}>
-              Retry
-            </button>
-          )}
+          <button type="button" className="link-button" onClick={retry}>Retry</button>
         </div>
       )}
 
-      {availableTypes.length > 0 && (
-        <div className="filter-row">
-          <button
-            type="button"
-            className={typeFilter === "all" ? "btn-primary btn-small" : "btn-secondary btn-small"}
-            onClick={() => setTypeFilter("all")}
-          >
-            All
-          </button>
-          {availableTypes.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={typeFilter === t ? "btn-primary btn-small" : "btn-secondary btn-small"}
-              onClick={() => setTypeFilter(t)}
-            >
-              {TYPE_LABEL[t] ?? t}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {sorted === null ? (
-        <p className="muted" role="status">{error ? "Content could not be loaded." : "Loading content…"}</p>
-      ) : sorted.length === 0 ? (
-        <div className="card">
-          <p className="muted" style={{ margin: 0 }}>
-            No posts yet — they'll show up here once someone comments on one of your Instagram posts or Reels.
-          </p>
-        </div>
+      {media === null ? (
+        error ? (
+          <section className="card"><ErrorState title="Content could not be loaded" description={error} action={<button type="button" className="btn-primary btn-small" onClick={retry}>Retry</button>} /></section>
+        ) : (
+          <section className="card"><LoadingState label="Loading content" description="Fetching posts from the selected Instagram account." /></section>
+        )
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {sorted.map((m) => {
-            const hasPreview = Boolean(m.thumbnailUrl) && !failedPreviews.has(m.mediaId);
-            return (
-              <div key={m.mediaId} className="card mb-0 overflow-hidden p-0">
-                {hasPreview ? (
-                  <button
-                    type="button"
-                    className="relative block aspect-square w-full cursor-pointer border-0 bg-chip p-0 text-left"
-                    onClick={() => setPreviewMedia(m)}
-                    aria-label={`Open ${mediaPreviewLabel(m.mediaType)}`}
-                  >
-                    <img
-                      src={m.thumbnailUrl!}
-                      alt={m.caption ? m.caption.split("\n")[0] : "Instagram post preview"}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      onError={() => markPreviewFailed(m.mediaId)}
-                    />
-                    {m.mediaType === "VIDEO" && (
-                      <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white shadow-sm">
-                        <PlayIcon className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                    {m.mediaType === "CAROUSEL_ALBUM" && (
-                      <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[11px] font-medium text-white">
-                        Carousel
-                      </span>
-                    )}
-                  </button>
-                ) : (
-                  <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-chip text-sm text-subtle">
-                    <span className="font-medium text-ink">Preview unavailable</span><span className="max-w-[16rem] px-4 text-center text-xs">Instagram may have expired this thumbnail. Refresh the content list to try again.</span>
-                    {m.thumbnailUrl && (
+        <>
+          <div className="content-toolbar" aria-label="Content filters">
+            <div className="content-type-filters" role="group" aria-label="Media type">
+              {TYPE_FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={typeFilter === filter.value ? "btn-primary btn-small" : "btn-secondary btn-small"}
+                  aria-pressed={typeFilter === filter.value}
+                  onClick={() => setTypeFilter(filter.value)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+            <label className="content-search">
+              <span className="sr-only">Search captions and keywords</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search captions and keywords"
+                aria-label="Search captions and keywords"
+              />
+            </label>
+          </div>
+
+          {filteredMedia.length === 0 ? (
+            media.length === 0 && !search && typeFilter === "all" ? (
+              <section className="card">
+                <EmptyState
+                  title="No commented posts yet"
+                  description="Posts will appear here after SignalAI receives a comment event for one of your connected Instagram accounts."
+                />
+              </section>
+            ) : (
+              <section className="card">
+                <EmptyState
+                  title="No posts match these filters"
+                  description="Try a different media type or clear the caption search."
+                  action={<button type="button" className="btn-secondary btn-small" onClick={() => { setTypeFilter("all"); setSearch(""); }}>Clear filters</button>}
+                />
+              </section>
+            )
+          ) : (
+            <div className="content-grid">
+              {filteredMedia.map((item) => {
+                const hasPreview = Boolean(item.thumbnailUrl) && !failedPreviews.has(item.mediaId);
+                return (
+                  <article key={item.mediaId} className="card content-card">
+                    {hasPreview ? (
                       <button
                         type="button"
-                        className="link-button"
-                        onClick={() => setReloadCount((count) => count + 1)}
+                        className="content-media-button"
+                        onClick={() => setPreviewMedia(item)}
+                        aria-label={`Open ${mediaPreviewLabel(item.mediaType)}`}
                       >
-                        Refresh
+                        <img
+                          src={item.thumbnailUrl!}
+                          alt={item.caption ? item.caption.split("\n")[0] : "Instagram post preview"}
+                          className="content-media-image"
+                          loading="lazy"
+                          onError={() => markPreviewFailed(item.mediaId)}
+                        />
+                        {item.mediaType === "VIDEO" && <span className="content-media-badge" aria-label="Video"><PlayIcon className="h-3.5 w-3.5" /></span>}
+                        {item.mediaType === "CAROUSEL_ALBUM" && <span className="content-media-type">Carousel</span>}
                       </button>
+                    ) : (
+                      <div className="content-media-unavailable">
+                        <strong>Preview unavailable</strong>
+                        <span>Instagram may have expired this thumbnail.</span>
+                        {item.thumbnailUrl && <button type="button" className="link-button" onClick={retry}>Refresh</button>}
+                      </div>
                     )}
-                  </div>
-                )}
-                <div className="p-3">
-                  <p className="m-0 line-clamp-2 min-h-[2.5em] break-words text-sm text-ink" title={m.caption ?? undefined}>
-                    {m.caption ? m.caption.split("\n")[0] : <span className="text-subtle">No caption</span>}
-                  </p>
-                  {!m.caption && (
-                    <p className="m-0 mt-1 break-all text-xs text-subtle">
-                      {TYPE_LABEL[m.mediaType ?? ""] ?? "Instagram post"} · Media ID: {m.mediaId}
-                    </p>
-                  )}
-                  <div className="mt-2 flex items-center justify-between text-xs text-subtle">
-                    <span className="pill" style={{ marginLeft: 0 }}>
-                      {m.commentCount} comment{m.commentCount === 1 ? "" : "s"}
-                    </span>
-                    <span>{formatRelative(m.lastSeenAt)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-3">
-                    {m.permalink && (
-                      <a
-                        href={m.permalink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-accent no-underline"
-                      >
-                        View on Instagram ↗
-                      </a>
-                    )}
-                    {hasPreview && (
-                      <button type="button" className="link-button text-xs" onClick={() => setPreviewMedia(m)}>
-                        Preview
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    <div className="content-card-body">
+                      <div className="content-card-meta">
+                        <span className="pill" style={{ marginLeft: 0 }}>{TYPE_LABEL[item.mediaType ?? ""] ?? "Instagram post"}</span>
+                        <span>{formatRelative(item.lastSeenAt ?? item.postedAt)}</span>
+                      </div>
+                      <p className="content-caption" title={item.caption ?? undefined}>
+                        {item.caption || <span className="text-subtle">No caption</span>}
+                      </p>
+                      <div className="content-card-footer">
+                        <span>{item.commentCount} comment{item.commentCount === 1 ? "" : "s"}</span>
+                        {item.commentCount > 0 && (
+                          <Link className="link-button" to={`/dashboard/${tenantId}/leads?sourceMediaId=${encodeURIComponent(item.mediaId)}`}>
+                            Review linked leads →
+                          </Link>
+                        )}
+                      </div>
+                      {item.permalink && (
+                        <a href={item.permalink} target="_blank" rel="noreferrer" className="text-xs text-accent no-underline">
+                          View on Instagram ↗
+                        </a>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {previewMedia && previewMedia.thumbnailUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="content-preview-backdrop"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPreviewMedia(null);
           }}
         >
-          <div
-            className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-            aria-label={mediaPreviewLabel(previewMedia.mediaType)}
-          >
-            <button
-              type="button"
-              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-lg text-white"
-              onClick={() => setPreviewMedia(null)}
-              aria-label="Close preview"
-            >
-              ×
-            </button>
-            <div className="flex max-h-[70vh] items-center justify-center bg-black">
+          <div className="content-preview-dialog" role="dialog" aria-modal="true" aria-label={mediaPreviewLabel(previewMedia.mediaType)}>
+            <button type="button" className="content-preview-close" onClick={() => setPreviewMedia(null)} aria-label="Close preview">×</button>
+            <div className="content-preview-image-wrap">
               <img
                 src={previewMedia.thumbnailUrl}
                 alt={previewMedia.caption ? previewMedia.caption.split("\n")[0] : "Instagram post preview"}
-                className="max-h-[70vh] w-auto max-w-full object-contain"
+                className="content-preview-image"
                 onError={() => {
                   markPreviewFailed(previewMedia.mediaId);
                   setPreviewMedia(null);
                 }}
               />
             </div>
-            <div className="p-5">
-              <div className="mb-2 flex items-center gap-2 text-xs text-subtle">
+            <div className="content-preview-details">
+              <div className="content-card-meta">
                 <span>{TYPE_LABEL[previewMedia.mediaType ?? ""] ?? "Instagram"}</span>
                 <span>·</span>
-                <span>{formatRelative(previewMedia.lastSeenAt)}</span>
+                <span>{formatRelative(previewMedia.lastSeenAt ?? previewMedia.postedAt)}</span>
               </div>
-              <p className="m-0 text-sm leading-6 text-ink">
-                {previewMedia.caption || "No caption"}
-              </p>
-              {previewMedia.permalink && (
-                <a
-                  href={previewMedia.permalink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-block text-sm font-medium text-accent no-underline"
-                >
-                  View on Instagram ↗
-                </a>
-              )}
+              <p>{previewMedia.caption || "No caption"}</p>
+              {previewMedia.commentCount > 0 && <Link className="link-button" to={`/dashboard/${tenantId}/leads?sourceMediaId=${encodeURIComponent(previewMedia.mediaId)}`} onClick={() => setPreviewMedia(null)}>Review linked leads →</Link>}
             </div>
           </div>
         </div>
