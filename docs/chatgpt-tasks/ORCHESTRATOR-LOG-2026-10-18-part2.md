@@ -21,3 +21,9 @@ Continuation of the 2026-10-18 orchestration log. Append-only; prior dated parts
 - Render metadata shows production `signalai-bui` is still deployed at `eaf50af2d38c04715a6b9b8016d9f87e1cc7f3bf`, while foundation has advanced to `6f07fc7aa6168496d622d9129fc59f29583eb8dc`; its auto-deploy is off. The preview render is also behind its configured source branch. I did not trigger any deployment because the current branch cannot be validated by build/CI and a post-change rendered check is unavailable.
 - Browser cleanup: closed the additional preview tab opened by this pass. The two app tabs seen earlier were already absent when close requests were attempted; the final BrowserMCP tab list contains no SignalAI preview or production app tabs. Agent-chat and unrelated tabs were left untouched.
 - Continue next cycle: re-read latest foundation/log/GAPS/PRs before proceeding, restore the approved Playwright worker for rendered verification, and re-evaluate the next highest-priority unblocked gap. Do not treat the migration as finished.
+
+
+## 2026-10-18 01:54 IST — [Independent VM Agent] draft PR opened
+
+- Opened draft PR [#150](https://github.com/akashdnb/signalAI/pull/150), `fix/preview-collapsed-rail-controls` → `feat/preview-to-production-foundation`. A fresh GitHub compare against the current foundation reported two commits ahead, zero behind, and only `client/src/styles/app-shell-phase2.css` plus this log part changed.
+- Kept the PR in draft because the hosted Playwright worker is offline and no build/lint/test run or post-change render was available. No deployment, merge, or `main` write occurred. Next run must re-check latest shared state and try to restore Playwright-based validation before promoting this work.
