@@ -130,6 +130,12 @@ export function AnalyticsPage() {
     if (!tenantId) return;
     let cancelled = false;
     async function load() {
+      setFunnel(null);
+      setRevenue(null);
+      setTimeseries(null);
+      setTopPosts(null);
+      setTopKeywords(null);
+      setErrors([]);
       const results = await Promise.allSettled([
         api.getFunnel(tenantId, selectedAccountId),
         api.getRevenue(tenantId, selectedAccountId),
