@@ -225,3 +225,142 @@
 @media (prefers-reduced-motion: reduce) {
   .page-wide *, .page-workspace * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+ 
+/* Leads route presentation polish. Scoped to production table markup so the
+   visual pass does not alter API, filter, account, or row behavior. */
+.page-leads > .card {
+  border-radius: 14px;
+  border-color: var(--border);
+  background: var(--card-bg);
+  box-shadow: none;
+}
+
+.page-leads > .card .filter-row {
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  margin: 0;
+  border-bottom: 1px solid var(--surface-divider, var(--border));
+}
+
+.page-leads .filter-row input,
+.page-leads .filter-row select {
+  min-height: 40px;
+  border-radius: 8px;
+  border-color: var(--line-strong, var(--border));
+  background: var(--card-bg);
+  font-size: 0.875rem;
+}
+
+.page-leads > .card > .-mx-2.overflow-x-auto {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong, var(--border)) transparent;
+}
+
+.page-leads .leads-data-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.page-leads .leads-data-table thead th {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--line-strong, var(--border));
+  background: var(--surface-muted, var(--pill-bg));
+  color: var(--text-muted);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.page-leads .leads-data-table tbody td {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--surface-divider, var(--border));
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  vertical-align: middle;
+}
+
+.page-leads .leads-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.page-leads .leads-data-table tbody tr:hover {
+  background: var(--surface-hover, var(--pill-bg));
+}
+
+.page-leads .leads-data-table td:first-child > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 28px;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.page-leads .leads-data-table td:first-child > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.page-leads .leads-data-table td:first-child > a > span:last-child,
+.page-leads .leads-data-table td:first-child > a > span:last-child > span {
+  min-width: 0;
+}
+
+.page-leads .leads-data-table td:first-child > a > span:last-child > span,
+.page-leads .leads-data-table td:first-child > a > span:last-child > strong {
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.page-leads .leads-data-table td:first-child > a small,
+.page-leads .leads-data-table td > small,
+.page-leads .leads-data-table td .muted.small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.page-leads .leads-data-table td:first-child > a [aria-label="Unread"] {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+}
+
+@media (max-width: 760px) {
+  .page-leads > .card {
+    border-radius: 12px;
+  }
+
+  .page-leads > .card .filter-row {
+    align-items: stretch;
+    padding: 0.85rem;
+  }
+
+  .page-leads .filter-row input,
+  .page-leads .filter-row select {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-leads > .card > .-mx-2.overflow-x-auto {
+    scroll-behavior: auto;
+  }
+}
