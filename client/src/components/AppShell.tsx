@@ -92,7 +92,7 @@ function NavList({
               <item.icon className="h-5 w-5 shrink-0" />
               <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
               {!collapsed && (
-                <span className="ml-auto rounded-full bg-chip px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-subtle">
+                <span className="ml-auto rounded-full bg-chip px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-subtle">
                   Soon
                 </span>
               )}
