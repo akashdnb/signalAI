@@ -239,7 +239,7 @@ Should the sandbox route `?preview=precision-operations` and `precision-operatio
 
 ### What main-side functionality this recovered
 
-Workspace/multi-account switching and `selectedAccountId` scoping (Leads/Inbox/Analytics), Leads CRM qualification/date/sort filters and the Analytics→Leads source-media deep link, real Notifications (replacing two non-functional "visual shell" settings mockups that this reconciliation found and fixed in `SettingsProfilePage`/`SettingsNotificationsPage`), Team role-gating and the editable workspace-settings card, Integrations role-gating, Inbox lead tags (foundation's own merge of this file left a dangling `setTags(null)` call referencing no declared state — a `ReferenceError` on first render — fixed by restoring the full feature rather than deleting the call), a funnel analytics correctness fix (server-computed `stageCounts`/`unmappedLeadCount`), and the MCP/OAuth/notifications backend plus its migrations, now wired into `app.ts`.
+Workspace/multi-account switching and `selectedAccountId` scoping (Leads/Inbox/Analytics), Leads CRM qualification/date/sort filters and the Analytics→Leads source-media deep link, real Notifications (replacing two non-functional \"visual shell\" settings mockups that this reconciliation found and fixed in `SettingsProfilePage`/`SettingsNotificationsPage`), Team role-gating and the editable workspace-settings card, Integrations role-gating, Inbox lead tags (foundation's own merge of this file left a dangling `setTags(null)` call referencing no declared state — a `ReferenceError` on first render — fixed by restoring the full feature rather than deleting the call), a funnel analytics correctness fix (server-computed `stageCounts`/`unmappedLeadCount`), and the MCP/OAuth/notifications backend plus its migrations, now wired into `app.ts`.
 
 ### CSS / preview-token audit result
 
@@ -295,7 +295,7 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 
 ## 2026-10-17 14:15 IST — Inbox unread-race review and next guard
 
-- Delegated independent code review found a concrete race in PR #103: a list request that began before the operator explicitly opened an unread lead could complete afterwards and restore stale `unread: true` in the list UI. The targeted correction is now committed on `task/inbox-selection-reset-parity` at `e7bc2b9ad715b40ef635f5c1fc7b5cdd91b7be5e`; the response apply path preserves `unread: false` for the actively selected lead. PR #103 remains open/unmerged and its only changed path is `client/src/pages/InboxPage.tsx` (26 additions, 5 deletions).
+- Delegated independent code review found a concrete race in PR #103: a list request that began before the operator explicitly opened an unread lead could complete afterwards and restore stale `unread: true` in the list UI. The targeted correction is now committed on `task/inbox-selection-reset-parity` at `e7bc2b9ad715b40ef635f5c1fc7b5cdd91b7be5e`; the PR remains open/unmerged and its only changed path is `client/src/pages/InboxPage.tsx` (26 additions, 5 deletions).
 - Review confirmed the declaration ordering around `selectedLastInboundAtRef` is not a runtime temporal-dead-zone defect because `clearSelectedLead` is called from effects/async continuations after render initialization. List-request generation handles latest filter/search/page/account response ordering.
 - A lower-severity polling race remains under delegated review: an in-flight `api.getLead` polling response may arrive after tab/search/page/account inputs changed but before the updated list response lands; the currently selected ID may still be the same, so the response can briefly merge stale lead data. The 15-second selected-lead polling semantics must remain; next step is a narrow review of whether an input-scope identity check safely guards this response.
 - Validation remains incomplete: no local checkout/build/lint was available, GitHub shows no CI statuses/workflow runs for the head, and BrowserMCP does not expose viewport resizing. No 390/768/1024 or full theme/browser parity verification is claimed. The separate PR #101 QA audit also advises against approval until the branch is refreshed onto current foundation and the manual client build/lint and browser-smoke workflows are run.
@@ -309,3 +309,14 @@ Repo-wide search for `.po-*`/`--po-*` outside preview-scoped files found one fil
 - Scope remains one changed path, `client/src/pages/InboxPage.tsx`. PR #103's base is now behind current foundation and should be refreshed/reconciled before any merge review; PR #101 and #102 also have stale bases and remain open/unmerged.
 - Validation is still blocked/incomplete: GitHub reports no status checks or PR workflow runs for head `9d55cd4`; local build/lint/typecheck were not run; BrowserMCP inspection in the final reviewer session surfaced ChatGPT rather than a live SignalAI page. The configured client CI and browser-smoke workflows are manual-dispatch only; they still need an actual run and results. Viewport resize controls are unavailable here, so the full 390/768/1024/1440 matrix has not been tested. No app behavior or deployment claims should be inferred from source review alone.
 - This entry was appended via GitHub read–concat–write against the latest fetched log blob SHA, preserving all earlier history. No merge, deployment, or `main` write occurred. Continue delegating QA/release checks and keep PRs open pending base refresh plus validation; squash-and-merge only when separately authorized.
+
+## 2026-10-17 14:20 IST — Delegated page-parity sessions and current PR status
+
+- Delegated page-parity sessions were launched for Journey Builder Results/Leads, Knowledge/Settings, Analytics/Content, AppShell/Overview/Leads/Automation, and Auth/Billing/Docs/Integrations.
+- PR #102 was closed as a stale duplicate.
+- PR #104 (Knowledge/Settings) passed independent source re-review and was squash-merged to `feat/preview-to-production-foundation` at `2729c64dc83d434f3cab36118a53e243b4e7c4ea`.
+- PR #105 (Analytics/Content) source review found account-scoping and error/loading issues; a delegated correction is in progress.
+- PR #108 (Journey Results/Leads) is open pending source review.
+- PR #101 cleanup refresh is delegated.
+- Current `GAPS.md` open items remain unresolved, and responsive exact widths are not verified.
+- No deployment occurred and no writes were made to `main`; this append is log-only and does not edit any app file or PR.
