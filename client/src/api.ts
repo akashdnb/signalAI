@@ -935,7 +935,7 @@ export const api = {
 
   getProfile: () => request<{ profile: UserProfile }>("/me/profile").then((r) => r.profile),
   updateProfile: (updates: { firstName?: string | null; lastName?: string | null; profilePictureUrl?: string | null }) =>
-    request<{ profile: UserProfile }>(`/me/profile`, { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
+    request<{ profile: UserProfile }>("/me/profile", { method: "PATCH", body: JSON.stringify(updates) }).then((r) => r.profile),
 
   listKnowledgeBaseDocuments: (tenantId: string) =>
     request<{ documents: KnowledgeBaseDocument[] }>(`/tenants/${tenantId}/knowledge-base`).then((r) => r.documents),
