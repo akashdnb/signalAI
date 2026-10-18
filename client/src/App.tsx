@@ -5,6 +5,7 @@ import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
 import "./styles/workspace-settings-preview.css";
+import "./styles/settings-notifications-parity.css";
 import { loadSession } from "./api";
 
 const WorkspaceSettingsPreviewPage = lazy(() =>
