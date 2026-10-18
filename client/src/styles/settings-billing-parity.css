@@ -3,17 +3,15 @@
  * checkout behavior, and production-only states intact. */
 .page-billing .billing-panel { display: grid; gap: 16px; }
 .page-billing .billing-panel > .banner { margin: 0; }
-.page-billing .billing-panel .billing-plan-section,
-.page-billing .billing-panel .billing-usage-section,
-.page-billing .billing-panel > .ui-section { margin: 0; }
+.page-billing .billing-panel > section { margin: 0; }
 .page-billing .billing-panel .billing-plan-section,
 .page-billing .billing-panel .billing-usage-section { padding: 18px 20px; }
-.page-billing .billing-panel .billing-plan-section .section-header,
-.page-billing .billing-panel .billing-usage-section .section-header { margin-bottom: 16px; }
-.page-billing .billing-panel .billing-plan-section .section-header h2,
-.page-billing .billing-panel .billing-usage-section .section-header h2 { font-size: 18px; line-height: 26px; letter-spacing: -.012em; }
-.page-billing .billing-panel .billing-plan-section .section-header p,
-.page-billing .billing-panel .billing-usage-section .section-header p { font-size: 14px; line-height: 21px; }
+.page-billing .billing-panel .billing-plan-section > div:first-child,
+.page-billing .billing-panel .billing-usage-section > div:first-child { margin-bottom: 16px; }
+.page-billing .billing-panel .billing-plan-section > div:first-child h2,
+.page-billing .billing-panel .billing-usage-section > div:first-child h2 { font-size: 18px; line-height: 26px; letter-spacing: -.012em; }
+.page-billing .billing-panel .billing-plan-section > div:first-child p,
+.page-billing .billing-panel .billing-usage-section > div:first-child p { font-size: 14px; line-height: 21px; }
 .page-billing .billing-plan-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 0 0; border-top: 1px solid var(--border); }
 .page-billing .billing-section-eyebrow { margin: 0 0 3px; color: var(--text-muted); font-size: 11px; line-height: 15px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .page-billing .billing-plan-name { margin: 0; font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
@@ -34,8 +32,7 @@
 .page-billing .billing-payment-notice h3 { font-size: 13px; line-height: 18px; }
 .page-billing .billing-overage-price { white-space: nowrap; font-size: 16px; line-height: 22px; }
 .page-billing .billing-entitlement-notice { margin: 0; }
-.page-billing .billing-panel > .ui-section:not(.billing-plan-section):not(.billing-usage-section) { margin: 0; }
-.page-billing .billing-panel > .ui-section:not(.billing-plan-section):not(.billing-usage-section) .section-header h2 { font-size: 18px; line-height: 26px; }
+.page-billing .billing-panel > section:not(.billing-plan-section):not(.billing-usage-section) > div:first-child h2 { font-size: 18px; line-height: 26px; }
 .page-billing .billing-panel .billing-payment-notice { margin: 0; }
 .page-billing .billing-panel .billing-reset-note { margin: 0; padding: 0 2px; font-size: 12px; line-height: 18px; }
 @media (max-width: 760px) {
