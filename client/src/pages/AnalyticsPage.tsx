@@ -135,8 +135,8 @@ export function AnalyticsPage() {
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    const currentTenantId = tenantId;
-    if (!currentTenantId) return;
+    if (!tenantId) return;
+    const currentTenantId: string = tenantId;
     let cancelled = false;
     async function load() {
       setFunnel(null);
