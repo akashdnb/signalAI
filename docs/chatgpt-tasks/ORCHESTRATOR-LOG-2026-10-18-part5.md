@@ -13,3 +13,12 @@ Continuation of `docs/chatgpt-tasks/ORCHESTRATOR-LOG-2026-10-18-part4.md`.
 - Deployment freshness remains the gating issue: the latest GAPS evidence records production deployed at `eaf50af2d38c04715a6b9b8016d9f87e1cc7f3bf` while foundation is materially newer, with auto-deploy disabled; preview is on a divergent stale deployment and currently lands on `/login`. Rendered differences therefore remain observations rather than actionable current-source defects unless they reproduce against current source.
 - Outcome: no application code change, PR, merge, deployment, or `main` modification was made this cycle. The highest-priority unblocked source gap is exhausted for the currently verifiable state; Analytics issue #149 is a decision blocker rather than a frontend-only implementation task.
 - Browser cleanup completed: the extension tab opened for this cycle was closed, and the hosted Playwright page was closed. Pre-existing agent-chat and unrelated tabs were left untouched.
+
+## 2026-10-18 — [Independent VM Agent] hourly wake-up: Knowledge review parity
+
+- Re-read the current foundation state and the latest GAPS pass. The current Knowledge source is already operationally richer than the preview: upload, delete, preview of indexed text, processing/ready/failed states, pagination/search, and real retrieval checks are preserved in `KnowledgeBasePanel`.
+- The actionable parity defect is presentation hierarchy rather than missing functionality: the preview places the source list beside a source-detail inspector and then a retrieval-check section; production previously stacked the source table, preview inspector, and retrieval check vertically.
+- Created `task/knowledge-review-parity` from foundation `7e0f18339d3cdacaa43d105bfb98ba85122ad58d` and added a scoped responsive grid so the existing source review and opened source preview render as a two-column review surface, with retrieval spanning the full width. At <=1000px it collapses back to one column.
+- No API, data, upload/delete behavior, status semantics, retrieval behavior, or permissions were changed. The change uses existing SignalAI tokens and remains scoped to `.page-knowledge`.
+- Verification limitation: the branch is not deployed, so rendered post-change verification could not honestly be claimed. GitHub source diff verification is still required before opening the PR; CI/build status will be checked from the new branch.
+- No merge, deployment, or `main` modification was made.
