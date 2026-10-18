@@ -1,0 +1,46 @@
+/* Settings → Plan & billing parity: use the preview's compact, scan-first hierarchy
+ * while keeping the live BillingPanel API/state, usage truth, entitlement gates,
+ * checkout behavior, and production-only states intact. */
+.page-billing .billing-panel { display: grid; gap: 16px; }
+.page-billing .billing-panel > .banner { margin: 0; }
+.page-billing .billing-panel .billing-plan-section,
+.page-billing .billing-panel .billing-usage-section,
+.page-billing .billing-panel > .ui-section { margin: 0; }
+.page-billing .billing-panel .billing-plan-section,
+.page-billing .billing-panel .billing-usage-section { padding: 18px 20px; }
+.page-billing .billing-panel .billing-plan-section .section-header,
+.page-billing .billing-panel .billing-usage-section .section-header { margin-bottom: 16px; }
+.page-billing .billing-panel .billing-plan-section .section-header h2,
+.page-billing .billing-panel .billing-usage-section .section-header h2 { font-size: 18px; line-height: 26px; letter-spacing: -.012em; }
+.page-billing .billing-panel .billing-plan-section .section-header p,
+.page-billing .billing-panel .billing-usage-section .section-header p { font-size: 14px; line-height: 21px; }
+.page-billing .billing-plan-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 0 0; border-top: 1px solid var(--border); }
+.page-billing .billing-section-eyebrow { margin: 0 0 3px; color: var(--text-muted); font-size: 11px; line-height: 15px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.page-billing .billing-plan-name { margin: 0; font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
+.page-billing .billing-plan-summary .muted { margin-top: 3px; }
+.page-billing .billing-trial-note { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--pill-bg); }
+.page-billing .billing-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.page-billing .billing-usage-meter { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
+.page-billing .billing-usage-meter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.page-billing .billing-usage-meter-heading h3 { margin: 0; font-size: 14px; line-height: 20px; font-weight: 700; }
+.page-billing .billing-usage-meter-heading p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.page-billing .billing-usage-percent { font-size: 14px; line-height: 20px; }
+.page-billing .billing-usage-track { height: 7px; margin: 14px 0 9px; overflow: hidden; border-radius: 999px; background: var(--pill-bg); }
+.page-billing .billing-usage-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.page-billing .billing-usage-meter-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: 11px; line-height: 15px; }
+.page-billing .billing-overage-note,
+.page-billing .billing-payment-notice { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--pill-bg); }
+.page-billing .billing-overage-note strong,
+.page-billing .billing-payment-notice h3 { font-size: 13px; line-height: 18px; }
+.page-billing .billing-overage-price { white-space: nowrap; font-size: 16px; line-height: 22px; }
+.page-billing .billing-entitlement-notice { margin: 0; }
+.page-billing .billing-panel > .ui-section:not(.billing-plan-section):not(.billing-usage-section) { margin: 0; }
+.page-billing .billing-panel > .ui-section:not(.billing-plan-section):not(.billing-usage-section) .section-header h2 { font-size: 18px; line-height: 26px; }
+.page-billing .billing-panel .billing-payment-notice { margin: 0; }
+.page-billing .billing-panel .billing-reset-note { margin: 0; padding: 0 2px; font-size: 12px; line-height: 18px; }
+@media (max-width: 760px) {
+  .page-billing .billing-usage-grid { grid-template-columns: 1fr; }
+  .page-billing .billing-plan-summary,
+  .page-billing .billing-overage-note,
+  .page-billing .billing-payment-notice { flex-direction: column; }
+}
