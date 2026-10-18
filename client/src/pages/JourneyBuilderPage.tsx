@@ -5,6 +5,7 @@ import { workspaceApi } from "../api/workspace";
 import type { JourneyAccountReadiness } from "../components/JourneyAccountsPanel";
 import { JourneyBuilder } from "../components/automation/JourneyBuilder";
 import "../styles/journey-builder-parity.css";
+import "../styles/journey-results-period-parity.css";
 
 export function JourneyBuilderPage() {
   const { tenantId, campaignId } = useParams<{ tenantId: string; campaignId: string }>();
