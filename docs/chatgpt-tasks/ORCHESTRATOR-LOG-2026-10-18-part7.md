@@ -19,3 +19,14 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 01:42 IST — [Independent VM Agent] Journey Builder Results reporting-window parity
+
+- Re-read the required foundation docs, latest GAPS part, open PRs, and open issue #149 before editing. Foundation remains the migration base; the required `PrecisionOperationsPreviewPage.tsx` is intentionally absent from foundation and lives on the separate preview branch.
+- Current open-work reconciliation leaves Journey Builder Results as an unowned actionable parity gap; existing open PRs cover Lead Detail, Knowledge, Profile, Scoring, Appearance, Leads, Inbox, Team & access, and General. Analytics issue #149 remains a backend/product semantics decision and was not changed.
+- Live preview Results was rendered through hosted Playwright after `browser_worker_list_tools` and `browser_status` checks. The preview explicitly exposes a `Results period` control with `Last 7 days`, `Last 30 days`, and `This month` choices, while the production Results API is intentionally fixed to the existing 30-day analytics series.
+- Production source inspection confirmed `AnalyticsPanel` already preserves real analytics, drop-off, lead, member, error/loading states, and the existing 30-day API semantics. This change therefore adds a truthful read-only `Results period / Last 30 days` presentation rather than inventing unsupported frontend date-range filtering or changing API behavior.
+- Child branch `task/journey-results-period-parity-2026-10-19` was created directly from `feat/preview-to-production-foundation`.
+- Focused source change: `AnalyticsPanel.tsx` adds the explicit reporting-window presentation; `journey-results-period-parity.css` scopes the compact parity styling; `JourneyBuilderPage.tsx` imports that stylesheet. No API, data, permissions, route, or `main` changes.
+- Production freshness was checked from the latest shared log: production is live on exact foundation commit `19973f198756d6bc6bd5d65f0b5dd485493ae3f3` / deployment `dep-dba948lg1s2s73b8ckng`; the Results source discrepancy is therefore not explained by a stale deployment.
+- Verification: source read-back completed and preview Results rendered. Child-branch build/lint/test/CI was not run in this runtime; no green CI/build claim is made. No merge or deployment performed. Preview browser tab was closed after inspection; unrelated/agent-chat tabs were not touched.
