@@ -121,9 +121,6 @@ export function ContentPage() {
           <h1>Content</h1>
           <p className="muted">Posts and Reels that have received comments, using the selected Instagram account scope.</p>
         </div>
-        <button type="button" className="btn-secondary btn-small" onClick={retry} disabled={media === null}>
-          Refresh posts
-        </button>
       </header>
 
       {error && media !== null && (
@@ -165,6 +162,13 @@ export function ContentPage() {
                 aria-label="Search captions and keywords"
               />
             </label>
+          </div>
+
+          <div className="content-sync-row">
+            <span className="muted">Selected Instagram account · live production data</span>
+            <button type="button" className="btn-secondary btn-small" onClick={retry} disabled={media === null}>
+              Refresh posts
+            </button>
           </div>
 
           {filteredMedia.length === 0 ? (
