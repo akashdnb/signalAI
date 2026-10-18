@@ -6,6 +6,7 @@ import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
 import "./styles/settings-notifications-parity.css";
 import "./styles/settings-profile-parity.css";
+import "./styles/settings-guardrails-parity.css";
 import "./styles/workspace-settings-preview.css";
 import { loadSession } from "./api";
 
@@ -90,76 +91,48 @@ const TeamPage = lazy(() =>
 const InvitationAcceptPage = lazy(() =>
   import("./pages/InvitationAcceptPage").then((module) => ({ default: module.InvitationAcceptPage })),
 );
+const DocsPreviewPage = lazy(() =>
+  import("./pages/DocsPreviewPage").then((module) => ({ default: module.DocsPreviewPage })),
+);
 
-function PageLoadingFallback() {
-  return (
-    <div
-      role="status"
-      className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle"
-    >
-      Loading page…
-    </div>
-  );
+function TenantRoute({ component: Component }: { component: LazyExoticComponent<ComponentType> }) {
+  const { tenantId } = useParams();
+  if (!tenantId) return <Navigate to="/login" replace />;
+  return <Component />;
 }
 
-function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
-  return (
-    <Suspense fallback={<PageLoadingFallback />}>
-      <Page />
-    </Suspense>
-  );
-}
-
-/** Team & access and Plan & billing moved into Settings' sub-nav (matching the preview's IA) — these keep any existing bookmarks/links to the old top-level routes working. */
-function RedirectToSettingsSection({ section }: { section: string }) {
-  const { tenantId } = useParams<{ tenantId: string }>();
-  return <Navigate to={`/dashboard/${tenantId}/settings/${section}`} replace />;
-}
-
-function HomeRedirect() {
-  const session = loadSession();
-  return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
-}
-
-export default function App() {
+export function App() {
   return (
     <Routes>
-      <Route path="/workspace-settings-preview" element={<LazyPage Page={WorkspaceSettingsPreviewPage} />} />
-      <Route path="/" element={<HomeRedirect />} />
-      <Route path="/docs" element={<Navigate to="/docs/introduction" replace />} />
-      <Route path="/docs/*" element={<LazyPage Page={DocsPage} />} />
-      <Route path="/login" element={<LazyPage Page={LoginPage} />} />
-      <Route path="/connect" element={<LazyPage Page={ConnectPage} />} />
-      <Route path="/invite" element={<LazyPage Page={InvitationAcceptPage} />} />
-      <Route path="/dashboard/:tenantId" element={<AppShell />}>
-        <Route index element={<LazyPage Page={DashboardPage} />} />
-        <Route path="settings" element={<LazyPage Page={SettingsPage} />}>
-          <Route index element={<Navigate to="team" replace />} />
-          <Route path="general" element={<LazyPage Page={SettingsGeneralPage} />} />
-          <Route path="team" element={<LazyPage Page={TeamPage} />} />
-          <Route path="billing" element={<LazyPage Page={BillingPage} />} />
-          <Route path="fields" element={<LazyPage Page={SettingsFieldsPage} />} />
-          <Route path="ai-behavior" element={<LazyPage Page={SettingsAiBehaviorPage} />} />
-          <Route path="forbidden-topics" element={<LazyPage Page={SettingsForbiddenTopicsPage} />} />
-          <Route path="escalation" element={<LazyPage Page={SettingsEscalationPage} />} />
-          <Route path="scoring" element={<LazyPage Page={SettingsScoringPage} />} />
-          <Route path="appearance" element={<LazyPage Page={SettingsAppearancePage} />} />
-          <Route path="profile" element={<LazyPage Page={SettingsProfilePage} />} />
-          <Route path="notifications" element={<LazyPage Page={SettingsNotificationsPage} />} />
-        </Route>
-        <Route path="leads/:leadId" element={<LazyPage Page={LeadDetailPage} />} />
-        <Route path="inbox" element={<LazyPage Page={InboxPage} />} />
-        <Route path="leads" element={<LazyPage Page={LeadsPage} />} />
-        <Route path="automation" element={<LazyPage Page={AutomationPage} />} />
-        <Route path="automation/journeys/:campaignId" element={<LazyPage Page={JourneyBuilderPage} />} />
-        <Route path="content" element={<LazyPage Page={ContentPage} />} />
-        <Route path="knowledge" element={<LazyPage Page={KnowledgePage} />} />
-        <Route path="analytics" element={<LazyPage Page={AnalyticsPage} />} />
-        <Route path="team" element={<RedirectToSettingsSection section="team" />} />
-        <Route path="integrations" element={<LazyPage Page={IntegrationsPage} />} />
-        <Route path="billing" element={<RedirectToSettingsSection section="billing" />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/invite/:token" element={<InvitationAcceptPage />} />
+      <Route path="/dashboard/:tenantId" element={<TenantRoute component={DashboardPage} />} />
+      <Route path="/dashboard/:tenantId/automation" element={<TenantRoute component={AutomationPage} />} />
+      <Route path="/dashboard/:tenantId/automation/:automationId" element={<TenantRoute component={JourneyBuilderPage} />} />
+      <Route path="/dashboard/:tenantId/inbox" element={<TenantRoute component={InboxPage} />} />
+      <Route path="/dashboard/:tenantId/leads" element={<TenantRoute component={LeadsPage} />} />
+      <Route path="/dashboard/:tenantId/leads/:leadId" element={<TenantRoute component={LeadDetailPage} />} />
+      <Route path="/dashboard/:tenantId/analytics" element={<TenantRoute component={AnalyticsPage} />} />
+      <Route path="/dashboard/:tenantId/content" element={<TenantRoute component={ContentPage} />} />
+      <Route path="/dashboard/:tenantId/knowledge" element={<TenantRoute component={KnowledgePage} />} />
+      <Route path="/dashboard/:tenantId/integrations" element={<TenantRoute component={IntegrationsPage} />} />
+      <Route path="/dashboard/:tenantId/settings" element={<TenantRoute component={SettingsPage} />}>
+        <Route index element={<Navigate to="general" replace />} />
+        <Route path="general" element={<SettingsGeneralPage />} />
+        <Route path="team" element={<TeamPage />} />
+        <Route path="billing" element={<BillingPage />} />
+        <Route path="fields" element={<SettingsFieldsPage />} />
+        <Route path="ai-behavior" element={<SettingsAiBehaviorPage />} />
+        <Route path="forbidden-topics" element={<SettingsForbiddenTopicsPage />} />
+        <Route path="escalation" element={<SettingsEscalationPage />} />
+        <Route path="scoring" element={<SettingsScoringPage />} />
+        <Route path="appearance" element={<SettingsAppearancePage />} />
+        <Route path="profile" element={<SettingsProfilePage />} />
+        <Route path="notifications" element={<SettingsNotificationsPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/docs/:slug" element={<TenantRoute component={DocsPage} />} />
+      <Route path="/docs-preview" element={<DocsPreviewPage />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
