@@ -1,5 +1,5 @@
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from "react";
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
@@ -7,7 +7,7 @@ import "./styles/product-polish-phase5.css";
 import "./styles/settings-notifications-parity.css";
 import "./styles/settings-profile-parity.css";
 import "./styles/workspace-settings-preview.css";
-import { loadSession } from "./api";
+import { api, loadSession } from "./api";
 
 const WorkspaceSettingsPreviewPage = lazy(() =>
   import("./pages/WorkspaceSettingsPreviewPage").then((module) => ({ default: module.WorkspaceSettingsPreviewPage })),
@@ -110,6 +110,46 @@ function LazyPage({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   );
 }
 
+function LeadDetailRoute() {
+  const { tenantId, leadId } = useParams<{ tenantId: string; leadId: string }>();
+  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const isUuid = !!leadId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
+
+  useEffect(() => {
+    if (!tenantId || !leadId || isUuid) return;
+    let cancelled = false;
+    const username = leadId.replace(/^@/, "").trim().toLowerCase();
+
+    api.getLeads(tenantId, { q: username })
+      .then((leads) => {
+        if (cancelled) return;
+        const match = leads.find((lead) => lead.username?.replace(/^@/, "").trim().toLowerCase() === username);
+        if (!match) {
+          setError("Lead not found. Return to Leads and choose a lead from the list.");
+          return;
+        }
+        navigate(`/dashboard/${tenantId}/leads/${match.id}`, { replace: true });
+      })
+      .catch(() => {
+        if (!cancelled) setError("Lead could not be loaded. Return to Leads and choose the lead again.");
+      });
+
+    return () => { cancelled = true; };
+  }, [tenantId, leadId, isUuid, navigate]);
+
+  if (!tenantId || !leadId) return null;
+  if (isUuid) return <LazyPage Page={LeadDetailPage} />;
+
+  return (
+    <div className="page page-wide">
+      <p className="muted" role={error ? "alert" : "status"}>
+        {error ?? "Finding this lead…"}
+      </p>
+    </div>
+  );
+}
+
 /** Team & access and Plan & billing moved into Settings' sub-nav (matching the preview's IA) — these keep any existing bookmarks/links to the old top-level routes working. */
 function RedirectToSettingsSection({ section }: { section: string }) {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -147,7 +187,7 @@ export default function App() {
           <Route path="profile" element={<LazyPage Page={SettingsProfilePage} />} />
           <Route path="notifications" element={<LazyPage Page={SettingsNotificationsPage} />} />
         </Route>
-        <Route path="leads/:leadId" element={<LazyPage Page={LeadDetailPage} />} />
+        <Route path="leads/:leadId" element={<LeadDetailRoute />} />
         <Route path="inbox" element={<LazyPage Page={InboxPage} />} />
         <Route path="leads" element={<LazyPage Page={LeadsPage} />} />
         <Route path="automation" element={<LazyPage Page={AutomationPage} />} />
