@@ -1,0 +1,121 @@
+.page-leads > header {
+  margin-bottom: 20px;
+}
+
+.page-leads > header h1 {
+  margin-bottom: 4px;
+}
+
+.page-leads > header > div:last-child {
+  min-width: 72px;
+  padding-top: 6px;
+}
+
+.page-leads > .card {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.page-leads .filter-row {
+  gap: 8px;
+  padding-bottom: 14px;
+}
+
+.page-leads .filter-row > select,
+.page-leads .filter-row > label input,
+.page-leads .filter-row > label {
+  min-height: 40px;
+}
+
+.page-leads .filter-row > select {
+  border-radius: 8px;
+}
+
+.page-leads .filter-row > label {
+  display: flex;
+  align-items: stretch;
+}
+
+.page-leads .filter-row > details {
+  flex-basis: 100%;
+  margin-top: 2px;
+}
+
+.page-leads .filter-row > details > summary {
+  width: fit-content;
+  padding: 3px 0;
+  list-style-position: inside;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.page-leads .filter-row > details[open] > summary {
+  color: var(--text);
+}
+
+.page-leads .leads-data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.page-leads .leads-data-table thead th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.page-leads .leads-data-table tbody td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  vertical-align: middle;
+}
+
+.page-leads .leads-data-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--bg) 8%);
+}
+
+.page-leads .leads-data-table tbody td:first-child {
+  min-width: 180px;
+}
+
+.page-leads .leads-data-table tbody td:first-child strong {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.page-leads .leads-data-table tbody td:first-child small {
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.page-leads .leads-data-table tbody td:nth-child(2),
+.page-leads .leads-data-table tbody td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.page-leads .leads-data-table .pill,
+.page-leads .leads-data-table [class*="handoff"] {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .page-leads > header > div:last-child {
+    min-width: auto;
+    padding-top: 0;
+    text-align: left;
+  }
+
+  .page-leads .filter-row > label {
+    width: 100%;
+  }
+
+  .page-leads .filter-row > select {
+    flex: 1 1 0;
+  }
+}
