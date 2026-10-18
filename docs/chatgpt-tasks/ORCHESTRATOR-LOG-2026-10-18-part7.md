@@ -19,3 +19,16 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 00:47 Asia/Kolkata — [Independent VM Agent] Settings General parity pass
+
+- Fresh foundation HEAD verified as `24ca13032d6588d0ca430990ae02e9f73056bd1e`; production `signalai-bui` is live on exact parent application commit `19973f198756d6bc6bd5d65f0b5dd485493ae3f3`, so the checked source/render discrepancy is not explained by a stale application deployment.
+- Re-read `AGENTS.md`, `DESIGN.md`, `client/src/components/ui/README.md`, `client/src/pages/PrecisionOperationsPreviewPage.tsx` availability, `GAPS.md`, numbered GAPS continuations through part 12, the orchestrator log/latest continuation, foundation branch, open PRs, and open issues. `PrecisionOperationsPreviewPage.tsx` is not present on foundation; the live preview service remains the visual reference.
+- Open-work reconciliation: PR #157 owns Lead Detail; #154 Knowledge; #159 Profile; #160 Scoring; #161 Appearance; #162 Leads; #163 Inbox; #164 Team & access. Analytics remains the backend/product decision tracked by issue #149. Settings General remains OPEN and unowned.
+- Hosted BrowserMCP Playwright worker and extension were both online. The live preview Settings → General route was rendered in light mode and confirmed the compact `WORKSPACE DEFAULTS` / `General` hierarchy, three-column defaults form, and divider-led action area.
+- Foundation `SettingsGeneralPage` already preserves real workspace name data, browser-derived timezone, explicit unavailable default-owner semantics, disabled save behavior, and a read-only explanatory note. No API/data/permission semantics were changed.
+- Focused source change: added scoped `settings-general-parity.css` and imported it from `App.tsx` to tighten the existing General panel's heading hierarchy, three-field grid, action divider, explanatory note, and responsive collapse toward the preview while retaining the richer truthful read-only state.
+- Child branch: `task/settings-general-parity-2026-10-19-0047`, created directly from foundation HEAD.
+- Render production deployment freshness was checked via Render: `dep-dba948lg1s2s73b8ckng` is live on `19973f198756d6bc6bd5d65f0b5dd485493ae3f3`; no newer production application deployment was found.
+- Verification limits: the approved hosted worker could render the preview, but no authenticated production dashboard session was available for a direct production General screenshot. No build/lint/test/CI pass is claimed in this run. No merge or deployment performed.
+- The product/backend semantic difference around default lead-owner/queue persistence remains intentionally unresolved; this change does not invent an API or local-only persistence model.
