@@ -1,0 +1,33 @@
+/* Settings → Notifications parity: keep the production API-driven channel controls,
+ * but use the same compact, scan-first hierarchy as the Precision Operations preview. */
+.settings-notifications-panel { padding: 0 !important; overflow: hidden; }
+.settings-notifications-panel .settings-panel-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+.settings-notifications-panel .settings-panel-header h2 { margin: 2px 0 3px; font-size: 18px; line-height: 26px; letter-spacing: -.012em; }
+.settings-notifications-panel .settings-panel-header p { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 21px; }
+.settings-notifications-panel .settings-notification-recipient { margin: 0; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--pill-bg); color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.settings-notifications-panel .settings-notification-recipient strong { color: var(--text); font-weight: 700; }
+.settings-notifications-panel .settings-notification-list { padding: 0 20px; }
+.settings-notifications-panel .settings-notification-row { min-height: 76px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.settings-notifications-panel .settings-notification-row:last-child { border-bottom: 0; }
+.settings-notifications-panel .settings-notification-row h3 { margin: 0 0 3px; font-size: 14px; line-height: 20px; font-weight: 700; }
+.settings-notifications-panel .settings-notification-row p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.settings-notifications-panel .settings-notification-channels { display: flex; align-items: stretch; gap: 8px; }
+.settings-notifications-panel .settings-notification-toggle,
+.settings-notifications-panel .settings-notification-unavailable { min-width: 106px; min-height: 46px; display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 9px; background: var(--card-bg); }
+.settings-notifications-panel .settings-notification-toggle:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card-bg)); }
+.settings-notifications-panel .settings-notification-toggle input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
+.settings-notifications-panel .settings-notification-toggle span,
+.settings-notifications-panel .settings-notification-unavailable { color: var(--text); }
+.settings-notifications-panel .settings-notification-toggle span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.settings-notifications-panel .settings-notification-toggle strong,
+.settings-notifications-panel .settings-notification-unavailable strong { font-size: 11px; line-height: 15px; font-weight: 700; }
+.settings-notifications-panel .settings-notification-toggle small,
+.settings-notifications-panel .settings-notification-unavailable small { color: var(--text-muted); font-size: 10px; line-height: 13px; }
+.settings-notifications-panel > .mt-4 { padding: 14px 20px 20px; margin-top: 0 !important; border-top: 1px solid var(--border); }
+.settings-notifications-panel > .mt-3 { margin-left: 20px; margin-right: 20px; }
+@media (max-width: 760px) {
+  .settings-notifications-panel .settings-notification-row { grid-template-columns: 1fr; gap: 10px; }
+  .settings-notifications-panel .settings-notification-channels { width: 100%; }
+  .settings-notifications-panel .settings-notification-toggle,
+  .settings-notifications-panel .settings-notification-unavailable { flex: 1 1 0; min-width: 0; }
+}
