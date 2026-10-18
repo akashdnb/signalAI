@@ -89,7 +89,7 @@ export function ContentPage() {
   }, [previewMedia]);
 
   const filteredMedia = useMemo(() => {
-    if (!media) return null;
+    if (media === null) return [];
     const query = search.trim().toLowerCase();
     return media
       .filter((item) => typeFilter === "all" || item.mediaType === typeFilter)
