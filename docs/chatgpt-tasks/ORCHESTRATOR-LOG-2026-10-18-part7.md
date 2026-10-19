@@ -70,3 +70,13 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - GitHub source writes were performed through read-modify-write only; no API, data, permissions, routes, or `main` changes were made.
 - BrowserMCP preflight was not available in this non-interactive automation runtime, so no rendered verification is claimed and no browser tabs were opened. Build/lint/test/CI were not run; no green verification or deployment is claimed.
 - Production freshness remains the previously verified foundation deployment `dep-dba948lg1s2s73b8ckng` at commit `19973f198756d6bc6bd5d65f0b5dd485493ae3f3`; no deployment was performed in this pass.
+
+## 2026-10-19 05:44 UTC — [Independent VM Agent] Integrations preview parity
+
+- Fresh foundation/open-work reconciliation selected Integrations as the highest-priority unclaimed presentation gap: the current open PR set covers Dashboard, Login, Lead Detail, Settings slices, Journey Builder Results, Leads, Inbox, Knowledge, and related work, while no open implementation PR covers Integrations. Analytics issue #149 remains explicitly blocked on backend/product semantics.
+- Current foundation `IntegrationsPage.tsx` was read before editing. Its tenant-scoped account loading, workspace-role checks, OAuth connect/reconnect, disconnect confirmation, real health/credential data, retry/error states, and coming-soon WhatsApp/CRM behavior were preserved unchanged.
+- Compared with the live preview source's `IntegrationsScreen`, which uses a compact health banner, bordered account header, four-column health facts, and two secondary integration panels. The production source uses the same information architecture but legacy card/list geometry.
+- Created child branch `style/integrations-preview-parity-20261019` from foundation `24ca13032d6588d0ca430990ae02e9f73056bd1e`.
+- Added only `client/src/styles/integrations-preview-parity.css` plus its App stylesheet import. The CSS is page-scoped and keeps real production APIs, data, permissions, and interaction behavior intact; no preview sample data or preview-only actions were copied.
+- BrowserMCP preflight was not available in this non-interactive runtime, so no rendered verification is claimed. No preview/production tabs were opened.
+- Build/lint/test/CI were not run in this runtime; no green verification or deployment is claimed. No `main` changes, merge, or deployment were performed.
