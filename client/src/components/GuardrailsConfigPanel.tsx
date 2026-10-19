@@ -99,12 +99,12 @@ export function GuardrailsConfigPanel({ tenantId, section }: { tenantId: string;
   const g = useGuardrailsConfig(tenantId);
 
   if (!g.loaded) {
-    return <section className="card">{g.error ? <div className="banner banner-error">{g.error}</div> : <p className="muted">Loading…</p>}</section>;
+    return <section className="card settings-guardrails-panel">{g.error ? <div className="banner banner-error">{g.error}</div> : <p className="muted">Loading…</p>}</section>;
   }
 
   if (section === "ai-behavior") {
     return (
-      <section className="card">
+      <section className="card settings-guardrails-panel">
         <h2>AI behavior</h2>
         <p className="muted small">How the assistant responds when context is incomplete or uncertain.</p>
         {g.error && <div className="banner banner-error">{g.error}</div>}
@@ -127,7 +127,7 @@ export function GuardrailsConfigPanel({ tenantId, section }: { tenantId: string;
 
   if (section === "forbidden-topics") {
     return (
-      <section className="card">
+      <section className="card settings-guardrails-panel">
         <h2>Forbidden topics</h2>
         <p className="muted small">Topics where the assistant should refuse, defer, or escalate.</p>
         {g.error && <div className="banner banner-error">{g.error}</div>}
@@ -143,7 +143,7 @@ export function GuardrailsConfigPanel({ tenantId, section }: { tenantId: string;
   }
 
   return (
-    <section className="card">
+    <section className="card settings-guardrails-panel">
       <h2>Escalation rules</h2>
       <p className="muted small">Situations that require human attention.</p>
       {g.error && <div className="banner banner-error">{g.error}</div>}
