@@ -1,0 +1,86 @@
+/* Inbox parity: keep the production conversation filters, pagination, assignment, handoff,
+ * messaging-window enforcement, and live data while matching the preview's scan-first geometry. */
+.page.page-workspace > h1 {
+  margin: 0 0 .35rem;
+  font-size: 2rem;
+  letter-spacing: -.035em;
+}
+
+.page.page-workspace > .inbox-subtitle {
+  max-width: 720px;
+  margin: 0 0 1rem;
+  line-height: 1.55;
+}
+
+.page.page-workspace > div:has(.inbox-conversation) {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.page.page-workspace > div:has(.inbox-conversation) > div:first-child {
+  width: 252px;
+  flex: 0 0 252px;
+}
+
+.page.page-workspace > div:has(.inbox-conversation) > div:last-child {
+  width: 245px;
+  flex: 0 0 245px;
+}
+
+.page.page-workspace > div:has(.inbox-conversation) > div:first-child > div:first-child {
+  min-height: 55px;
+  padding: .7rem .8rem;
+  gap: .25rem;
+}
+
+.page.page-workspace > div:has(.inbox-conversation) > div:first-child > div:first-child button {
+  min-height: 40px;
+  padding-inline: .55rem;
+}
+
+.page.page-workspace > div:has(.inbox-conversation) > div:first-child > div:nth-child(2) {
+  padding: .7rem .8rem .45rem;
+}
+
+.page.page-workspace > div:has(.inbox-conversation) > div:first-child > div:nth-child(2) input {
+  min-height: 40px;
+}
+
+.page.page-workspace .inbox-conversation {
+  min-height: 0;
+  padding: .85rem .7rem;
+}
+
+.page.page-workspace .inbox-thread-header {
+  min-height: 61px;
+  padding: .75rem .95rem;
+}
+
+.page.page-workspace .inbox-post-context {
+  margin-bottom: .75rem;
+  padding: .65rem .75rem;
+}
+
+.page.page-workspace .inbox-details {
+  padding: 1rem .85rem;
+}
+
+@media (max-width: 900px) {
+  .page.page-workspace > div:has(.inbox-conversation) > div:first-child,
+  .page.page-workspace > div:has(.inbox-conversation) > div:last-child {
+    width: 220px;
+    flex-basis: 220px;
+  }
+}
+
+@media (max-width: 760px) {
+  .page.page-workspace > h1 { font-size: 1.65rem; }
+  .page.page-workspace > div:has(.inbox-conversation) { border-radius: 12px; }
+  .page.page-workspace > div:has(.inbox-conversation) > div:first-child,
+  .page.page-workspace > div:has(.inbox-conversation) > div:last-child {
+    width: auto;
+    flex-basis: auto;
+  }
+}
