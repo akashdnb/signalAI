@@ -19,3 +19,12 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 07:45 IST — [Independent VM Agent] Lead Detail source parity pass
+
+- Fresh GitHub-only reconciliation identified Lead Detail as the highest-priority actionable gap not covered by the currently open implementation PRs; the latest GAPS Part 21 still records Lead Detail as OPEN/NOT VERIFIED FIXED because production is stale relative to the merged legacy-username resolver. The current foundation `LeadsPage.tsx` already navigates using canonical `lead.id`, and `LeadDetailPage.tsx` consumes the route `leadId` directly, so no API/data-contract change was introduced.
+- Preview source review confirms the target Lead Detail composition uses a compact profile header, tabbed Overview/Conversation/Activities/Notes hierarchy, and a two-column detail layout. The foundation production page already exposes the same operational tabs and richer live data/actions, so the focused change is presentation-only.
+- Child branch `style/settings-profile-parity-20261019` starts from foundation `24ca13032d6588d0ca430990ae02e9f73056bd1e`. It adds `client/src/styles/lead-detail-parity.css` and imports that scoped stylesheet from `client/src/App.tsx`. The stylesheet tightens the Lead Detail tab bar, active-state hierarchy, two-column card layout, card hierarchy, and responsive collapse while preserving all existing API calls, live data, permissions, routes, and interactions.
+- The existing HomeRedirect `replace` behavior was preserved after a source-write review; no unrelated App behavior remains changed.
+- BrowserMCP hosted-worker preflight was not run to completion in this non-interactive automation runtime; no rendered verification is claimed. No preview/production browser tabs were opened in this pass.
+- Build/lint/test/CI were not available in this runtime; no green verification or deployment is claimed. No `main` change and no production deployment were performed.
