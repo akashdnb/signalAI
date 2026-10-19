@@ -136,6 +136,7 @@ export function AnalyticsPage() {
 
   useEffect(() => {
     if (!tenantId) return;
+    const currentTenantId: string = tenantId;
     let cancelled = false;
     async function load() {
       setFunnel(null);
@@ -147,11 +148,11 @@ export function AnalyticsPage() {
       setTimeseriesError(null);
       setTopPostsError(null);
       const results = await Promise.allSettled([
-        api.getFunnel(tenantId, selectedAccountId),
-        api.getRevenue(tenantId, selectedAccountId),
-        api.getConversationsTimeseries(tenantId, selectedAccountId),
-        api.getTopPosts(tenantId, selectedAccountId),
-        api.getTopKeywords(tenantId, selectedAccountId),
+        api.getFunnel(currentTenantId, selectedAccountId),
+        api.getRevenue(currentTenantId, selectedAccountId),
+        api.getConversationsTimeseries(currentTenantId, selectedAccountId),
+        api.getTopPosts(currentTenantId, selectedAccountId),
+        api.getTopKeywords(currentTenantId, selectedAccountId),
       ]);
       if (cancelled) return;
       if (results.some((result) => result.status === "rejected" && result.reason instanceof ApiError && result.reason.status === 401)) {
