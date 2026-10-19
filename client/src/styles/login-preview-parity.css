@@ -1,0 +1,53 @@
+/* Login parity: preserve the real authentication flow while matching the preview's quieter, product-first split layout. */
+.login-preview-parity {
+  width: 100%;
+}
+
+.login-preview-parity .login-marketing {
+  max-width: 32rem;
+}
+
+.login-preview-parity .login-marketing h1 {
+  max-width: 30rem;
+  margin-top: 2rem;
+  font-size: 32px;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+}
+
+.login-preview-parity .login-marketing p {
+  max-width: 30rem;
+  line-height: 1.6;
+}
+
+.login-preview-parity .login-card {
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 12px 32px -20px rgba(15, 23, 42, 0.28);
+}
+
+.login-preview-parity .login-card h1 {
+  font-size: 24px;
+  line-height: 32px;
+}
+
+@media (max-width: 1023px) {
+  .login-preview-parity .login-marketing h1 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 767px) {
+  .login-preview-parity {
+    padding-block: 32px;
+  }
+
+  .login-preview-parity .login-marketing h1 {
+    margin-top: 1.5rem;
+    font-size: 28px;
+  }
+
+  .login-preview-parity .login-card {
+    padding: 22px;
+  }
+}
