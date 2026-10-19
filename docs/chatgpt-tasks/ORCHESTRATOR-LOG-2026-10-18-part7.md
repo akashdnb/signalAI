@@ -50,3 +50,12 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - GitHub compare is 3 commits ahead / 0 behind; the application diff is exactly the new scoped stylesheet plus its App import. The third commit is the required safe read-modify-write orchestrator bookkeeping.
 - BrowserMCP `browser_worker_list_tools` and `browser_status` were called before hosted Playwright. The worker was online; preview and production were rendered at the matched viewport. No browser interaction modified application data. No preview/production tabs were left open by this run.
 - Build/lint/test/CI were not run in this runtime; no green verification is claimed. No merge or deployment was performed. `main` was not modified.
+
+## 2026-10-19 07:31 UTC — [Independent VM Agent] Settings Notifications parity refinement
+
+- Fresh GitHub reconciliation confirmed the latest foundation HEAD remains `24ca13032d6588d0ca430990ae02e9f73056bd1e`; open PRs cover the other current Settings presentation slices (General, Team & access, Billing, Guardrails, Appearance, Profile, Scoring, and Lead fields), while issue #149 remains the Analytics backend/product decision. The current foundation `SettingsNotificationsPage.tsx` was inspected before editing.
+- The live preview Notifications screen was rendered in light mode through the approved preview URL. It uses a compact four-row preference hierarchy with simple checkboxes and concise descriptions; the production screen must retain its richer six-event API-driven in-app/email matrix and recipient semantics.
+- Child branch `style/settings-notifications-preview-parity-20261019` starts exactly from foundation `24ca13032d6588d0ca430990ae02e9f73056bd1e` and changes only `client/src/styles/settings-notifications-parity.css` plus this bookkeeping entry.
+- The focused source change flattens the production notification rows and channel controls into a divider-based, scan-first hierarchy closer to the preview, while preserving the existing real channel availability, disabled/unavailable states, recipient copy, save flow, and responsive collapse.
+- BrowserMCP `browser_worker_list_tools` and `browser_status` were called before rendered inspection; hosted Playwright was online. The approved preview URL was opened and inspected in light mode. No production interaction was performed because an authenticated production comparison was not available through the approved session.
+- No build/lint/test/CI run is claimed in this runtime. No merge, deployment, or `main` change was performed.
