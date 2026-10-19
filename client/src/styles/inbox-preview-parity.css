@@ -1,0 +1,84 @@
+/* Inbox parity — compact, scan-first conversation workspace while preserving the live operational model. */
+.page.page-workspace .inbox-layout {
+  min-height: 0;
+  background: var(--card-bg);
+}
+
+.page.page-workspace .inbox-layout > .inbox-conversation-list {
+  width: 220px;
+  flex: 0 0 220px;
+}
+
+.page.page-workspace .inbox-layout > .inbox-thread-pane {
+  min-width: 0;
+}
+
+.page.page-workspace .inbox-layout > .inbox-details-pane {
+  width: 216px;
+  flex: 0 0 216px;
+}
+
+.page.page-workspace .inbox-conversation-list > div:first-child {
+  padding: .65rem .7rem;
+  gap: .2rem;
+}
+
+.page.page-workspace .inbox-conversation-list > div:nth-child(2) {
+  padding: 0 .7rem .7rem;
+}
+
+.page.page-workspace .inbox-conversation-list .list-item-button {
+  min-height: 0;
+  padding: .7rem .65rem;
+}
+
+.page.page-workspace .inbox-conversation-list .inbox-conversation-body {
+  min-width: 0;
+}
+
+.page.page-workspace .inbox-conversation-list .inbox-conversation-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.page.page-workspace .inbox-thread-pane .inbox-thread-header {
+  padding: .8rem .9rem;
+}
+
+.page.page-workspace .inbox-thread-pane .inbox-post-context {
+  padding: .65rem .75rem;
+}
+
+.page.page-workspace .inbox-details-pane .inbox-details {
+  padding: .8rem;
+}
+
+.page.page-workspace .inbox-details-pane .inbox-detail-row {
+  padding: .65rem 0;
+}
+
+@media (max-width: 900px) {
+  .page.page-workspace .inbox-layout > .inbox-conversation-list {
+    width: 280px;
+    flex-basis: 280px;
+  }
+
+  .page.page-workspace .inbox-layout > .inbox-details-pane {
+    width: 248px;
+    flex-basis: 248px;
+  }
+}
+
+@media (max-width: 760px) {
+  .page.page-workspace .inbox-layout > .inbox-conversation-list,
+  .page.page-workspace .inbox-layout > .inbox-details-pane {
+    width: auto;
+    flex-basis: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page.page-workspace .inbox-layout * { transition: none !important; }
+}
