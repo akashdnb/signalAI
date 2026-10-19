@@ -6,6 +6,7 @@ import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
 import "./styles/settings-notifications-parity.css";
 import "./styles/settings-profile-parity.css";
+import "./styles/lead-detail-parity.css";
 import "./styles/workspace-settings-preview.css";
 import { loadSession } from "./api";
 
@@ -118,7 +119,7 @@ function RedirectToSettingsSection({ section }: { section: string }) {
 
 function HomeRedirect() {
   const session = loadSession();
-  return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
+  return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} />;
 }
 
 export default function App() {
