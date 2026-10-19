@@ -107,7 +107,10 @@ const InvitationAcceptPage = lazy(() =>
 
 function PageLoadingFallback() {
   return (
-    <div role="status" className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle">
+    <div
+      role="status"
+      className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle"
+    >
       Loading page…
     </div>
   );
