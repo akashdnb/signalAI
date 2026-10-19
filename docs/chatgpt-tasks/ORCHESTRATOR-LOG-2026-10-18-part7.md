@@ -19,3 +19,12 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 07:31 UTC — [Independent VM Agent] Settings Notifications parity refinement
+
+- Fresh GitHub reconciliation confirmed the latest foundation HEAD remains `24ca13032d6588d0ca430990ae02e9f73056bd1e`; open PRs cover the other current Settings presentation slices (General, Team & access, Billing, Guardrails, Appearance, Profile, Scoring, and Lead fields), while issue #149 remains the Analytics backend/product decision. The current foundation `SettingsNotificationsPage.tsx` was inspected before editing.
+- The live preview Notifications screen was rendered in light mode through the approved preview URL. It uses a compact four-row preference hierarchy with simple checkboxes and concise descriptions; the production screen must retain its richer six-event API-driven in-app/email matrix and recipient semantics.
+- Child branch `style/settings-notifications-preview-parity-20261019` starts exactly from foundation `24ca13032d6588d0ca430990ae02e9f73056bd1e` and changes only `client/src/styles/settings-notifications-parity.css` plus this bookkeeping entry.
+- The focused source change flattens the production notification rows and channel controls into a divider-based, scan-first hierarchy closer to the preview, while preserving the existing real channel availability, disabled/unavailable states, recipient copy, save flow, and responsive collapse.
+- BrowserMCP `browser_worker_list_tools` and `browser_status` were called before rendered inspection; hosted Playwright was online. The approved preview URL was opened and inspected in light mode. No production interaction was performed because an authenticated production comparison was not available through the approved session.
+- No build/lint/test/CI run is claimed in this runtime. No merge, deployment, or `main` change was performed.
