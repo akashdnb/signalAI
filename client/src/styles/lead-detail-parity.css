@@ -57,12 +57,12 @@
 }
 
 .page-lead-detail .lead-detail-main,
-.page-lead-detail .lead-detail-sidebar {
+.page-lead-detail .lead-detail-aside {
   min-width: 0;
 }
 
 .page-lead-detail .lead-detail-main > .card,
-.page-lead-detail .lead-detail-sidebar > .card {
+.page-lead-detail .lead-detail-aside > .card {
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card-bg);
@@ -70,19 +70,19 @@
 }
 
 .page-lead-detail .lead-detail-main > .card + .card,
-.page-lead-detail .lead-detail-sidebar > .card + .card {
+.page-lead-detail .lead-detail-aside > .card + .card {
   margin-top: 1rem;
 }
 
 .page-lead-detail .lead-detail-main > .card h2,
-.page-lead-detail .lead-detail-sidebar > .card h2 {
+.page-lead-detail .lead-detail-aside > .card h2 {
   margin-top: 0;
   font-size: 1rem;
   letter-spacing: -.012em;
 }
 
 .page-lead-detail .lead-detail-main > .card > h2,
-.page-lead-detail .lead-detail-sidebar > .card > h2 {
+.page-lead-detail .lead-detail-aside > .card > h2 {
   margin-bottom: .85rem;
 }
 
