@@ -19,3 +19,12 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 00:15 UTC — [Independent VM Agent] Lead fields compact parity
+
+- Fresh foundation/open-work reconciliation confirmed Lead Detail remains covered by PR #157, Analytics remains blocked by product/backend decision issue #149, and no open implementation PR covers Settings → Lead fields.
+- Re-read the current foundation Settings fields source and shared UI guidance before editing. The production screen already preserves the real tenant-scoped field-definition API, create/delete workflows, and truthful live data.
+- On child branch `style/settings-fields-compact-parity-20261019` from foundation `24ca13032d6588d0ca430990ae02e9f73056bd1e`, changed only `client/src/styles/settings-fields-parity.css` plus this bookkeeping entry.
+- The focused change removes the per-row rounded/card treatment and restores a compact divider-based table hierarchy: business-facing Label remains primary, Technical key remains secondary, and Type/Remove remain quiet. This is intended to better match the preview's scan-first list without copying preview sample data or changing production behavior.
+- BrowserMCP hosted Playwright preflight was attempted (`browser_worker_list_tools`, `browser_status`) but the non-interactive runtime rejected both with `User input required`; no rendered verification is claimed and no browser tabs were opened.
+- Build/lint/test/CI were not available in this runtime; no green verification is claimed. No merge, deploy, or `main` change was performed.
