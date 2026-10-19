@@ -122,17 +122,20 @@ export function SettingsProfilePage() {
       ) : (
         <form className="settings-form" onSubmit={(event) => void saveProfile(event)}>
           <div className="settings-form-grid">
-            <Field label="First name" htmlFor="profile-first-name">
-              <TextInput id="profile-first-name" value={firstName} maxLength={80} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" />
-            </Field>
-            <Field label="Last name" htmlFor="profile-last-name">
-              <TextInput id="profile-last-name" value={lastName} maxLength={80} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" />
+            <Field label="Display name" htmlFor="profile-display-name" hint="Shown to teammates across SignalAI.">
+              <TextInput id="profile-display-name" value={displayName} readOnly aria-readonly="true" />
             </Field>
             <Field label="Email address" htmlFor="profile-email" hint="Managed by your sign-in identity provider.">
               <TextInput id="profile-email" value={email} readOnly aria-readonly="true" />
             </Field>
             <Field label="Workspace role" htmlFor="profile-role" hint={role ? "Your workspace membership controls this role." : "Workspace role is unavailable until membership data loads."}>
               <TextInput id="profile-role" value={role ? formatRole(role) : "—"} readOnly aria-readonly="true" />
+            </Field>
+            <Field label="First name" htmlFor="profile-first-name">
+              <TextInput id="profile-first-name" value={firstName} maxLength={80} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" />
+            </Field>
+            <Field label="Last name" htmlFor="profile-last-name">
+              <TextInput id="profile-last-name" value={lastName} maxLength={80} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" />
             </Field>
           </div>
 

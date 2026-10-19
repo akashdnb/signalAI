@@ -1,0 +1,31 @@
+/* Settings → Team & access parity: retain the production workspace controls,
+ * but use the preview's compact member/permissions hierarchy and spacing. */
+.page-team { display: flex; flex-direction: column; gap: 16px; max-width: 1180px; margin-inline: auto; }
+.page-team > .card { margin: 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; padding: 20px 0 0; }
+.page-team > .card:first-of-type { border-top: 0; padding-top: 0; }
+.page-team > .card h2 { margin: 0 0 4px; font-size: 18px; line-height: 26px; font-weight: 600; letter-spacing: -.012em; }
+.page-team > .card > .mb-4.border-b { margin-bottom: 14px; padding-bottom: 12px; border-color: var(--border); }
+.page-team > .card > .mb-4.border-b h2 { margin-bottom: 4px; }
+.page-team > .card > .mb-4.border-b p,
+.page-team > .card > .mb-4.flex { color: var(--text-muted); }
+.page-team > .card > .mb-4.flex { margin-bottom: 12px; padding-bottom: 12px; border-color: var(--border); }
+.page-team .list { margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.page-team .list-item { min-height: 64px; margin: 0; padding: 12px 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.page-team .list-item:last-child { border-bottom: 0; }
+.page-team .team-permissions-table { width: 100%; min-width: 620px; margin: 0; border-collapse: collapse; }
+.page-team .team-permissions-table th,
+.page-team .team-permissions-table td { padding: 11px 12px; border-bottom: 1px solid var(--border); font-size: 13px; line-height: 18px; }
+.page-team .team-permissions-table thead th { background: var(--pill-bg); color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.page-team .team-permissions-table tbody th { color: var(--text); font-weight: 600; text-align: left; }
+.page-team .team-permissions-table tbody td { color: var(--text-muted); }
+.page-team .team-permission-limited { color: var(--text-muted); }
+.page-team .team-permissions-note { max-width: 960px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.page-team .inline-form { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--pill-bg); }
+.page-team .banner { margin: 0; }
+@media (max-width: 760px) {
+  .page-team { gap: 14px; }
+  .page-team > .card { padding-top: 16px; }
+  .page-team .list-item { align-items: flex-start; gap: 10px; }
+  .page-team .inline-form { grid-template-columns: 1fr; }
+  .page-team .team-permissions-table { min-width: 560px; }
+}
