@@ -1,0 +1,50 @@
+/* Automation list dark-theme parity: status badges currently use fixed light Tailwind swatches. Keep the existing light appearance, but map those badges to SignalAI semantic tokens when the app is dark. */
+:root[data-theme="dark"] .page-automation [class*="bg-[#FEF3C7]"] {
+  background: var(--warn-bg);
+}
+
+:root[data-theme="dark"] .page-automation [class*="text-[#92400E]"] {
+  color: var(--warn-text);
+}
+
+:root[data-theme="dark"] .page-automation [class*="bg-[#D1FAE5]"] {
+  background: var(--ok-bg);
+}
+
+:root[data-theme="dark"] .page-automation [class*="text-[#047857]"] {
+  color: var(--ok-text);
+}
+
+:root[data-theme="dark"] .page-automation [class*="bg-[#E2E8F0]"] {
+  background: var(--pill-bg);
+}
+
+:root[data-theme="dark"] .page-automation [class*="text-[#475569]"] {
+  color: var(--text-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .page-automation [class*="bg-[#FEF3C7]"] {
+    background: var(--warn-bg);
+  }
+
+  :root:not([data-theme="light"]) .page-automation [class*="text-[#92400E]"] {
+    color: var(--warn-text);
+  }
+
+  :root:not([data-theme="light"]) .page-automation [class*="bg-[#D1FAE5]"] {
+    background: var(--ok-bg);
+  }
+
+  :root:not([data-theme="light"]) .page-automation [class*="text-[#047857]"] {
+    color: var(--ok-text);
+  }
+
+  :root:not([data-theme="light"]) .page-automation [class*="bg-[#E2E8F0]"] {
+    background: var(--pill-bg);
+  }
+
+  :root:not([data-theme="light"]) .page-automation [class*="text-[#475569]"] {
+    color: var(--text-muted);
+  }
+}
