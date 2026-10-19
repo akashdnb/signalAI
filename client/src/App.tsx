@@ -119,7 +119,7 @@ function RedirectToSettingsSection({ section }: { section: string }) {
 
 function HomeRedirect() {
   const session = loadSession();
-  return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} />;
+  return <Navigate to={session ? `/dashboard/${session.tenantId}` : "/login"} replace />;
 }
 
 export default function App() {
