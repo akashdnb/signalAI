@@ -1,0 +1,101 @@
+/* Settings → Guardrails parity: compact operator hierarchy shared by AI behavior, forbidden topics, and escalation. */
+.settings-guardrails-panel {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.settings-guardrails-panel > h2 {
+  margin: 0;
+  padding: 18px 20px 3px;
+  border-top: 0;
+  font-size: 18px;
+  line-height: 26px;
+  letter-spacing: -.012em;
+}
+
+.settings-guardrails-panel > h2 + p {
+  margin: 0;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.settings-guardrails-panel > label {
+  display: block;
+  margin: 0 !important;
+  padding: 14px 20px 0;
+}
+
+.settings-guardrails-panel > label > span {
+  display: block;
+  margin-bottom: 6px !important;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+}
+
+.settings-guardrails-panel > label textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+}
+
+.settings-guardrails-panel > .muted.small.mt-2 {
+  margin: 8px 20px 0 !important;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-guardrails-panel > .banner {
+  margin: 12px 20px 0;
+}
+
+.settings-guardrails-panel > .mt-3.rounded-lg {
+  margin: 14px 20px 0 !important;
+}
+
+.settings-guardrails-panel > .btn-primary {
+  margin: 14px 20px 20px !important;
+}
+
+.settings-guardrails-panel > .mt-3.rounded-lg + .btn-primary {
+  margin-top: 12px !important;
+}
+
+.settings-guardrails-panel > p.muted:not(.mt-2) {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .settings-guardrails-panel > h2 {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .settings-guardrails-panel > h2 + p,
+  .settings-guardrails-panel > label {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .settings-guardrails-panel > .muted.small.mt-2 {
+    margin-left: 16px !important;
+    margin-right: 16px !important;
+  }
+
+  .settings-guardrails-panel > .banner,
+  .settings-guardrails-panel > .mt-3.rounded-lg {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .settings-guardrails-panel > .btn-primary {
+    margin-left: 16px !important;
+    margin-right: 16px !important;
+  }
+}
