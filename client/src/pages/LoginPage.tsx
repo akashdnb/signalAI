@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { API_BASE_URL, ApiError, exchangeGoogleHandoff, requestOtp, saveSession, verifyOtp } from "../api";
 import { InboxIcon } from "../components/icons";
 import { Logo } from "../components/Logo";
+import "../styles/login-preview-parity.css";
 
 const VERIFY_ERROR_MESSAGES: Record<string, string> = {
   invalid_or_expired_code: "That code is incorrect or has expired. Please check your inbox for the latest code.",
@@ -76,7 +77,7 @@ function SsoButton({
 
 function MarketingColumn() {
   return (
-    <div className="max-w-lg">
+    <div className="max-w-lg login-marketing">
       <Logo size="md" />
       <h1 className="mt-8 text-4xl font-extrabold leading-tight text-ink">
         Turn Instagram enquiries into <span className="text-accent">qualified customers</span>
@@ -101,11 +102,11 @@ function MarketingColumn() {
 
 function LoginLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="relative min-h-screen login-preview-parity" style={{ background: "var(--bg)" }}>
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-14 px-6 py-16 lg:flex-row lg:items-center">
         <MarketingColumn />
         <div className="w-full max-w-sm shrink-0">
-          <div className="rounded-2xl border border-line bg-card p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.25)]">
+          <div className="rounded-2xl border border-line bg-card p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.25)] login-card">
             {children}
           </div>
         </div>
