@@ -1,0 +1,31 @@
+/* Settings → Appearance parity: keep real theme/palette persistence while matching the preview's compact choice hierarchy. */
+.settings-appearance-panel { padding: 0 !important; overflow: hidden; }
+.settings-appearance-panel .settings-panel-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+.settings-appearance-panel .settings-panel-header h2 { margin: 2px 0 3px; font-size: 18px; line-height: 26px; letter-spacing: -.012em; }
+.settings-appearance-panel .settings-panel-header p { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 21px; }
+.settings-appearance-panel .settings-appearance-section { padding: 18px 20px 20px; border-bottom: 1px solid var(--border); }
+.settings-appearance-panel .settings-appearance-section:last-child { border-bottom: 0; }
+.settings-appearance-panel .settings-appearance-section h3 { margin: 0; font-size: 16px; line-height: 22px; }
+.settings-appearance-panel .settings-appearance-section > .muted { margin: 3px 0 12px; font-size: 13px; line-height: 19px; }
+.settings-appearance-panel .settings-theme-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.settings-appearance-panel .settings-choice-card,
+.settings-appearance-panel .settings-palette-card { min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--card-bg); color: var(--text); text-align: left; }
+.settings-appearance-panel .settings-choice-card { min-height: 64px; }
+.settings-appearance-panel .settings-palette-card { min-height: 64px; }
+.settings-appearance-panel .settings-choice-card.is-selected,
+.settings-appearance-panel .settings-palette-card.is-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card-bg)); }
+.settings-appearance-panel .settings-choice-card:hover,
+.settings-appearance-panel .settings-palette-card:hover { background: var(--surface-hover, var(--card-bg)); }
+.settings-appearance-panel .settings-choice-icon { width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); }
+.settings-appearance-panel .settings-choice-icon svg { width: 16px; height: 16px; }
+.settings-appearance-panel .settings-choice-card.is-selected .settings-choice-icon { border-color: var(--accent); color: var(--accent); }
+.settings-appearance-panel .settings-choice-title { display: block; font-size: 13px; line-height: 18px; font-weight: 700; }
+.settings-appearance-panel .settings-choice-description { display: block; margin-top: 1px; color: var(--text-muted); font-size: 11px; line-height: 15px; }
+.settings-appearance-panel .settings-choice-check { width: 16px; height: 16px; margin-left: auto; flex: 0 0 auto; color: var(--accent); }
+.settings-appearance-panel .settings-palette-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.settings-appearance-panel .settings-palette-swatches { display: grid; grid-template-columns: repeat(2, 18px); width: 38px; flex: 0 0 auto; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; }
+.settings-appearance-panel .settings-palette-swatches span { display: block; width: 18px; height: 28px; }
+@media (max-width: 760px) {
+  .settings-appearance-panel .settings-theme-grid,
+  .settings-appearance-panel .settings-palette-grid { grid-template-columns: 1fr; }
+}
