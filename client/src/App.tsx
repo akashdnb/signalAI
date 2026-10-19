@@ -8,6 +8,7 @@ import "./styles/settings-notifications-parity.css";
 import "./styles/settings-profile-parity.css";
 import "./styles/settings-billing-parity.css";
 import "./styles/settings-guardrails-parity.css";
+import "./styles/settings-team-parity.css";
 import "./styles/lead-detail-parity.css";
 import "./styles/workspace-settings-preview.css";
 import "./styles/automation-dark-parity.css";
