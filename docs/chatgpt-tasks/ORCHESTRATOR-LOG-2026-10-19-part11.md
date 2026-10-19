@@ -75,3 +75,26 @@ Continues [ORCHESTRATOR-LOG-2026-10-19-part10.md](./ORCHESTRATOR-LOG-2026-10-19-
 - Open issue **#149** remains **NEEDS DECISION** for canonical Analytics date-range/account-filter backend semantics; no frontend-only semantic workaround was invented.
 - Verification: GitHub-only repository/ref/PR/issue/file refresh completed. No local build/lint/typecheck/test execution or CI result is available in this runtime; no green verification was claimed. No application source mutation was justified for #195.
 - Merge readiness: **#195 is not recommended for merge yet** because the required full-diff/source and executable verification review is incomplete. No other-shard merge recommendation was changed. No merge, deployment, force-push, or `main` write performed. Migration remains in progress and is not declared finished.
+
+## 2026-10-20 03:04 IST — [Hourly PR Queue Coordinator + Repair Shard 0/3] deterministic backlog pass
+
+- Refreshed foundation HEAD at start of run: `96ef7988d3cf2d3a9760f00ff3609bcd3876b77a`.
+- Dynamically refreshed open PRs targeting `feat/preview-to-production-foundation`: **#196, #195, #194, #193, #184, #158**. Stable modulo ownership: #196 → shard 1, #195 → shard 0, #194 → shard 2, #193 → shard 1, #184 → shard 1, #158 → shard 2.
+- Assigned PR **#195** was re-read at current metadata state: head `baabb31ad23dcf6a73f550faafa3e8beb1e40d52`, base `96ef7988d3cf2d3a9760f00ff3609bcd3876b77a`, GitHub reports `mergeable=true`, 2 commits / 1 changed file / +28/-9. The effective diff is documentation-only; its earlier Settings → Scoring source audit found no concrete source defect and preserves production's richer tenant/account-backed scoring behavior. No mutation is justified this run.
+- New PR **#196** is shard 1, not owned by shard 0. High-level review shows it is an application fix for the documented Lead Detail regression: canonical UUID routes remain direct; non-UUID legacy identifiers are resolved through tenant-scoped `api.getLeads` with exact case-insensitive username matching, then redirected to the canonical UUID. GitHub reports `mergeable=true`, head `8e5ce1bded298fbbc7d25f5b2283122e42f8aa12`, base `96ef7988d3cf2d3a9760f00ff3609bcd3876b77a`. Its branch was not modified by shard 0.
+- Queue status table (current open foundation PRs):
+
+| PR | Shard | State | Blocker | Last-reviewed head SHA |
+|---|---:|---|---|---|
+| #196 | 1 | needs review | owner shard must complete full source/verification review; no local build/lint/typecheck/test available here | `8e5ce1bded298fbbc7d25f5b2283122e42f8aa12` |
+| #195 | 0 | ready | docs-only; GitHub mergeable; local build/lint/typecheck/test unavailable | `baabb31ad23dcf6a73f550faafa3e8beb1e40d52` |
+| #194 | 2 | ready | docs-only; owner shard merge coordination | `e40aecc1fa2e160af574894fba134ecd84111491` |
+| #193 | 1 | ready | docs-only; owner shard merge coordination | `7b9689b233de4fc04553fb9edf449dc9c0196adb` |
+| #184 | 1 | blocked | stale docs-only log overlap; safe current-base reconciliation required | `8c8cd090862d84aec5bb9c2066399358fcad6a30` |
+| #158 | 2 | blocked | stale docs-only log overlap; safe current-base reconciliation required | `212d1adf388ae88a878fcb92a3f6b5a4700edf14` |
+
+- Repository guidance was refreshed from `AGENTS.md`, `DESIGN.md`, and `client/src/components/ui/README.md`; the current rules require preserving real API/data/permission semantics, both themes, accessibility, responsive behavior, existing tokens/primitives, legacy/Tailwind compatibility, and truthful verification. `DESIGN.md` confirms the light-first + supported dark theme and product-specific operational UI direction. `client/src/components/ui/README.md` requires reuse of shared primitives and preserving legacy/Tailwind compatibility.
+- `GAPS.md` and numbered continuations were refreshed on the current foundation; latest numbered continuation present on this ref is **Part 12**. Part 12 still records Lead Detail as OPEN/NOT FIXED from the observed production `internal server error`, and does not authorize inventing backend semantics.
+- Open issue **#149** remains **NEEDS DECISION**: the canonical Analytics date-range/account-filter contract, including `This month`, timezone boundaries, historical funnel/revenue semantics, and account scoping, must be decided before UI controls are implemented. No frontend-only workaround was invented.
+- Verification: GitHub-only ref/PR/issue/file refresh completed. No local build/lint/typecheck/test execution or CI result is available through this runtime; no green verification was claimed. No shard-0 application source mutation was necessary.
+- Merge readiness: **#195 is ready for merge coordination** based on current GitHub mergeability and docs-only scope, subject to the merge coordinator's policy and unavailable executable verification. #196 remains owned by shard 1 and was not touched. No merge, deployment, force-push, or `main` write performed. Migration remains in progress and is not declared finished.
