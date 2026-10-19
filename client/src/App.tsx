@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
+import "./styles/integrations-preview-parity.css";
 import "./styles/settings-notifications-parity.css";
 import "./styles/settings-profile-parity.css";
 import "./styles/workspace-settings-preview.css";
