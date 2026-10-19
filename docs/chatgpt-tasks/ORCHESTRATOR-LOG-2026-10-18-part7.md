@@ -19,3 +19,13 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 15:55 IST — [Independent VM Agent] Journey Builder Leads parity
+
+- Fresh foundation/open-work reconciliation kept Analytics #149 as a backend/product decision and found the remaining unclaimed rendered gap in Journey Builder → Leads; current open PRs cover the other Settings, Dashboard, Content, Integrations, Inbox, Login, Lead Detail, Results, and Automation surfaces.
+- Re-read current foundation `JourneyBuilderPage.tsx`, `JourneyBuilder.tsx`, and `LeadsPanel.tsx` before editing. Production behavior remains tenant-scoped and real: goal-linked leads, pipeline filtering/search, owner assignment, captured facts, pagination, and canonical lead-detail navigation.
+- Rendered the live Precision Operations preview Journey Builder → Leads at the approved preview URL. The preview is a compact scan-first table with six columns and divider-led rows; production adds richer metrics, filters, goal/fact context, and wider card/table treatment. This is a presentation mismatch, not a reason to remove production capabilities.
+- Child branch `style/journey-builder-leads-preview-parity-20261019-v2` starts exactly from foundation `24ca13032d6588d0ca430990ae02e9f73056bd1e`.
+- The focused source change adds one scoped Leads parity stylesheet and loads it from `App.tsx`. It flattens metric/toolbar/table surfaces, uses divider-led rows and preview-like density, and preserves all production data, controls, owner editing, filters, pagination, and lead-detail links.
+- BrowserMCP hosted Playwright was online after `browser_worker_list_tools` and `browser_status`; the live preview Leads tab was rendered and inspected. The child branch is not deployed, so post-change production rendering is not claimed.
+- No CI/build/lint/test run is available through the connector in this run; no green CI claim. No merge, deployment, or `main` change was performed.
