@@ -1,0 +1,329 @@
+/* Overview parity: keep live dashboard data and actions, but use the preview's compact
+ * scan-first hierarchy, four-metric row, and balanced two-column panel grid. */
+.page-overview {
+  max-width: 1120px;
+}
+
+.page-overview .overview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .85rem;
+}
+
+.page-overview .overview-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+
+.page-overview .overview-header p {
+  max-width: 720px;
+  margin: .35rem 0 0;
+  line-height: 1.5;
+}
+
+.page-overview .overview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .65rem;
+  min-height: 42px;
+  margin-bottom: .75rem;
+}
+
+.page-overview .overview-period-select select {
+  min-height: 40px;
+  min-width: 148px;
+  padding: .45rem 2rem .45rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: .82rem;
+}
+
+.page-overview .overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+  margin-bottom: .9rem;
+}
+
+.page-overview .overview-metric {
+  min-width: 0;
+  padding: .95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+
+.page-overview .overview-metric > span,
+.page-overview .overview-metric > small {
+  display: block;
+  color: var(--text-muted);
+}
+
+.page-overview .overview-metric > span {
+  font-size: .75rem;
+  line-height: 1.25;
+}
+
+.page-overview .overview-metric > strong {
+  display: block;
+  margin-top: .25rem;
+  font-size: 1.55rem;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.page-overview .overview-metric > small {
+  margin-top: .25rem;
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+.page-overview .overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+}
+
+.page-overview .overview-panel {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: none;
+}
+
+.page-overview .overview-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .9rem;
+  padding: 1rem 1.1rem .8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-overview .overview-panel-header > div {
+  min-width: 0;
+}
+
+.page-overview .overview-eyebrow {
+  display: block;
+  margin-bottom: .18rem;
+  color: var(--text-muted);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.page-overview .overview-panel-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  letter-spacing: -.012em;
+}
+
+.page-overview .overview-panel-header p {
+  margin: .25rem 0 0;
+  font-size: .76rem;
+  line-height: 1.45;
+}
+
+.page-overview .overview-panel-header > a {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: .78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.page-overview .overview-panel-header > a:hover {
+  text-decoration: underline;
+}
+
+.page-overview .overview-panel > .chart,
+.page-overview .overview-panel > .overview-stage-list,
+.page-overview .overview-panel > .overview-actions,
+.page-overview .overview-panel > .overview-recent-list {
+  margin: 0;
+}
+
+.page-overview .overview-panel > .chart {
+  min-height: 250px;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.page-overview .overview-stage-list {
+  display: grid;
+  gap: .8rem;
+  padding: 1rem 1.1rem .65rem;
+}
+
+.page-overview .overview-stage-row {
+  display: grid;
+  grid-template-columns: minmax(76px, auto) minmax(80px, 1fr) auto auto;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+  font-size: .78rem;
+}
+
+.page-overview .overview-stage-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pill-bg);
+}
+
+.page-overview .overview-stage-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.page-overview .overview-stage-row > strong {
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.page-overview .overview-stage-percent {
+  min-width: 34px;
+  color: var(--text-muted);
+  font-size: .72rem;
+  text-align: right;
+}
+
+.page-overview .overview-reconcile {
+  margin: 0;
+  padding: .75rem 1.1rem 1rem;
+  color: var(--text-muted);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.page-overview .overview-actions {
+  display: grid;
+}
+
+.page-overview .overview-actions > a {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .7rem;
+  min-height: 66px;
+  padding: .75rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}
+
+.page-overview .overview-actions > a:last-child {
+  border-bottom: 0;
+}
+
+.page-overview .overview-actions > a:hover {
+  background: var(--pill-bg);
+}
+
+.page-overview .overview-action-number {
+  color: var(--accent);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.page-overview .overview-actions > a strong,
+.page-overview .overview-actions > a small {
+  display: block;
+}
+
+.page-overview .overview-actions > a strong {
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.page-overview .overview-actions > a small {
+  margin-top: .15rem;
+  color: var(--text-muted);
+  font-size: .7rem;
+  line-height: 1.4;
+}
+
+.page-overview .overview-actions > a > span:last-child {
+  color: var(--text-muted);
+}
+
+.page-overview .overview-recent-list {
+  padding: 0;
+}
+
+.page-overview .overview-recent-list .list-item {
+  margin: 0;
+  padding: .7rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-overview .overview-recent-list .list-item:last-child {
+  border-bottom: 0;
+}
+
+.page-overview .overview-recent-list .list-item:hover {
+  background: var(--pill-bg);
+}
+
+.page-overview .overview-definitions-link {
+  display: inline-flex;
+  margin-top: .8rem;
+  padding: .25rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.page-overview .overview-definitions {
+  margin-top: .35rem;
+  padding: .85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  font-size: .75rem;
+  line-height: 1.5;
+}
+
+.page-overview .overview-definitions p {
+  margin: .3rem 0 0;
+}
+
+@media (max-width: 1000px) {
+  .page-overview .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .page-overview { max-width: none; }
+  .page-overview .overview-header { flex-direction: column; margin-bottom: .65rem; }
+  .page-overview .overview-header h1 { font-size: 1.65rem; }
+  .page-overview .overview-toolbar { justify-content: flex-start; }
+  .page-overview .overview-grid { grid-template-columns: 1fr; }
+  .page-overview .overview-panel-header { padding-inline: .9rem; }
+  .page-overview .overview-actions > a,
+  .page-overview .overview-recent-list .list-item { padding-inline: .9rem; }
+}
+
+@media (max-width: 480px) {
+  .page-overview .overview-metrics { grid-template-columns: 1fr; }
+  .page-overview .overview-stage-row { grid-template-columns: minmax(68px, auto) minmax(60px, 1fr) auto; }
+  .page-overview .overview-stage-percent { display: none; }
+}
