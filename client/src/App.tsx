@@ -5,6 +5,7 @@ import "./styles/app-shell-phase2.css";
 import "./styles/core-screens-phase4.css";
 import "./styles/product-polish-phase5.css";
 import "./styles/settings-appearance-parity.css";
+import "./styles/inbox-parity.css";
 import "./styles/settings-notifications-parity.css";
 import "./styles/settings-profile-parity.css";
 import "./styles/settings-billing-parity.css";
@@ -106,10 +107,7 @@ const InvitationAcceptPage = lazy(() =>
 
 function PageLoadingFallback() {
   return (
-    <div
-      role="status"
-      className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle"
-    >
+    <div role="status" className="flex min-h-24 items-center justify-center px-4 py-8 text-sm text-subtle">
       Loading page…
     </div>
   );
