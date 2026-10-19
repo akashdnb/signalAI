@@ -1,0 +1,105 @@
+.page-lead-detail {
+  max-width: 1180px;
+}
+
+.page-lead-detail .lead-detail-heading {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+
+.page-lead-detail .lead-detail-tabs {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+  margin: .35rem 0 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-lead-detail .lead-detail-tab {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: .7rem .9rem .62rem;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.page-lead-detail .lead-detail-tab:hover {
+  color: var(--text);
+}
+
+.page-lead-detail .lead-detail-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+
+.page-lead-detail .lead-detail-tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.page-lead-detail .lead-detail-tab-panel {
+  outline: none;
+}
+
+.page-lead-detail .lead-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.page-lead-detail .lead-detail-main,
+.page-lead-detail .lead-detail-aside {
+  min-width: 0;
+}
+
+.page-lead-detail .lead-detail-main > .card,
+.page-lead-detail .lead-detail-aside > .card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.page-lead-detail .lead-detail-main > .card + .card,
+.page-lead-detail .lead-detail-aside > .card + .card {
+  margin-top: 1rem;
+}
+
+.page-lead-detail .lead-detail-main > .card h2,
+.page-lead-detail .lead-detail-aside > .card h2 {
+  margin-top: 0;
+  font-size: 1rem;
+  letter-spacing: -.012em;
+}
+
+.page-lead-detail .lead-detail-main > .card > h2,
+.page-lead-detail .lead-detail-aside > .card > h2 {
+  margin-bottom: .85rem;
+}
+
+@media (max-width: 900px) {
+  .page-lead-detail .lead-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-lead-detail .lead-detail-tabs {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .page-lead-detail .lead-detail-tab {
+    flex: 0 0 auto;
+    padding-inline: .7rem;
+  }
+}
