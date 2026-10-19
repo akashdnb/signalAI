@@ -1,0 +1,36 @@
+/* Integrations parity: keep the live connection controls and account data, but use the preview's compact scan-first hierarchy. */
+.integration-accounts { padding: 0 !important; overflow: hidden; }
+.integration-accounts .integration-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+.integration-accounts .integration-section-heading h2 { margin: 0 0 3px; font-size: 18px; line-height: 26px; }
+.integration-accounts .integration-section-heading p { font-size: 14px; line-height: 21px; }
+.integration-accounts .integration-section-heading > .muted { padding-top: 4px; }
+.integration-accounts > .muted[role="status"],
+.integration-accounts > .integration-empty-state { margin: 0; padding: 18px 20px 22px; }
+.integration-accounts .list { margin-top: 0 !important; padding: 0 20px; }
+.integration-accounts .integration-account-row { display: flex; align-items: flex-start; gap: 16px; padding: 15px 0; border: 0; border-top: 1px solid var(--border); background: transparent; }
+.integration-accounts .integration-account-row:first-child { border-top: 0; }
+.integration-accounts .integration-account-row > span:first-child { gap: 11px; }
+.integration-accounts .integration-account-row > span:first-child > span:first-child { width: 38px; height: 38px; border-radius: 7px; }
+.integration-accounts .integration-account-row strong { font-size: 14px; line-height: 20px; }
+.integration-accounts .integration-account-row details { color: var(--text-subtle); }
+.integration-accounts .integration-account-row details summary { font-size: 12px; }
+.integration-accounts .integration-account-row .banner-error { padding: 9px 10px; }
+.integration-accounts .integration-account-actions { align-items: center; padding-top: 1px; }
+.integration-accounts .integration-account-actions .btn-primary,
+.integration-accounts .integration-account-actions .btn-secondary { min-height: 34px; }
+.integration-empty-state { border-top: 1px solid var(--border); }
+.integration-empty-state strong { font-size: 14px; }
+.integration-empty-state p { max-width: 680px; line-height: 1.55; }
+.page-wide > section.card.flex.items-start.gap-3 { padding: 16px 18px; border-radius: 0; box-shadow: none; }
+.page-wide > section.card.flex.items-start.gap-3 + section.card.flex.items-start.gap-3 { margin-top: 12px; }
+.page-wide > section.card.flex.items-start.gap-3 h3 { font-size: 18px; line-height: 26px; }
+.page-wide > section.card.flex.items-start.gap-3 p { font-size: 14px; line-height: 21px; }
+@media (max-width: 760px) {
+  .integration-accounts .integration-section-heading { flex-direction: column; }
+  .integration-accounts .integration-account-row { flex-direction: column; gap: 11px; }
+  .integration-accounts .integration-account-actions { width: 100%; }
+  .integration-accounts .integration-account-actions > * { flex: 1 1 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .integration-accounts .integration-account-row { transition: none; }
+}

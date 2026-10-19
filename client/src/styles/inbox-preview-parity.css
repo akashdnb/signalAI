@@ -1,0 +1,84 @@
+/* Inbox parity — compact, scan-first conversation workspace while preserving the live operational model. */
+.page.page-workspace > div.flex.flex-col {
+  min-height: 0;
+  background: var(--card-bg);
+}
+
+.page.page-workspace > div.flex.flex-col > div:first-child {
+  width: 220px;
+  flex: 0 0 220px;
+}
+
+.page.page-workspace > div.flex.flex-col > div:nth-child(2) {
+  min-width: 0;
+}
+
+.page.page-workspace > div.flex.flex-col > div:nth-child(3) {
+  width: 216px;
+  flex: 0 0 216px;
+}
+
+.page.page-workspace > div.flex.flex-col > div:first-child > div:first-child {
+  padding: .65rem .7rem;
+  gap: .2rem;
+}
+
+.page.page-workspace > div.flex.flex-col > div:first-child > div:nth-child(2) {
+  padding: 0 .7rem .7rem;
+}
+
+.page.page-workspace > div.flex.flex-col > div:first-child .list-item-button {
+  min-height: 0;
+  padding: .7rem .65rem;
+}
+
+.page.page-workspace > div.flex.flex-col > div:first-child .inbox-conversation-body {
+  min-width: 0;
+}
+
+.page.page-workspace > div.flex.flex-col > div:first-child .inbox-conversation-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.page.page-workspace > div.flex.flex-col > div:nth-child(2) .inbox-thread-header {
+  padding: .8rem .9rem;
+}
+
+.page.page-workspace > div.flex.flex-col > div:nth-child(2) .inbox-post-context {
+  padding: .65rem .75rem;
+}
+
+.page.page-workspace > div.flex.flex-col > div:nth-child(3) .inbox-details {
+  padding: .8rem;
+}
+
+.page.page-workspace > div.flex.flex-col > div:nth-child(3) .inbox-detail-row {
+  padding: .65rem 0;
+}
+
+@media (max-width: 900px) {
+  .page.page-workspace > div.flex.flex-col > div:first-child {
+    width: 280px;
+    flex-basis: 280px;
+  }
+
+  .page.page-workspace > div.flex.flex-col > div:nth-child(3) {
+    width: 248px;
+    flex-basis: 248px;
+  }
+}
+
+@media (max-width: 760px) {
+  .page.page-workspace > div.flex.flex-col > div:first-child,
+  .page.page-workspace > div.flex.flex-col > div:nth-child(3) {
+    width: auto;
+    flex-basis: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page.page-workspace > div.flex.flex-col * { transition: none !important; }
+}
