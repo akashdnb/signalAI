@@ -1,0 +1,8 @@
+/* Keep the production results window explicit without inventing unsupported date-range controls. */
+.page-journey-builder .builder-results-period { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 132px; gap: 0.2rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 9px; background: var(--card-bg); }
+.page-journey-builder .builder-results-period span { color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.page-journey-builder .builder-results-period strong { color: var(--text); font-size: 13px; font-weight: 600; }
+@media (max-width: 767px) {
+  .page-journey-builder .builder-results-header { flex-direction: column; }
+  .page-journey-builder .builder-results-period { width: 100%; align-items: flex-start; }
+}
