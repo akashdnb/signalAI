@@ -19,3 +19,14 @@ Continues [ORCHESTRATOR-LOG-2026-10-18-part6.md](./ORCHESTRATOR-LOG-2026-10-18-p
 - Hosted Playwright tabs used for verification were closed; no agent-chat tabs were touched. Render still reports auto-deploy off, unchanged.
 - npm install emitted an advisory that one high-severity dependency vulnerability exists. It did not fail the build and was not auto-fixed as part of the targeted type repair; follow-up dependency audit is recommended.
 - No `main` changes were made. This entry records a successful production deploy; it does not declare the overall UI migration finished.
+
+## 2026-10-19 09:42 IST — [Independent VM Agent] Dashboard Overview parity pass
+
+- Fresh foundation HEAD remains `24ca13032d6588d0ca430990ae02e9f73056bd1e`. Required shared docs were re-read through GitHub API, including the foundation `PrecisionOperationsPreviewPage.tsx` absence and the live preview branch source.
+- Current open PR reconciliation shows Dashboard/Overview is not covered by another implementation PR. Existing Login, Lead Detail, Settings, Inbox, Leads, Results, and other PRs were treated as underway and not duplicated. Analytics issue #149 remains a product/backend decision.
+- Current foundation `DashboardPage.tsx` already preserves real analytics/funnel/revenue/timeseries/lead/campaign data, reporting-period filtering, retry/error states, account health, next actions, and metric definitions. The source defect selected was presentation hierarchy only.
+- Live preview `OverviewScreen` uses a compact four-metric row and balanced two-column panel grid with scan-first panel headers. A new scoped `dashboard-overview-parity.css` applies that hierarchy to production without copying preview sample values or changing APIs/data/permissions.
+- `App.tsx` imports only the new scoped dashboard stylesheet; no route, API, permission, or `main` changes were made.
+- Child branch: `style/dashboard-overview-preview-parity-20261019`, created directly from foundation HEAD `24ca13032d6588d0ca430990ae02e9f73056bd1e`.
+- BrowserMCP hosted-worker preflight was attempted first as required, but both `browser_worker_list_tools` and `browser_status` were rejected by the non-interactive runtime with `User input required`; no rendered browser verification is claimed and no browser tabs were opened.
+- Build/lint/test/CI were not run in this runtime; no green verification is claimed. No deployment or merge was performed.
