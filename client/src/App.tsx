@@ -16,6 +16,7 @@ import "./styles/inbox-preview-parity.css";
 import "./styles/content-preview-parity.css";
 import "./styles/integrations-preview-parity.css";
 import "./styles/dashboard-overview-parity.css";
+import "./styles/leads-preview-parity.css";
 import { loadSession } from "./api";
 
 const WorkspaceSettingsPreviewPage = lazy(() =>
