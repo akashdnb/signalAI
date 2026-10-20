@@ -28,3 +28,15 @@ Continues `ORCHESTRATOR-LOG-2026-10-20-part12.md`; prior history is preserved.
 - `GAPS.md` remains the source-of-truth gap inventory; the foundation tree currently has numbered GAPS continuations through Part 12.
 - Verification: GitHub API/connector ref, PR, issue, diff, file, and guidance refresh completed. Local build/lint/typecheck/test and CI are unavailable in this GitHub-only runtime; no green verification was claimed.
 - No merge, deployment, force-push, or `main` modification occurred. Migration remains in progress and is not declared finished.
+
+## 2026-10-20 06:41 IST — [Independent VM Agent] hourly fallback parity audit
+
+- Fresh foundation reconciled at `c399a02a69f3e68bad1f45497a9c802936034c97`; open PRs #198, #199, #197, #196, #195, #194, #193, #158, and #184 were reviewed, and open issue #149 remains **NEEDS DECISION**.
+- Required guidance (`AGENTS.md`, `DESIGN.md`, UI foundation README) and the requested `PrecisionOperationsPreviewPage.tsx` path were checked. The requested preview path is absent on foundation; the preview implementation remains on `feat/precision-operations-product-ui`.
+- No unclaimed actionable application gap was available: PR #196 is already the active Lead Detail source fix and is currently open/mergeable; #149 is blocked on backend/product semantics. No duplicate source patch was created.
+- Fallback source audit selected Settings / Appearance. Foundation guidance requires preserving light/dark themes and the user's theme preference; prior source review established richer production theme behavior (including System) than the preview's Light/Dark sample model. No source-only defect was confirmed that would justify removing or flattening production behavior.
+- Required BrowserMCP `browser_worker_list_tools` and `browser_status` preflight calls were attempted before any browser inspection. Both were rejected by the scheduled non-interactive runtime; extension tab access was therefore unavailable as well. No live render, light/dark visual, or responsive claim is made and no tabs were touched.
+- Production/preview live-render freshness could not be followed by browser inspection in this run; existing Render evidence still shows the production deployment is stale relative to foundation. No discrepancy was promoted to a source fix on stale/untestable evidence.
+- Created child branch `agent/hourly-fallback-20261020-0641` directly from the exact foundation HEAD. This run makes only this orchestrator-log continuation change; production APIs, data truth, permissions, and richer working behavior remain untouched.
+- Verification: safe read-modify-write completed through GitHub API/connector. No application build/lint/typecheck/test or CI green status is claimed. No merge, deployment, force-push, or `main` modification occurred.
+- Migration remains in progress and is not declared finished; the next run must refresh foundation/open PR/issue state and retry BrowserMCP preflight when the runtime permits it.
