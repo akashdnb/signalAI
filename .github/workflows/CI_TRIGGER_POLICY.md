@@ -1,18 +1,20 @@
 # CI Trigger Policy
 
-SignalAI CI is intentionally not run on every push.
+SignalAI server/database validation is authoritative through the RenderUtils VM CI interface (`ci_run`, `ci_status`, `ci_logs`, `ci_cancel`, `ci_list`).
 
-## Trigger policy
+## Server CI policy
 
-- CI workflows must use `workflow_dispatch` for normal execution.
-- Do not add `push` or `pull_request` triggers to CI workflows unless this policy is explicitly changed.
-- An agent may trigger the workflow explicitly after making changes that need validation.
-- A developer may trigger the workflow manually from the GitHub Actions UI.
+- Use the persistent VM's PostgreSQL installation; do not add a Docker/Postgres service to repository CI.
+- The VM CI layer creates an isolated temporary database for each CI job and supplies SignalAI's existing `DATABASE_URL` contract to that job.
+- The VM CI layer owns database cleanup and must drop the temporary database even when the job fails.
+- Project commands must consume `DATABASE_URL` as-is; they must not create a shared CI database, invent a second test-database variable, embed credentials, or print connection strings.
+- Run `bash server/scripts/ci-test.sh` from the repository root for the standard server validation sequence.
+- Forge CI is not used for SignalAI validation.
+
+## GitHub Actions
+
+GitHub Actions is intentionally not used as the authoritative server/database test runner. Keep CI-specific changes aligned with the VM CI contract above rather than reintroducing service containers or hardcoded database credentials.
 
 ## Why
 
-The repository uses agent-driven development and intentionally avoids paying the compute cost of running the full CI suite for every intermediate commit. Validation should happen at deliberate checkpoints rather than on every push.
-
-## Adding a new workflow
-
-Before adding a new workflow, decide whether it is CI. If it is CI, make it manually/agent triggered. Deployment and release workflows may have their own explicit triggers, but they must not silently turn ordinary pushes into full CI runs.
+The repository uses agent-driven development and intentionally avoids paying the compute cost of running the full server suite for every intermediate commit. Validation should happen at deliberate checkpoints through the authoritative VM CI path.
