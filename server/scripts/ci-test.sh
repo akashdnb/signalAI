@@ -8,6 +8,7 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 npm ci
 npm run typecheck
 npm run build
